@@ -13,5 +13,10 @@ export interface TradingConcept {
   category: string | null;
   /** @nullable */
   description: string | null;
+  /** @nullable */
+  detectionRules: string | null;
+  /** @nullable */
+  invalidationRules: string | null;
+  isBuiltIn: boolean;
   createdAt: Date;
 }

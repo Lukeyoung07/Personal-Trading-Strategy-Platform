@@ -37,6 +37,9 @@ export const tradingConceptsTable = pgTable("trading_concepts", {
   name: text("name").notNull(),
   category: text("category"),
   description: text("description"),
+  detectionRules: text("detection_rules"),
+  invalidationRules: text("invalidation_rules"),
+  isBuiltIn: boolean("is_built_in").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

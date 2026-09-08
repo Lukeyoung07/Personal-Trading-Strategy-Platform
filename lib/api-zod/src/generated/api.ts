@@ -200,6 +200,9 @@ export const ListConceptsResponseItem = zod.object({
   "name": zod.string(),
   "category": zod.string().nullable(),
   "description": zod.string().nullable(),
+  "detectionRules": zod.string().nullable(),
+  "invalidationRules": zod.string().nullable(),
+  "isBuiltIn": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
 export const ListConceptsResponse = zod.array(ListConceptsResponseItem)
@@ -214,7 +217,9 @@ export const ListConceptsResponse = zod.array(ListConceptsResponseItem)
 export const CreateConceptBody = zod.object({
   "name": zod.string().min(1),
   "category": zod.string().nullish(),
-  "description": zod.string().nullish()
+  "description": zod.string().nullish(),
+  "detectionRules": zod.string().nullish(),
+  "invalidationRules": zod.string().nullish()
 })
 
 export const CreateConceptResponse = zod.object({
@@ -222,6 +227,9 @@ export const CreateConceptResponse = zod.object({
   "name": zod.string(),
   "category": zod.string().nullable(),
   "description": zod.string().nullable(),
+  "detectionRules": zod.string().nullable(),
+  "invalidationRules": zod.string().nullable(),
+  "isBuiltIn": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
 
@@ -242,7 +250,9 @@ export const UpdateConceptParams = zod.object({
 export const UpdateConceptBody = zod.object({
   "name": zod.string().min(1).optional(),
   "category": zod.string().nullish(),
-  "description": zod.string().nullish()
+  "description": zod.string().nullish(),
+  "detectionRules": zod.string().nullish(),
+  "invalidationRules": zod.string().nullish()
 })
 
 export const UpdateConceptResponse = zod.object({
@@ -250,6 +260,9 @@ export const UpdateConceptResponse = zod.object({
   "name": zod.string(),
   "category": zod.string().nullable(),
   "description": zod.string().nullable(),
+  "detectionRules": zod.string().nullable(),
+  "invalidationRules": zod.string().nullable(),
+  "isBuiltIn": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
 

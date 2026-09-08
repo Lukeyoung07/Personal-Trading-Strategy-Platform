@@ -69,6 +69,66 @@ import {
 
 const router: IRouter = Router();
 
+const DEFAULT_CONCEPTS = [
+  ["MARKET STRUCTURE", "Higher High"],
+  ["MARKET STRUCTURE", "Higher Low"],
+  ["MARKET STRUCTURE", "Lower High"],
+  ["MARKET STRUCTURE", "Lower Low"],
+  ["MARKET STRUCTURE", "Break of Structure"],
+  ["MARKET STRUCTURE", "Change of Character"],
+  ["MARKET STRUCTURE", "Market Structure Shift"],
+  ["LIQUIDITY", "Buy-Side Liquidity"],
+  ["LIQUIDITY", "Sell-Side Liquidity"],
+  ["LIQUIDITY", "Liquidity Sweep"],
+  ["LIQUIDITY", "Equal Highs"],
+  ["LIQUIDITY", "Equal Lows"],
+  ["LIQUIDITY", "Previous Day High"],
+  ["LIQUIDITY", "Previous Day Low"],
+  ["LIQUIDITY", "Previous Week High"],
+  ["LIQUIDITY", "Previous Week Low"],
+  ["LIQUIDITY", "Session High"],
+  ["LIQUIDITY", "Session Low"],
+  ["FAIR VALUE / PRICE DELIVERY", "Fair Value Gap"],
+  ["FAIR VALUE / PRICE DELIVERY", "Inverse Fair Value Gap"],
+  ["FAIR VALUE / PRICE DELIVERY", "Order Block"],
+  ["FAIR VALUE / PRICE DELIVERY", "Breaker Block"],
+  ["FAIR VALUE / PRICE DELIVERY", "Mitigation Block"],
+  ["FAIR VALUE / PRICE DELIVERY", "Balanced Price Range"],
+  ["ICT / TIME-BASED", "Power of 3 / AMD"],
+  ["ICT / TIME-BASED", "Kill Zones"],
+  ["ICT / TIME-BASED", "London Session"],
+  ["ICT / TIME-BASED", "New York Session"],
+  ["ICT / TIME-BASED", "Asian Session"],
+  ["ICT / TIME-BASED", "Daily Open"],
+  ["ICT / TIME-BASED", "Weekly Open"],
+  ["TECHNICAL", "EMA"],
+  ["TECHNICAL", "SMA"],
+  ["TECHNICAL", "VWAP"],
+  ["TECHNICAL", "RSI"],
+  ["TECHNICAL", "Volume"],
+  ["TECHNICAL", "Divergence"],
+  ["TECHNICAL", "SMT Divergence"],
+] as const;
+
+async function ensureBuiltInConcepts(): Promise<void> {
+  const existing = await db
+    .select({ name: tradingConceptsTable.name })
+    .from(tradingConceptsTable)
+    .where(eq(tradingConceptsTable.isBuiltIn, true));
+  const existingNames = new Set(existing.map(({ name }) => name));
+  const missing = DEFAULT_CONCEPTS.filter(([, name]) => !existingNames.has(name)).map(([category, name]) => ({
+    category,
+    name,
+    description: null,
+    detectionRules: null,
+    invalidationRules: null,
+    isBuiltIn: true,
+  }));
+  if (missing.length > 0) {
+    await db.insert(tradingConceptsTable).values(missing);
+  }
+}
+
 const nullableNumber = (value: string | number | null | undefined): number | null =>
   value == null ? null : Number(value);
 
@@ -213,6 +273,7 @@ router.post("/strategies/:strategyId/versions", async (req, res): Promise<void> 
 });
 
 router.get("/concepts", async (_req, res): Promise<void> => {
+  await ensureBuiltInConcepts();
   res.json(ListConceptsResponse.parse(await db.select().from(tradingConceptsTable).orderBy(asc(tradingConceptsTable.name))));
 });
 

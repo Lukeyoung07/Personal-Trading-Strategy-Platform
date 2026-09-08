@@ -625,12 +625,15 @@ components:
         notes: { type: ["string", "null"] }
     TradingConcept:
       type: object
-      required: [id, name, category, description, createdAt]
+      required: [id, name, category, description, detectionRules, invalidationRules, isBuiltIn, createdAt]
       properties:
         id: { type: integer }
         name: { type: string }
         category: { type: ["string", "null"] }
         description: { type: ["string", "null"] }
+        detectionRules: { type: ["string", "null"] }
+        invalidationRules: { type: ["string", "null"] }
+        isBuiltIn: { type: boolean }
         createdAt: { type: string, format: date-time }
     TradingConceptInput:
       type: object
@@ -639,12 +642,16 @@ components:
         name: { type: string, minLength: 1 }
         category: { type: ["string", "null"] }
         description: { type: ["string", "null"] }
+        detectionRules: { type: ["string", "null"] }
+        invalidationRules: { type: ["string", "null"] }
     TradingConceptUpdate:
       type: object
       properties:
         name: { type: string, minLength: 1 }
         category: { type: ["string", "null"] }
         description: { type: ["string", "null"] }
+        detectionRules: { type: ["string", "null"] }
+        invalidationRules: { type: ["string", "null"] }
     Condition:
       type: object
       required: [id, name, type, definition, createdAt]

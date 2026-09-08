@@ -13,4 +13,8 @@ export interface TradingConceptInput {
   category?: string | null;
   /** @nullable */
   description?: string | null;
+  /** @nullable */
+  detectionRules?: string | null;
+  /** @nullable */
+  invalidationRules?: string | null;
 }

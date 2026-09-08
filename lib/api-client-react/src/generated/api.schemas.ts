@@ -121,6 +121,11 @@ export interface TradingConcept {
   category: string | null;
   /** @nullable */
   description: string | null;
+  /** @nullable */
+  detectionRules: string | null;
+  /** @nullable */
+  invalidationRules: string | null;
+  isBuiltIn: boolean;
   createdAt: string;
 }
 
@@ -131,6 +136,10 @@ export interface TradingConceptInput {
   category?: string | null;
   /** @nullable */
   description?: string | null;
+  /** @nullable */
+  detectionRules?: string | null;
+  /** @nullable */
+  invalidationRules?: string | null;
 }
 
 export interface TradingConceptUpdate {
@@ -140,6 +149,10 @@ export interface TradingConceptUpdate {
   category?: string | null;
   /** @nullable */
   description?: string | null;
+  /** @nullable */
+  detectionRules?: string | null;
+  /** @nullable */
+  invalidationRules?: string | null;
 }
 
 export interface Condition {
