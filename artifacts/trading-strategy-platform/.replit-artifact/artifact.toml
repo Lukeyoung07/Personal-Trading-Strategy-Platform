@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Trading Strategy Platform"
+description = "A broker-independent workspace for designing trading strategies, organizing concepts and market instruments, journaling trades, monitoring performance, and managing alerts without automated trading or invented market data."
+version = "1.0.0"
+id = "artifacts/trading-strategy-platform"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21584
+
+[services.development]
+run = "pnpm --filter @workspace/trading-strategy-platform run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/trading-strategy-platform", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/trading-strategy-platform/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21584"
+BASE_PATH = "/"

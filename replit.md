@@ -1,6 +1,6 @@
-# [Project name]
+# Tandem Trading Workspace
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A broker-independent workspace for designing, journaling, monitoring, and reviewing personal trading strategies without automated execution.
 
 ## Run & Operate
 
@@ -22,23 +22,32 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/trading-strategy-platform/src/App.tsx` — responsive workspace UI and route surface
+- `artifacts/trading-strategy-platform/src/index.css` — dark workspace theme and reusable visual primitives
+- `lib/api-spec/openapi.yaml` — source of truth for the typed API contract
+- `artifacts/api-server/src/routes/trading.ts` — API handlers for the trading workspace
+- `lib/db/src/schema/index.ts` — Drizzle schema for strategy, journal, market, alert, performance, and settings records
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The product is broker- and asset-class-independent: market records store user-defined asset class, venue, and symbol instead of assuming a futures, forex, or equity workflow.
+- Market monitor and alerts manage personal records only; there is no quote feed, broker connection, or automated execution path.
+- Performance is derived from closed journal trades and renders an explicit no-data state until the user records real results.
+- Backtesting is intentionally a placeholder route so it can be added later without implying simulated performance exists today.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Tandem gives a trader one quiet workspace for strategy hypotheses, reusable concepts and conditions, strategy versions, personal market lists, trade journaling, data-backed performance review, alerts, and workspace preferences.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Keep the interface professional, dark, responsive, and low-clutter.
+- Do not invent strategies, market data, performance data, broker integrations, AI, or automated trading.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- After changing `lib/api-spec/openapi.yaml`, run `pnpm --filter @workspace/api-spec run codegen`.
+- API and frontend are separate managed artifacts; restart the existing managed workflows after backend or frontend changes.
 
 ## Pointers
 

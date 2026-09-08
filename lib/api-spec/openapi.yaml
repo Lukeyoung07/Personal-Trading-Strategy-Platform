@@ -3,13 +3,31 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Broker-independent trading strategy workspace API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Workspace overview
+  - name: strategies
+    description: Strategy design and versioning
+  - name: concepts
+    description: Trading concepts
+  - name: conditions
+    description: Reusable strategy conditions
+  - name: markets
+    description: Markets and instruments
+  - name: trades
+    description: Trade journal
+  - name: performance
+    description: Performance tracking
+  - name: alerts
+    description: User-created alerts
+  - name: settings
+    description: Workspace settings
 paths:
   /healthz:
     get:
@@ -24,7 +42,508 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get workspace summary
+      responses:
+        "200":
+          description: Data-backed workspace summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /strategies:
+    get:
+      operationId: listStrategies
+      tags: [strategies]
+      summary: List strategies
+      responses:
+        "200":
+          description: Strategy list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Strategy"
+    post:
+      operationId: createStrategy
+      tags: [strategies]
+      summary: Create a strategy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyInput"
+      responses:
+        "201":
+          description: Created strategy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strategy"
+  /strategies/{strategyId}:
+    get:
+      operationId: getStrategy
+      tags: [strategies]
+      summary: Get a strategy
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+      responses:
+        "200":
+          description: Strategy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strategy"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateStrategy
+      tags: [strategies]
+      summary: Update a strategy
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyUpdate"
+      responses:
+        "200":
+          description: Updated strategy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strategy"
+    delete:
+      operationId: deleteStrategy
+      tags: [strategies]
+      summary: Delete a strategy
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+      responses:
+        "204":
+          description: Deleted
+  /strategies/{strategyId}/versions:
+    get:
+      operationId: listStrategyVersions
+      tags: [strategies]
+      summary: List strategy versions
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+      responses:
+        "200":
+          description: Version list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StrategyVersion"
+    post:
+      operationId: createStrategyVersion
+      tags: [strategies]
+      summary: Create strategy version
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyVersionInput"
+      responses:
+        "201":
+          description: Created version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategyVersion"
+  /concepts:
+    get:
+      operationId: listConcepts
+      tags: [concepts]
+      summary: List trading concepts
+      responses:
+        "200":
+          description: Concept list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TradingConcept"
+    post:
+      operationId: createConcept
+      tags: [concepts]
+      summary: Create trading concept
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradingConceptInput"
+      responses:
+        "201":
+          description: Created concept
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradingConcept"
+  /concepts/{conceptId}:
+    patch:
+      operationId: updateConcept
+      tags: [concepts]
+      summary: Update trading concept
+      parameters:
+        - $ref: "#/components/parameters/ConceptId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradingConceptUpdate"
+      responses:
+        "200":
+          description: Updated concept
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradingConcept"
+    delete:
+      operationId: deleteConcept
+      tags: [concepts]
+      summary: Delete trading concept
+      parameters:
+        - $ref: "#/components/parameters/ConceptId"
+      responses:
+        "204":
+          description: Deleted
+  /conditions:
+    get:
+      operationId: listConditions
+      tags: [conditions]
+      summary: List reusable conditions
+      responses:
+        "200":
+          description: Condition list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Condition"
+    post:
+      operationId: createCondition
+      tags: [conditions]
+      summary: Create condition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConditionInput"
+      responses:
+        "201":
+          description: Created condition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Condition"
+  /conditions/{conditionId}:
+    patch:
+      operationId: updateCondition
+      tags: [conditions]
+      summary: Update condition
+      parameters:
+        - $ref: "#/components/parameters/ConditionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConditionUpdate"
+      responses:
+        "200":
+          description: Updated condition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Condition"
+    delete:
+      operationId: deleteCondition
+      tags: [conditions]
+      summary: Delete condition
+      parameters:
+        - $ref: "#/components/parameters/ConditionId"
+      responses:
+        "204":
+          description: Deleted
+  /markets:
+    get:
+      operationId: listMarkets
+      tags: [markets]
+      summary: List markets and instruments
+      responses:
+        "200":
+          description: Market list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Market"
+    post:
+      operationId: createMarket
+      tags: [markets]
+      summary: Create market or instrument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarketInput"
+      responses:
+        "201":
+          description: Created market
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Market"
+  /markets/{marketId}:
+    patch:
+      operationId: updateMarket
+      tags: [markets]
+      summary: Update market or instrument
+      parameters:
+        - $ref: "#/components/parameters/MarketId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarketUpdate"
+      responses:
+        "200":
+          description: Updated market
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Market"
+    delete:
+      operationId: deleteMarket
+      tags: [markets]
+      summary: Delete market or instrument
+      parameters:
+        - $ref: "#/components/parameters/MarketId"
+      responses:
+        "204":
+          description: Deleted
+  /trades:
+    get:
+      operationId: listTrades
+      tags: [trades]
+      summary: List journal trades
+      responses:
+        "200":
+          description: Trade list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trade"
+    post:
+      operationId: createTrade
+      tags: [trades]
+      summary: Log a trade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradeInput"
+      responses:
+        "201":
+          description: Created trade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+  /trades/{tradeId}:
+    patch:
+      operationId: updateTrade
+      tags: [trades]
+      summary: Update journal trade
+      parameters:
+        - $ref: "#/components/parameters/TradeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradeUpdate"
+      responses:
+        "200":
+          description: Updated trade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+    delete:
+      operationId: deleteTrade
+      tags: [trades]
+      summary: Delete journal trade
+      parameters:
+        - $ref: "#/components/parameters/TradeId"
+      responses:
+        "204":
+          description: Deleted
+  /performance/summary:
+    get:
+      operationId: getPerformanceSummary
+      tags: [performance]
+      summary: Get performance summary
+      responses:
+        "200":
+          description: Data-backed performance summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceSummary"
+  /alerts:
+    get:
+      operationId: listAlerts
+      tags: [alerts]
+      summary: List alerts
+      responses:
+        "200":
+          description: Alert list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Alert"
+    post:
+      operationId: createAlert
+      tags: [alerts]
+      summary: Create an alert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertInput"
+      responses:
+        "201":
+          description: Created alert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+  /alerts/{alertId}:
+    patch:
+      operationId: updateAlert
+      tags: [alerts]
+      summary: Update alert
+      parameters:
+        - $ref: "#/components/parameters/AlertId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertUpdate"
+      responses:
+        "200":
+          description: Updated alert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alert"
+    delete:
+      operationId: deleteAlert
+      tags: [alerts]
+      summary: Delete alert
+      parameters:
+        - $ref: "#/components/parameters/AlertId"
+      responses:
+        "204":
+          description: Deleted
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get user settings
+      responses:
+        "200":
+          description: User settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update user settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSettingsUpdate"
+      responses:
+        "200":
+          description: Updated user settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
 components:
+  parameters:
+    StrategyId:
+      name: strategyId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ConceptId:
+      name: conceptId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ConditionId:
+      name: conditionId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    MarketId:
+      name: marketId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    TradeId:
+      name: tradeId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    AlertId:
+      name: alertId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +552,272 @@ components:
           type: string
       required:
         - status
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+      required: [error]
+    DashboardSummary:
+      type: object
+      required: [strategyCount, tradeCount, alertCount, conceptCount, marketCount, activeStrategyCount, hasPerformanceData]
+      properties:
+        strategyCount: { type: integer }
+        tradeCount: { type: integer }
+        alertCount: { type: integer }
+        conceptCount: { type: integer }
+        marketCount: { type: integer }
+        activeStrategyCount: { type: integer }
+        hasPerformanceData: { type: boolean }
+        latestTradeAt: { type: ["string", "null"], format: date-time }
+    Strategy:
+      type: object
+      required: [id, name, description, status, currentVersion, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        status:
+          type: string
+          enum: [draft, active, archived]
+        currentVersion: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    StrategyInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        status:
+          type: string
+          enum: [draft, active, archived]
+          default: draft
+    StrategyUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        status:
+          type: string
+          enum: [draft, active, archived]
+    StrategyVersion:
+      type: object
+      required: [id, strategyId, versionNumber, label, thesis, entryRules, exitRules, riskRules, notes, createdAt]
+      properties:
+        id: { type: integer }
+        strategyId: { type: integer }
+        versionNumber: { type: integer }
+        label: { type: ["string", "null"] }
+        thesis: { type: ["string", "null"] }
+        entryRules: { type: ["string", "null"] }
+        exitRules: { type: ["string", "null"] }
+        riskRules: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    StrategyVersionInput:
+      type: object
+      properties:
+        label: { type: ["string", "null"] }
+        thesis: { type: ["string", "null"] }
+        entryRules: { type: ["string", "null"] }
+        exitRules: { type: ["string", "null"] }
+        riskRules: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+    TradingConcept:
+      type: object
+      required: [id, name, category, description, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        category: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    TradingConceptInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        category: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+    TradingConceptUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        category: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+    Condition:
+      type: object
+      required: [id, name, type, definition, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        type: { type: string }
+        definition: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    ConditionInput:
+      type: object
+      required: [name, type]
+      properties:
+        name: { type: string, minLength: 1 }
+        type: { type: string, minLength: 1 }
+        definition: { type: ["string", "null"] }
+    ConditionUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        type: { type: string, minLength: 1 }
+        definition: { type: ["string", "null"] }
+    Market:
+      type: object
+      required: [id, assetClass, venue, symbol, description, createdAt]
+      properties:
+        id: { type: integer }
+        assetClass: { type: string }
+        venue: { type: ["string", "null"] }
+        symbol: { type: string }
+        description: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    MarketInput:
+      type: object
+      required: [assetClass, symbol]
+      properties:
+        assetClass: { type: string, minLength: 1 }
+        venue: { type: ["string", "null"] }
+        symbol: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+    MarketUpdate:
+      type: object
+      properties:
+        assetClass: { type: string, minLength: 1 }
+        venue: { type: ["string", "null"] }
+        symbol: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+    Trade:
+      type: object
+      required: [id, marketId, side, status, quantity, entryPrice, exitPrice, openedAt, closedAt, thesis, notes, createdAt]
+      properties:
+        id: { type: integer }
+        marketId: { type: ["integer", "null"] }
+        marketSymbol: { type: ["string", "null"] }
+        side:
+          type: string
+          enum: [long, short]
+        status:
+          type: string
+          enum: [planned, open, closed, cancelled]
+        quantity: { type: ["number", "null"] }
+        entryPrice: { type: ["number", "null"] }
+        exitPrice: { type: ["number", "null"] }
+        pnl: { type: ["number", "null"] }
+        openedAt: { type: ["string", "null"], format: date-time }
+        closedAt: { type: ["string", "null"], format: date-time }
+        thesis: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    TradeInput:
+      type: object
+      required: [side, status]
+      properties:
+        marketId: { type: ["integer", "null"] }
+        side:
+          type: string
+          enum: [long, short]
+        status:
+          type: string
+          enum: [planned, open, closed, cancelled]
+        quantity: { type: ["number", "null"] }
+        entryPrice: { type: ["number", "null"] }
+        exitPrice: { type: ["number", "null"] }
+        pnl: { type: ["number", "null"] }
+        openedAt: { type: ["string", "null"], format: date-time }
+        closedAt: { type: ["string", "null"], format: date-time }
+        thesis: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+    TradeUpdate:
+      type: object
+      properties:
+        marketId: { type: ["integer", "null"] }
+        side:
+          type: string
+          enum: [long, short]
+        status:
+          type: string
+          enum: [planned, open, closed, cancelled]
+        quantity: { type: ["number", "null"] }
+        entryPrice: { type: ["number", "null"] }
+        exitPrice: { type: ["number", "null"] }
+        pnl: { type: ["number", "null"] }
+        openedAt: { type: ["string", "null"], format: date-time }
+        closedAt: { type: ["string", "null"], format: date-time }
+        thesis: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+    PerformanceSummary:
+      type: object
+      required: [hasData, tradeCount, netPnl, winRate, averagePnl, largestWin, largestLoss]
+      properties:
+        hasData: { type: boolean }
+        tradeCount: { type: integer }
+        netPnl: { type: ["number", "null"] }
+        winRate: { type: ["number", "null"] }
+        averagePnl: { type: ["number", "null"] }
+        largestWin: { type: ["number", "null"] }
+        largestLoss: { type: ["number", "null"] }
+    Alert:
+      type: object
+      required: [id, name, marketId, marketSymbol, condition, threshold, status, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        marketId: { type: ["integer", "null"] }
+        marketSymbol: { type: ["string", "null"] }
+        condition: { type: string }
+        threshold: { type: ["string", "null"] }
+        status:
+          type: string
+          enum: [active, paused]
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AlertInput:
+      type: object
+      required: [name, condition]
+      properties:
+        name: { type: string, minLength: 1 }
+        marketId: { type: ["integer", "null"] }
+        condition: { type: string, minLength: 1 }
+        threshold: { type: ["string", "null"] }
+        status:
+          type: string
+          enum: [active, paused]
+          default: paused
+    AlertUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        marketId: { type: ["integer", "null"] }
+        condition: { type: string, minLength: 1 }
+        threshold: { type: ["string", "null"] }
+        status:
+          type: string
+          enum: [active, paused]
+    UserSettings:
+      type: object
+      required: [id, timezone, baseCurrency, defaultRiskUnit, compactMode, updatedAt]
+      properties:
+        id: { type: integer }
+        timezone: { type: string }
+        baseCurrency: { type: string }
+        defaultRiskUnit:
+          type: string
+          enum: [percent, amount, r]
+        compactMode: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+    UserSettingsUpdate:
+      type: object
+      properties:
+        timezone: { type: string, minLength: 1 }
+        baseCurrency: { type: string, minLength: 1 }
+        defaultRiskUnit:
+          type: string
+          enum: [percent, amount, r]
+        compactMode: { type: boolean }
 
