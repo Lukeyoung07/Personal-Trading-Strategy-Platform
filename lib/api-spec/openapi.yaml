@@ -815,7 +815,7 @@ components:
       required: [id, strategyVersionId, conceptId, conceptName, conceptCategory, stage, name, description, timeframe, direction, requirement, order, triggerRules, invalidationRules, resetBehavior, createdAt]
       properties:
         id: { type: integer }
-        strategyVersionId: { type: integer }
+        strategyVersionId: { type: ["integer", "null"] }
         conceptId: { type: integer }
         conceptName: { type: string }
         conceptCategory: { type: ["string", "null"] }

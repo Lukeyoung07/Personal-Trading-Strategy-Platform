@@ -111,7 +111,7 @@ export const marketsTable = pgTable("markets", {
 
 export const tradesTable = pgTable("trades", {
   id: serial("id").primaryKey(),
-  strategyVersionId: integer("strategy_version_id").notNull().references(() => strategyVersionsTable.id, { onDelete: "restrict" }),
+  strategyVersionId: integer("strategy_version_id").references(() => strategyVersionsTable.id, { onDelete: "restrict" }),
   marketId: integer("market_id").references(() => marketsTable.id, { onDelete: "set null" }),
   side: text("side").notNull(),
   status: text("status").notNull().default("planned"),

@@ -323,7 +323,7 @@ export const ListStrategyVersionConditionsParams = zod.object({
 
 export const ListStrategyVersionConditionsResponseItem = zod.object({
   "id": zod.number().int(),
-  "strategyVersionId": zod.number().int(),
+  "strategyVersionId": zod.number().int().nullable(),
   "conceptId": zod.number().int(),
   "conceptName": zod.string(),
   "conceptCategory": zod.string().nullable(),

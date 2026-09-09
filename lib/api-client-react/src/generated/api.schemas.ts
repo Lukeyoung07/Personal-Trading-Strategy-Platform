@@ -248,7 +248,8 @@ export const StrategyVersionConditionRequirement = {
 
 export interface StrategyVersionCondition {
   id: number;
-  strategyVersionId: number;
+  /** @nullable */
+  strategyVersionId: number | null;
   conceptId: number;
   conceptName: string;
   /** @nullable */

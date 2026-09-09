@@ -20,6 +20,7 @@ import {
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { StrategyBuilder } from '@/components/strategy-builder';
+import { StrategyLibraryPage as StrategyLibrary } from '@/components/strategy-library';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
@@ -106,7 +107,7 @@ function TradeRow({trade, onEdit, onDelete}:{trade:Trade;onEdit?:(t:Trade)=>void
 function formatDate(value?:string|null){return value?new Date(value).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'—'}
 function formatMoney(value?:number|null){return value===null||value===undefined?'—':`${value<0?'−':''}$${Math.abs(value).toFixed(2)}`}
 
-function StrategyLibrary() {
+function LegacyStrategyLibrary() {
   const q=useListStrategies(); const create=useCreateStrategy(); const update=useUpdateStrategy(); const del=useDeleteStrategy(); const qc=useQueryClient(); const [search,setSearch]=useState(''); const [modal,setModal]=useState<Strategy|null|false>(false); const [confirm,setConfirm]=useState<Strategy|null>(null);
   const rows=(q.data||[]).filter((s:Strategy)=>s.name.toLowerCase().includes(search.toLowerCase()));
   const save=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const d=new FormData(e.currentTarget);const data={name:String(d.get('name')),description:String(d.get('description')||'')||null,status:String(d.get('status')||'draft') as 'draft'|'active'|'archived'};const done=()=>{qc.invalidateQueries({queryKey:getListStrategiesQueryKey()});qc.invalidateQueries({queryKey:getGetDashboardSummaryQueryKey()});setModal(false)};modal&&typeof modal==='object'?update.mutate({strategyId:modal.id,data},{onSuccess:done}):create.mutate({data},{onSuccess:done})};

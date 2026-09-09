@@ -303,7 +303,7 @@ router.post("/strategies/:strategyId/duplicate", async (req, res): Promise<void>
   const params = GetStrategyParams.safeParse(req.params);
   const body = DuplicateStrategyBody.safeParse(req.body ?? {});
   if (!params.success || !body.success) {
-    res.status(400).json({ error: !params.success ? params.error.message : body.error.message });
+    res.status(400).json({ error: !params.success ? params.error.message : body.success ? "Invalid request body" : body.error.message });
     return;
   }
   const [source] = await db.select().from(strategiesTable).where(eq(strategiesTable.id, params.data.strategyId));
@@ -739,8 +739,8 @@ router.get("/trades", async (_req, res): Promise<void> => {
       versionNumber: strategyVersionsTable.versionNumber,
     })
     .from(tradesTable)
-    .innerJoin(strategyVersionsTable, eq(tradesTable.strategyVersionId, strategyVersionsTable.id))
-    .innerJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
+    .leftJoin(strategyVersionsTable, eq(tradesTable.strategyVersionId, strategyVersionsTable.id))
+    .leftJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
     .leftJoin(marketsTable, eq(tradesTable.marketId, marketsTable.id))
     .orderBy(desc(tradesTable.createdAt));
   res.json(
@@ -775,11 +775,11 @@ router.post("/trades", async (req, res): Promise<void> => {
       pnl: parsed.data.pnl?.toString(),
     })
     .returning();
-  const [context] = await db
+  const [context] = created.strategyVersionId ? await db
     .select({ strategyName: strategiesTable.name, versionNumber: strategyVersionsTable.versionNumber })
     .from(strategyVersionsTable)
     .innerJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
-    .where(eq(strategyVersionsTable.id, created.strategyVersionId));
+    .where(eq(strategyVersionsTable.id, created.strategyVersionId)) : [];
   res.status(201).json(
     CreateTradeResponse.parse({
       ...created,
@@ -817,11 +817,11 @@ router.patch("/trades/:tradeId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Trade not found" });
     return;
   }
-  const [context] = await db
+  const [context] = updated.strategyVersionId ? await db
     .select({ strategyName: strategiesTable.name, versionNumber: strategyVersionsTable.versionNumber })
     .from(strategyVersionsTable)
     .innerJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
-    .where(eq(strategyVersionsTable.id, updated.strategyVersionId));
+    .where(eq(strategyVersionsTable.id, updated.strategyVersionId)) : [];
   res.json(
     UpdateTradeResponse.parse({
       ...updated,
