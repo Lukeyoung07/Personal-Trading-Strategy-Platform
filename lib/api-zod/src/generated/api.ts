@@ -41,6 +41,14 @@ export const ListStrategiesResponseItem = zod.object({
   "description": zod.string().nullable(),
   "status": zod.enum(['draft', 'active', 'archived']),
   "currentVersion": zod.number().int().nullable(),
+  "marketId": zod.number().int().nullable(),
+  "marketSymbol": zod.string().nullish(),
+  "assetClass": zod.string().nullable(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "timeframes": zod.array(zod.string()),
+  "riskManagementRules": zod.string().nullable(),
+  "resetRules": zod.string().nullable(),
+  "alertRules": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -52,11 +60,19 @@ export const ListStrategiesResponse = zod.array(ListStrategiesResponseItem)
  */
 
 export const createStrategyBodyStatusDefault = `draft`;
+export const createStrategyBodyDirectionDefault = `both`;
 
 export const CreateStrategyBody = zod.object({
   "name": zod.string().min(1),
   "description": zod.string().nullish(),
-  "status": zod.enum(['draft', 'active', 'archived']).default(createStrategyBodyStatusDefault)
+  "status": zod.enum(['draft', 'active', 'archived']).default(createStrategyBodyStatusDefault),
+  "marketId": zod.number().int().nullish(),
+  "assetClass": zod.string().nullish(),
+  "direction": zod.enum(['long', 'short', 'both']).default(createStrategyBodyDirectionDefault),
+  "timeframes": zod.array(zod.string()).optional(),
+  "riskManagementRules": zod.string().nullish(),
+  "resetRules": zod.string().nullish(),
+  "alertRules": zod.string().nullish()
 })
 
 export const CreateStrategyResponse = zod.object({
@@ -65,6 +81,14 @@ export const CreateStrategyResponse = zod.object({
   "description": zod.string().nullable(),
   "status": zod.enum(['draft', 'active', 'archived']),
   "currentVersion": zod.number().int().nullable(),
+  "marketId": zod.number().int().nullable(),
+  "marketSymbol": zod.string().nullish(),
+  "assetClass": zod.string().nullable(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "timeframes": zod.array(zod.string()),
+  "riskManagementRules": zod.string().nullable(),
+  "resetRules": zod.string().nullable(),
+  "alertRules": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -86,6 +110,14 @@ export const GetStrategyResponse = zod.object({
   "description": zod.string().nullable(),
   "status": zod.enum(['draft', 'active', 'archived']),
   "currentVersion": zod.number().int().nullable(),
+  "marketId": zod.number().int().nullable(),
+  "marketSymbol": zod.string().nullish(),
+  "assetClass": zod.string().nullable(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "timeframes": zod.array(zod.string()),
+  "riskManagementRules": zod.string().nullable(),
+  "resetRules": zod.string().nullable(),
+  "alertRules": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -107,7 +139,14 @@ export const UpdateStrategyParams = zod.object({
 export const UpdateStrategyBody = zod.object({
   "name": zod.string().min(1).optional(),
   "description": zod.string().nullish(),
-  "status": zod.enum(['draft', 'active', 'archived']).optional()
+  "status": zod.enum(['draft', 'active', 'archived']).optional(),
+  "marketId": zod.number().int().nullish(),
+  "assetClass": zod.string().nullish(),
+  "direction": zod.enum(['long', 'short', 'both']).optional(),
+  "timeframes": zod.array(zod.string()).optional(),
+  "riskManagementRules": zod.string().nullish(),
+  "resetRules": zod.string().nullish(),
+  "alertRules": zod.string().nullish()
 })
 
 export const UpdateStrategyResponse = zod.object({
@@ -116,6 +155,14 @@ export const UpdateStrategyResponse = zod.object({
   "description": zod.string().nullable(),
   "status": zod.enum(['draft', 'active', 'archived']),
   "currentVersion": zod.number().int().nullable(),
+  "marketId": zod.number().int().nullable(),
+  "marketSymbol": zod.string().nullish(),
+  "assetClass": zod.string().nullable(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "timeframes": zod.array(zod.string()),
+  "riskManagementRules": zod.string().nullable(),
+  "resetRules": zod.string().nullable(),
+  "alertRules": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -190,6 +237,193 @@ export const CreateStrategyVersionResponse = zod.object({
   "notes": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary List ordered strategy conditions
+ */
+
+
+
+export const ListStrategyConditionsParams = zod.object({
+  "strategyId": zod.coerce.number().int().min(1)
+})
+
+export const ListStrategyConditionsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "conceptId": zod.number().int(),
+  "conceptName": zod.string(),
+  "conceptCategory": zod.string().nullable(),
+  "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "timeframe": zod.string(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "requirement": zod.enum(['required', 'optional']),
+  "order": zod.number().int(),
+  "triggerRules": zod.string().nullable(),
+  "invalidationRules": zod.string().nullable(),
+  "resetBehavior": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListStrategyConditionsResponse = zod.array(ListStrategyConditionsResponseItem)
+
+
+/**
+ * @summary Add a concept-based condition to a strategy
+ */
+
+
+
+export const CreateStrategyConditionParams = zod.object({
+  "strategyId": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const createStrategyConditionBodyDirectionDefault = `both`;
+export const createStrategyConditionBodyRequirementDefault = `required`;
+
+export const CreateStrategyConditionBody = zod.object({
+  "conceptId": zod.number().int().min(1),
+  "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
+  "name": zod.string().min(1),
+  "description": zod.string().nullish(),
+  "timeframe": zod.string().min(1),
+  "direction": zod.enum(['long', 'short', 'both']).default(createStrategyConditionBodyDirectionDefault),
+  "requirement": zod.enum(['required', 'optional']).default(createStrategyConditionBodyRequirementDefault),
+  "triggerRules": zod.string().nullish(),
+  "invalidationRules": zod.string().nullish(),
+  "resetBehavior": zod.string().nullish()
+})
+
+export const CreateStrategyConditionResponse = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "conceptId": zod.number().int(),
+  "conceptName": zod.string(),
+  "conceptCategory": zod.string().nullable(),
+  "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "timeframe": zod.string(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "requirement": zod.enum(['required', 'optional']),
+  "order": zod.number().int(),
+  "triggerRules": zod.string().nullable(),
+  "invalidationRules": zod.string().nullable(),
+  "resetBehavior": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Reorder strategy conditions
+ */
+
+
+
+export const ReorderStrategyConditionsParams = zod.object({
+  "strategyId": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const ReorderStrategyConditionsBody = zod.object({
+  "conditionIds": zod.array(zod.number().int().min(1))
+})
+
+export const ReorderStrategyConditionsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "conceptId": zod.number().int(),
+  "conceptName": zod.string(),
+  "conceptCategory": zod.string().nullable(),
+  "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "timeframe": zod.string(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "requirement": zod.enum(['required', 'optional']),
+  "order": zod.number().int(),
+  "triggerRules": zod.string().nullable(),
+  "invalidationRules": zod.string().nullable(),
+  "resetBehavior": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ReorderStrategyConditionsResponse = zod.array(ReorderStrategyConditionsResponseItem)
+
+
+/**
+ * @summary Update a strategy condition
+ */
+
+
+
+
+export const UpdateStrategyConditionParams = zod.object({
+  "strategyId": zod.coerce.number().int().min(1),
+  "conditionId": zod.coerce.number().int().min(1)
+})
+
+
+
+
+
+
+export const UpdateStrategyConditionBody = zod.object({
+  "conceptId": zod.number().int().min(1).optional(),
+  "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']).optional(),
+  "name": zod.string().min(1).optional(),
+  "description": zod.string().nullish(),
+  "timeframe": zod.string().min(1).optional(),
+  "direction": zod.enum(['long', 'short', 'both']).optional(),
+  "requirement": zod.enum(['required', 'optional']).optional(),
+  "triggerRules": zod.string().nullish(),
+  "invalidationRules": zod.string().nullish(),
+  "resetBehavior": zod.string().nullish()
+})
+
+export const UpdateStrategyConditionResponse = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "conceptId": zod.number().int(),
+  "conceptName": zod.string(),
+  "conceptCategory": zod.string().nullable(),
+  "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "timeframe": zod.string(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "requirement": zod.enum(['required', 'optional']),
+  "order": zod.number().int(),
+  "triggerRules": zod.string().nullable(),
+  "invalidationRules": zod.string().nullable(),
+  "resetBehavior": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete a strategy condition
+ */
+
+
+
+
+export const DeleteStrategyConditionParams = zod.object({
+  "strategyId": zod.coerce.number().int().min(1),
+  "conditionId": zod.coerce.number().int().min(1)
+})
+
+export const DeleteStrategyConditionResponse = zod.void()
 
 
 /**

@@ -5,6 +5,7 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { StrategyDirection } from './strategyDirection';
 import type { StrategyStatus } from './strategyStatus';
 
 export interface Strategy {
@@ -15,6 +16,20 @@ export interface Strategy {
   status: StrategyStatus;
   /** @nullable */
   currentVersion: number | null;
+  /** @nullable */
+  marketId: number | null;
+  /** @nullable */
+  marketSymbol?: string | null;
+  /** @nullable */
+  assetClass: string | null;
+  direction: StrategyDirection;
+  timeframes: string[];
+  /** @nullable */
+  riskManagementRules: string | null;
+  /** @nullable */
+  resetRules: string | null;
+  /** @nullable */
+  alertRules: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

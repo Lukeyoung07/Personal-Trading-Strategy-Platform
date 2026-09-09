@@ -34,6 +34,10 @@ import type {
   NotFoundResponse,
   PerformanceSummary,
   Strategy,
+  StrategyCondition,
+  StrategyConditionInput,
+  StrategyConditionReorderInput,
+  StrategyConditionUpdate,
   StrategyInput,
   StrategyUpdate,
   StrategyVersion,
@@ -745,6 +749,374 @@ export const useCreateStrategyVersion = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateStrategyVersionMutationOptions(options));
+    }
+
+export const getListStrategyConditionsUrl = (strategyId: number,) => {
+
+
+
+
+  return `/api/strategies/${strategyId}/conditions`
+}
+
+/**
+ * @summary List ordered strategy conditions
+ */
+export const listStrategyConditions = async (strategyId: number, options?: Parameters<typeof customFetch>[1]): Promise<StrategyCondition[]> => {
+
+  return customFetch<StrategyCondition[]>(getListStrategyConditionsUrl(strategyId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStrategyConditionsQueryKey = (strategyId: number,) => {
+    return [
+    `/api/strategies/${strategyId}/conditions`
+    ] as const;
+    }
+
+
+export const getListStrategyConditionsQueryOptions = <TData = Awaited<ReturnType<typeof listStrategyConditions>>, TError = ErrorType<unknown>>(strategyId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStrategyConditions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStrategyConditionsQueryKey(strategyId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStrategyConditions>>> = ({ signal }) => listStrategyConditions(strategyId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: strategyId !== null && strategyId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStrategyConditions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListStrategyConditionsQueryResult = NonNullable<Awaited<ReturnType<typeof listStrategyConditions>>>
+export type ListStrategyConditionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List ordered strategy conditions
+ */
+
+export function useListStrategyConditions<TData = Awaited<ReturnType<typeof listStrategyConditions>>, TError = ErrorType<unknown>>(
+ strategyId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStrategyConditions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListStrategyConditionsQueryOptions(strategyId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateStrategyConditionUrl = (strategyId: number,) => {
+
+
+
+
+  return `/api/strategies/${strategyId}/conditions`
+}
+
+/**
+ * @summary Add a concept-based condition to a strategy
+ */
+export const createStrategyCondition = async (strategyId: number,
+    strategyConditionInput: StrategyConditionInput, options?: Parameters<typeof customFetch>[1]): Promise<StrategyCondition> => {
+
+  return customFetch<StrategyCondition>(getCreateStrategyConditionUrl(strategyId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(strategyConditionInput)
+  }
+);}
+
+
+
+
+
+export const getCreateStrategyConditionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStrategyCondition>>, TError,{strategyId: number;data: BodyType<StrategyConditionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createStrategyCondition>>, TError,{strategyId: number;data: BodyType<StrategyConditionInput>}, TContext> => {
+
+const mutationKey = ['createStrategyCondition'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStrategyCondition>>, {strategyId: number;data: BodyType<StrategyConditionInput>}> = (props) => {
+          const {strategyId,data} = props ?? {};
+
+          return  createStrategyCondition(strategyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateStrategyConditionMutationResult = NonNullable<Awaited<ReturnType<typeof createStrategyCondition>>>
+    export type CreateStrategyConditionMutationBody = BodyType<StrategyConditionInput>
+    export type CreateStrategyConditionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a concept-based condition to a strategy
+ */
+export const useCreateStrategyCondition = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStrategyCondition>>, TError,{strategyId: number;data: BodyType<StrategyConditionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createStrategyCondition>>,
+        TError,
+        {strategyId: number;data: BodyType<StrategyConditionInput>},
+        TContext
+      > => {
+      return useMutation(getCreateStrategyConditionMutationOptions(options));
+    }
+
+export const getReorderStrategyConditionsUrl = (strategyId: number,) => {
+
+
+
+
+  return `/api/strategies/${strategyId}/conditions/reorder`
+}
+
+/**
+ * @summary Reorder strategy conditions
+ */
+export const reorderStrategyConditions = async (strategyId: number,
+    strategyConditionReorderInput: StrategyConditionReorderInput, options?: Parameters<typeof customFetch>[1]): Promise<StrategyCondition[]> => {
+
+  return customFetch<StrategyCondition[]>(getReorderStrategyConditionsUrl(strategyId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(strategyConditionReorderInput)
+  }
+);}
+
+
+
+
+
+export const getReorderStrategyConditionsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderStrategyConditions>>, TError,{strategyId: number;data: BodyType<StrategyConditionReorderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reorderStrategyConditions>>, TError,{strategyId: number;data: BodyType<StrategyConditionReorderInput>}, TContext> => {
+
+const mutationKey = ['reorderStrategyConditions'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reorderStrategyConditions>>, {strategyId: number;data: BodyType<StrategyConditionReorderInput>}> = (props) => {
+          const {strategyId,data} = props ?? {};
+
+          return  reorderStrategyConditions(strategyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReorderStrategyConditionsMutationResult = NonNullable<Awaited<ReturnType<typeof reorderStrategyConditions>>>
+    export type ReorderStrategyConditionsMutationBody = BodyType<StrategyConditionReorderInput>
+    export type ReorderStrategyConditionsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reorder strategy conditions
+ */
+export const useReorderStrategyConditions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderStrategyConditions>>, TError,{strategyId: number;data: BodyType<StrategyConditionReorderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reorderStrategyConditions>>,
+        TError,
+        {strategyId: number;data: BodyType<StrategyConditionReorderInput>},
+        TContext
+      > => {
+      return useMutation(getReorderStrategyConditionsMutationOptions(options));
+    }
+
+export const getUpdateStrategyConditionUrl = (strategyId: number,
+    conditionId: number,) => {
+
+
+
+
+  return `/api/strategies/${strategyId}/conditions/${conditionId}`
+}
+
+/**
+ * @summary Update a strategy condition
+ */
+export const updateStrategyCondition = async (strategyId: number,
+    conditionId: number,
+    strategyConditionUpdate: StrategyConditionUpdate, options?: Parameters<typeof customFetch>[1]): Promise<StrategyCondition> => {
+
+  return customFetch<StrategyCondition>(getUpdateStrategyConditionUrl(strategyId,conditionId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(strategyConditionUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateStrategyConditionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStrategyCondition>>, TError,{strategyId: number;conditionId: number;data: BodyType<StrategyConditionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateStrategyCondition>>, TError,{strategyId: number;conditionId: number;data: BodyType<StrategyConditionUpdate>}, TContext> => {
+
+const mutationKey = ['updateStrategyCondition'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateStrategyCondition>>, {strategyId: number;conditionId: number;data: BodyType<StrategyConditionUpdate>}> = (props) => {
+          const {strategyId,conditionId,data} = props ?? {};
+
+          return  updateStrategyCondition(strategyId,conditionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateStrategyConditionMutationResult = NonNullable<Awaited<ReturnType<typeof updateStrategyCondition>>>
+    export type UpdateStrategyConditionMutationBody = BodyType<StrategyConditionUpdate>
+    export type UpdateStrategyConditionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a strategy condition
+ */
+export const useUpdateStrategyCondition = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStrategyCondition>>, TError,{strategyId: number;conditionId: number;data: BodyType<StrategyConditionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateStrategyCondition>>,
+        TError,
+        {strategyId: number;conditionId: number;data: BodyType<StrategyConditionUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateStrategyConditionMutationOptions(options));
+    }
+
+export const getDeleteStrategyConditionUrl = (strategyId: number,
+    conditionId: number,) => {
+
+
+
+
+  return `/api/strategies/${strategyId}/conditions/${conditionId}`
+}
+
+/**
+ * @summary Delete a strategy condition
+ */
+export const deleteStrategyCondition = async (strategyId: number,
+    conditionId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteStrategyConditionUrl(strategyId,conditionId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteStrategyConditionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStrategyCondition>>, TError,{strategyId: number;conditionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteStrategyCondition>>, TError,{strategyId: number;conditionId: number}, TContext> => {
+
+const mutationKey = ['deleteStrategyCondition'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteStrategyCondition>>, {strategyId: number;conditionId: number}> = (props) => {
+          const {strategyId,conditionId} = props ?? {};
+
+          return  deleteStrategyCondition(strategyId,conditionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteStrategyConditionMutationResult = NonNullable<Awaited<ReturnType<typeof deleteStrategyCondition>>>
+
+    export type DeleteStrategyConditionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a strategy condition
+ */
+export const useDeleteStrategyCondition = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStrategyCondition>>, TError,{strategyId: number;conditionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteStrategyCondition>>,
+        TError,
+        {strategyId: number;conditionId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteStrategyConditionMutationOptions(options));
     }
 
 export const getListConceptsUrl = () => {

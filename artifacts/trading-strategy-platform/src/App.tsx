@@ -19,6 +19,7 @@ import {
   useUpdateTrade, type Alert, type Condition, type Market, type Strategy, type Trade, type TradingConcept
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { StrategyBuilder } from '@/components/strategy-builder';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
@@ -169,6 +170,6 @@ function SettingsPage() { const q=useGetSettings();const u=useUpdateSettings();c
 
 function Backtesting() { return <Page eyebrow="Utilities" title="Backtesting" description="A deliberate boundary, for now."><div className="panel empty-grid p-10 md:p-16 text-center max-w-2xl mx-auto"><div className="w-12 h-12 mx-auto rounded-xl border border-accent/30 bg-accent/10 text-accent flex items-center justify-center mb-5"><Clock3 size={21}/></div><span className="tag tag-draft">Not built yet</span><h2 className="display text-2xl font-bold mt-5">No simulated certainty here.</h2><p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto mt-3">Backtesting is intentionally a placeholder. This workspace is for building and reviewing your own records, not manufacturing a performance history.</p><Link href="/strategy-builder" className="btn btn-secondary mt-7" data-testid="link-backtesting-builder">Return to builder <ChevronRight size={14}/></Link></div></Page>; }
 
-function StrategyBuilderRoute() { const params=useParams<{id:string}>(); return <Builder/>; }
+function StrategyBuilderRoute() { return <StrategyBuilder/>; }
 function Router() { return <ErrorBoundary><Shell><Switch><Route path="/" component={Dashboard}/><Route path="/strategy-builder" component={StrategyBuilderRoute}/><Route path="/strategy-library" component={StrategyLibrary}/><Route path="/market-monitor" component={Markets}/><Route path="/trade-journal" component={Journal}/><Route path="/performance" component={Performance}/><Route path="/alerts" component={Alerts}/><Route path="/settings" component={SettingsPage}/><Route path="/backtesting" component={Backtesting}/><Route component={NotFound}/></Switch></Shell></ErrorBoundary>; }
 export default function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><Router/><Toaster/></TooltipProvider></QueryClientProvider>; }

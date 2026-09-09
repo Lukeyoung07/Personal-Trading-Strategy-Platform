@@ -15,6 +15,13 @@ export const strategiesTable = pgTable("strategies", {
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").notNull().default("draft"),
+  marketId: integer("market_id"),
+  assetClass: text("asset_class"),
+  direction: text("direction").notNull().default("both"),
+  timeframes: text("timeframes").array().notNull().default([]),
+  riskManagementRules: text("risk_management_rules"),
+  resetRules: text("reset_rules"),
+  alertRules: text("alert_rules"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
@@ -41,6 +48,24 @@ export const tradingConceptsTable = pgTable("trading_concepts", {
   invalidationRules: text("invalidation_rules"),
   isBuiltIn: boolean("is_built_in").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const strategyConditionsTable = pgTable("strategy_conditions", {
+  id: serial("id").primaryKey(),
+  strategyId: integer("strategy_id").notNull().references(() => strategiesTable.id, { onDelete: "cascade" }),
+  conceptId: integer("concept_id").notNull().references(() => tradingConceptsTable.id, { onDelete: "restrict" }),
+  stage: text("stage").notNull().default("entry"),
+  name: text("name").notNull(),
+  description: text("description"),
+  timeframe: text("timeframe").notNull(),
+  direction: text("direction").notNull().default("both"),
+  requirement: text("requirement").notNull().default("required"),
+  conditionOrder: integer("condition_order").notNull().default(1),
+  triggerRules: text("trigger_rules"),
+  invalidationRules: text("invalidation_rules"),
+  resetBehavior: text("reset_behavior"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
 export const conditionsTable = pgTable("conditions", {
@@ -119,6 +144,7 @@ export const insertUserSettingsSchema = createInsertSchema(userSettingsTable).om
 
 export type Strategy = typeof strategiesTable.$inferSelect;
 export type StrategyVersion = typeof strategyVersionsTable.$inferSelect;
+export type StrategyCondition = typeof strategyConditionsTable.$inferSelect;
 export type TradingConcept = typeof tradingConceptsTable.$inferSelect;
 export type Condition = typeof conditionsTable.$inferSelect;
 export type Market = typeof marketsTable.$inferSelect;
@@ -128,6 +154,8 @@ export type Alert = typeof alertsTable.$inferSelect;
 export type UserSettings = typeof userSettingsTable.$inferSelect;
 export type InsertStrategy = z.infer<typeof insertStrategySchema>;
 export type InsertStrategyVersion = z.infer<typeof insertStrategyVersionSchema>;
+export const insertStrategyConditionSchema = createInsertSchema(strategyConditionsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStrategyCondition = z.infer<typeof insertStrategyConditionSchema>;
 export type InsertTradingConcept = z.infer<typeof insertTradingConceptSchema>;
 export type InsertCondition = z.infer<typeof insertConditionSchema>;
 export type InsertMarket = z.infer<typeof insertMarketSchema>;

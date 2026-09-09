@@ -164,6 +164,94 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StrategyVersion"
+  /strategies/{strategyId}/conditions:
+    get:
+      operationId: listStrategyConditions
+      tags: [strategies]
+      summary: List ordered strategy conditions
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+      responses:
+        "200":
+          description: Ordered strategy conditions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StrategyCondition"
+    post:
+      operationId: createStrategyCondition
+      tags: [strategies]
+      summary: Add a concept-based condition to a strategy
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyConditionInput"
+      responses:
+        "201":
+          description: Created strategy condition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategyCondition"
+  /strategies/{strategyId}/conditions/reorder:
+    patch:
+      operationId: reorderStrategyConditions
+      tags: [strategies]
+      summary: Reorder strategy conditions
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyConditionReorderInput"
+      responses:
+        "200":
+          description: Reordered strategy conditions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StrategyCondition"
+  /strategies/{strategyId}/conditions/{conditionId}:
+    patch:
+      operationId: updateStrategyCondition
+      tags: [strategies]
+      summary: Update a strategy condition
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+        - $ref: "#/components/parameters/ConditionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyConditionUpdate"
+      responses:
+        "200":
+          description: Updated strategy condition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategyCondition"
+    delete:
+      operationId: deleteStrategyCondition
+      tags: [strategies]
+      summary: Delete a strategy condition
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+        - $ref: "#/components/parameters/ConditionId"
+      responses:
+        "204":
+          description: Deleted
   /concepts:
     get:
       operationId: listConcepts
@@ -571,7 +659,7 @@ components:
         latestTradeAt: { type: ["string", "null"], format: date-time }
     Strategy:
       type: object
-      required: [id, name, description, status, currentVersion, createdAt, updatedAt]
+      required: [id, name, description, status, currentVersion, marketId, assetClass, direction, timeframes, riskManagementRules, resetRules, alertRules, createdAt, updatedAt]
       properties:
         id: { type: integer }
         name: { type: string }
@@ -580,6 +668,18 @@ components:
           type: string
           enum: [draft, active, archived]
         currentVersion: { type: ["integer", "null"] }
+        marketId: { type: ["integer", "null"] }
+        marketSymbol: { type: ["string", "null"] }
+        assetClass: { type: ["string", "null"] }
+        direction:
+          type: string
+          enum: [long, short, both]
+        timeframes:
+          type: array
+          items: { type: string }
+        riskManagementRules: { type: ["string", "null"] }
+        resetRules: { type: ["string", "null"] }
+        alertRules: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     StrategyInput:
@@ -592,6 +692,18 @@ components:
           type: string
           enum: [draft, active, archived]
           default: draft
+        marketId: { type: ["integer", "null"] }
+        assetClass: { type: ["string", "null"] }
+        direction:
+          type: string
+          enum: [long, short, both]
+          default: both
+        timeframes:
+          type: array
+          items: { type: string }
+        riskManagementRules: { type: ["string", "null"] }
+        resetRules: { type: ["string", "null"] }
+        alertRules: { type: ["string", "null"] }
     StrategyUpdate:
       type: object
       properties:
@@ -600,6 +712,17 @@ components:
         status:
           type: string
           enum: [draft, active, archived]
+        marketId: { type: ["integer", "null"] }
+        assetClass: { type: ["string", "null"] }
+        direction:
+          type: string
+          enum: [long, short, both]
+        timeframes:
+          type: array
+          items: { type: string }
+        riskManagementRules: { type: ["string", "null"] }
+        resetRules: { type: ["string", "null"] }
+        alertRules: { type: ["string", "null"] }
     StrategyVersion:
       type: object
       required: [id, strategyId, versionNumber, label, thesis, entryRules, exitRules, riskRules, notes, createdAt]
@@ -623,6 +746,81 @@ components:
         exitRules: { type: ["string", "null"] }
         riskRules: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
+    StrategyCondition:
+      type: object
+      required: [id, strategyId, conceptId, conceptName, conceptCategory, stage, name, description, timeframe, direction, requirement, order, triggerRules, invalidationRules, resetBehavior, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        strategyId: { type: integer }
+        conceptId: { type: integer }
+        conceptName: { type: string }
+        conceptCategory: { type: ["string", "null"] }
+        stage:
+          type: string
+          enum: [entry, confirmation, invalidation, exit]
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        timeframe: { type: string }
+        direction:
+          type: string
+          enum: [long, short, both]
+        requirement:
+          type: string
+          enum: [required, optional]
+        order: { type: integer }
+        triggerRules: { type: ["string", "null"] }
+        invalidationRules: { type: ["string", "null"] }
+        resetBehavior: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    StrategyConditionInput:
+      type: object
+      required: [conceptId, stage, name, timeframe]
+      properties:
+        conceptId: { type: integer, minimum: 1 }
+        stage:
+          type: string
+          enum: [entry, confirmation, invalidation, exit]
+        name: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        timeframe: { type: string, minLength: 1 }
+        direction:
+          type: string
+          enum: [long, short, both]
+          default: both
+        requirement:
+          type: string
+          enum: [required, optional]
+          default: required
+        triggerRules: { type: ["string", "null"] }
+        invalidationRules: { type: ["string", "null"] }
+        resetBehavior: { type: ["string", "null"] }
+    StrategyConditionUpdate:
+      type: object
+      properties:
+        conceptId: { type: integer, minimum: 1 }
+        stage:
+          type: string
+          enum: [entry, confirmation, invalidation, exit]
+        name: { type: string, minLength: 1 }
+        description: { type: ["string", "null"] }
+        timeframe: { type: string, minLength: 1 }
+        direction:
+          type: string
+          enum: [long, short, both]
+        requirement:
+          type: string
+          enum: [required, optional]
+        triggerRules: { type: ["string", "null"] }
+        invalidationRules: { type: ["string", "null"] }
+        resetBehavior: { type: ["string", "null"] }
+    StrategyConditionReorderInput:
+      type: object
+      required: [conditionIds]
+      properties:
+        conditionIds:
+          type: array
+          items: { type: integer, minimum: 1 }
     TradingConcept:
       type: object
       required: [id, name, category, description, detectionRules, invalidationRules, isBuiltIn, createdAt]

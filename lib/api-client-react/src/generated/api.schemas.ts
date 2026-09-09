@@ -34,6 +34,15 @@ export const StrategyStatus = {
   archived: 'archived',
 } as const;
 
+export type StrategyDirection = typeof StrategyDirection[keyof typeof StrategyDirection];
+
+
+export const StrategyDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
 export interface Strategy {
   id: number;
   name: string;
@@ -42,6 +51,20 @@ export interface Strategy {
   status: StrategyStatus;
   /** @nullable */
   currentVersion: number | null;
+  /** @nullable */
+  marketId: number | null;
+  /** @nullable */
+  marketSymbol?: string | null;
+  /** @nullable */
+  assetClass: string | null;
+  direction: StrategyDirection;
+  timeframes: string[];
+  /** @nullable */
+  riskManagementRules: string | null;
+  /** @nullable */
+  resetRules: string | null;
+  /** @nullable */
+  alertRules: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -55,12 +78,33 @@ export const StrategyInputStatus = {
   archived: 'archived',
 } as const;
 
+export type StrategyInputDirection = typeof StrategyInputDirection[keyof typeof StrategyInputDirection];
+
+
+export const StrategyInputDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
 export interface StrategyInput {
   /** @minLength 1 */
   name: string;
   /** @nullable */
   description?: string | null;
   status?: StrategyInputStatus;
+  /** @nullable */
+  marketId?: number | null;
+  /** @nullable */
+  assetClass?: string | null;
+  direction?: StrategyInputDirection;
+  timeframes?: string[];
+  /** @nullable */
+  riskManagementRules?: string | null;
+  /** @nullable */
+  resetRules?: string | null;
+  /** @nullable */
+  alertRules?: string | null;
 }
 
 export type StrategyUpdateStatus = typeof StrategyUpdateStatus[keyof typeof StrategyUpdateStatus];
@@ -72,12 +116,33 @@ export const StrategyUpdateStatus = {
   archived: 'archived',
 } as const;
 
+export type StrategyUpdateDirection = typeof StrategyUpdateDirection[keyof typeof StrategyUpdateDirection];
+
+
+export const StrategyUpdateDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
 export interface StrategyUpdate {
   /** @minLength 1 */
   name?: string;
   /** @nullable */
   description?: string | null;
   status?: StrategyUpdateStatus;
+  /** @nullable */
+  marketId?: number | null;
+  /** @nullable */
+  assetClass?: string | null;
+  direction?: StrategyUpdateDirection;
+  timeframes?: string[];
+  /** @nullable */
+  riskManagementRules?: string | null;
+  /** @nullable */
+  resetRules?: string | null;
+  /** @nullable */
+  alertRules?: string | null;
 }
 
 export interface StrategyVersion {
@@ -112,6 +177,157 @@ export interface StrategyVersionInput {
   riskRules?: string | null;
   /** @nullable */
   notes?: string | null;
+}
+
+export type StrategyConditionStage = typeof StrategyConditionStage[keyof typeof StrategyConditionStage];
+
+
+export const StrategyConditionStage = {
+  entry: 'entry',
+  confirmation: 'confirmation',
+  invalidation: 'invalidation',
+  exit: 'exit',
+} as const;
+
+export type StrategyConditionDirection = typeof StrategyConditionDirection[keyof typeof StrategyConditionDirection];
+
+
+export const StrategyConditionDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
+export type StrategyConditionRequirement = typeof StrategyConditionRequirement[keyof typeof StrategyConditionRequirement];
+
+
+export const StrategyConditionRequirement = {
+  required: 'required',
+  optional: 'optional',
+} as const;
+
+export interface StrategyCondition {
+  id: number;
+  strategyId: number;
+  conceptId: number;
+  conceptName: string;
+  /** @nullable */
+  conceptCategory: string | null;
+  stage: StrategyConditionStage;
+  name: string;
+  /** @nullable */
+  description: string | null;
+  timeframe: string;
+  direction: StrategyConditionDirection;
+  requirement: StrategyConditionRequirement;
+  order: number;
+  /** @nullable */
+  triggerRules: string | null;
+  /** @nullable */
+  invalidationRules: string | null;
+  /** @nullable */
+  resetBehavior: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type StrategyConditionInputStage = typeof StrategyConditionInputStage[keyof typeof StrategyConditionInputStage];
+
+
+export const StrategyConditionInputStage = {
+  entry: 'entry',
+  confirmation: 'confirmation',
+  invalidation: 'invalidation',
+  exit: 'exit',
+} as const;
+
+export type StrategyConditionInputDirection = typeof StrategyConditionInputDirection[keyof typeof StrategyConditionInputDirection];
+
+
+export const StrategyConditionInputDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
+export type StrategyConditionInputRequirement = typeof StrategyConditionInputRequirement[keyof typeof StrategyConditionInputRequirement];
+
+
+export const StrategyConditionInputRequirement = {
+  required: 'required',
+  optional: 'optional',
+} as const;
+
+export interface StrategyConditionInput {
+  /** @minimum 1 */
+  conceptId: number;
+  stage: StrategyConditionInputStage;
+  /** @minLength 1 */
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  /** @minLength 1 */
+  timeframe: string;
+  direction?: StrategyConditionInputDirection;
+  requirement?: StrategyConditionInputRequirement;
+  /** @nullable */
+  triggerRules?: string | null;
+  /** @nullable */
+  invalidationRules?: string | null;
+  /** @nullable */
+  resetBehavior?: string | null;
+}
+
+export type StrategyConditionUpdateStage = typeof StrategyConditionUpdateStage[keyof typeof StrategyConditionUpdateStage];
+
+
+export const StrategyConditionUpdateStage = {
+  entry: 'entry',
+  confirmation: 'confirmation',
+  invalidation: 'invalidation',
+  exit: 'exit',
+} as const;
+
+export type StrategyConditionUpdateDirection = typeof StrategyConditionUpdateDirection[keyof typeof StrategyConditionUpdateDirection];
+
+
+export const StrategyConditionUpdateDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
+export type StrategyConditionUpdateRequirement = typeof StrategyConditionUpdateRequirement[keyof typeof StrategyConditionUpdateRequirement];
+
+
+export const StrategyConditionUpdateRequirement = {
+  required: 'required',
+  optional: 'optional',
+} as const;
+
+export interface StrategyConditionUpdate {
+  /** @minimum 1 */
+  conceptId?: number;
+  stage?: StrategyConditionUpdateStage;
+  /** @minLength 1 */
+  name?: string;
+  /** @nullable */
+  description?: string | null;
+  /** @minLength 1 */
+  timeframe?: string;
+  direction?: StrategyConditionUpdateDirection;
+  requirement?: StrategyConditionUpdateRequirement;
+  /** @nullable */
+  triggerRules?: string | null;
+  /** @nullable */
+  invalidationRules?: string | null;
+  /** @nullable */
+  resetBehavior?: string | null;
+}
+
+export interface StrategyConditionReorderInput {
+  /** @items.minimum 1 */
+  conditionIds: number[];
 }
 
 export interface TradingConcept {

@@ -6,6 +6,7 @@ import {
   conditionsTable,
   marketsTable,
   strategiesTable,
+  strategyConditionsTable,
   strategyVersionsTable,
   tradesTable,
   tradingConceptsTable,
@@ -24,6 +25,8 @@ import {
   CreateStrategyResponse,
   CreateStrategyVersionBody,
   CreateStrategyVersionResponse,
+  CreateStrategyConditionBody,
+  CreateStrategyConditionResponse,
   CreateTradeBody,
   CreateTradeResponse,
   DeleteAlertParams,
@@ -32,6 +35,7 @@ import {
   DeleteMarketParams,
   DeleteStrategyParams,
   DeleteTradeParams,
+  DeleteStrategyConditionParams,
   GetDashboardSummaryResponse,
   GetPerformanceSummaryResponse,
   GetSettingsResponse,
@@ -44,6 +48,8 @@ import {
   ListStrategiesResponse,
   ListStrategyVersionsParams,
   ListStrategyVersionsResponse,
+  ListStrategyConditionsParams,
+  ListStrategyConditionsResponse,
   ListTradesResponse,
   UpdateAlertBody,
   UpdateAlertParams,
@@ -62,6 +68,11 @@ import {
   UpdateStrategyBody,
   UpdateStrategyParams,
   UpdateStrategyResponse,
+  UpdateStrategyConditionBody,
+  UpdateStrategyConditionParams,
+  UpdateStrategyConditionResponse,
+  ReorderStrategyConditionsBody,
+  ReorderStrategyConditionsResponse,
   UpdateTradeBody,
   UpdateTradeParams,
   UpdateTradeResponse,
@@ -139,6 +150,7 @@ async function strategyView(strategy: typeof strategiesTable.$inferSelect) {
     .where(eq(strategyVersionsTable.strategyId, strategy.id));
   return {
     ...strategy,
+    marketSymbol: await marketSymbol(strategy.marketId),
     currentVersion: latest?.versionNumber == null ? null : Number(latest.versionNumber),
   };
 }
@@ -270,6 +282,120 @@ router.post("/strategies/:strategyId/versions", async (req, res): Promise<void> 
     .values({ ...body.data, strategyId: params.data.strategyId, versionNumber: Number(latest?.versionNumber ?? 0) + 1 })
     .returning();
   res.status(201).json(CreateStrategyVersionResponse.parse(created));
+});
+
+async function strategyConditionView(condition: typeof strategyConditionsTable.$inferSelect) {
+  const [concept] = await db
+    .select({ name: tradingConceptsTable.name, category: tradingConceptsTable.category })
+    .from(tradingConceptsTable)
+    .where(eq(tradingConceptsTable.id, condition.conceptId));
+  return {
+    ...condition,
+    conceptName: concept?.name ?? "Missing concept",
+    conceptCategory: concept?.category ?? null,
+    order: condition.conditionOrder,
+  };
+}
+
+router.get("/strategies/:strategyId/conditions", async (req, res): Promise<void> => {
+  const params = ListStrategyConditionsParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const rows = await db
+    .select()
+    .from(strategyConditionsTable)
+    .where(eq(strategyConditionsTable.strategyId, params.data.strategyId))
+    .orderBy(asc(strategyConditionsTable.conditionOrder));
+  res.json(ListStrategyConditionsResponse.parse(await Promise.all(rows.map(strategyConditionView))));
+});
+
+router.post("/strategies/:strategyId/conditions", async (req, res): Promise<void> => {
+  const params = ListStrategyConditionsParams.safeParse(req.params);
+  const body = CreateStrategyConditionBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: !params.success ? params.error.message : body.success ? "Invalid request body" : body.error.message });
+    return;
+  }
+  const [strategy] = await db.select({ id: strategiesTable.id }).from(strategiesTable).where(eq(strategiesTable.id, params.data.strategyId));
+  if (!strategy) {
+    res.status(404).json({ error: "Strategy not found" });
+    return;
+  }
+  const [latest] = await db
+    .select({ conditionOrder: max(strategyConditionsTable.conditionOrder) })
+    .from(strategyConditionsTable)
+    .where(eq(strategyConditionsTable.strategyId, params.data.strategyId));
+  const [created] = await db
+    .insert(strategyConditionsTable)
+    .values({ ...body.data, strategyId: params.data.strategyId, conditionOrder: Number(latest?.conditionOrder ?? 0) + 1 })
+    .returning();
+  res.status(201).json(CreateStrategyConditionResponse.parse(await strategyConditionView(created)));
+});
+
+router.patch("/strategies/:strategyId/conditions/reorder", async (req, res): Promise<void> => {
+  const params = ListStrategyConditionsParams.safeParse(req.params);
+  const body = ReorderStrategyConditionsBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: !params.success ? params.error.message : body.success ? "Invalid request body" : body.error.message });
+    return;
+  }
+  const existing = await db
+    .select({ id: strategyConditionsTable.id })
+    .from(strategyConditionsTable)
+    .where(eq(strategyConditionsTable.strategyId, params.data.strategyId));
+  const existingIds = new Set(existing.map(({ id }) => id));
+  const requestedIds = body.data.conditionIds;
+  if (requestedIds.length !== existing.length || new Set(requestedIds).size !== requestedIds.length || requestedIds.some(id => !existingIds.has(id))) {
+    res.status(400).json({ error: "conditionIds must contain each condition for this strategy exactly once" });
+    return;
+  }
+  for (const [index, conditionId] of requestedIds.entries()) {
+    await db.update(strategyConditionsTable).set({ conditionOrder: index + 1, updatedAt: new Date() }).where(and(eq(strategyConditionsTable.id, conditionId), eq(strategyConditionsTable.strategyId, params.data.strategyId)));
+  }
+  const rows = await db
+    .select()
+    .from(strategyConditionsTable)
+    .where(eq(strategyConditionsTable.strategyId, params.data.strategyId))
+    .orderBy(asc(strategyConditionsTable.conditionOrder));
+  res.json(ReorderStrategyConditionsResponse.parse(await Promise.all(rows.map(strategyConditionView))));
+});
+
+router.patch("/strategies/:strategyId/conditions/:conditionId", async (req, res): Promise<void> => {
+  const params = UpdateStrategyConditionParams.safeParse(req.params);
+  const body = UpdateStrategyConditionBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: !params.success ? params.error.message : body.success ? "Invalid request body" : body.error.message });
+    return;
+  }
+  const [updated] = await db
+    .update(strategyConditionsTable)
+    .set({ ...body.data, updatedAt: new Date() })
+    .where(and(eq(strategyConditionsTable.id, params.data.conditionId), eq(strategyConditionsTable.strategyId, params.data.strategyId)))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Strategy condition not found" });
+    return;
+  }
+  res.json(UpdateStrategyConditionResponse.parse(await strategyConditionView(updated)));
+});
+
+router.delete("/strategies/:strategyId/conditions/:conditionId", async (req, res): Promise<void> => {
+  const params = DeleteStrategyConditionParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [deleted] = await db
+    .delete(strategyConditionsTable)
+    .where(and(eq(strategyConditionsTable.id, params.data.conditionId), eq(strategyConditionsTable.strategyId, params.data.strategyId)))
+    .returning();
+  if (!deleted) {
+    res.status(404).json({ error: "Strategy condition not found" });
+    return;
+  }
+  res.sendStatus(204);
 });
 
 router.get("/concepts", async (_req, res): Promise<void> => {
