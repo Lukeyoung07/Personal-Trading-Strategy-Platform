@@ -511,21 +511,60 @@ export interface ConditionUpdate {
 export interface Market {
   id: number;
   assetClass: string;
+  instrumentType: string;
   /** @nullable */
   venue: string | null;
   symbol: string;
   /** @nullable */
+  displayName: string | null;
+  /** @nullable */
+  baseCurrency: string | null;
+  /** @nullable */
+  quoteCurrency: string | null;
+  /** @nullable */
+  exchangeTimezone: string | null;
+  /** @nullable */
+  tickSize: number | null;
+  /** @nullable */
+  contractMultiplier: number | null;
+  /** @nullable */
+  expiry: string | null;
+  isActive: boolean;
+  /** @nullable */
   description: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface MarketInput {
   /** @minLength 1 */
   assetClass: string;
+  instrumentType?: string;
   /** @nullable */
   venue?: string | null;
   /** @minLength 1 */
   symbol: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  baseCurrency?: string | null;
+  /** @nullable */
+  quoteCurrency?: string | null;
+  /** @nullable */
+  exchangeTimezone?: string | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  tickSize?: number | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  contractMultiplier?: number | null;
+  /** @nullable */
+  expiry?: string | null;
+  isActive?: boolean;
   /** @nullable */
   description?: string | null;
 }
@@ -533,12 +572,420 @@ export interface MarketInput {
 export interface MarketUpdate {
   /** @minLength 1 */
   assetClass?: string;
+  instrumentType?: string;
   /** @nullable */
   venue?: string | null;
   /** @minLength 1 */
   symbol?: string;
   /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  baseCurrency?: string | null;
+  /** @nullable */
+  quoteCurrency?: string | null;
+  /** @nullable */
+  exchangeTimezone?: string | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  tickSize?: number | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  contractMultiplier?: number | null;
+  /** @nullable */
+  expiry?: string | null;
+  isActive?: boolean;
+  /** @nullable */
   description?: string | null;
+}
+
+export type InstrumentInstrumentType = typeof InstrumentInstrumentType[keyof typeof InstrumentInstrumentType];
+
+
+export const InstrumentInstrumentType = {
+  future: 'future',
+  forex: 'forex',
+  stock: 'stock',
+  index: 'index',
+  commodity: 'commodity',
+  crypto: 'crypto',
+  other: 'other',
+} as const;
+
+export interface Instrument {
+  id: number;
+  assetClass: string;
+  instrumentType: InstrumentInstrumentType;
+  /** @nullable */
+  venue: string | null;
+  symbol: string;
+  /** @nullable */
+  displayName: string | null;
+  /** @nullable */
+  baseCurrency: string | null;
+  /** @nullable */
+  quoteCurrency: string | null;
+  /** @nullable */
+  exchangeTimezone: string | null;
+  /** @nullable */
+  tickSize: number | null;
+  /** @nullable */
+  contractMultiplier: number | null;
+  /** @nullable */
+  expiry: string | null;
+  isActive: boolean;
+  /** @nullable */
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type InstrumentInputInstrumentType = typeof InstrumentInputInstrumentType[keyof typeof InstrumentInputInstrumentType];
+
+
+export const InstrumentInputInstrumentType = {
+  future: 'future',
+  forex: 'forex',
+  stock: 'stock',
+  index: 'index',
+  commodity: 'commodity',
+  crypto: 'crypto',
+  other: 'other',
+} as const;
+
+export interface InstrumentInput {
+  /** @minLength 1 */
+  assetClass: string;
+  instrumentType: InstrumentInputInstrumentType;
+  /** @nullable */
+  venue?: string | null;
+  /** @minLength 1 */
+  symbol: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  baseCurrency?: string | null;
+  /** @nullable */
+  quoteCurrency?: string | null;
+  /** @nullable */
+  exchangeTimezone?: string | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  tickSize?: number | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  contractMultiplier?: number | null;
+  /** @nullable */
+  expiry?: string | null;
+  isActive?: boolean;
+  /** @nullable */
+  description?: string | null;
+}
+
+export type InstrumentUpdateInstrumentType = typeof InstrumentUpdateInstrumentType[keyof typeof InstrumentUpdateInstrumentType];
+
+
+export const InstrumentUpdateInstrumentType = {
+  future: 'future',
+  forex: 'forex',
+  stock: 'stock',
+  index: 'index',
+  commodity: 'commodity',
+  crypto: 'crypto',
+  other: 'other',
+} as const;
+
+export interface InstrumentUpdate {
+  /** @minLength 1 */
+  assetClass?: string;
+  instrumentType?: InstrumentUpdateInstrumentType;
+  /** @nullable */
+  venue?: string | null;
+  /** @minLength 1 */
+  symbol?: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  baseCurrency?: string | null;
+  /** @nullable */
+  quoteCurrency?: string | null;
+  /** @nullable */
+  exchangeTimezone?: string | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  tickSize?: number | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  contractMultiplier?: number | null;
+  /** @nullable */
+  expiry?: string | null;
+  isActive?: boolean;
+  /** @nullable */
+  description?: string | null;
+}
+
+export type MarketDataSourceSourceType = typeof MarketDataSourceSourceType[keyof typeof MarketDataSourceSourceType];
+
+
+export const MarketDataSourceSourceType = {
+  rest: 'rest',
+  websocket: 'websocket',
+  file: 'file',
+  other: 'other',
+} as const;
+
+export type MarketDataSourceCapabilitiesItem = typeof MarketDataSourceCapabilitiesItem[keyof typeof MarketDataSourceCapabilitiesItem];
+
+
+export const MarketDataSourceCapabilitiesItem = {
+  realtime: 'realtime',
+  candles: 'candles',
+  historical: 'historical',
+  sessions: 'sessions',
+} as const;
+
+export type MarketDataSourceConfigurationStatus = typeof MarketDataSourceConfigurationStatus[keyof typeof MarketDataSourceConfigurationStatus];
+
+
+export const MarketDataSourceConfigurationStatus = {
+  not_configured: 'not_configured',
+  configured: 'configured',
+  disabled: 'disabled',
+} as const;
+
+export interface MarketDataSource {
+  id: number;
+  name: string;
+  /** @nullable */
+  providerKey: string | null;
+  sourceType: MarketDataSourceSourceType;
+  /** @nullable */
+  description: string | null;
+  capabilities: MarketDataSourceCapabilitiesItem[];
+  configurationStatus: MarketDataSourceConfigurationStatus;
+  isEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MarketDataSourceInputSourceType = typeof MarketDataSourceInputSourceType[keyof typeof MarketDataSourceInputSourceType];
+
+
+export const MarketDataSourceInputSourceType = {
+  rest: 'rest',
+  websocket: 'websocket',
+  file: 'file',
+  other: 'other',
+} as const;
+
+export type MarketDataSourceInputCapabilitiesItem = typeof MarketDataSourceInputCapabilitiesItem[keyof typeof MarketDataSourceInputCapabilitiesItem];
+
+
+export const MarketDataSourceInputCapabilitiesItem = {
+  realtime: 'realtime',
+  candles: 'candles',
+  historical: 'historical',
+  sessions: 'sessions',
+} as const;
+
+export type MarketDataSourceInputConfigurationStatus = typeof MarketDataSourceInputConfigurationStatus[keyof typeof MarketDataSourceInputConfigurationStatus];
+
+
+export const MarketDataSourceInputConfigurationStatus = {
+  not_configured: 'not_configured',
+  configured: 'configured',
+  disabled: 'disabled',
+} as const;
+
+export interface MarketDataSourceInput {
+  /** @minLength 1 */
+  name: string;
+  /** @nullable */
+  providerKey?: string | null;
+  sourceType: MarketDataSourceInputSourceType;
+  /** @nullable */
+  description?: string | null;
+  capabilities?: MarketDataSourceInputCapabilitiesItem[];
+  configurationStatus?: MarketDataSourceInputConfigurationStatus;
+  isEnabled?: boolean;
+}
+
+export type MarketDataSourceUpdateSourceType = typeof MarketDataSourceUpdateSourceType[keyof typeof MarketDataSourceUpdateSourceType];
+
+
+export const MarketDataSourceUpdateSourceType = {
+  rest: 'rest',
+  websocket: 'websocket',
+  file: 'file',
+  other: 'other',
+} as const;
+
+export type MarketDataSourceUpdateCapabilitiesItem = typeof MarketDataSourceUpdateCapabilitiesItem[keyof typeof MarketDataSourceUpdateCapabilitiesItem];
+
+
+export const MarketDataSourceUpdateCapabilitiesItem = {
+  realtime: 'realtime',
+  candles: 'candles',
+  historical: 'historical',
+  sessions: 'sessions',
+} as const;
+
+export type MarketDataSourceUpdateConfigurationStatus = typeof MarketDataSourceUpdateConfigurationStatus[keyof typeof MarketDataSourceUpdateConfigurationStatus];
+
+
+export const MarketDataSourceUpdateConfigurationStatus = {
+  not_configured: 'not_configured',
+  configured: 'configured',
+  disabled: 'disabled',
+} as const;
+
+export interface MarketDataSourceUpdate {
+  /** @minLength 1 */
+  name?: string;
+  /** @nullable */
+  providerKey?: string | null;
+  sourceType?: MarketDataSourceUpdateSourceType;
+  /** @nullable */
+  description?: string | null;
+  capabilities?: MarketDataSourceUpdateCapabilitiesItem[];
+  configurationStatus?: MarketDataSourceUpdateConfigurationStatus;
+  isEnabled?: boolean;
+}
+
+export interface SourceInstrumentMapping {
+  id: number;
+  sourceId: number;
+  sourceName: string;
+  instrumentId: number;
+  instrumentSymbol: string;
+  providerSymbol: string;
+  /** @nullable */
+  providerMetadata: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SourceInstrumentMappingInput {
+  /** @minimum 1 */
+  sourceId: number;
+  /** @minimum 1 */
+  instrumentId: number;
+  /** @minLength 1 */
+  providerSymbol: string;
+  /** @nullable */
+  providerMetadata?: string | null;
+}
+
+export interface SourceInstrumentMappingUpdate {
+  /** @minimum 1 */
+  sourceId?: number;
+  /** @minimum 1 */
+  instrumentId?: number;
+  /** @minLength 1 */
+  providerSymbol?: string;
+  /** @nullable */
+  providerMetadata?: string | null;
+}
+
+export interface Timeframe {
+  id: number;
+  code: string;
+  label: string;
+  durationSeconds: number;
+  /** @nullable */
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TimeframeInput {
+  /** @minLength 1 */
+  code: string;
+  /** @minLength 1 */
+  label: string;
+  /** @minimum 1 */
+  durationSeconds: number;
+  /** @nullable */
+  description?: string | null;
+  isActive?: boolean;
+}
+
+export interface TimeframeUpdate {
+  /** @minLength 1 */
+  code?: string;
+  /** @minLength 1 */
+  label?: string;
+  /** @minimum 1 */
+  durationSeconds?: number;
+  /** @nullable */
+  description?: string | null;
+  isActive?: boolean;
+}
+
+export type MarketDataConnectionStatus = typeof MarketDataConnectionStatus[keyof typeof MarketDataConnectionStatus];
+
+
+export const MarketDataConnectionStatus = {
+  disconnected: 'disconnected',
+  connecting: 'connecting',
+  connected: 'connected',
+  degraded: 'degraded',
+  error: 'error',
+} as const;
+
+export interface MarketDataConnection {
+  id: number;
+  sourceId: number;
+  sourceName: string;
+  status: MarketDataConnectionStatus;
+  /** @nullable */
+  statusMessage: string | null;
+  /** @nullable */
+  lastConnectedAt: string | null;
+  /** @nullable */
+  lastDataAt: string | null;
+  checkedAt: string;
+  updatedAt: string;
+}
+
+export interface Candle {
+  id: number;
+  instrumentId: number;
+  sourceId: number;
+  timeframeId: number;
+  openTime: string;
+  /** @nullable */
+  closeTime: string | null;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  /** @nullable */
+  volume: number | null;
+  isClosed: boolean;
+  receivedAt: string;
+}
+
+export interface MarketDataSummary {
+  instrumentCount: number;
+  sourceCount: number;
+  timeframeCount: number;
+  candleCount: number;
+  connectedSourceCount: number;
+  /** @nullable */
+  latestDataAt: string | null;
 }
 
 export type TradeSide = typeof TradeSide[keyof typeof TradeSide];
@@ -794,4 +1241,26 @@ export interface UserSettingsUpdate {
  * Resource not found
  */
 export type NotFoundResponse = Error;
+
+export type ListCandlesParams = {
+/**
+ * @minimum 1
+ */
+instrumentId: number;
+/**
+ * @minimum 1
+ */
+timeframeId: number;
+/**
+ * @minimum 1
+ */
+sourceId?: number;
+from?: string;
+to?: string;
+/**
+ * @minimum 1
+ * @maximum 2000
+ */
+limit?: number;
+};
 

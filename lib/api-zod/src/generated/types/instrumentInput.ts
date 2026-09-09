@@ -5,11 +5,12 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { InstrumentInputInstrumentType } from './instrumentInputInstrumentType';
 
-export interface MarketInput {
+export interface InstrumentInput {
   /** @minLength 1 */
   assetClass: string;
-  instrumentType?: string;
+  instrumentType: InstrumentInputInstrumentType;
   /** @nullable */
   venue?: string | null;
   /** @minLength 1 */

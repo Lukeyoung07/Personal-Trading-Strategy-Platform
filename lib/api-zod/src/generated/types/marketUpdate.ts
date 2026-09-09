@@ -9,10 +9,32 @@
 export interface MarketUpdate {
   /** @minLength 1 */
   assetClass?: string;
+  instrumentType?: string;
   /** @nullable */
   venue?: string | null;
   /** @minLength 1 */
   symbol?: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  baseCurrency?: string | null;
+  /** @nullable */
+  quoteCurrency?: string | null;
+  /** @nullable */
+  exchangeTimezone?: string | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  tickSize?: number | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  contractMultiplier?: number | null;
+  /** @nullable */
+  expiry?: string | null;
+  isActive?: boolean;
   /** @nullable */
   description?: string | null;
 }

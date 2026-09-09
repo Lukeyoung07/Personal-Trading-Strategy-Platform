@@ -23,16 +23,29 @@ import type {
   Alert,
   AlertInput,
   AlertUpdate,
+  Candle,
   Condition,
   ConditionInput,
   ConditionUpdate,
   DashboardSummary,
   HealthStatus,
+  Instrument,
+  InstrumentInput,
+  InstrumentUpdate,
+  ListCandlesParams,
   Market,
+  MarketDataConnection,
+  MarketDataSource,
+  MarketDataSourceInput,
+  MarketDataSourceUpdate,
+  MarketDataSummary,
   MarketInput,
   MarketUpdate,
   NotFoundResponse,
   PerformanceSummary,
+  SourceInstrumentMapping,
+  SourceInstrumentMappingInput,
+  SourceInstrumentMappingUpdate,
   Strategy,
   StrategyCondition,
   StrategyConditionInput,
@@ -45,6 +58,9 @@ import type {
   StrategyVersionCloneInput,
   StrategyVersionCondition,
   StrategyVersionInput,
+  Timeframe,
+  TimeframeInput,
+  TimeframeUpdate,
   Trade,
   TradeInput,
   TradeUpdate,
@@ -2295,6 +2311,1408 @@ export const useDeleteMarket = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDeleteMarketMutationOptions(options));
     }
+
+export const getListInstrumentsUrl = () => {
+
+
+
+
+  return `/api/instruments`
+}
+
+/**
+ * @summary List provider-neutral instruments
+ */
+export const listInstruments = async ( options?: Parameters<typeof customFetch>[1]): Promise<Instrument[]> => {
+
+  return customFetch<Instrument[]>(getListInstrumentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInstrumentsQueryKey = () => {
+    return [
+    `/api/instruments`
+    ] as const;
+    }
+
+
+export const getListInstrumentsQueryOptions = <TData = Awaited<ReturnType<typeof listInstruments>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInstruments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInstrumentsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInstruments>>> = ({ signal }) => listInstruments({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInstruments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInstrumentsQueryResult = NonNullable<Awaited<ReturnType<typeof listInstruments>>>
+export type ListInstrumentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List provider-neutral instruments
+ */
+
+export function useListInstruments<TData = Awaited<ReturnType<typeof listInstruments>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInstruments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInstrumentsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateInstrumentUrl = () => {
+
+
+
+
+  return `/api/instruments`
+}
+
+/**
+ * @summary Create a provider-neutral instrument
+ */
+export const createInstrument = async (instrumentInput: InstrumentInput, options?: Parameters<typeof customFetch>[1]): Promise<Instrument> => {
+
+  return customFetch<Instrument>(getCreateInstrumentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(instrumentInput)
+  }
+);}
+
+
+
+
+
+export const getCreateInstrumentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInstrument>>, TError,{data: BodyType<InstrumentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createInstrument>>, TError,{data: BodyType<InstrumentInput>}, TContext> => {
+
+const mutationKey = ['createInstrument'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createInstrument>>, {data: BodyType<InstrumentInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createInstrument(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateInstrumentMutationResult = NonNullable<Awaited<ReturnType<typeof createInstrument>>>
+    export type CreateInstrumentMutationBody = BodyType<InstrumentInput>
+    export type CreateInstrumentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a provider-neutral instrument
+ */
+export const useCreateInstrument = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInstrument>>, TError,{data: BodyType<InstrumentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createInstrument>>,
+        TError,
+        {data: BodyType<InstrumentInput>},
+        TContext
+      > => {
+      return useMutation(getCreateInstrumentMutationOptions(options));
+    }
+
+export const getUpdateInstrumentUrl = (instrumentId: number,) => {
+
+
+
+
+  return `/api/instruments/${instrumentId}`
+}
+
+/**
+ * @summary Update a provider-neutral instrument
+ */
+export const updateInstrument = async (instrumentId: number,
+    instrumentUpdate: InstrumentUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Instrument> => {
+
+  return customFetch<Instrument>(getUpdateInstrumentUrl(instrumentId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(instrumentUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateInstrumentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstrument>>, TError,{instrumentId: number;data: BodyType<InstrumentUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateInstrument>>, TError,{instrumentId: number;data: BodyType<InstrumentUpdate>}, TContext> => {
+
+const mutationKey = ['updateInstrument'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateInstrument>>, {instrumentId: number;data: BodyType<InstrumentUpdate>}> = (props) => {
+          const {instrumentId,data} = props ?? {};
+
+          return  updateInstrument(instrumentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateInstrumentMutationResult = NonNullable<Awaited<ReturnType<typeof updateInstrument>>>
+    export type UpdateInstrumentMutationBody = BodyType<InstrumentUpdate>
+    export type UpdateInstrumentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a provider-neutral instrument
+ */
+export const useUpdateInstrument = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateInstrument>>, TError,{instrumentId: number;data: BodyType<InstrumentUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateInstrument>>,
+        TError,
+        {instrumentId: number;data: BodyType<InstrumentUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateInstrumentMutationOptions(options));
+    }
+
+export const getDeleteInstrumentUrl = (instrumentId: number,) => {
+
+
+
+
+  return `/api/instruments/${instrumentId}`
+}
+
+/**
+ * @summary Delete an unused instrument
+ */
+export const deleteInstrument = async (instrumentId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteInstrumentUrl(instrumentId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteInstrumentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteInstrument>>, TError,{instrumentId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteInstrument>>, TError,{instrumentId: number}, TContext> => {
+
+const mutationKey = ['deleteInstrument'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteInstrument>>, {instrumentId: number}> = (props) => {
+          const {instrumentId} = props ?? {};
+
+          return  deleteInstrument(instrumentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteInstrumentMutationResult = NonNullable<Awaited<ReturnType<typeof deleteInstrument>>>
+
+    export type DeleteInstrumentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete an unused instrument
+ */
+export const useDeleteInstrument = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteInstrument>>, TError,{instrumentId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteInstrument>>,
+        TError,
+        {instrumentId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteInstrumentMutationOptions(options));
+    }
+
+export const getListMarketDataSourcesUrl = () => {
+
+
+
+
+  return `/api/market-data/sources`
+}
+
+/**
+ * @summary List market-data source configurations
+ */
+export const listMarketDataSources = async ( options?: Parameters<typeof customFetch>[1]): Promise<MarketDataSource[]> => {
+
+  return customFetch<MarketDataSource[]>(getListMarketDataSourcesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMarketDataSourcesQueryKey = () => {
+    return [
+    `/api/market-data/sources`
+    ] as const;
+    }
+
+
+export const getListMarketDataSourcesQueryOptions = <TData = Awaited<ReturnType<typeof listMarketDataSources>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketDataSources>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMarketDataSourcesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMarketDataSources>>> = ({ signal }) => listMarketDataSources({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMarketDataSources>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMarketDataSourcesQueryResult = NonNullable<Awaited<ReturnType<typeof listMarketDataSources>>>
+export type ListMarketDataSourcesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List market-data source configurations
+ */
+
+export function useListMarketDataSources<TData = Awaited<ReturnType<typeof listMarketDataSources>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketDataSources>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMarketDataSourcesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateMarketDataSourceUrl = () => {
+
+
+
+
+  return `/api/market-data/sources`
+}
+
+/**
+ * @summary Register a future market-data source without credentials
+ */
+export const createMarketDataSource = async (marketDataSourceInput: MarketDataSourceInput, options?: Parameters<typeof customFetch>[1]): Promise<MarketDataSource> => {
+
+  return customFetch<MarketDataSource>(getCreateMarketDataSourceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(marketDataSourceInput)
+  }
+);}
+
+
+
+
+
+export const getCreateMarketDataSourceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMarketDataSource>>, TError,{data: BodyType<MarketDataSourceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMarketDataSource>>, TError,{data: BodyType<MarketDataSourceInput>}, TContext> => {
+
+const mutationKey = ['createMarketDataSource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMarketDataSource>>, {data: BodyType<MarketDataSourceInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createMarketDataSource(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMarketDataSourceMutationResult = NonNullable<Awaited<ReturnType<typeof createMarketDataSource>>>
+    export type CreateMarketDataSourceMutationBody = BodyType<MarketDataSourceInput>
+    export type CreateMarketDataSourceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Register a future market-data source without credentials
+ */
+export const useCreateMarketDataSource = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMarketDataSource>>, TError,{data: BodyType<MarketDataSourceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMarketDataSource>>,
+        TError,
+        {data: BodyType<MarketDataSourceInput>},
+        TContext
+      > => {
+      return useMutation(getCreateMarketDataSourceMutationOptions(options));
+    }
+
+export const getUpdateMarketDataSourceUrl = (sourceId: number,) => {
+
+
+
+
+  return `/api/market-data/sources/${sourceId}`
+}
+
+/**
+ * @summary Update a market-data source configuration
+ */
+export const updateMarketDataSource = async (sourceId: number,
+    marketDataSourceUpdate: MarketDataSourceUpdate, options?: Parameters<typeof customFetch>[1]): Promise<MarketDataSource> => {
+
+  return customFetch<MarketDataSource>(getUpdateMarketDataSourceUrl(sourceId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(marketDataSourceUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateMarketDataSourceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMarketDataSource>>, TError,{sourceId: number;data: BodyType<MarketDataSourceUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMarketDataSource>>, TError,{sourceId: number;data: BodyType<MarketDataSourceUpdate>}, TContext> => {
+
+const mutationKey = ['updateMarketDataSource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMarketDataSource>>, {sourceId: number;data: BodyType<MarketDataSourceUpdate>}> = (props) => {
+          const {sourceId,data} = props ?? {};
+
+          return  updateMarketDataSource(sourceId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMarketDataSourceMutationResult = NonNullable<Awaited<ReturnType<typeof updateMarketDataSource>>>
+    export type UpdateMarketDataSourceMutationBody = BodyType<MarketDataSourceUpdate>
+    export type UpdateMarketDataSourceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a market-data source configuration
+ */
+export const useUpdateMarketDataSource = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMarketDataSource>>, TError,{sourceId: number;data: BodyType<MarketDataSourceUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMarketDataSource>>,
+        TError,
+        {sourceId: number;data: BodyType<MarketDataSourceUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateMarketDataSourceMutationOptions(options));
+    }
+
+export const getDeleteMarketDataSourceUrl = (sourceId: number,) => {
+
+
+
+
+  return `/api/market-data/sources/${sourceId}`
+}
+
+/**
+ * @summary Delete an unused market-data source
+ */
+export const deleteMarketDataSource = async (sourceId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteMarketDataSourceUrl(sourceId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteMarketDataSourceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMarketDataSource>>, TError,{sourceId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMarketDataSource>>, TError,{sourceId: number}, TContext> => {
+
+const mutationKey = ['deleteMarketDataSource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMarketDataSource>>, {sourceId: number}> = (props) => {
+          const {sourceId} = props ?? {};
+
+          return  deleteMarketDataSource(sourceId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMarketDataSourceMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMarketDataSource>>>
+
+    export type DeleteMarketDataSourceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete an unused market-data source
+ */
+export const useDeleteMarketDataSource = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMarketDataSource>>, TError,{sourceId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMarketDataSource>>,
+        TError,
+        {sourceId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteMarketDataSourceMutationOptions(options));
+    }
+
+export const getListSourceInstrumentMappingsUrl = () => {
+
+
+
+
+  return `/api/market-data/mappings`
+}
+
+/**
+ * @summary List provider-symbol mappings
+ */
+export const listSourceInstrumentMappings = async ( options?: Parameters<typeof customFetch>[1]): Promise<SourceInstrumentMapping[]> => {
+
+  return customFetch<SourceInstrumentMapping[]>(getListSourceInstrumentMappingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSourceInstrumentMappingsQueryKey = () => {
+    return [
+    `/api/market-data/mappings`
+    ] as const;
+    }
+
+
+export const getListSourceInstrumentMappingsQueryOptions = <TData = Awaited<ReturnType<typeof listSourceInstrumentMappings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSourceInstrumentMappings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSourceInstrumentMappingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSourceInstrumentMappings>>> = ({ signal }) => listSourceInstrumentMappings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSourceInstrumentMappings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSourceInstrumentMappingsQueryResult = NonNullable<Awaited<ReturnType<typeof listSourceInstrumentMappings>>>
+export type ListSourceInstrumentMappingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List provider-symbol mappings
+ */
+
+export function useListSourceInstrumentMappings<TData = Awaited<ReturnType<typeof listSourceInstrumentMappings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSourceInstrumentMappings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSourceInstrumentMappingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateSourceInstrumentMappingUrl = () => {
+
+
+
+
+  return `/api/market-data/mappings`
+}
+
+/**
+ * @summary Map a canonical instrument to a provider symbol
+ */
+export const createSourceInstrumentMapping = async (sourceInstrumentMappingInput: SourceInstrumentMappingInput, options?: Parameters<typeof customFetch>[1]): Promise<SourceInstrumentMapping> => {
+
+  return customFetch<SourceInstrumentMapping>(getCreateSourceInstrumentMappingUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceInstrumentMappingInput)
+  }
+);}
+
+
+
+
+
+export const getCreateSourceInstrumentMappingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSourceInstrumentMapping>>, TError,{data: BodyType<SourceInstrumentMappingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSourceInstrumentMapping>>, TError,{data: BodyType<SourceInstrumentMappingInput>}, TContext> => {
+
+const mutationKey = ['createSourceInstrumentMapping'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSourceInstrumentMapping>>, {data: BodyType<SourceInstrumentMappingInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSourceInstrumentMapping(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSourceInstrumentMappingMutationResult = NonNullable<Awaited<ReturnType<typeof createSourceInstrumentMapping>>>
+    export type CreateSourceInstrumentMappingMutationBody = BodyType<SourceInstrumentMappingInput>
+    export type CreateSourceInstrumentMappingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Map a canonical instrument to a provider symbol
+ */
+export const useCreateSourceInstrumentMapping = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSourceInstrumentMapping>>, TError,{data: BodyType<SourceInstrumentMappingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSourceInstrumentMapping>>,
+        TError,
+        {data: BodyType<SourceInstrumentMappingInput>},
+        TContext
+      > => {
+      return useMutation(getCreateSourceInstrumentMappingMutationOptions(options));
+    }
+
+export const getUpdateSourceInstrumentMappingUrl = (mappingId: number,) => {
+
+
+
+
+  return `/api/market-data/mappings/${mappingId}`
+}
+
+/**
+ * @summary Update a provider-symbol mapping
+ */
+export const updateSourceInstrumentMapping = async (mappingId: number,
+    sourceInstrumentMappingUpdate: SourceInstrumentMappingUpdate, options?: Parameters<typeof customFetch>[1]): Promise<SourceInstrumentMapping> => {
+
+  return customFetch<SourceInstrumentMapping>(getUpdateSourceInstrumentMappingUrl(mappingId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceInstrumentMappingUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateSourceInstrumentMappingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSourceInstrumentMapping>>, TError,{mappingId: number;data: BodyType<SourceInstrumentMappingUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSourceInstrumentMapping>>, TError,{mappingId: number;data: BodyType<SourceInstrumentMappingUpdate>}, TContext> => {
+
+const mutationKey = ['updateSourceInstrumentMapping'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSourceInstrumentMapping>>, {mappingId: number;data: BodyType<SourceInstrumentMappingUpdate>}> = (props) => {
+          const {mappingId,data} = props ?? {};
+
+          return  updateSourceInstrumentMapping(mappingId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSourceInstrumentMappingMutationResult = NonNullable<Awaited<ReturnType<typeof updateSourceInstrumentMapping>>>
+    export type UpdateSourceInstrumentMappingMutationBody = BodyType<SourceInstrumentMappingUpdate>
+    export type UpdateSourceInstrumentMappingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a provider-symbol mapping
+ */
+export const useUpdateSourceInstrumentMapping = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSourceInstrumentMapping>>, TError,{mappingId: number;data: BodyType<SourceInstrumentMappingUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSourceInstrumentMapping>>,
+        TError,
+        {mappingId: number;data: BodyType<SourceInstrumentMappingUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateSourceInstrumentMappingMutationOptions(options));
+    }
+
+export const getDeleteSourceInstrumentMappingUrl = (mappingId: number,) => {
+
+
+
+
+  return `/api/market-data/mappings/${mappingId}`
+}
+
+/**
+ * @summary Delete a provider-symbol mapping
+ */
+export const deleteSourceInstrumentMapping = async (mappingId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteSourceInstrumentMappingUrl(mappingId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteSourceInstrumentMappingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSourceInstrumentMapping>>, TError,{mappingId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSourceInstrumentMapping>>, TError,{mappingId: number}, TContext> => {
+
+const mutationKey = ['deleteSourceInstrumentMapping'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSourceInstrumentMapping>>, {mappingId: number}> = (props) => {
+          const {mappingId} = props ?? {};
+
+          return  deleteSourceInstrumentMapping(mappingId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSourceInstrumentMappingMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSourceInstrumentMapping>>>
+
+    export type DeleteSourceInstrumentMappingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a provider-symbol mapping
+ */
+export const useDeleteSourceInstrumentMapping = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSourceInstrumentMapping>>, TError,{mappingId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSourceInstrumentMapping>>,
+        TError,
+        {mappingId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteSourceInstrumentMappingMutationOptions(options));
+    }
+
+export const getListTimeframesUrl = () => {
+
+
+
+
+  return `/api/market-data/timeframes`
+}
+
+/**
+ * @summary List supported candle timeframes
+ */
+export const listTimeframes = async ( options?: Parameters<typeof customFetch>[1]): Promise<Timeframe[]> => {
+
+  return customFetch<Timeframe[]>(getListTimeframesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTimeframesQueryKey = () => {
+    return [
+    `/api/market-data/timeframes`
+    ] as const;
+    }
+
+
+export const getListTimeframesQueryOptions = <TData = Awaited<ReturnType<typeof listTimeframes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTimeframes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTimeframesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTimeframes>>> = ({ signal }) => listTimeframes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTimeframes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTimeframesQueryResult = NonNullable<Awaited<ReturnType<typeof listTimeframes>>>
+export type ListTimeframesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List supported candle timeframes
+ */
+
+export function useListTimeframes<TData = Awaited<ReturnType<typeof listTimeframes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTimeframes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTimeframesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateTimeframeUrl = () => {
+
+
+
+
+  return `/api/market-data/timeframes`
+}
+
+/**
+ * @summary Create a candle timeframe
+ */
+export const createTimeframe = async (timeframeInput: TimeframeInput, options?: Parameters<typeof customFetch>[1]): Promise<Timeframe> => {
+
+  return customFetch<Timeframe>(getCreateTimeframeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(timeframeInput)
+  }
+);}
+
+
+
+
+
+export const getCreateTimeframeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTimeframe>>, TError,{data: BodyType<TimeframeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTimeframe>>, TError,{data: BodyType<TimeframeInput>}, TContext> => {
+
+const mutationKey = ['createTimeframe'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTimeframe>>, {data: BodyType<TimeframeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createTimeframe(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTimeframeMutationResult = NonNullable<Awaited<ReturnType<typeof createTimeframe>>>
+    export type CreateTimeframeMutationBody = BodyType<TimeframeInput>
+    export type CreateTimeframeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a candle timeframe
+ */
+export const useCreateTimeframe = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTimeframe>>, TError,{data: BodyType<TimeframeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTimeframe>>,
+        TError,
+        {data: BodyType<TimeframeInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTimeframeMutationOptions(options));
+    }
+
+export const getUpdateTimeframeUrl = (timeframeId: number,) => {
+
+
+
+
+  return `/api/market-data/timeframes/${timeframeId}`
+}
+
+/**
+ * @summary Update a candle timeframe
+ */
+export const updateTimeframe = async (timeframeId: number,
+    timeframeUpdate: TimeframeUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Timeframe> => {
+
+  return customFetch<Timeframe>(getUpdateTimeframeUrl(timeframeId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(timeframeUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateTimeframeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTimeframe>>, TError,{timeframeId: number;data: BodyType<TimeframeUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTimeframe>>, TError,{timeframeId: number;data: BodyType<TimeframeUpdate>}, TContext> => {
+
+const mutationKey = ['updateTimeframe'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTimeframe>>, {timeframeId: number;data: BodyType<TimeframeUpdate>}> = (props) => {
+          const {timeframeId,data} = props ?? {};
+
+          return  updateTimeframe(timeframeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTimeframeMutationResult = NonNullable<Awaited<ReturnType<typeof updateTimeframe>>>
+    export type UpdateTimeframeMutationBody = BodyType<TimeframeUpdate>
+    export type UpdateTimeframeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a candle timeframe
+ */
+export const useUpdateTimeframe = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTimeframe>>, TError,{timeframeId: number;data: BodyType<TimeframeUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTimeframe>>,
+        TError,
+        {timeframeId: number;data: BodyType<TimeframeUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateTimeframeMutationOptions(options));
+    }
+
+export const getDeleteTimeframeUrl = (timeframeId: number,) => {
+
+
+
+
+  return `/api/market-data/timeframes/${timeframeId}`
+}
+
+/**
+ * @summary Delete an unused candle timeframe
+ */
+export const deleteTimeframe = async (timeframeId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteTimeframeUrl(timeframeId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteTimeframeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTimeframe>>, TError,{timeframeId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTimeframe>>, TError,{timeframeId: number}, TContext> => {
+
+const mutationKey = ['deleteTimeframe'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTimeframe>>, {timeframeId: number}> = (props) => {
+          const {timeframeId} = props ?? {};
+
+          return  deleteTimeframe(timeframeId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTimeframeMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTimeframe>>>
+
+    export type DeleteTimeframeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete an unused candle timeframe
+ */
+export const useDeleteTimeframe = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTimeframe>>, TError,{timeframeId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTimeframe>>,
+        TError,
+        {timeframeId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteTimeframeMutationOptions(options));
+    }
+
+export const getListMarketDataConnectionsUrl = () => {
+
+
+
+
+  return `/api/market-data/connections`
+}
+
+/**
+ * @summary List market-data connection states
+ */
+export const listMarketDataConnections = async ( options?: Parameters<typeof customFetch>[1]): Promise<MarketDataConnection[]> => {
+
+  return customFetch<MarketDataConnection[]>(getListMarketDataConnectionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMarketDataConnectionsQueryKey = () => {
+    return [
+    `/api/market-data/connections`
+    ] as const;
+    }
+
+
+export const getListMarketDataConnectionsQueryOptions = <TData = Awaited<ReturnType<typeof listMarketDataConnections>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketDataConnections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMarketDataConnectionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMarketDataConnections>>> = ({ signal }) => listMarketDataConnections({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMarketDataConnections>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMarketDataConnectionsQueryResult = NonNullable<Awaited<ReturnType<typeof listMarketDataConnections>>>
+export type ListMarketDataConnectionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List market-data connection states
+ */
+
+export function useListMarketDataConnections<TData = Awaited<ReturnType<typeof listMarketDataConnections>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMarketDataConnections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMarketDataConnectionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListCandlesUrl = (params: ListCandlesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/market-data/candles?${stringifiedParams}` : `/api/market-data/candles`
+}
+
+/**
+ * @summary Query stored provider candle data
+ */
+export const listCandles = async (params: ListCandlesParams, options?: Parameters<typeof customFetch>[1]): Promise<Candle[]> => {
+
+  return customFetch<Candle[]>(getListCandlesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCandlesQueryKey = (params?: ListCandlesParams,) => {
+    return [
+    `/api/market-data/candles`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCandlesQueryOptions = <TData = Awaited<ReturnType<typeof listCandles>>, TError = ErrorType<unknown>>(params: ListCandlesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCandles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCandlesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCandles>>> = ({ signal }) => listCandles(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCandles>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCandlesQueryResult = NonNullable<Awaited<ReturnType<typeof listCandles>>>
+export type ListCandlesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Query stored provider candle data
+ */
+
+export function useListCandles<TData = Awaited<ReturnType<typeof listCandles>>, TError = ErrorType<unknown>>(
+ params: ListCandlesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCandles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCandlesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMarketDataSummaryUrl = () => {
+
+
+
+
+  return `/api/market-data/summary`
+}
+
+/**
+ * @summary Summarize configured market-data architecture
+ */
+export const getMarketDataSummary = async ( options?: Parameters<typeof customFetch>[1]): Promise<MarketDataSummary> => {
+
+  return customFetch<MarketDataSummary>(getGetMarketDataSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMarketDataSummaryQueryKey = () => {
+    return [
+    `/api/market-data/summary`
+    ] as const;
+    }
+
+
+export const getGetMarketDataSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getMarketDataSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMarketDataSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMarketDataSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMarketDataSummary>>> = ({ signal }) => getMarketDataSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMarketDataSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMarketDataSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getMarketDataSummary>>>
+export type GetMarketDataSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Summarize configured market-data architecture
+ */
+
+export function useGetMarketDataSummary<TData = Awaited<ReturnType<typeof getMarketDataSummary>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMarketDataSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMarketDataSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListTradesUrl = () => {
 

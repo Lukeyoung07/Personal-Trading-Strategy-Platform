@@ -3,8 +3,10 @@ import { and, asc, count, desc, eq, isNotNull, max, avg, min, sql, sum } from "d
 import {
   db,
   alertsTable,
+  candlesTable,
   conditionsTable,
   marketsTable,
+  sourceInstrumentMappingsTable,
   strategiesTable,
   strategyConditionsTable,
   strategyVersionConditionsTable,
@@ -201,6 +203,14 @@ async function marketSymbol(marketId: number | null) {
   if (marketId == null) return null;
   const [market] = await db.select({ symbol: marketsTable.symbol }).from(marketsTable).where(eq(marketsTable.id, marketId));
   return market?.symbol ?? null;
+}
+
+function marketView(market: typeof marketsTable.$inferSelect) {
+  return {
+    ...market,
+    tickSize: market.tickSize == null ? null : Number(market.tickSize),
+    contractMultiplier: market.contractMultiplier == null ? null : Number(market.contractMultiplier),
+  };
 }
 
 async function snapshotMarketSymbol(executor: any, marketId: number | null) {
@@ -893,7 +903,8 @@ router.delete("/conditions/:conditionId", async (req, res): Promise<void> => {
 });
 
 router.get("/markets", async (_req, res): Promise<void> => {
-  res.json(ListMarketsResponse.parse(await db.select().from(marketsTable).orderBy(asc(marketsTable.symbol))));
+  const rows = await db.select().from(marketsTable).orderBy(asc(marketsTable.symbol));
+  res.json(ListMarketsResponse.parse(rows.map(marketView)));
 });
 
 router.post("/markets", async (req, res): Promise<void> => {
@@ -902,8 +913,12 @@ router.post("/markets", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [created] = await db.insert(marketsTable).values(parsed.data).returning();
-  res.status(201).json(CreateMarketResponse.parse(created));
+  const [created] = await db.insert(marketsTable).values({
+    ...parsed.data,
+    tickSize: parsed.data.tickSize?.toString(),
+    contractMultiplier: parsed.data.contractMultiplier?.toString(),
+  }).returning();
+  res.status(201).json(CreateMarketResponse.parse(marketView(created)));
 });
 
 router.patch("/markets/:marketId", async (req, res): Promise<void> => {
@@ -913,18 +928,32 @@ router.patch("/markets/:marketId", async (req, res): Promise<void> => {
     res.status(400).json({ error: !params.success ? params.error.message : body.success ? "Invalid request body" : body.error.message });
     return;
   }
-  const [updated] = await db.update(marketsTable).set(body.data).where(eq(marketsTable.id, params.data.marketId)).returning();
+  const [updated] = await db.update(marketsTable).set({
+    ...body.data,
+    tickSize: body.data.tickSize === undefined ? undefined : body.data.tickSize?.toString(),
+    contractMultiplier: body.data.contractMultiplier === undefined ? undefined : body.data.contractMultiplier?.toString(),
+  }).where(eq(marketsTable.id, params.data.marketId)).returning();
   if (!updated) {
     res.status(404).json({ error: "Market not found" });
     return;
   }
-  res.json(UpdateMarketResponse.parse(updated));
+  res.json(UpdateMarketResponse.parse(marketView(updated)));
 });
 
 router.delete("/markets/:marketId", async (req, res): Promise<void> => {
   const params = DeleteMarketParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [[candles], [strategies], [versions], [mappings]] = await Promise.all([
+    db.select({ value: count() }).from(candlesTable).where(eq(candlesTable.instrumentId, params.data.marketId)),
+    db.select({ value: count() }).from(strategiesTable).where(eq(strategiesTable.marketId, params.data.marketId)),
+    db.select({ value: count() }).from(strategyVersionsTable).where(eq(strategyVersionsTable.marketId, params.data.marketId)),
+    db.select({ value: count() }).from(sourceInstrumentMappingsTable).where(eq(sourceInstrumentMappingsTable.instrumentId, params.data.marketId)),
+  ]);
+  if ([candles, strategies, versions, mappings].some(row => Number(row?.value ?? 0) > 0)) {
+    res.status(409).json({ error: "Market is referenced by strategy history, provider mappings, or candle data. Deactivate it instead." });
     return;
   }
   const [deleted] = await db.delete(marketsTable).where(eq(marketsTable.id, params.data.marketId)).returning();

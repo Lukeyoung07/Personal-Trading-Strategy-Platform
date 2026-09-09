@@ -7,6 +7,7 @@ import {
   timestamp,
   boolean,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -17,7 +18,7 @@ export const strategiesTable = pgTable("strategies", {
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").notNull().default("draft"),
-  marketId: integer("market_id"),
+  marketId: integer("market_id").references((): AnyPgColumn => marketsTable.id, { onDelete: "restrict" }),
   assetClass: text("asset_class"),
   direction: text("direction").notNull().default("both"),
   timeframes: text("timeframes").array().notNull().default([]),
@@ -41,7 +42,7 @@ export const strategyVersionsTable = pgTable("strategy_versions", {
   exitRules: text("exit_rules"),
   riskRules: text("risk_rules"),
   notes: text("notes"),
-  marketId: integer("market_id"),
+  marketId: integer("market_id").references((): AnyPgColumn => marketsTable.id, { onDelete: "restrict" }),
   marketSymbol: text("market_symbol"),
   assetClass: text("asset_class"),
   direction: text("direction").notNull().default("both"),
@@ -117,11 +118,98 @@ export const conditionsTable = pgTable("conditions", {
 export const marketsTable = pgTable("markets", {
   id: serial("id").primaryKey(),
   assetClass: text("asset_class").notNull(),
+  instrumentType: text("instrument_type").notNull().default("other"),
   venue: text("venue"),
   symbol: text("symbol").notNull(),
+  displayName: text("display_name"),
+  baseCurrency: text("base_currency"),
+  quoteCurrency: text("quote_currency"),
+  exchangeTimezone: text("exchange_timezone"),
+  tickSize: numeric("tick_size"),
+  contractMultiplier: numeric("contract_multiplier"),
+  expiry: text("expiry"),
+  isActive: boolean("is_active").notNull().default(true),
   description: text("description"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
+
+// `markets` is the existing provider-neutral instrument catalog used by
+// strategies and trades. This alias gives Step 5 services domain terminology
+// without duplicating the catalog or breaking the existing Builder contract.
+export const instrumentsTable = marketsTable;
+
+export const marketDataSourcesTable = pgTable("market_data_sources", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  providerKey: text("provider_key"),
+  sourceType: text("source_type").notNull().default("other"),
+  description: text("description"),
+  capabilities: text("capabilities").array().notNull().default([]),
+  configurationStatus: text("configuration_status").notNull().default("not_configured"),
+  isEnabled: boolean("is_enabled").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, table => [
+  uniqueIndex("market_data_sources_name_unique").on(table.name),
+]);
+
+export const sourceInstrumentMappingsTable = pgTable("source_instrument_mappings", {
+  id: serial("id").primaryKey(),
+  sourceId: integer("source_id").notNull().references(() => marketDataSourcesTable.id, { onDelete: "cascade" }),
+  instrumentId: integer("instrument_id").notNull().references(() => marketsTable.id, { onDelete: "restrict" }),
+  providerSymbol: text("provider_symbol").notNull(),
+  providerMetadata: text("provider_metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, table => [
+  uniqueIndex("source_instrument_mapping_pair_unique").on(table.sourceId, table.instrumentId),
+  uniqueIndex("source_instrument_mapping_symbol_unique").on(table.sourceId, table.providerSymbol),
+]);
+
+export const timeframesTable = pgTable("timeframes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull(),
+  label: text("label").notNull(),
+  durationSeconds: integer("duration_seconds").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, table => [
+  uniqueIndex("timeframes_code_unique").on(table.code),
+]);
+
+export const marketDataConnectionsTable = pgTable("market_data_connections", {
+  id: serial("id").primaryKey(),
+  sourceId: integer("source_id").notNull().references(() => marketDataSourcesTable.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("disconnected"),
+  statusMessage: text("status_message"),
+  lastConnectedAt: timestamp("last_connected_at", { withTimezone: true }),
+  lastDataAt: timestamp("last_data_at", { withTimezone: true }),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, table => [
+  uniqueIndex("market_data_connections_source_unique").on(table.sourceId),
+]);
+
+export const candlesTable = pgTable("candles", {
+  id: serial("id").primaryKey(),
+  instrumentId: integer("instrument_id").notNull().references(() => marketsTable.id, { onDelete: "restrict" }),
+  sourceId: integer("source_id").notNull().references(() => marketDataSourcesTable.id, { onDelete: "restrict" }),
+  timeframeId: integer("timeframe_id").notNull().references(() => timeframesTable.id, { onDelete: "restrict" }),
+  openTime: timestamp("open_time", { withTimezone: true }).notNull(),
+  closeTime: timestamp("close_time", { withTimezone: true }),
+  open: numeric("open").notNull(),
+  high: numeric("high").notNull(),
+  low: numeric("low").notNull(),
+  close: numeric("close").notNull(),
+  volume: numeric("volume"),
+  isClosed: boolean("is_closed").notNull().default(true),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  uniqueIndex("candles_series_open_unique").on(table.instrumentId, table.sourceId, table.timeframeId, table.openTime),
+]);
 
 export const tradesTable = pgTable("trades", {
   id: serial("id").primaryKey(),
@@ -176,7 +264,12 @@ export const insertStrategyVersionSchema = createInsertSchema(strategyVersionsTa
 export const insertStrategyVersionConditionSchema = createInsertSchema(strategyVersionConditionsTable).omit({ id: true, createdAt: true });
 export const insertTradingConceptSchema = createInsertSchema(tradingConceptsTable).omit({ id: true, createdAt: true });
 export const insertConditionSchema = createInsertSchema(conditionsTable).omit({ id: true, createdAt: true });
-export const insertMarketSchema = createInsertSchema(marketsTable).omit({ id: true, createdAt: true });
+export const insertMarketSchema = createInsertSchema(marketsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMarketDataSourceSchema = createInsertSchema(marketDataSourcesTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSourceInstrumentMappingSchema = createInsertSchema(sourceInstrumentMappingsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTimeframeSchema = createInsertSchema(timeframesTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMarketDataConnectionSchema = createInsertSchema(marketDataConnectionsTable).omit({ id: true, updatedAt: true });
+export const insertCandleSchema = createInsertSchema(candlesTable).omit({ id: true, receivedAt: true });
 export const insertTradeSchema = createInsertSchema(tradesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPerformanceRecordSchema = createInsertSchema(performanceRecordsTable).omit({ id: true, createdAt: true });
 export const insertAlertSchema = createInsertSchema(alertsTable).omit({ id: true, createdAt: true, updatedAt: true });
@@ -189,6 +282,12 @@ export type StrategyCondition = typeof strategyConditionsTable.$inferSelect;
 export type TradingConcept = typeof tradingConceptsTable.$inferSelect;
 export type Condition = typeof conditionsTable.$inferSelect;
 export type Market = typeof marketsTable.$inferSelect;
+export type Instrument = typeof instrumentsTable.$inferSelect;
+export type MarketDataSource = typeof marketDataSourcesTable.$inferSelect;
+export type SourceInstrumentMapping = typeof sourceInstrumentMappingsTable.$inferSelect;
+export type Timeframe = typeof timeframesTable.$inferSelect;
+export type MarketDataConnection = typeof marketDataConnectionsTable.$inferSelect;
+export type Candle = typeof candlesTable.$inferSelect;
 export type Trade = typeof tradesTable.$inferSelect;
 export type PerformanceRecord = typeof performanceRecordsTable.$inferSelect;
 export type Alert = typeof alertsTable.$inferSelect;
@@ -201,6 +300,11 @@ export type InsertStrategyCondition = z.infer<typeof insertStrategyConditionSche
 export type InsertTradingConcept = z.infer<typeof insertTradingConceptSchema>;
 export type InsertCondition = z.infer<typeof insertConditionSchema>;
 export type InsertMarket = z.infer<typeof insertMarketSchema>;
+export type InsertMarketDataSource = z.infer<typeof insertMarketDataSourceSchema>;
+export type InsertSourceInstrumentMapping = z.infer<typeof insertSourceInstrumentMappingSchema>;
+export type InsertTimeframe = z.infer<typeof insertTimeframeSchema>;
+export type InsertMarketDataConnection = z.infer<typeof insertMarketDataConnectionSchema>;
+export type InsertCandle = z.infer<typeof insertCandleSchema>;
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
 export type InsertPerformanceRecord = z.infer<typeof insertPerformanceRecordSchema>;
 export type InsertAlert = z.infer<typeof insertAlertSchema>;

@@ -804,10 +804,20 @@ export const DeleteConditionResponse = zod.void()
 export const ListMarketsResponseItem = zod.object({
   "id": zod.number().int(),
   "assetClass": zod.string(),
+  "instrumentType": zod.string(),
   "venue": zod.string().nullable(),
   "symbol": zod.string(),
+  "displayName": zod.string().nullable(),
+  "baseCurrency": zod.string().nullable(),
+  "quoteCurrency": zod.string().nullable(),
+  "exchangeTimezone": zod.string().nullable(),
+  "tickSize": zod.number().nullable(),
+  "contractMultiplier": zod.number().nullable(),
+  "expiry": zod.string().nullable(),
+  "isActive": zod.boolean(),
   "description": zod.string().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
 })
 export const ListMarketsResponse = zod.array(ListMarketsResponseItem)
 
@@ -817,22 +827,45 @@ export const ListMarketsResponse = zod.array(ListMarketsResponseItem)
  */
 
 
+export const createMarketBodyTickSizeExclusiveMin = 0;
+
+export const createMarketBodyContractMultiplierExclusiveMin = 0;
+
 
 
 export const CreateMarketBody = zod.object({
   "assetClass": zod.string().min(1),
+  "instrumentType": zod.string().optional(),
   "venue": zod.string().nullish(),
   "symbol": zod.string().min(1),
+  "displayName": zod.string().nullish(),
+  "baseCurrency": zod.string().nullish(),
+  "quoteCurrency": zod.string().nullish(),
+  "exchangeTimezone": zod.string().nullish(),
+  "tickSize": zod.number().gt(createMarketBodyTickSizeExclusiveMin).nullish(),
+  "contractMultiplier": zod.number().gt(createMarketBodyContractMultiplierExclusiveMin).nullish(),
+  "expiry": zod.string().nullish(),
+  "isActive": zod.boolean().optional(),
   "description": zod.string().nullish()
 })
 
 export const CreateMarketResponse = zod.object({
   "id": zod.number().int(),
   "assetClass": zod.string(),
+  "instrumentType": zod.string(),
   "venue": zod.string().nullable(),
   "symbol": zod.string(),
+  "displayName": zod.string().nullable(),
+  "baseCurrency": zod.string().nullable(),
+  "quoteCurrency": zod.string().nullable(),
+  "exchangeTimezone": zod.string().nullable(),
+  "tickSize": zod.number().nullable(),
+  "contractMultiplier": zod.number().nullable(),
+  "expiry": zod.string().nullable(),
+  "isActive": zod.boolean(),
   "description": zod.string().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
 })
 
 
@@ -848,22 +881,45 @@ export const UpdateMarketParams = zod.object({
 
 
 
+export const updateMarketBodyTickSizeExclusiveMin = 0;
+
+export const updateMarketBodyContractMultiplierExclusiveMin = 0;
+
 
 
 export const UpdateMarketBody = zod.object({
   "assetClass": zod.string().min(1).optional(),
+  "instrumentType": zod.string().optional(),
   "venue": zod.string().nullish(),
   "symbol": zod.string().min(1).optional(),
+  "displayName": zod.string().nullish(),
+  "baseCurrency": zod.string().nullish(),
+  "quoteCurrency": zod.string().nullish(),
+  "exchangeTimezone": zod.string().nullish(),
+  "tickSize": zod.number().gt(updateMarketBodyTickSizeExclusiveMin).nullish(),
+  "contractMultiplier": zod.number().gt(updateMarketBodyContractMultiplierExclusiveMin).nullish(),
+  "expiry": zod.string().nullish(),
+  "isActive": zod.boolean().optional(),
   "description": zod.string().nullish()
 })
 
 export const UpdateMarketResponse = zod.object({
   "id": zod.number().int(),
   "assetClass": zod.string(),
+  "instrumentType": zod.string(),
   "venue": zod.string().nullable(),
   "symbol": zod.string(),
+  "displayName": zod.string().nullable(),
+  "baseCurrency": zod.string().nullable(),
+  "quoteCurrency": zod.string().nullable(),
+  "exchangeTimezone": zod.string().nullable(),
+  "tickSize": zod.number().nullable(),
+  "contractMultiplier": zod.number().nullable(),
+  "expiry": zod.string().nullable(),
+  "isActive": zod.boolean(),
   "description": zod.string().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
 })
 
 
@@ -878,6 +934,495 @@ export const DeleteMarketParams = zod.object({
 })
 
 export const DeleteMarketResponse = zod.void()
+
+
+/**
+ * @summary List provider-neutral instruments
+ */
+export const ListInstrumentsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "assetClass": zod.string(),
+  "instrumentType": zod.enum(['future', 'forex', 'stock', 'index', 'commodity', 'crypto', 'other']),
+  "venue": zod.string().nullable(),
+  "symbol": zod.string(),
+  "displayName": zod.string().nullable(),
+  "baseCurrency": zod.string().nullable(),
+  "quoteCurrency": zod.string().nullable(),
+  "exchangeTimezone": zod.string().nullable(),
+  "tickSize": zod.number().nullable(),
+  "contractMultiplier": zod.number().nullable(),
+  "expiry": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "description": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListInstrumentsResponse = zod.array(ListInstrumentsResponseItem)
+
+
+/**
+ * @summary Create a provider-neutral instrument
+ */
+
+
+export const createInstrumentBodyTickSizeExclusiveMin = 0;
+
+export const createInstrumentBodyContractMultiplierExclusiveMin = 0;
+
+export const createInstrumentBodyIsActiveDefault = true;
+
+export const CreateInstrumentBody = zod.object({
+  "assetClass": zod.string().min(1),
+  "instrumentType": zod.enum(['future', 'forex', 'stock', 'index', 'commodity', 'crypto', 'other']),
+  "venue": zod.string().nullish(),
+  "symbol": zod.string().min(1),
+  "displayName": zod.string().nullish(),
+  "baseCurrency": zod.string().nullish(),
+  "quoteCurrency": zod.string().nullish(),
+  "exchangeTimezone": zod.string().nullish(),
+  "tickSize": zod.number().gt(createInstrumentBodyTickSizeExclusiveMin).nullish(),
+  "contractMultiplier": zod.number().gt(createInstrumentBodyContractMultiplierExclusiveMin).nullish(),
+  "expiry": zod.string().nullish(),
+  "isActive": zod.boolean().default(createInstrumentBodyIsActiveDefault),
+  "description": zod.string().nullish()
+})
+
+export const CreateInstrumentResponse = zod.object({
+  "id": zod.number().int(),
+  "assetClass": zod.string(),
+  "instrumentType": zod.enum(['future', 'forex', 'stock', 'index', 'commodity', 'crypto', 'other']),
+  "venue": zod.string().nullable(),
+  "symbol": zod.string(),
+  "displayName": zod.string().nullable(),
+  "baseCurrency": zod.string().nullable(),
+  "quoteCurrency": zod.string().nullable(),
+  "exchangeTimezone": zod.string().nullable(),
+  "tickSize": zod.number().nullable(),
+  "contractMultiplier": zod.number().nullable(),
+  "expiry": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "description": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a provider-neutral instrument
+ */
+
+
+
+export const UpdateInstrumentParams = zod.object({
+  "instrumentId": zod.coerce.number().int().min(1)
+})
+
+
+
+export const updateInstrumentBodyTickSizeExclusiveMin = 0;
+
+export const updateInstrumentBodyContractMultiplierExclusiveMin = 0;
+
+
+
+export const UpdateInstrumentBody = zod.object({
+  "assetClass": zod.string().min(1).optional(),
+  "instrumentType": zod.enum(['future', 'forex', 'stock', 'index', 'commodity', 'crypto', 'other']).optional(),
+  "venue": zod.string().nullish(),
+  "symbol": zod.string().min(1).optional(),
+  "displayName": zod.string().nullish(),
+  "baseCurrency": zod.string().nullish(),
+  "quoteCurrency": zod.string().nullish(),
+  "exchangeTimezone": zod.string().nullish(),
+  "tickSize": zod.number().gt(updateInstrumentBodyTickSizeExclusiveMin).nullish(),
+  "contractMultiplier": zod.number().gt(updateInstrumentBodyContractMultiplierExclusiveMin).nullish(),
+  "expiry": zod.string().nullish(),
+  "isActive": zod.boolean().optional(),
+  "description": zod.string().nullish()
+})
+
+export const UpdateInstrumentResponse = zod.object({
+  "id": zod.number().int(),
+  "assetClass": zod.string(),
+  "instrumentType": zod.enum(['future', 'forex', 'stock', 'index', 'commodity', 'crypto', 'other']),
+  "venue": zod.string().nullable(),
+  "symbol": zod.string(),
+  "displayName": zod.string().nullable(),
+  "baseCurrency": zod.string().nullable(),
+  "quoteCurrency": zod.string().nullable(),
+  "exchangeTimezone": zod.string().nullable(),
+  "tickSize": zod.number().nullable(),
+  "contractMultiplier": zod.number().nullable(),
+  "expiry": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "description": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete an unused instrument
+ */
+
+
+
+export const DeleteInstrumentParams = zod.object({
+  "instrumentId": zod.coerce.number().int().min(1)
+})
+
+export const DeleteInstrumentResponse = zod.void()
+
+
+/**
+ * @summary List market-data source configurations
+ */
+export const ListMarketDataSourcesResponseItem = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "providerKey": zod.string().nullable(),
+  "sourceType": zod.enum(['rest', 'websocket', 'file', 'other']),
+  "description": zod.string().nullable(),
+  "capabilities": zod.array(zod.enum(['realtime', 'candles', 'historical', 'sessions'])),
+  "configurationStatus": zod.enum(['not_configured', 'configured', 'disabled']),
+  "isEnabled": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListMarketDataSourcesResponse = zod.array(ListMarketDataSourcesResponseItem)
+
+
+/**
+ * @summary Register a future market-data source without credentials
+ */
+
+
+
+export const CreateMarketDataSourceBody = zod.object({
+  "name": zod.string().min(1),
+  "providerKey": zod.string().nullish(),
+  "sourceType": zod.enum(['rest', 'websocket', 'file', 'other']),
+  "description": zod.string().nullish(),
+  "capabilities": zod.array(zod.enum(['realtime', 'candles', 'historical', 'sessions'])).optional(),
+  "configurationStatus": zod.enum(['not_configured', 'configured', 'disabled']).optional(),
+  "isEnabled": zod.boolean().optional()
+})
+
+export const CreateMarketDataSourceResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "providerKey": zod.string().nullable(),
+  "sourceType": zod.enum(['rest', 'websocket', 'file', 'other']),
+  "description": zod.string().nullable(),
+  "capabilities": zod.array(zod.enum(['realtime', 'candles', 'historical', 'sessions'])),
+  "configurationStatus": zod.enum(['not_configured', 'configured', 'disabled']),
+  "isEnabled": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a market-data source configuration
+ */
+
+
+
+export const UpdateMarketDataSourceParams = zod.object({
+  "sourceId": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const UpdateMarketDataSourceBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "providerKey": zod.string().nullish(),
+  "sourceType": zod.enum(['rest', 'websocket', 'file', 'other']).optional(),
+  "description": zod.string().nullish(),
+  "capabilities": zod.array(zod.enum(['realtime', 'candles', 'historical', 'sessions'])).optional(),
+  "configurationStatus": zod.enum(['not_configured', 'configured', 'disabled']).optional(),
+  "isEnabled": zod.boolean().optional()
+})
+
+export const UpdateMarketDataSourceResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "providerKey": zod.string().nullable(),
+  "sourceType": zod.enum(['rest', 'websocket', 'file', 'other']),
+  "description": zod.string().nullable(),
+  "capabilities": zod.array(zod.enum(['realtime', 'candles', 'historical', 'sessions'])),
+  "configurationStatus": zod.enum(['not_configured', 'configured', 'disabled']),
+  "isEnabled": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete an unused market-data source
+ */
+
+
+
+export const DeleteMarketDataSourceParams = zod.object({
+  "sourceId": zod.coerce.number().int().min(1)
+})
+
+export const DeleteMarketDataSourceResponse = zod.void()
+
+
+/**
+ * @summary List provider-symbol mappings
+ */
+export const ListSourceInstrumentMappingsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "sourceId": zod.number().int(),
+  "sourceName": zod.string(),
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "providerSymbol": zod.string(),
+  "providerMetadata": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListSourceInstrumentMappingsResponse = zod.array(ListSourceInstrumentMappingsResponseItem)
+
+
+/**
+ * @summary Map a canonical instrument to a provider symbol
+ */
+
+
+
+
+
+export const CreateSourceInstrumentMappingBody = zod.object({
+  "sourceId": zod.number().int().min(1),
+  "instrumentId": zod.number().int().min(1),
+  "providerSymbol": zod.string().min(1),
+  "providerMetadata": zod.string().nullish()
+})
+
+export const CreateSourceInstrumentMappingResponse = zod.object({
+  "id": zod.number().int(),
+  "sourceId": zod.number().int(),
+  "sourceName": zod.string(),
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "providerSymbol": zod.string(),
+  "providerMetadata": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a provider-symbol mapping
+ */
+
+
+
+export const UpdateSourceInstrumentMappingParams = zod.object({
+  "mappingId": zod.coerce.number().int().min(1)
+})
+
+
+
+
+
+
+export const UpdateSourceInstrumentMappingBody = zod.object({
+  "sourceId": zod.number().int().min(1).optional(),
+  "instrumentId": zod.number().int().min(1).optional(),
+  "providerSymbol": zod.string().min(1).optional(),
+  "providerMetadata": zod.string().nullish()
+})
+
+export const UpdateSourceInstrumentMappingResponse = zod.object({
+  "id": zod.number().int(),
+  "sourceId": zod.number().int(),
+  "sourceName": zod.string(),
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "providerSymbol": zod.string(),
+  "providerMetadata": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete a provider-symbol mapping
+ */
+
+
+
+export const DeleteSourceInstrumentMappingParams = zod.object({
+  "mappingId": zod.coerce.number().int().min(1)
+})
+
+export const DeleteSourceInstrumentMappingResponse = zod.void()
+
+
+/**
+ * @summary List supported candle timeframes
+ */
+export const ListTimeframesResponseItem = zod.object({
+  "id": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "durationSeconds": zod.number().int(),
+  "description": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListTimeframesResponse = zod.array(ListTimeframesResponseItem)
+
+
+/**
+ * @summary Create a candle timeframe
+ */
+
+
+
+
+
+export const CreateTimeframeBody = zod.object({
+  "code": zod.string().min(1),
+  "label": zod.string().min(1),
+  "durationSeconds": zod.number().int().min(1),
+  "description": zod.string().nullish(),
+  "isActive": zod.boolean().optional()
+})
+
+export const CreateTimeframeResponse = zod.object({
+  "id": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "durationSeconds": zod.number().int(),
+  "description": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a candle timeframe
+ */
+
+
+
+export const UpdateTimeframeParams = zod.object({
+  "timeframeId": zod.coerce.number().int().min(1)
+})
+
+
+
+
+
+
+export const UpdateTimeframeBody = zod.object({
+  "code": zod.string().min(1).optional(),
+  "label": zod.string().min(1).optional(),
+  "durationSeconds": zod.number().int().min(1).optional(),
+  "description": zod.string().nullish(),
+  "isActive": zod.boolean().optional()
+})
+
+export const UpdateTimeframeResponse = zod.object({
+  "id": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "durationSeconds": zod.number().int(),
+  "description": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete an unused candle timeframe
+ */
+
+
+
+export const DeleteTimeframeParams = zod.object({
+  "timeframeId": zod.coerce.number().int().min(1)
+})
+
+export const DeleteTimeframeResponse = zod.void()
+
+
+/**
+ * @summary List market-data connection states
+ */
+export const ListMarketDataConnectionsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "sourceId": zod.number().int(),
+  "sourceName": zod.string(),
+  "status": zod.enum(['disconnected', 'connecting', 'connected', 'degraded', 'error']),
+  "statusMessage": zod.string().nullable(),
+  "lastConnectedAt": zod.coerce.date().nullable(),
+  "lastDataAt": zod.coerce.date().nullable(),
+  "checkedAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListMarketDataConnectionsResponse = zod.array(ListMarketDataConnectionsResponseItem)
+
+
+/**
+ * @summary Query stored provider candle data
+ */
+
+
+
+export const listCandlesQueryLimitDefault = 500;
+export const listCandlesQueryLimitMax = 2000;
+
+
+
+export const ListCandlesQueryParams = zod.object({
+  "instrumentId": zod.coerce.number().int().min(1),
+  "timeframeId": zod.coerce.number().int().min(1),
+  "sourceId": zod.coerce.number().int().min(1).optional(),
+  "from": zod.date().optional(),
+  "to": zod.date().optional(),
+  "limit": zod.coerce.number().int().min(1).max(listCandlesQueryLimitMax).default(listCandlesQueryLimitDefault)
+})
+
+export const ListCandlesResponseItem = zod.object({
+  "id": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "sourceId": zod.number().int(),
+  "timeframeId": zod.number().int(),
+  "openTime": zod.coerce.date(),
+  "closeTime": zod.coerce.date().nullable(),
+  "open": zod.number(),
+  "high": zod.number(),
+  "low": zod.number(),
+  "close": zod.number(),
+  "volume": zod.number().nullable(),
+  "isClosed": zod.boolean(),
+  "receivedAt": zod.coerce.date()
+})
+export const ListCandlesResponse = zod.array(ListCandlesResponseItem)
+
+
+/**
+ * @summary Summarize configured market-data architecture
+ */
+export const GetMarketDataSummaryResponse = zod.object({
+  "instrumentCount": zod.number().int(),
+  "sourceCount": zod.number().int(),
+  "timeframeCount": zod.number().int(),
+  "candleCount": zod.number().int(),
+  "connectedSourceCount": zod.number().int(),
+  "latestDataAt": zod.coerce.date().nullable()
+})
 
 
 /**

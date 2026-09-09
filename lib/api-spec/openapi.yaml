@@ -505,6 +505,311 @@ paths:
       responses:
         "204":
           description: Deleted
+  /instruments:
+    get:
+      operationId: listInstruments
+      tags: [market-data]
+      summary: List provider-neutral instruments
+      responses:
+        "200":
+          description: Instrument catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Instrument"
+    post:
+      operationId: createInstrument
+      tags: [market-data]
+      summary: Create a provider-neutral instrument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstrumentInput"
+      responses:
+        "201":
+          description: Created instrument
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instrument"
+  /instruments/{instrumentId}:
+    patch:
+      operationId: updateInstrument
+      tags: [market-data]
+      summary: Update a provider-neutral instrument
+      parameters:
+        - $ref: "#/components/parameters/InstrumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstrumentUpdate"
+      responses:
+        "200":
+          description: Updated instrument
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Instrument"
+    delete:
+      operationId: deleteInstrument
+      tags: [market-data]
+      summary: Delete an unused instrument
+      parameters:
+        - $ref: "#/components/parameters/InstrumentId"
+      responses:
+        "204":
+          description: Deleted
+  /market-data/sources:
+    get:
+      operationId: listMarketDataSources
+      tags: [market-data]
+      summary: List market-data source configurations
+      responses:
+        "200":
+          description: Source list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketDataSource"
+    post:
+      operationId: createMarketDataSource
+      tags: [market-data]
+      summary: Register a future market-data source without credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarketDataSourceInput"
+      responses:
+        "201":
+          description: Created source
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketDataSource"
+  /market-data/sources/{sourceId}:
+    patch:
+      operationId: updateMarketDataSource
+      tags: [market-data]
+      summary: Update a market-data source configuration
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarketDataSourceUpdate"
+      responses:
+        "200":
+          description: Updated source
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketDataSource"
+    delete:
+      operationId: deleteMarketDataSource
+      tags: [market-data]
+      summary: Delete an unused market-data source
+      parameters:
+        - $ref: "#/components/parameters/SourceId"
+      responses:
+        "204":
+          description: Deleted
+  /market-data/mappings:
+    get:
+      operationId: listSourceInstrumentMappings
+      tags: [market-data]
+      summary: List provider-symbol mappings
+      responses:
+        "200":
+          description: Source instrument mappings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SourceInstrumentMapping"
+    post:
+      operationId: createSourceInstrumentMapping
+      tags: [market-data]
+      summary: Map a canonical instrument to a provider symbol
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SourceInstrumentMappingInput"
+      responses:
+        "201":
+          description: Created mapping
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceInstrumentMapping"
+  /market-data/mappings/{mappingId}:
+    patch:
+      operationId: updateSourceInstrumentMapping
+      tags: [market-data]
+      summary: Update a provider-symbol mapping
+      parameters:
+        - $ref: "#/components/parameters/MappingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SourceInstrumentMappingUpdate"
+      responses:
+        "200":
+          description: Updated mapping
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceInstrumentMapping"
+    delete:
+      operationId: deleteSourceInstrumentMapping
+      tags: [market-data]
+      summary: Delete a provider-symbol mapping
+      parameters:
+        - $ref: "#/components/parameters/MappingId"
+      responses:
+        "204":
+          description: Deleted
+  /market-data/timeframes:
+    get:
+      operationId: listTimeframes
+      tags: [market-data]
+      summary: List supported candle timeframes
+      responses:
+        "200":
+          description: Timeframe list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Timeframe"
+    post:
+      operationId: createTimeframe
+      tags: [market-data]
+      summary: Create a candle timeframe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeframeInput"
+      responses:
+        "201":
+          description: Created timeframe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timeframe"
+  /market-data/timeframes/{timeframeId}:
+    patch:
+      operationId: updateTimeframe
+      tags: [market-data]
+      summary: Update a candle timeframe
+      parameters:
+        - $ref: "#/components/parameters/TimeframeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeframeUpdate"
+      responses:
+        "200":
+          description: Updated timeframe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timeframe"
+    delete:
+      operationId: deleteTimeframe
+      tags: [market-data]
+      summary: Delete an unused candle timeframe
+      parameters:
+        - $ref: "#/components/parameters/TimeframeId"
+      responses:
+        "204":
+          description: Deleted
+  /market-data/connections:
+    get:
+      operationId: listMarketDataConnections
+      tags: [market-data]
+      summary: List market-data connection states
+      responses:
+        "200":
+          description: Connection states
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketDataConnection"
+  /market-data/candles:
+    get:
+      operationId: listCandles
+      tags: [market-data]
+      summary: Query stored provider candle data
+      parameters:
+        - name: instrumentId
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: timeframeId
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: sourceId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 2000, default: 500 }
+      responses:
+        "200":
+          description: Candle series, empty when no provider has ingested data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Candle"
+  /market-data/summary:
+    get:
+      operationId: getMarketDataSummary
+      tags: [market-data]
+      summary: Summarize configured market-data architecture
+      responses:
+        "200":
+          description: Architecture summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketDataSummary"
   /trades:
     get:
       operationId: listTrades
@@ -690,6 +995,26 @@ components:
       schema: { type: integer, minimum: 1 }
     MarketId:
       name: marketId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    InstrumentId:
+      name: instrumentId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    SourceId:
+      name: sourceId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    TimeframeId:
+      name: timeframeId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    MappingId:
+      name: mappingId
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
@@ -1012,29 +1337,274 @@ components:
         definition: { type: ["string", "null"] }
     Market:
       type: object
-      required: [id, assetClass, venue, symbol, description, createdAt]
+      required: [id, assetClass, instrumentType, venue, symbol, displayName, baseCurrency, quoteCurrency, exchangeTimezone, tickSize, contractMultiplier, expiry, isActive, description, createdAt, updatedAt]
       properties:
         id: { type: integer }
         assetClass: { type: string }
+        instrumentType: { type: string }
         venue: { type: ["string", "null"] }
         symbol: { type: string }
+        displayName: { type: ["string", "null"] }
+        baseCurrency: { type: ["string", "null"] }
+        quoteCurrency: { type: ["string", "null"] }
+        exchangeTimezone: { type: ["string", "null"] }
+        tickSize: { type: ["number", "null"] }
+        contractMultiplier: { type: ["number", "null"] }
+        expiry: { type: ["string", "null"] }
+        isActive: { type: boolean }
         description: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     MarketInput:
       type: object
       required: [assetClass, symbol]
       properties:
         assetClass: { type: string, minLength: 1 }
+        instrumentType: { type: string }
         venue: { type: ["string", "null"] }
         symbol: { type: string, minLength: 1 }
+        displayName: { type: ["string", "null"] }
+        baseCurrency: { type: ["string", "null"] }
+        quoteCurrency: { type: ["string", "null"] }
+        exchangeTimezone: { type: ["string", "null"] }
+        tickSize: { type: ["number", "null"], exclusiveMinimum: 0 }
+        contractMultiplier: { type: ["number", "null"], exclusiveMinimum: 0 }
+        expiry: { type: ["string", "null"] }
+        isActive: { type: boolean }
         description: { type: ["string", "null"] }
     MarketUpdate:
       type: object
       properties:
         assetClass: { type: string, minLength: 1 }
+        instrumentType: { type: string }
         venue: { type: ["string", "null"] }
         symbol: { type: string, minLength: 1 }
+        displayName: { type: ["string", "null"] }
+        baseCurrency: { type: ["string", "null"] }
+        quoteCurrency: { type: ["string", "null"] }
+        exchangeTimezone: { type: ["string", "null"] }
+        tickSize: { type: ["number", "null"], exclusiveMinimum: 0 }
+        contractMultiplier: { type: ["number", "null"], exclusiveMinimum: 0 }
+        expiry: { type: ["string", "null"] }
+        isActive: { type: boolean }
         description: { type: ["string", "null"] }
+    Instrument:
+      type: object
+      required: [id, assetClass, instrumentType, venue, symbol, displayName, baseCurrency, quoteCurrency, exchangeTimezone, tickSize, contractMultiplier, expiry, isActive, description, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        assetClass: { type: string }
+        instrumentType:
+          type: string
+          enum: [future, forex, stock, index, commodity, crypto, other]
+        venue: { type: ["string", "null"] }
+        symbol: { type: string }
+        displayName: { type: ["string", "null"] }
+        baseCurrency: { type: ["string", "null"] }
+        quoteCurrency: { type: ["string", "null"] }
+        exchangeTimezone: { type: ["string", "null"] }
+        tickSize: { type: ["number", "null"] }
+        contractMultiplier: { type: ["number", "null"] }
+        expiry: { type: ["string", "null"] }
+        isActive: { type: boolean }
+        description: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    InstrumentInput:
+      type: object
+      required: [assetClass, instrumentType, symbol]
+      properties:
+        assetClass: { type: string, minLength: 1 }
+        instrumentType:
+          type: string
+          enum: [future, forex, stock, index, commodity, crypto, other]
+        venue: { type: ["string", "null"] }
+        symbol: { type: string, minLength: 1 }
+        displayName: { type: ["string", "null"] }
+        baseCurrency: { type: ["string", "null"] }
+        quoteCurrency: { type: ["string", "null"] }
+        exchangeTimezone: { type: ["string", "null"] }
+        tickSize: { type: ["number", "null"], exclusiveMinimum: 0 }
+        contractMultiplier: { type: ["number", "null"], exclusiveMinimum: 0 }
+        expiry: { type: ["string", "null"] }
+        isActive: { type: boolean, default: true }
+        description: { type: ["string", "null"] }
+    InstrumentUpdate:
+      type: object
+      properties:
+        assetClass: { type: string, minLength: 1 }
+        instrumentType:
+          type: string
+          enum: [future, forex, stock, index, commodity, crypto, other]
+        venue: { type: ["string", "null"] }
+        symbol: { type: string, minLength: 1 }
+        displayName: { type: ["string", "null"] }
+        baseCurrency: { type: ["string", "null"] }
+        quoteCurrency: { type: ["string", "null"] }
+        exchangeTimezone: { type: ["string", "null"] }
+        tickSize: { type: ["number", "null"], exclusiveMinimum: 0 }
+        contractMultiplier: { type: ["number", "null"], exclusiveMinimum: 0 }
+        expiry: { type: ["string", "null"] }
+        isActive: { type: boolean }
+        description: { type: ["string", "null"] }
+    MarketDataSource:
+      type: object
+      required: [id, name, providerKey, sourceType, description, capabilities, configurationStatus, isEnabled, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        providerKey: { type: ["string", "null"] }
+        sourceType:
+          type: string
+          enum: [rest, websocket, file, other]
+        description: { type: ["string", "null"] }
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [realtime, candles, historical, sessions]
+        configurationStatus:
+          type: string
+          enum: [not_configured, configured, disabled]
+        isEnabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    MarketDataSourceInput:
+      type: object
+      required: [name, sourceType]
+      properties:
+        name: { type: string, minLength: 1 }
+        providerKey: { type: ["string", "null"] }
+        sourceType:
+          type: string
+          enum: [rest, websocket, file, other]
+        description: { type: ["string", "null"] }
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [realtime, candles, historical, sessions]
+        configurationStatus:
+          type: string
+          enum: [not_configured, configured, disabled]
+        isEnabled: { type: boolean }
+    MarketDataSourceUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        providerKey: { type: ["string", "null"] }
+        sourceType:
+          type: string
+          enum: [rest, websocket, file, other]
+        description: { type: ["string", "null"] }
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [realtime, candles, historical, sessions]
+        configurationStatus:
+          type: string
+          enum: [not_configured, configured, disabled]
+        isEnabled: { type: boolean }
+    SourceInstrumentMapping:
+      type: object
+      required: [id, sourceId, sourceName, instrumentId, instrumentSymbol, providerSymbol, providerMetadata, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        sourceId: { type: integer }
+        sourceName: { type: string }
+        instrumentId: { type: integer }
+        instrumentSymbol: { type: string }
+        providerSymbol: { type: string }
+        providerMetadata: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    SourceInstrumentMappingInput:
+      type: object
+      required: [sourceId, instrumentId, providerSymbol]
+      properties:
+        sourceId: { type: integer, minimum: 1 }
+        instrumentId: { type: integer, minimum: 1 }
+        providerSymbol: { type: string, minLength: 1 }
+        providerMetadata: { type: ["string", "null"] }
+    SourceInstrumentMappingUpdate:
+      type: object
+      properties:
+        sourceId: { type: integer, minimum: 1 }
+        instrumentId: { type: integer, minimum: 1 }
+        providerSymbol: { type: string, minLength: 1 }
+        providerMetadata: { type: ["string", "null"] }
+    Timeframe:
+      type: object
+      required: [id, code, label, durationSeconds, description, isActive, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        label: { type: string }
+        durationSeconds: { type: integer }
+        description: { type: ["string", "null"] }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    TimeframeInput:
+      type: object
+      required: [code, label, durationSeconds]
+      properties:
+        code: { type: string, minLength: 1 }
+        label: { type: string, minLength: 1 }
+        durationSeconds: { type: integer, minimum: 1 }
+        description: { type: ["string", "null"] }
+        isActive: { type: boolean }
+    TimeframeUpdate:
+      type: object
+      properties:
+        code: { type: string, minLength: 1 }
+        label: { type: string, minLength: 1 }
+        durationSeconds: { type: integer, minimum: 1 }
+        description: { type: ["string", "null"] }
+        isActive: { type: boolean }
+    MarketDataConnection:
+      type: object
+      required: [id, sourceId, sourceName, status, statusMessage, lastConnectedAt, lastDataAt, checkedAt, updatedAt]
+      properties:
+        id: { type: integer }
+        sourceId: { type: integer }
+        sourceName: { type: string }
+        status:
+          type: string
+          enum: [disconnected, connecting, connected, degraded, error]
+        statusMessage: { type: ["string", "null"] }
+        lastConnectedAt: { type: ["string", "null"], format: date-time }
+        lastDataAt: { type: ["string", "null"], format: date-time }
+        checkedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Candle:
+      type: object
+      required: [id, instrumentId, sourceId, timeframeId, openTime, closeTime, open, high, low, close, volume, isClosed, receivedAt]
+      properties:
+        id: { type: integer }
+        instrumentId: { type: integer }
+        sourceId: { type: integer }
+        timeframeId: { type: integer }
+        openTime: { type: string, format: date-time }
+        closeTime: { type: ["string", "null"], format: date-time }
+        open: { type: number }
+        high: { type: number }
+        low: { type: number }
+        close: { type: number }
+        volume: { type: ["number", "null"] }
+        isClosed: { type: boolean }
+        receivedAt: { type: string, format: date-time }
+    MarketDataSummary:
+      type: object
+      required: [instrumentCount, sourceCount, timeframeCount, candleCount, connectedSourceCount, latestDataAt]
+      properties:
+        instrumentCount: { type: integer }
+        sourceCount: { type: integer }
+        timeframeCount: { type: integer }
+        candleCount: { type: integer }
+        connectedSourceCount: { type: integer }
+        latestDataAt: { type: ["string", "null"], format: date-time }
     Trade:
       type: object
       required: [id, strategyId, strategyVersionId, strategyName, strategyVersionNumber, marketId, side, status, quantity, entryPrice, exitPrice, openedAt, closedAt, thesis, notes, createdAt]

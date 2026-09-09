@@ -1,0 +1,91 @@
+Now build Step 5 of my trading app: Market & Live Data Architecture.
+
+The Strategy Builder, Trading Concept Library, Strategy Library and Strategy Versioning are already implemented. Do not rebuild or remove any of them.
+
+The purpose of this step is to create the architecture that will eventually allow the app to monitor real market data without needing to capture my screen.
+
+IMPORTANT:
+
+I currently use Trading 212 to manually place trades, but I may eventually use Tradovate or a prop firm.
+
+I have not decided exactly what I will trade yet.
+
+Therefore, the application must remain completely independent from any specific broker or market-data provider.
+
+Create a flexible instrument system capable of supporting:
+
+- Futures
+- Forex
+- Stocks
+- Indices
+- Commodities
+- Crypto
+
+Examples include:
+
+ES
+MES
+NQ
+MNQ
+XAUUSD
+NAS100
+US30
+
+These are examples only and must not be the only available instruments.
+
+Create a clean market-data abstraction layer with this architecture:
+
+EXTERNAL MARKET DATA
+↓
+MARKET DATA SERVICE
+↓
+PRICE / CANDLE DATA
+↓
+STRATEGY ENGINE
+
+The market-data layer should be designed to eventually support:
+
+- Real-time price data
+- OHLC candles
+- Multiple timeframes
+- Historical candle data
+- Market/session information
+- Connection status
+- Data timestamps
+
+The system should be designed so different market-data providers can be connected later without having to rebuild the Strategy Builder or Strategy Engine.
+
+For now, DO NOT connect to a specific external market-data provider unless one is already required by the existing application architecture.
+
+DO NOT:
+
+- Use fake market data
+- Use screen scraping
+- Capture my screen
+- Build a Trading 212 integration
+- Build a Tradovate integration
+- Build a prop-firm integration
+- Automatically place trades
+- Generate fake BUY or SELL signals
+- Build the live strategy monitoring logic yet
+- Build alerts yet
+- Build the AI yet
+- Build backtesting yet
+
+Create the necessary database structures and interfaces for:
+
+- Instruments
+- Market data sources
+- Timeframes
+- Candle data
+- Market-data connection status
+
+Make sure the Strategy Builder and saved strategy conditions can eventually receive market data through this architecture.
+
+Do not change the existing Strategy Builder, Trading Concept Library, Strategy Library or Strategy Versioning functionality.
+
+Keep the implementation modular so Step 6 can build the Strategy Monitoring Engine on top of this market-data architecture.
+
+After completing the work, test the existing application to make sure nothing from Steps 1–4 has been broken.
+
+Only work on Step 5.
