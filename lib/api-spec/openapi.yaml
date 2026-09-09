@@ -201,6 +201,42 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/StrategyVersionCondition"
+  /strategies/{strategyId}/versions/{versionId}/activate:
+    post:
+      operationId: activateStrategyVersion
+      tags: [strategies]
+      summary: Activate an immutable strategy version and load it into the Builder
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+        - $ref: "#/components/parameters/VersionId"
+      responses:
+        "200":
+          description: Activated version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategyVersion"
+  /strategies/{strategyId}/versions/{versionId}/clone:
+    post:
+      operationId: cloneStrategyVersion
+      tags: [strategies]
+      summary: Create a new immutable version from an existing version
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+        - $ref: "#/components/parameters/VersionId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyVersionCloneInput"
+      responses:
+        "201":
+          description: Cloned version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategyVersion"
   /strategies/{strategyId}/conditions:
     get:
       operationId: listStrategyConditions
@@ -701,7 +737,7 @@ components:
         latestTradeAt: { type: ["string", "null"], format: date-time }
     Strategy:
       type: object
-      required: [id, name, description, status, currentVersion, marketId, assetClass, direction, timeframes, riskManagementRules, resetRules, alertRules, tradeCount, winRate, createdAt, updatedAt]
+      required: [id, name, description, status, currentVersion, currentVersionId, marketId, assetClass, direction, timeframes, riskManagementRules, resetRules, alertRules, tradeCount, winRate, createdAt, updatedAt]
       properties:
         id: { type: integer }
         name: { type: string }
@@ -710,6 +746,7 @@ components:
           type: string
           enum: [draft, active, archived]
         currentVersion: { type: ["integer", "null"] }
+        currentVersionId: { type: ["integer", "null"] }
         marketId: { type: ["integer", "null"] }
         marketSymbol: { type: ["string", "null"] }
         assetClass: { type: ["string", "null"] }
@@ -773,18 +810,22 @@ components:
         alertRules: { type: ["string", "null"] }
     StrategyVersion:
       type: object
-      required: [id, strategyId, versionNumber, label, thesis, entryRules, exitRules, riskRules, notes, marketId, assetClass, direction, timeframes, riskManagementRules, resetRules, alertRules, conditionCount, tradeCount, winRate, netPnl, averagePnl, createdAt]
+      required: [id, strategyId, versionNumber, isActive, label, name, description, thesis, entryRules, exitRules, riskRules, notes, marketId, marketSymbol, assetClass, direction, timeframes, riskManagementRules, resetRules, alertRules, conditionCount, tradeCount, winRate, netPnl, averagePnl, createdAt]
       properties:
         id: { type: integer }
         strategyId: { type: integer }
         versionNumber: { type: integer }
+        isActive: { type: boolean }
         label: { type: ["string", "null"] }
+        name: { type: string }
+        description: { type: ["string", "null"] }
         thesis: { type: ["string", "null"] }
         entryRules: { type: ["string", "null"] }
         exitRules: { type: ["string", "null"] }
         riskRules: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
         marketId: { type: ["integer", "null"] }
+        marketSymbol: { type: ["string", "null"] }
         assetClass: { type: ["string", "null"] }
         direction:
           type: string
@@ -810,15 +851,22 @@ components:
         exitRules: { type: ["string", "null"] }
         riskRules: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
+    StrategyVersionCloneInput:
+      type: object
+      properties:
+        label: { type: ["string", "null"] }
     StrategyVersionCondition:
       type: object
-      required: [id, strategyVersionId, conceptId, conceptName, conceptCategory, stage, name, description, timeframe, direction, requirement, order, triggerRules, invalidationRules, resetBehavior, createdAt]
+      required: [id, strategyVersionId, conceptId, conceptName, conceptCategory, conceptDescription, conceptDetectionRules, conceptInvalidationRules, stage, name, description, timeframe, direction, requirement, order, triggerRules, invalidationRules, resetBehavior, createdAt]
       properties:
         id: { type: integer }
-        strategyVersionId: { type: ["integer", "null"] }
+        strategyVersionId: { type: integer }
         conceptId: { type: integer }
         conceptName: { type: string }
         conceptCategory: { type: ["string", "null"] }
+        conceptDescription: { type: ["string", "null"] }
+        conceptDetectionRules: { type: ["string", "null"] }
+        conceptInvalidationRules: { type: ["string", "null"] }
         stage:
           type: string
           enum: [entry, confirmation, invalidation, exit]
@@ -989,9 +1037,10 @@ components:
         description: { type: ["string", "null"] }
     Trade:
       type: object
-      required: [id, strategyVersionId, strategyName, strategyVersionNumber, marketId, side, status, quantity, entryPrice, exitPrice, openedAt, closedAt, thesis, notes, createdAt]
+      required: [id, strategyId, strategyVersionId, strategyName, strategyVersionNumber, marketId, side, status, quantity, entryPrice, exitPrice, openedAt, closedAt, thesis, notes, createdAt]
       properties:
         id: { type: integer }
+        strategyId: { type: integer }
         strategyVersionId: { type: integer }
         strategyName: { type: ["string", "null"] }
         strategyVersionNumber: { type: ["integer", "null"] }
@@ -1014,7 +1063,7 @@ components:
         createdAt: { type: string, format: date-time }
     TradeInput:
       type: object
-      required: [side, status]
+      required: [strategyVersionId, side, status]
       properties:
         strategyVersionId: { type: integer, minimum: 1 }
         marketId: { type: ["integer", "null"] }
@@ -1035,7 +1084,6 @@ components:
     TradeUpdate:
       type: object
       properties:
-        strategyVersionId: { type: integer, minimum: 1 }
         marketId: { type: ["integer", "null"] }
         side:
           type: string

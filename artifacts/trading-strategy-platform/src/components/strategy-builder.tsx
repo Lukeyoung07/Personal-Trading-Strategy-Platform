@@ -25,6 +25,7 @@ import {
   type TradingConcept,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { StrategyVersionManager } from "@/components/strategy-versioning";
 
 const STAGES = [
   { value: "entry", label: "Entry" },
@@ -346,7 +347,8 @@ export function StrategyBuilder() {
   const markets = useListMarkets();
   const concepts = useListConcepts();
   const queryClient = useQueryClient();
-  const [selectedStrategyId, setSelectedStrategyId] = useState<number | null>(null);
+  const requestedStrategyId = Number(new URLSearchParams(window.location.search).get("strategyId")) || null;
+  const [selectedStrategyId, setSelectedStrategyId] = useState<number | null>(requestedStrategyId);
   const [strategyModal, setStrategyModal] = useState<"new" | "edit" | false>(false);
   const [conditionModal, setConditionModal] = useState<StrategyCondition | "new" | false>(false);
   const activeStrategy = useMemo(() => {
@@ -404,6 +406,7 @@ export function StrategyBuilder() {
           {strategyConditions.isLoading ? <div className="panel p-8 text-center text-sm text-muted-foreground">Loading conditions…</div> : strategyConditions.isError ? <div className="panel p-8 text-center text-sm text-muted-foreground">Couldn’t load conditions.</div> : <ConditionFlow strategyId={strategyId} conditions={strategyConditions.data || []} concepts={concepts.data || []} onAdd={() => setConditionModal("new")} onEdit={condition => setConditionModal(condition)} onChanged={refreshConditions} />}
         </div>
         <div className="space-y-5">
+          <StrategyVersionManager strategy={activeStrategy} compact />
           <ConceptsCard concepts={concepts.data || []} />
           <Panel title="Builder boundaries" eyebrow="What this page does not do">
             <ul className="mt-4 space-y-3 text-xs text-muted-foreground leading-relaxed">

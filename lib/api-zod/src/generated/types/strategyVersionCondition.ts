@@ -11,12 +11,17 @@ import type { StrategyVersionConditionStage } from './strategyVersionConditionSt
 
 export interface StrategyVersionCondition {
   id: number;
-  /** @nullable */
-  strategyVersionId: number | null;
+  strategyVersionId: number;
   conceptId: number;
   conceptName: string;
   /** @nullable */
   conceptCategory: string | null;
+  /** @nullable */
+  conceptDescription: string | null;
+  /** @nullable */
+  conceptDetectionRules: string | null;
+  /** @nullable */
+  conceptInvalidationRules: string | null;
   stage: StrategyVersionConditionStage;
   name: string;
   /** @nullable */

@@ -41,6 +41,7 @@ export const ListStrategiesResponseItem = zod.object({
   "description": zod.string().nullable(),
   "status": zod.enum(['draft', 'active', 'archived']),
   "currentVersion": zod.number().int().nullable(),
+  "currentVersionId": zod.number().int().nullable(),
   "marketId": zod.number().int().nullable(),
   "marketSymbol": zod.string().nullish(),
   "assetClass": zod.string().nullable(),
@@ -83,6 +84,7 @@ export const CreateStrategyResponse = zod.object({
   "description": zod.string().nullable(),
   "status": zod.enum(['draft', 'active', 'archived']),
   "currentVersion": zod.number().int().nullable(),
+  "currentVersionId": zod.number().int().nullable(),
   "marketId": zod.number().int().nullable(),
   "marketSymbol": zod.string().nullish(),
   "assetClass": zod.string().nullable(),
@@ -114,6 +116,7 @@ export const GetStrategyResponse = zod.object({
   "description": zod.string().nullable(),
   "status": zod.enum(['draft', 'active', 'archived']),
   "currentVersion": zod.number().int().nullable(),
+  "currentVersionId": zod.number().int().nullable(),
   "marketId": zod.number().int().nullable(),
   "marketSymbol": zod.string().nullish(),
   "assetClass": zod.string().nullable(),
@@ -161,6 +164,7 @@ export const UpdateStrategyResponse = zod.object({
   "description": zod.string().nullable(),
   "status": zod.enum(['draft', 'active', 'archived']),
   "currentVersion": zod.number().int().nullable(),
+  "currentVersionId": zod.number().int().nullable(),
   "marketId": zod.number().int().nullable(),
   "marketSymbol": zod.string().nullish(),
   "assetClass": zod.string().nullable(),
@@ -212,6 +216,7 @@ export const DuplicateStrategyResponse = zod.object({
   "description": zod.string().nullable(),
   "status": zod.enum(['draft', 'active', 'archived']),
   "currentVersion": zod.number().int().nullable(),
+  "currentVersionId": zod.number().int().nullable(),
   "marketId": zod.number().int().nullable(),
   "marketSymbol": zod.string().nullish(),
   "assetClass": zod.string().nullable(),
@@ -241,13 +246,17 @@ export const ListStrategyVersionsResponseItem = zod.object({
   "id": zod.number().int(),
   "strategyId": zod.number().int(),
   "versionNumber": zod.number().int(),
+  "isActive": zod.boolean(),
   "label": zod.string().nullable(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
   "thesis": zod.string().nullable(),
   "entryRules": zod.string().nullable(),
   "exitRules": zod.string().nullable(),
   "riskRules": zod.string().nullable(),
   "notes": zod.string().nullable(),
   "marketId": zod.number().int().nullable(),
+  "marketSymbol": zod.string().nullable(),
   "assetClass": zod.string().nullable(),
   "direction": zod.enum(['long', 'short', 'both']),
   "timeframes": zod.array(zod.string()),
@@ -287,13 +296,17 @@ export const CreateStrategyVersionResponse = zod.object({
   "id": zod.number().int(),
   "strategyId": zod.number().int(),
   "versionNumber": zod.number().int(),
+  "isActive": zod.boolean(),
   "label": zod.string().nullable(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
   "thesis": zod.string().nullable(),
   "entryRules": zod.string().nullable(),
   "exitRules": zod.string().nullable(),
   "riskRules": zod.string().nullable(),
   "notes": zod.string().nullable(),
   "marketId": zod.number().int().nullable(),
+  "marketSymbol": zod.string().nullable(),
   "assetClass": zod.string().nullable(),
   "direction": zod.enum(['long', 'short', 'both']),
   "timeframes": zod.array(zod.string()),
@@ -323,10 +336,13 @@ export const ListStrategyVersionConditionsParams = zod.object({
 
 export const ListStrategyVersionConditionsResponseItem = zod.object({
   "id": zod.number().int(),
-  "strategyVersionId": zod.number().int().nullable(),
+  "strategyVersionId": zod.number().int(),
   "conceptId": zod.number().int(),
   "conceptName": zod.string(),
   "conceptCategory": zod.string().nullable(),
+  "conceptDescription": zod.string().nullable(),
+  "conceptDetectionRules": zod.string().nullable(),
+  "conceptInvalidationRules": zod.string().nullable(),
   "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
   "name": zod.string(),
   "description": zod.string().nullable(),
@@ -340,6 +356,94 @@ export const ListStrategyVersionConditionsResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const ListStrategyVersionConditionsResponse = zod.array(ListStrategyVersionConditionsResponseItem)
+
+
+/**
+ * @summary Activate an immutable strategy version and load it into the Builder
+ */
+
+
+
+
+export const ActivateStrategyVersionParams = zod.object({
+  "strategyId": zod.coerce.number().int().min(1),
+  "versionId": zod.coerce.number().int().min(1)
+})
+
+export const ActivateStrategyVersionResponse = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "versionNumber": zod.number().int(),
+  "isActive": zod.boolean(),
+  "label": zod.string().nullable(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "thesis": zod.string().nullable(),
+  "entryRules": zod.string().nullable(),
+  "exitRules": zod.string().nullable(),
+  "riskRules": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "marketId": zod.number().int().nullable(),
+  "marketSymbol": zod.string().nullable(),
+  "assetClass": zod.string().nullable(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "timeframes": zod.array(zod.string()),
+  "riskManagementRules": zod.string().nullable(),
+  "resetRules": zod.string().nullable(),
+  "alertRules": zod.string().nullable(),
+  "conditionCount": zod.number().int(),
+  "tradeCount": zod.number().int(),
+  "winRate": zod.number().nullable(),
+  "netPnl": zod.number().nullable(),
+  "averagePnl": zod.number().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Create a new immutable version from an existing version
+ */
+
+
+
+
+export const CloneStrategyVersionParams = zod.object({
+  "strategyId": zod.coerce.number().int().min(1),
+  "versionId": zod.coerce.number().int().min(1)
+})
+
+export const CloneStrategyVersionBody = zod.object({
+  "label": zod.string().nullish()
+})
+
+export const CloneStrategyVersionResponse = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "versionNumber": zod.number().int(),
+  "isActive": zod.boolean(),
+  "label": zod.string().nullable(),
+  "name": zod.string(),
+  "description": zod.string().nullable(),
+  "thesis": zod.string().nullable(),
+  "entryRules": zod.string().nullable(),
+  "exitRules": zod.string().nullable(),
+  "riskRules": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "marketId": zod.number().int().nullable(),
+  "marketSymbol": zod.string().nullable(),
+  "assetClass": zod.string().nullable(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "timeframes": zod.array(zod.string()),
+  "riskManagementRules": zod.string().nullable(),
+  "resetRules": zod.string().nullable(),
+  "alertRules": zod.string().nullable(),
+  "conditionCount": zod.number().int(),
+  "tradeCount": zod.number().int(),
+  "winRate": zod.number().nullable(),
+  "netPnl": zod.number().nullable(),
+  "averagePnl": zod.number().nullable(),
+  "createdAt": zod.coerce.date()
+})
 
 
 /**
@@ -781,6 +885,7 @@ export const DeleteMarketResponse = zod.void()
  */
 export const ListTradesResponseItem = zod.object({
   "id": zod.number().int(),
+  "strategyId": zod.number().int(),
   "strategyVersionId": zod.number().int(),
   "strategyName": zod.string().nullable(),
   "strategyVersionNumber": zod.number().int().nullable(),
@@ -808,7 +913,7 @@ export const ListTradesResponse = zod.array(ListTradesResponseItem)
 
 
 export const CreateTradeBody = zod.object({
-  "strategyVersionId": zod.number().int().min(1).optional(),
+  "strategyVersionId": zod.number().int().min(1),
   "marketId": zod.number().int().nullish(),
   "side": zod.enum(['long', 'short']),
   "status": zod.enum(['planned', 'open', 'closed', 'cancelled']),
@@ -824,6 +929,7 @@ export const CreateTradeBody = zod.object({
 
 export const CreateTradeResponse = zod.object({
   "id": zod.number().int(),
+  "strategyId": zod.number().int(),
   "strategyVersionId": zod.number().int(),
   "strategyName": zod.string().nullable(),
   "strategyVersionNumber": zod.number().int().nullable(),
@@ -853,11 +959,7 @@ export const UpdateTradeParams = zod.object({
   "tradeId": zod.coerce.number().int().min(1)
 })
 
-
-
-
 export const UpdateTradeBody = zod.object({
-  "strategyVersionId": zod.number().int().min(1).optional(),
   "marketId": zod.number().int().nullish(),
   "side": zod.enum(['long', 'short']).optional(),
   "status": zod.enum(['planned', 'open', 'closed', 'cancelled']).optional(),
@@ -873,6 +975,7 @@ export const UpdateTradeBody = zod.object({
 
 export const UpdateTradeResponse = zod.object({
   "id": zod.number().int(),
+  "strategyId": zod.number().int(),
   "strategyVersionId": zod.number().int(),
   "strategyName": zod.string().nullable(),
   "strategyVersionNumber": zod.number().int().nullable(),

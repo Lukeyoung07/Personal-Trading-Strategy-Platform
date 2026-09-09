@@ -11,8 +11,12 @@ export interface StrategyVersion {
   id: number;
   strategyId: number;
   versionNumber: number;
+  isActive: boolean;
   /** @nullable */
   label: string | null;
+  name: string;
+  /** @nullable */
+  description: string | null;
   /** @nullable */
   thesis: string | null;
   /** @nullable */
@@ -25,6 +29,8 @@ export interface StrategyVersion {
   notes: string | null;
   /** @nullable */
   marketId: number | null;
+  /** @nullable */
+  marketSymbol: string | null;
   /** @nullable */
   assetClass: string | null;
   direction: StrategyVersionDirection;

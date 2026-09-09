@@ -1,1 +1,2 @@
 - [Strategy builder model](strategy-builder-model.md) — strategy-owned, concept-referencing checkpoints stay descriptive and manually ordered until market data is explicitly added.
+- [Strategy version integrity](strategy-version-integrity.md) — snapshots own historical display context; version allocation and activation are serialized per strategy.

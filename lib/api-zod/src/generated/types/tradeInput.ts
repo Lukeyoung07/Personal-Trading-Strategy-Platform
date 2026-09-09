@@ -10,7 +10,7 @@ import type { TradeInputStatus } from './tradeInputStatus';
 
 export interface TradeInput {
   /** @minimum 1 */
-  strategyVersionId?: number;
+  strategyVersionId: number;
   /** @nullable */
   marketId?: number | null;
   side: TradeInputSide;

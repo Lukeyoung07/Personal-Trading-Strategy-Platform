@@ -17,6 +17,8 @@ export interface Strategy {
   /** @nullable */
   currentVersion: number | null;
   /** @nullable */
+  currentVersionId: number | null;
+  /** @nullable */
   marketId: number | null;
   /** @nullable */
   marketSymbol?: string | null;

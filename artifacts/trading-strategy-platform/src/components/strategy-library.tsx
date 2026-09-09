@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "wouter";
 import {
   Archive, Boxes, CheckCircle2, Copy, Edit3, ExternalLink, MoreHorizontal,
-  PauseCircle, Pencil, Plus, Search, Trash2, X,
+  History, PauseCircle, Pencil, Plus, Search, Trash2, X,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,13 +17,14 @@ import {
   type Market,
   type Strategy,
 } from "@workspace/api-client-react";
+import { StrategyVersionManager } from "@/components/strategy-versioning";
 
 type EditorState = { mode: "create" } | { mode: "edit"; strategy: Strategy } | { mode: "rename"; strategy: Strategy } | null;
 type StatusFilter = "all" | "active" | "inactive" | "archived";
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   return <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-5" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-    <div className="panel w-full max-w-2xl max-h-[94dvh] overflow-y-auto p-6 rise">
+    <div className={`panel w-full ${wide ? "max-w-6xl" : "max-w-2xl"} max-h-[94dvh] overflow-y-auto p-6 rise`}>
       <div className="flex items-center justify-between mb-6">
         <h2 className="font-semibold text-lg">{title}</h2>
         <button type="button" className="btn btn-ghost" onClick={onClose} aria-label="Close"><X size={17} /></button>
@@ -155,6 +156,7 @@ function StrategyCard({
   onEdit,
   onRename,
   onDuplicate,
+  onVersions,
   onStatus,
   onDelete,
 }: {
@@ -163,6 +165,7 @@ function StrategyCard({
   onEdit: () => void;
   onRename: () => void;
   onDuplicate: () => void;
+  onVersions: () => void;
   onStatus: (status: "draft" | "active" | "archived") => void;
   onDelete: () => void;
 }) {
@@ -198,8 +201,9 @@ function StrategyCard({
       <div><div className="eyebrow">Win rate</div><div className="text-xs font-semibold mt-2">{hasWinRate ? `${strategy.winRate!.toFixed(1)}%` : "—"}</div></div>
     </div>
     {!hasWinRate && <div className="mt-4 rounded-md bg-secondary/50 px-3 py-2 text-[11px] text-muted-foreground">Not enough data yet{strategy.tradeCount === 0 ? " — no recorded trades." : " — no closed trades with results."}</div>}
-    <div className="mt-5 flex flex-col sm:flex-row gap-2">
-      <Link href="/strategy-builder" className="btn btn-primary flex-1" data-testid={`link-open-strategy-builder-${strategy.id}`}>Open in Builder <ExternalLink size={13} /></Link>
+    <div className="mt-5 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2">
+      <Link href={`/strategy-builder?strategyId=${strategy.id}`} className="btn btn-primary" data-testid={`link-open-strategy-builder-${strategy.id}`}>Open in Builder <ExternalLink size={13} /></Link>
+      <button className="btn btn-secondary" onClick={onVersions} data-testid={`button-view-versions-${strategy.id}`}><History size={13} /> Versions</button>
       <button className="btn btn-secondary" disabled={busy} onClick={onEdit} data-testid={`button-edit-strategy-${strategy.id}`}><Pencil size={13} /> Edit</button>
     </div>
   </article>;
@@ -216,6 +220,7 @@ export function StrategyLibraryPage() {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [editor, setEditor] = useState<EditorState>(null);
   const [confirmDelete, setConfirmDelete] = useState<Strategy | null>(null);
+  const [versionStrategy, setVersionStrategy] = useState<Strategy | null>(null);
   const [actionError, setActionError] = useState("");
 
   const rows = useMemo(() => (strategies.data || []).filter(strategy => {
@@ -270,7 +275,7 @@ export function StrategyLibraryPage() {
       : strategies.isError || markets.isError
         ? <div className="panel p-10 text-center"><div className="font-semibold">Couldn’t load the Strategy Library</div><button className="btn btn-secondary mt-4" onClick={() => strategies.refetch()}>Try again</button></div>
         : rows.length
-          ? <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">{rows.map(strategy => <StrategyCard key={strategy.id} strategy={strategy} busy={busy} onEdit={() => setEditor({ mode: "edit", strategy })} onRename={() => setEditor({ mode: "rename", strategy })} onDuplicate={() => duplicateStrategy(strategy)} onStatus={nextStatus => setStrategyStatus(strategy, nextStatus)} onDelete={() => setConfirmDelete(strategy)} />)}</div>
+          ? <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">{rows.map(strategy => <StrategyCard key={strategy.id} strategy={strategy} busy={busy} onEdit={() => setEditor({ mode: "edit", strategy })} onRename={() => setEditor({ mode: "rename", strategy })} onDuplicate={() => duplicateStrategy(strategy)} onVersions={() => setVersionStrategy(strategy)} onStatus={nextStatus => setStrategyStatus(strategy, nextStatus)} onDelete={() => setConfirmDelete(strategy)} />)}</div>
           : <div className="panel empty-grid p-10 md:p-14 text-center">
             <div className="w-12 h-12 mx-auto rounded-xl bg-primary/10 text-primary flex items-center justify-center"><Boxes size={21} /></div>
             <h2 className="font-semibold text-lg mt-5">{strategies.data?.length ? "No strategies match these filters" : "No saved strategies yet"}</h2>
@@ -280,6 +285,7 @@ export function StrategyLibraryPage() {
     {editor?.mode === "create" && <Modal title="Create strategy" onClose={() => setEditor(null)}><StrategyEditor strategy={null} markets={markets.data || []} onClose={() => setEditor(null)} /></Modal>}
     {editor?.mode === "edit" && <Modal title="Edit strategy" onClose={() => setEditor(null)}><StrategyEditor strategy={editor.strategy} markets={markets.data || []} onClose={() => setEditor(null)} /></Modal>}
     {editor?.mode === "rename" && <Modal title="Rename strategy" onClose={() => setEditor(null)}><RenameEditor strategy={editor.strategy} onClose={() => setEditor(null)} /></Modal>}
+    {versionStrategy && <Modal title="Strategy versions" wide onClose={() => setVersionStrategy(null)}><StrategyVersionManager strategy={versionStrategy} /></Modal>}
     {confirmDelete && <Modal title={`Delete “${confirmDelete.name}”?`} onClose={() => setConfirmDelete(null)}>
       <p className="text-sm text-muted-foreground leading-relaxed">This permanently deletes the strategy when it has no recorded trades. Strategies with trade history must be archived so their records remain intact.</p>
       <div className="flex justify-end gap-3 mt-6"><button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button><button className="btn bg-destructive text-destructive-foreground hover:opacity-90" disabled={remove.isPending} onClick={deleteStrategy} data-testid="button-confirm-delete-strategy">{remove.isPending ? "Deleting…" : "Delete strategy"}</button></div>

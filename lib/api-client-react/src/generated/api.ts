@@ -42,6 +42,7 @@ import type {
   StrategyInput,
   StrategyUpdate,
   StrategyVersion,
+  StrategyVersionCloneInput,
   StrategyVersionCondition,
   StrategyVersionInput,
   Trade,
@@ -906,6 +907,153 @@ export function useListStrategyVersionConditions<TData = Awaited<ReturnType<type
 
 
 
+
+export const getActivateStrategyVersionUrl = (strategyId: number,
+    versionId: number,) => {
+
+
+
+
+  return `/api/strategies/${strategyId}/versions/${versionId}/activate`
+}
+
+/**
+ * @summary Activate an immutable strategy version and load it into the Builder
+ */
+export const activateStrategyVersion = async (strategyId: number,
+    versionId: number, options?: Parameters<typeof customFetch>[1]): Promise<StrategyVersion> => {
+
+  return customFetch<StrategyVersion>(getActivateStrategyVersionUrl(strategyId,versionId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getActivateStrategyVersionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof activateStrategyVersion>>, TError,{strategyId: number;versionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof activateStrategyVersion>>, TError,{strategyId: number;versionId: number}, TContext> => {
+
+const mutationKey = ['activateStrategyVersion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof activateStrategyVersion>>, {strategyId: number;versionId: number}> = (props) => {
+          const {strategyId,versionId} = props ?? {};
+
+          return  activateStrategyVersion(strategyId,versionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ActivateStrategyVersionMutationResult = NonNullable<Awaited<ReturnType<typeof activateStrategyVersion>>>
+
+    export type ActivateStrategyVersionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Activate an immutable strategy version and load it into the Builder
+ */
+export const useActivateStrategyVersion = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof activateStrategyVersion>>, TError,{strategyId: number;versionId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof activateStrategyVersion>>,
+        TError,
+        {strategyId: number;versionId: number},
+        TContext
+      > => {
+      return useMutation(getActivateStrategyVersionMutationOptions(options));
+    }
+
+export const getCloneStrategyVersionUrl = (strategyId: number,
+    versionId: number,) => {
+
+
+
+
+  return `/api/strategies/${strategyId}/versions/${versionId}/clone`
+}
+
+/**
+ * @summary Create a new immutable version from an existing version
+ */
+export const cloneStrategyVersion = async (strategyId: number,
+    versionId: number,
+    strategyVersionCloneInput?: StrategyVersionCloneInput, options?: Parameters<typeof customFetch>[1]): Promise<StrategyVersion> => {
+
+  return customFetch<StrategyVersion>(getCloneStrategyVersionUrl(strategyId,versionId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(strategyVersionCloneInput)
+  }
+);}
+
+
+
+
+
+export const getCloneStrategyVersionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cloneStrategyVersion>>, TError,{strategyId: number;versionId: number;data?: BodyType<StrategyVersionCloneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cloneStrategyVersion>>, TError,{strategyId: number;versionId: number;data?: BodyType<StrategyVersionCloneInput>}, TContext> => {
+
+const mutationKey = ['cloneStrategyVersion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cloneStrategyVersion>>, {strategyId: number;versionId: number;data?: BodyType<StrategyVersionCloneInput>}> = (props) => {
+          const {strategyId,versionId,data} = props ?? {};
+
+          return  cloneStrategyVersion(strategyId,versionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CloneStrategyVersionMutationResult = NonNullable<Awaited<ReturnType<typeof cloneStrategyVersion>>>
+    export type CloneStrategyVersionMutationBody = BodyType<StrategyVersionCloneInput> | undefined
+    export type CloneStrategyVersionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new immutable version from an existing version
+ */
+export const useCloneStrategyVersion = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cloneStrategyVersion>>, TError,{strategyId: number;versionId: number;data?: BodyType<StrategyVersionCloneInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cloneStrategyVersion>>,
+        TError,
+        {strategyId: number;versionId: number;data?: BodyType<StrategyVersionCloneInput>},
+        TContext
+      > => {
+      return useMutation(getCloneStrategyVersionMutationOptions(options));
+    }
 
 export const getListStrategyConditionsUrl = (strategyId: number,) => {
 

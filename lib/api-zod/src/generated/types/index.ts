@@ -47,6 +47,7 @@ export * from './strategyUpdate';
 export * from './strategyUpdateDirection';
 export * from './strategyUpdateStatus';
 export * from './strategyVersion';
+export * from './strategyVersionCloneInput';
 export * from './strategyVersionCondition';
 export * from './strategyVersionConditionDirection';
 export * from './strategyVersionConditionRequirement';

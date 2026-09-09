@@ -14,6 +14,11 @@ import {
   userSettingsTable,
 } from "@workspace/db";
 import {
+  ActivateStrategyVersionParams,
+  ActivateStrategyVersionResponse,
+  CloneStrategyVersionBody,
+  CloneStrategyVersionParams,
+  CloneStrategyVersionResponse,
   CreateAlertBody,
   CreateAlertResponse,
   CreateConditionBody,
@@ -170,14 +175,24 @@ async function strategyTradeMetrics(strategyId: number) {
 }
 
 async function strategyView(strategy: typeof strategiesTable.$inferSelect) {
-  const [latest] = await db
-    .select({ versionNumber: max(strategyVersionsTable.versionNumber) })
+  const [active] = await db
+    .select({ id: strategyVersionsTable.id, versionNumber: strategyVersionsTable.versionNumber })
     .from(strategyVersionsTable)
-    .where(eq(strategyVersionsTable.strategyId, strategy.id));
+    .where(and(eq(strategyVersionsTable.strategyId, strategy.id), eq(strategyVersionsTable.isActive, true)))
+    .orderBy(desc(strategyVersionsTable.versionNumber))
+    .limit(1);
+  const [latest] = active ? [] : await db
+    .select({ id: strategyVersionsTable.id, versionNumber: strategyVersionsTable.versionNumber })
+    .from(strategyVersionsTable)
+    .where(eq(strategyVersionsTable.strategyId, strategy.id))
+    .orderBy(desc(strategyVersionsTable.versionNumber))
+    .limit(1);
+  const current = active ?? latest;
   return {
     ...strategy,
     marketSymbol: await marketSymbol(strategy.marketId),
-    currentVersion: latest?.versionNumber == null ? null : Number(latest.versionNumber),
+    currentVersion: current?.versionNumber == null ? null : Number(current.versionNumber),
+    currentVersionId: current?.id ?? null,
     ...(await strategyTradeMetrics(strategy.id)),
   };
 }
@@ -186,6 +201,44 @@ async function marketSymbol(marketId: number | null) {
   if (marketId == null) return null;
   const [market] = await db.select({ symbol: marketsTable.symbol }).from(marketsTable).where(eq(marketsTable.id, marketId));
   return market?.symbol ?? null;
+}
+
+async function snapshotMarketSymbol(executor: any, marketId: number | null) {
+  if (marketId == null) return null;
+  const [market] = await executor.select({ symbol: marketsTable.symbol }).from(marketsTable).where(eq(marketsTable.id, marketId));
+  return market?.symbol ?? null;
+}
+
+async function buildVersionConditionSnapshots(
+  executor: any,
+  conditions: Array<typeof strategyConditionsTable.$inferSelect>,
+  strategyVersionId: number,
+) {
+  return Promise.all(conditions.map(async condition => {
+    const [concept] = await executor
+      .select()
+      .from(tradingConceptsTable)
+      .where(eq(tradingConceptsTable.id, condition.conceptId));
+    return {
+      strategyVersionId,
+      conceptId: condition.conceptId,
+      conceptName: concept?.name ?? "Unknown concept",
+      conceptCategory: concept?.category ?? null,
+      conceptDescription: concept?.description ?? null,
+      conceptDetectionRules: concept?.detectionRules ?? null,
+      conceptInvalidationRules: concept?.invalidationRules ?? null,
+      stage: condition.stage,
+      name: condition.name,
+      description: condition.description,
+      timeframe: condition.timeframe,
+      direction: condition.direction,
+      requirement: condition.requirement,
+      conditionOrder: condition.conditionOrder,
+      triggerRules: condition.triggerRules,
+      invalidationRules: condition.invalidationRules,
+      resetBehavior: condition.resetBehavior,
+    };
+  }));
 }
 
 router.get("/dashboard/summary", async (_req, res): Promise<void> => {
@@ -228,8 +281,12 @@ router.post("/strategies", async (req, res): Promise<void> => {
     await tx.insert(strategyVersionsTable).values({
       strategyId: strategy.id,
       versionNumber: 1,
+      isActive: true,
       label: "Initial version",
+      name: strategy.name,
+      description: strategy.description,
       marketId: strategy.marketId,
+      marketSymbol: await snapshotMarketSymbol(tx, strategy.marketId),
       assetClass: strategy.assetClass,
       direction: strategy.direction,
       timeframes: strategy.timeframes,
@@ -327,8 +384,12 @@ router.post("/strategies/:strategyId/duplicate", async (req, res): Promise<void>
     const [version] = await tx.insert(strategyVersionsTable).values({
       strategyId: strategy.id,
       versionNumber: 1,
+      isActive: true,
       label: "Initial copy",
+      name: strategy.name,
+      description: strategy.description,
       marketId: strategy.marketId,
+      marketSymbol: await snapshotMarketSymbol(tx, strategy.marketId),
       assetClass: strategy.assetClass,
       direction: strategy.direction,
       timeframes: strategy.timeframes,
@@ -338,20 +399,7 @@ router.post("/strategies/:strategyId/duplicate", async (req, res): Promise<void>
     }).returning();
     const conditions = await tx.select().from(strategyConditionsTable).where(eq(strategyConditionsTable.strategyId, source.id));
     if (conditions.length) {
-      await tx.insert(strategyVersionConditionsTable).values(conditions.map(condition => ({
-        strategyVersionId: version.id,
-        conceptId: condition.conceptId,
-        stage: condition.stage,
-        name: condition.name,
-        description: condition.description,
-        timeframe: condition.timeframe,
-        direction: condition.direction,
-        requirement: condition.requirement,
-        conditionOrder: condition.conditionOrder,
-        triggerRules: condition.triggerRules,
-        invalidationRules: condition.invalidationRules,
-        resetBehavior: condition.resetBehavior,
-      })));
+      await tx.insert(strategyVersionConditionsTable).values(await buildVersionConditionSnapshots(tx, conditions, version.id));
       await tx.insert(strategyConditionsTable).values(conditions.map(condition => ({
         strategyId: strategy.id,
         conceptId: condition.conceptId,
@@ -415,6 +463,7 @@ router.post("/strategies/:strategyId/versions", async (req, res): Promise<void> 
     return;
   }
   const created = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(${params.data.strategyId})`);
     const [latest] = await tx
       .select({ versionNumber: max(strategyVersionsTable.versionNumber) })
       .from(strategyVersionsTable)
@@ -423,13 +472,18 @@ router.post("/strategies/:strategyId/versions", async (req, res): Promise<void> 
       .select()
       .from(strategiesTable)
       .where(eq(strategiesTable.id, params.data.strategyId));
+    await tx.update(strategyVersionsTable).set({ isActive: false }).where(eq(strategyVersionsTable.strategyId, params.data.strategyId));
     const [version] = await tx
       .insert(strategyVersionsTable)
       .values({
         ...body.data,
         strategyId: params.data.strategyId,
         versionNumber: Number(latest?.versionNumber ?? 0) + 1,
+        isActive: true,
+        name: current.name,
+        description: current.description,
         marketId: current.marketId,
+        marketSymbol: await snapshotMarketSymbol(tx, current.marketId),
         assetClass: current.assetClass,
         direction: current.direction,
         timeframes: current.timeframes,
@@ -440,8 +494,156 @@ router.post("/strategies/:strategyId/versions", async (req, res): Promise<void> 
       .returning();
     const conditions = await tx.select().from(strategyConditionsTable).where(eq(strategyConditionsTable.strategyId, params.data.strategyId));
     if (conditions.length) {
-      await tx.insert(strategyVersionConditionsTable).values(conditions.map(condition => ({
+      await tx.insert(strategyVersionConditionsTable).values(await buildVersionConditionSnapshots(tx, conditions, version.id));
+    }
+    return version;
+  });
+  res.status(201).json(CreateStrategyVersionResponse.parse(await strategyVersionView(created)));
+});
+
+async function activateVersionSnapshot(strategyId: number, versionId: number) {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(${strategyId})`);
+    const [version] = await tx
+      .select()
+      .from(strategyVersionsTable)
+      .where(and(eq(strategyVersionsTable.id, versionId), eq(strategyVersionsTable.strategyId, strategyId)));
+    if (!version) return null;
+    const conditions = await tx
+      .select()
+      .from(strategyVersionConditionsTable)
+      .where(eq(strategyVersionConditionsTable.strategyVersionId, version.id))
+      .orderBy(asc(strategyVersionConditionsTable.conditionOrder));
+    await tx.update(strategyVersionsTable).set({ isActive: false }).where(eq(strategyVersionsTable.strategyId, strategyId));
+    const [active] = await tx.update(strategyVersionsTable).set({ isActive: true }).where(eq(strategyVersionsTable.id, version.id)).returning();
+    await tx.update(strategiesTable).set({
+      name: version.name,
+      description: version.description,
+      marketId: version.marketId,
+      assetClass: version.assetClass,
+      direction: version.direction,
+      timeframes: version.timeframes,
+      riskManagementRules: version.riskManagementRules,
+      resetRules: version.resetRules,
+      alertRules: version.alertRules,
+      updatedAt: new Date(),
+    }).where(eq(strategiesTable.id, strategyId));
+    await tx.delete(strategyConditionsTable).where(eq(strategyConditionsTable.strategyId, strategyId));
+    if (conditions.length) {
+      await tx.insert(strategyConditionsTable).values(conditions.map(condition => ({
+        strategyId,
+        conceptId: condition.conceptId,
+        stage: condition.stage,
+        name: condition.name,
+        description: condition.description,
+        timeframe: condition.timeframe,
+        direction: condition.direction,
+        requirement: condition.requirement,
+        conditionOrder: condition.conditionOrder,
+        triggerRules: condition.triggerRules,
+        invalidationRules: condition.invalidationRules,
+        resetBehavior: condition.resetBehavior,
+      })));
+    }
+    return active;
+  });
+}
+
+router.post("/strategies/:strategyId/versions/:versionId/activate", async (req, res): Promise<void> => {
+  const params = ActivateStrategyVersionParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const active = await activateVersionSnapshot(params.data.strategyId, params.data.versionId);
+  if (!active) {
+    res.status(404).json({ error: "Strategy version not found" });
+    return;
+  }
+  res.json(ActivateStrategyVersionResponse.parse(await strategyVersionView(active)));
+});
+
+router.post("/strategies/:strategyId/versions/:versionId/clone", async (req, res): Promise<void> => {
+  const params = CloneStrategyVersionParams.safeParse(req.params);
+  const body = CloneStrategyVersionBody.safeParse(req.body ?? {});
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: !params.success ? params.error.message : body.success ? "Invalid request body" : body.error.message });
+    return;
+  }
+  const created = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(${params.data.strategyId})`);
+    const [source] = await tx
+      .select()
+      .from(strategyVersionsTable)
+      .where(and(eq(strategyVersionsTable.id, params.data.versionId), eq(strategyVersionsTable.strategyId, params.data.strategyId)));
+    if (!source) return null;
+    const [latest] = await tx
+      .select({ versionNumber: max(strategyVersionsTable.versionNumber) })
+      .from(strategyVersionsTable)
+      .where(eq(strategyVersionsTable.strategyId, params.data.strategyId));
+    await tx.update(strategyVersionsTable).set({ isActive: false }).where(eq(strategyVersionsTable.strategyId, params.data.strategyId));
+    const [version] = await tx.insert(strategyVersionsTable).values({
+      strategyId: source.strategyId,
+      versionNumber: Number(latest?.versionNumber ?? 0) + 1,
+      isActive: true,
+      label: body.data.label || `Created from v${source.versionNumber}`,
+      name: source.name,
+      description: source.description,
+      thesis: source.thesis,
+      entryRules: source.entryRules,
+      exitRules: source.exitRules,
+      riskRules: source.riskRules,
+      notes: source.notes,
+      marketId: source.marketId,
+      marketSymbol: source.marketSymbol,
+      assetClass: source.assetClass,
+      direction: source.direction,
+      timeframes: source.timeframes,
+      riskManagementRules: source.riskManagementRules,
+      resetRules: source.resetRules,
+      alertRules: source.alertRules,
+    }).returning();
+    const sourceConditions = await tx
+      .select()
+      .from(strategyVersionConditionsTable)
+      .where(eq(strategyVersionConditionsTable.strategyVersionId, source.id));
+    if (sourceConditions.length) {
+      await tx.insert(strategyVersionConditionsTable).values(sourceConditions.map(condition => ({
         strategyVersionId: version.id,
+        conceptId: condition.conceptId,
+        conceptName: condition.conceptName,
+        conceptCategory: condition.conceptCategory,
+        conceptDescription: condition.conceptDescription,
+        conceptDetectionRules: condition.conceptDetectionRules,
+        conceptInvalidationRules: condition.conceptInvalidationRules,
+        stage: condition.stage,
+        name: condition.name,
+        description: condition.description,
+        timeframe: condition.timeframe,
+        direction: condition.direction,
+        requirement: condition.requirement,
+        conditionOrder: condition.conditionOrder,
+        triggerRules: condition.triggerRules,
+        invalidationRules: condition.invalidationRules,
+        resetBehavior: condition.resetBehavior,
+      })));
+    }
+    await tx.update(strategiesTable).set({
+      name: source.name,
+      description: source.description,
+      marketId: source.marketId,
+      assetClass: source.assetClass,
+      direction: source.direction,
+      timeframes: source.timeframes,
+      riskManagementRules: source.riskManagementRules,
+      resetRules: source.resetRules,
+      alertRules: source.alertRules,
+      updatedAt: new Date(),
+    }).where(eq(strategiesTable.id, source.strategyId));
+    await tx.delete(strategyConditionsTable).where(eq(strategyConditionsTable.strategyId, source.strategyId));
+    if (sourceConditions.length) {
+      await tx.insert(strategyConditionsTable).values(sourceConditions.map(condition => ({
+        strategyId: source.strategyId,
         conceptId: condition.conceptId,
         stage: condition.stage,
         name: condition.name,
@@ -457,7 +659,11 @@ router.post("/strategies/:strategyId/versions", async (req, res): Promise<void> 
     }
     return version;
   });
-  res.status(201).json(CreateStrategyVersionResponse.parse(await strategyVersionView(created)));
+  if (!created) {
+    res.status(404).json({ error: "Strategy version not found" });
+    return;
+  }
+  res.status(201).json(CloneStrategyVersionResponse.parse(await strategyVersionView(created)));
 });
 
 router.get("/strategies/:strategyId/versions/:versionId/conditions", async (req, res): Promise<void> => {
@@ -480,8 +686,7 @@ router.get("/strategies/:strategyId/versions/:versionId/conditions", async (req,
     .where(eq(strategyVersionConditionsTable.strategyVersionId, params.data.versionId))
     .orderBy(asc(strategyVersionConditionsTable.conditionOrder));
   const withConcepts = await Promise.all(rows.map(async condition => {
-    const [concept] = await db.select({ name: tradingConceptsTable.name, category: tradingConceptsTable.category }).from(tradingConceptsTable).where(eq(tradingConceptsTable.id, condition.conceptId));
-    return { ...condition, conceptName: concept?.name ?? "Missing concept", conceptCategory: concept?.category ?? null, order: condition.conditionOrder };
+    return { ...condition, order: condition.conditionOrder };
   }));
   res.json(ListStrategyVersionConditionsResponse.parse(withConcepts));
 });
@@ -736,6 +941,7 @@ router.get("/trades", async (_req, res): Promise<void> => {
       trade: tradesTable,
       symbol: marketsTable.symbol,
       strategyName: strategiesTable.name,
+      strategyId: strategiesTable.id,
       versionNumber: strategyVersionsTable.versionNumber,
     })
     .from(tradesTable)
@@ -745,10 +951,11 @@ router.get("/trades", async (_req, res): Promise<void> => {
     .orderBy(desc(tradesTable.createdAt));
   res.json(
     ListTradesResponse.parse(
-      rows.map(({ trade, symbol, strategyName, versionNumber }) => ({
+      rows.map(({ trade, symbol, strategyName, strategyId, versionNumber }) => ({
         ...trade,
         marketSymbol: symbol,
         strategyName,
+        strategyId,
         strategyVersionNumber: versionNumber,
         quantity: nullableNumber(trade.quantity),
         entryPrice: nullableNumber(trade.entryPrice),
@@ -765,6 +972,14 @@ router.post("/trades", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const [strategyVersion] = await db
+    .select({ id: strategyVersionsTable.id })
+    .from(strategyVersionsTable)
+    .where(eq(strategyVersionsTable.id, parsed.data.strategyVersionId));
+  if (!strategyVersion) {
+    res.status(400).json({ error: "Select a valid saved strategy version for this trade." });
+    return;
+  }
   const [created] = await db
     .insert(tradesTable)
     .values({
@@ -776,7 +991,7 @@ router.post("/trades", async (req, res): Promise<void> => {
     })
     .returning();
   const [context] = created.strategyVersionId ? await db
-    .select({ strategyName: strategiesTable.name, versionNumber: strategyVersionsTable.versionNumber })
+    .select({ strategyId: strategiesTable.id, strategyName: strategiesTable.name, versionNumber: strategyVersionsTable.versionNumber })
     .from(strategyVersionsTable)
     .innerJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
     .where(eq(strategyVersionsTable.id, created.strategyVersionId)) : [];
@@ -785,6 +1000,7 @@ router.post("/trades", async (req, res): Promise<void> => {
       ...created,
       marketSymbol: await marketSymbol(created.marketId),
       strategyName: context?.strategyName ?? null,
+      strategyId: context?.strategyId,
       strategyVersionNumber: context?.versionNumber ?? null,
       quantity: nullableNumber(created.quantity),
       entryPrice: nullableNumber(created.entryPrice),
@@ -818,7 +1034,7 @@ router.patch("/trades/:tradeId", async (req, res): Promise<void> => {
     return;
   }
   const [context] = updated.strategyVersionId ? await db
-    .select({ strategyName: strategiesTable.name, versionNumber: strategyVersionsTable.versionNumber })
+    .select({ strategyId: strategiesTable.id, strategyName: strategiesTable.name, versionNumber: strategyVersionsTable.versionNumber })
     .from(strategyVersionsTable)
     .innerJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
     .where(eq(strategyVersionsTable.id, updated.strategyVersionId)) : [];
@@ -827,6 +1043,7 @@ router.patch("/trades/:tradeId", async (req, res): Promise<void> => {
       ...updated,
       marketSymbol: await marketSymbol(updated.marketId),
       strategyName: context?.strategyName ?? null,
+      strategyId: context?.strategyId,
       strategyVersionNumber: context?.versionNumber ?? null,
       quantity: nullableNumber(updated.quantity),
       entryPrice: nullableNumber(updated.entryPrice),

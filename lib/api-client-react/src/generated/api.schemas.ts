@@ -52,6 +52,8 @@ export interface Strategy {
   /** @nullable */
   currentVersion: number | null;
   /** @nullable */
+  currentVersionId: number | null;
+  /** @nullable */
   marketId: number | null;
   /** @nullable */
   marketSymbol?: string | null;
@@ -169,8 +171,12 @@ export interface StrategyVersion {
   id: number;
   strategyId: number;
   versionNumber: number;
+  isActive: boolean;
   /** @nullable */
   label: string | null;
+  name: string;
+  /** @nullable */
+  description: string | null;
   /** @nullable */
   thesis: string | null;
   /** @nullable */
@@ -183,6 +189,8 @@ export interface StrategyVersion {
   notes: string | null;
   /** @nullable */
   marketId: number | null;
+  /** @nullable */
+  marketSymbol: string | null;
   /** @nullable */
   assetClass: string | null;
   direction: StrategyVersionDirection;
@@ -219,6 +227,11 @@ export interface StrategyVersionInput {
   notes?: string | null;
 }
 
+export interface StrategyVersionCloneInput {
+  /** @nullable */
+  label?: string | null;
+}
+
 export type StrategyVersionConditionStage = typeof StrategyVersionConditionStage[keyof typeof StrategyVersionConditionStage];
 
 
@@ -248,12 +261,17 @@ export const StrategyVersionConditionRequirement = {
 
 export interface StrategyVersionCondition {
   id: number;
-  /** @nullable */
-  strategyVersionId: number | null;
+  strategyVersionId: number;
   conceptId: number;
   conceptName: string;
   /** @nullable */
   conceptCategory: string | null;
+  /** @nullable */
+  conceptDescription: string | null;
+  /** @nullable */
+  conceptDetectionRules: string | null;
+  /** @nullable */
+  conceptInvalidationRules: string | null;
   stage: StrategyVersionConditionStage;
   name: string;
   /** @nullable */
@@ -543,6 +561,7 @@ export const TradeStatus = {
 
 export interface Trade {
   id: number;
+  strategyId: number;
   strategyVersionId: number;
   /** @nullable */
   strategyName: string | null;
@@ -593,7 +612,7 @@ export const TradeInputStatus = {
 
 export interface TradeInput {
   /** @minimum 1 */
-  strategyVersionId?: number;
+  strategyVersionId: number;
   /** @nullable */
   marketId?: number | null;
   side: TradeInputSide;
@@ -635,8 +654,6 @@ export const TradeUpdateStatus = {
 } as const;
 
 export interface TradeUpdate {
-  /** @minimum 1 */
-  strategyVersionId?: number;
   /** @nullable */
   marketId?: number | null;
   side?: TradeUpdateSide;

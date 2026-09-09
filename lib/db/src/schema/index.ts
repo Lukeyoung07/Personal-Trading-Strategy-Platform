@@ -6,7 +6,9 @@ import {
   text,
   timestamp,
   boolean,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -30,13 +32,17 @@ export const strategyVersionsTable = pgTable("strategy_versions", {
   id: serial("id").primaryKey(),
   strategyId: integer("strategy_id").notNull().references(() => strategiesTable.id, { onDelete: "cascade" }),
   versionNumber: integer("version_number").notNull(),
+  isActive: boolean("is_active").notNull().default(false),
   label: text("label"),
+  name: text("name").notNull().default("Untitled strategy"),
+  description: text("description"),
   thesis: text("thesis"),
   entryRules: text("entry_rules"),
   exitRules: text("exit_rules"),
   riskRules: text("risk_rules"),
   notes: text("notes"),
   marketId: integer("market_id"),
+  marketSymbol: text("market_symbol"),
   assetClass: text("asset_class"),
   direction: text("direction").notNull().default("both"),
   timeframes: text("timeframes").array().notNull().default([]),
@@ -44,7 +50,10 @@ export const strategyVersionsTable = pgTable("strategy_versions", {
   resetRules: text("reset_rules"),
   alertRules: text("alert_rules"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, table => [
+  uniqueIndex("strategy_versions_strategy_number_unique").on(table.strategyId, table.versionNumber),
+  uniqueIndex("strategy_versions_one_active_unique").on(table.strategyId).where(sql`${table.isActive} = true`),
+]);
 
 export const tradingConceptsTable = pgTable("trading_concepts", {
   id: serial("id").primaryKey(),
@@ -79,6 +88,11 @@ export const strategyVersionConditionsTable = pgTable("strategy_version_conditio
   id: serial("id").primaryKey(),
   strategyVersionId: integer("strategy_version_id").notNull().references(() => strategyVersionsTable.id, { onDelete: "cascade" }),
   conceptId: integer("concept_id").notNull().references(() => tradingConceptsTable.id, { onDelete: "restrict" }),
+  conceptName: text("concept_name").notNull().default("Unknown concept"),
+  conceptCategory: text("concept_category"),
+  conceptDescription: text("concept_description"),
+  conceptDetectionRules: text("concept_detection_rules"),
+  conceptInvalidationRules: text("concept_invalidation_rules"),
   stage: text("stage").notNull().default("entry"),
   name: text("name").notNull(),
   description: text("description"),
@@ -111,7 +125,7 @@ export const marketsTable = pgTable("markets", {
 
 export const tradesTable = pgTable("trades", {
   id: serial("id").primaryKey(),
-  strategyVersionId: integer("strategy_version_id").references(() => strategyVersionsTable.id, { onDelete: "restrict" }),
+  strategyVersionId: integer("strategy_version_id").notNull().references(() => strategyVersionsTable.id, { onDelete: "restrict" }),
   marketId: integer("market_id").references(() => marketsTable.id, { onDelete: "set null" }),
   side: text("side").notNull(),
   status: text("status").notNull().default("planned"),
