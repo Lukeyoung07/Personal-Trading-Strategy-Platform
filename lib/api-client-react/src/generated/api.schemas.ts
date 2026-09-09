@@ -65,6 +65,9 @@ export interface Strategy {
   resetRules: string | null;
   /** @nullable */
   alertRules: string | null;
+  tradeCount: number;
+  /** @nullable */
+  winRate: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -107,6 +110,14 @@ export interface StrategyInput {
   alertRules?: string | null;
 }
 
+export interface StrategyDuplicateInput {
+  /**
+     * @minLength 1
+     * @nullable
+     */
+  name?: string | null;
+}
+
 export type StrategyUpdateStatus = typeof StrategyUpdateStatus[keyof typeof StrategyUpdateStatus];
 
 
@@ -145,6 +156,15 @@ export interface StrategyUpdate {
   alertRules?: string | null;
 }
 
+export type StrategyVersionDirection = typeof StrategyVersionDirection[keyof typeof StrategyVersionDirection];
+
+
+export const StrategyVersionDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
 export interface StrategyVersion {
   id: number;
   strategyId: number;
@@ -161,6 +181,26 @@ export interface StrategyVersion {
   riskRules: string | null;
   /** @nullable */
   notes: string | null;
+  /** @nullable */
+  marketId: number | null;
+  /** @nullable */
+  assetClass: string | null;
+  direction: StrategyVersionDirection;
+  timeframes: string[];
+  /** @nullable */
+  riskManagementRules: string | null;
+  /** @nullable */
+  resetRules: string | null;
+  /** @nullable */
+  alertRules: string | null;
+  conditionCount: number;
+  tradeCount: number;
+  /** @nullable */
+  winRate: number | null;
+  /** @nullable */
+  netPnl: number | null;
+  /** @nullable */
+  averagePnl: number | null;
   createdAt: string;
 }
 
@@ -177,6 +217,57 @@ export interface StrategyVersionInput {
   riskRules?: string | null;
   /** @nullable */
   notes?: string | null;
+}
+
+export type StrategyVersionConditionStage = typeof StrategyVersionConditionStage[keyof typeof StrategyVersionConditionStage];
+
+
+export const StrategyVersionConditionStage = {
+  entry: 'entry',
+  confirmation: 'confirmation',
+  invalidation: 'invalidation',
+  exit: 'exit',
+} as const;
+
+export type StrategyVersionConditionDirection = typeof StrategyVersionConditionDirection[keyof typeof StrategyVersionConditionDirection];
+
+
+export const StrategyVersionConditionDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
+export type StrategyVersionConditionRequirement = typeof StrategyVersionConditionRequirement[keyof typeof StrategyVersionConditionRequirement];
+
+
+export const StrategyVersionConditionRequirement = {
+  required: 'required',
+  optional: 'optional',
+} as const;
+
+export interface StrategyVersionCondition {
+  id: number;
+  strategyVersionId: number;
+  conceptId: number;
+  conceptName: string;
+  /** @nullable */
+  conceptCategory: string | null;
+  stage: StrategyVersionConditionStage;
+  name: string;
+  /** @nullable */
+  description: string | null;
+  timeframe: string;
+  direction: StrategyVersionConditionDirection;
+  requirement: StrategyVersionConditionRequirement;
+  order: number;
+  /** @nullable */
+  triggerRules: string | null;
+  /** @nullable */
+  invalidationRules: string | null;
+  /** @nullable */
+  resetBehavior: string | null;
+  createdAt: string;
 }
 
 export type StrategyConditionStage = typeof StrategyConditionStage[keyof typeof StrategyConditionStage];
@@ -451,6 +542,11 @@ export const TradeStatus = {
 
 export interface Trade {
   id: number;
+  strategyVersionId: number;
+  /** @nullable */
+  strategyName: string | null;
+  /** @nullable */
+  strategyVersionNumber: number | null;
   /** @nullable */
   marketId: number | null;
   /** @nullable */
@@ -495,6 +591,8 @@ export const TradeInputStatus = {
 } as const;
 
 export interface TradeInput {
+  /** @minimum 1 */
+  strategyVersionId?: number;
   /** @nullable */
   marketId?: number | null;
   side: TradeInputSide;
@@ -536,6 +634,8 @@ export const TradeUpdateStatus = {
 } as const;
 
 export interface TradeUpdate {
+  /** @minimum 1 */
+  strategyVersionId?: number;
   /** @nullable */
   marketId?: number | null;
   side?: TradeUpdateSide;

@@ -9,6 +9,8 @@ import type { TradeUpdateSide } from './tradeUpdateSide';
 import type { TradeUpdateStatus } from './tradeUpdateStatus';
 
 export interface TradeUpdate {
+  /** @minimum 1 */
+  strategyVersionId?: number;
   /** @nullable */
   marketId?: number | null;
   side?: TradeUpdateSide;

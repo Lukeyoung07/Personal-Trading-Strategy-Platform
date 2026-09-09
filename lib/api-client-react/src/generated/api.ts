@@ -38,9 +38,11 @@ import type {
   StrategyConditionInput,
   StrategyConditionReorderInput,
   StrategyConditionUpdate,
+  StrategyDuplicateInput,
   StrategyInput,
   StrategyUpdate,
   StrategyVersion,
+  StrategyVersionCondition,
   StrategyVersionInput,
   Trade,
   TradeInput,
@@ -602,6 +604,78 @@ export const useDeleteStrategy = <TError = ErrorType<unknown>,
       return useMutation(getDeleteStrategyMutationOptions(options));
     }
 
+export const getDuplicateStrategyUrl = (strategyId: number,) => {
+
+
+
+
+  return `/api/strategies/${strategyId}/duplicate`
+}
+
+/**
+ * @summary Duplicate a strategy without its trade history
+ */
+export const duplicateStrategy = async (strategyId: number,
+    strategyDuplicateInput?: StrategyDuplicateInput, options?: Parameters<typeof customFetch>[1]): Promise<Strategy> => {
+
+  return customFetch<Strategy>(getDuplicateStrategyUrl(strategyId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(strategyDuplicateInput)
+  }
+);}
+
+
+
+
+
+export const getDuplicateStrategyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof duplicateStrategy>>, TError,{strategyId: number;data?: BodyType<StrategyDuplicateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof duplicateStrategy>>, TError,{strategyId: number;data?: BodyType<StrategyDuplicateInput>}, TContext> => {
+
+const mutationKey = ['duplicateStrategy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof duplicateStrategy>>, {strategyId: number;data?: BodyType<StrategyDuplicateInput>}> = (props) => {
+          const {strategyId,data} = props ?? {};
+
+          return  duplicateStrategy(strategyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DuplicateStrategyMutationResult = NonNullable<Awaited<ReturnType<typeof duplicateStrategy>>>
+    export type DuplicateStrategyMutationBody = BodyType<StrategyDuplicateInput> | undefined
+    export type DuplicateStrategyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Duplicate a strategy without its trade history
+ */
+export const useDuplicateStrategy = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof duplicateStrategy>>, TError,{strategyId: number;data?: BodyType<StrategyDuplicateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof duplicateStrategy>>,
+        TError,
+        {strategyId: number;data?: BodyType<StrategyDuplicateInput>},
+        TContext
+      > => {
+      return useMutation(getDuplicateStrategyMutationOptions(options));
+    }
+
 export const getListStrategyVersionsUrl = (strategyId: number,) => {
 
 
@@ -750,6 +824,88 @@ export const useCreateStrategyVersion = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreateStrategyVersionMutationOptions(options));
     }
+
+export const getListStrategyVersionConditionsUrl = (strategyId: number,
+    versionId: number,) => {
+
+
+
+
+  return `/api/strategies/${strategyId}/versions/${versionId}/conditions`
+}
+
+/**
+ * @summary List the immutable conditions captured by a version
+ */
+export const listStrategyVersionConditions = async (strategyId: number,
+    versionId: number, options?: Parameters<typeof customFetch>[1]): Promise<StrategyVersionCondition[]> => {
+
+  return customFetch<StrategyVersionCondition[]>(getListStrategyVersionConditionsUrl(strategyId,versionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStrategyVersionConditionsQueryKey = (strategyId: number,
+    versionId: number,) => {
+    return [
+    `/api/strategies/${strategyId}/versions/${versionId}/conditions`
+    ] as const;
+    }
+
+
+export const getListStrategyVersionConditionsQueryOptions = <TData = Awaited<ReturnType<typeof listStrategyVersionConditions>>, TError = ErrorType<unknown>>(strategyId: number,
+    versionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStrategyVersionConditions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStrategyVersionConditionsQueryKey(strategyId,versionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStrategyVersionConditions>>> = ({ signal }) => listStrategyVersionConditions(strategyId,versionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: strategyId !== null && strategyId !== undefined && versionId !== null && versionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStrategyVersionConditions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListStrategyVersionConditionsQueryResult = NonNullable<Awaited<ReturnType<typeof listStrategyVersionConditions>>>
+export type ListStrategyVersionConditionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the immutable conditions captured by a version
+ */
+
+export function useListStrategyVersionConditions<TData = Awaited<ReturnType<typeof listStrategyVersionConditions>>, TError = ErrorType<unknown>>(
+ strategyId: number,
+    versionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStrategyVersionConditions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListStrategyVersionConditionsQueryOptions(strategyId,versionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListStrategyConditionsUrl = (strategyId: number,) => {
 

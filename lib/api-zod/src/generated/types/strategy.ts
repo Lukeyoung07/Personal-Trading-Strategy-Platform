@@ -30,6 +30,9 @@ export interface Strategy {
   resetRules: string | null;
   /** @nullable */
   alertRules: string | null;
+  tradeCount: number;
+  /** @nullable */
+  winRate: number | null;
   createdAt: Date;
   updatedAt: Date;
 }

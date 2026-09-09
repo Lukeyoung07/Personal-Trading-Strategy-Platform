@@ -5,6 +5,7 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { StrategyVersionDirection } from './strategyVersionDirection';
 
 export interface StrategyVersion {
   id: number;
@@ -22,5 +23,25 @@ export interface StrategyVersion {
   riskRules: string | null;
   /** @nullable */
   notes: string | null;
+  /** @nullable */
+  marketId: number | null;
+  /** @nullable */
+  assetClass: string | null;
+  direction: StrategyVersionDirection;
+  timeframes: string[];
+  /** @nullable */
+  riskManagementRules: string | null;
+  /** @nullable */
+  resetRules: string | null;
+  /** @nullable */
+  alertRules: string | null;
+  conditionCount: number;
+  tradeCount: number;
+  /** @nullable */
+  winRate: number | null;
+  /** @nullable */
+  netPnl: number | null;
+  /** @nullable */
+  averagePnl: number | null;
   createdAt: Date;
 }

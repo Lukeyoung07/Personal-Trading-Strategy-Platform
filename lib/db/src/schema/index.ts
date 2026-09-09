@@ -36,6 +36,13 @@ export const strategyVersionsTable = pgTable("strategy_versions", {
   exitRules: text("exit_rules"),
   riskRules: text("risk_rules"),
   notes: text("notes"),
+  marketId: integer("market_id"),
+  assetClass: text("asset_class"),
+  direction: text("direction").notNull().default("both"),
+  timeframes: text("timeframes").array().notNull().default([]),
+  riskManagementRules: text("risk_management_rules"),
+  resetRules: text("reset_rules"),
+  alertRules: text("alert_rules"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -68,6 +75,23 @@ export const strategyConditionsTable = pgTable("strategy_conditions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
+export const strategyVersionConditionsTable = pgTable("strategy_version_conditions", {
+  id: serial("id").primaryKey(),
+  strategyVersionId: integer("strategy_version_id").notNull().references(() => strategyVersionsTable.id, { onDelete: "cascade" }),
+  conceptId: integer("concept_id").notNull().references(() => tradingConceptsTable.id, { onDelete: "restrict" }),
+  stage: text("stage").notNull().default("entry"),
+  name: text("name").notNull(),
+  description: text("description"),
+  timeframe: text("timeframe").notNull(),
+  direction: text("direction").notNull().default("both"),
+  requirement: text("requirement").notNull().default("required"),
+  conditionOrder: integer("condition_order").notNull().default(1),
+  triggerRules: text("trigger_rules"),
+  invalidationRules: text("invalidation_rules"),
+  resetBehavior: text("reset_behavior"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const conditionsTable = pgTable("conditions", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -87,6 +111,7 @@ export const marketsTable = pgTable("markets", {
 
 export const tradesTable = pgTable("trades", {
   id: serial("id").primaryKey(),
+  strategyVersionId: integer("strategy_version_id").notNull().references(() => strategyVersionsTable.id, { onDelete: "restrict" }),
   marketId: integer("market_id").references(() => marketsTable.id, { onDelete: "set null" }),
   side: text("side").notNull(),
   status: text("status").notNull().default("planned"),
@@ -134,6 +159,7 @@ export const userSettingsTable = pgTable("user_settings", {
 
 export const insertStrategySchema = createInsertSchema(strategiesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertStrategyVersionSchema = createInsertSchema(strategyVersionsTable).omit({ id: true, createdAt: true });
+export const insertStrategyVersionConditionSchema = createInsertSchema(strategyVersionConditionsTable).omit({ id: true, createdAt: true });
 export const insertTradingConceptSchema = createInsertSchema(tradingConceptsTable).omit({ id: true, createdAt: true });
 export const insertConditionSchema = createInsertSchema(conditionsTable).omit({ id: true, createdAt: true });
 export const insertMarketSchema = createInsertSchema(marketsTable).omit({ id: true, createdAt: true });
@@ -144,6 +170,7 @@ export const insertUserSettingsSchema = createInsertSchema(userSettingsTable).om
 
 export type Strategy = typeof strategiesTable.$inferSelect;
 export type StrategyVersion = typeof strategyVersionsTable.$inferSelect;
+export type StrategyVersionCondition = typeof strategyVersionConditionsTable.$inferSelect;
 export type StrategyCondition = typeof strategyConditionsTable.$inferSelect;
 export type TradingConcept = typeof tradingConceptsTable.$inferSelect;
 export type Condition = typeof conditionsTable.$inferSelect;
@@ -154,6 +181,7 @@ export type Alert = typeof alertsTable.$inferSelect;
 export type UserSettings = typeof userSettingsTable.$inferSelect;
 export type InsertStrategy = z.infer<typeof insertStrategySchema>;
 export type InsertStrategyVersion = z.infer<typeof insertStrategyVersionSchema>;
+export type InsertStrategyVersionCondition = z.infer<typeof insertStrategyVersionConditionSchema>;
 export const insertStrategyConditionSchema = createInsertSchema(strategyConditionsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertStrategyCondition = z.infer<typeof insertStrategyConditionSchema>;
 export type InsertTradingConcept = z.infer<typeof insertTradingConceptSchema>;

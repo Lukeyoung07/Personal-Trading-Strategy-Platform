@@ -7,6 +7,7 @@ import {
   marketsTable,
   strategiesTable,
   strategyConditionsTable,
+  strategyVersionConditionsTable,
   strategyVersionsTable,
   tradesTable,
   tradingConceptsTable,
@@ -25,6 +26,8 @@ import {
   CreateStrategyResponse,
   CreateStrategyVersionBody,
   CreateStrategyVersionResponse,
+  DuplicateStrategyBody,
+  DuplicateStrategyResponse,
   CreateStrategyConditionBody,
   CreateStrategyConditionResponse,
   CreateTradeBody,
@@ -48,6 +51,8 @@ import {
   ListStrategiesResponse,
   ListStrategyVersionsParams,
   ListStrategyVersionsResponse,
+  ListStrategyVersionConditionsParams,
+  ListStrategyVersionConditionsResponse,
   ListStrategyConditionsParams,
   ListStrategyConditionsResponse,
   ListTradesResponse,
@@ -143,6 +148,27 @@ async function ensureBuiltInConcepts(): Promise<void> {
 const nullableNumber = (value: string | number | null | undefined): number | null =>
   value == null ? null : Number(value);
 
+function calculateTradeMetrics(rows: Array<{ status: string; pnl: string | number | null }>) {
+  const closed = rows.filter(row => row.status === "closed");
+  const pnlValues = closed.map(row => nullableNumber(row.pnl)).filter((value): value is number => value != null);
+  const wins = pnlValues.filter(value => value > 0).length;
+  return {
+    tradeCount: rows.length,
+    winRate: pnlValues.length ? Number(((wins / pnlValues.length) * 100).toFixed(2)) : null,
+    netPnl: pnlValues.length ? Number(pnlValues.reduce((total, value) => total + value, 0).toFixed(2)) : null,
+    averagePnl: pnlValues.length ? Number((pnlValues.reduce((total, value) => total + value, 0) / pnlValues.length).toFixed(2)) : null,
+  };
+}
+
+async function strategyTradeMetrics(strategyId: number) {
+  const rows = await db
+    .select({ status: tradesTable.status, pnl: tradesTable.pnl })
+    .from(tradesTable)
+    .innerJoin(strategyVersionsTable, eq(tradesTable.strategyVersionId, strategyVersionsTable.id))
+    .where(eq(strategyVersionsTable.strategyId, strategyId));
+  return calculateTradeMetrics(rows);
+}
+
 async function strategyView(strategy: typeof strategiesTable.$inferSelect) {
   const [latest] = await db
     .select({ versionNumber: max(strategyVersionsTable.versionNumber) })
@@ -152,6 +178,7 @@ async function strategyView(strategy: typeof strategiesTable.$inferSelect) {
     ...strategy,
     marketSymbol: await marketSymbol(strategy.marketId),
     currentVersion: latest?.versionNumber == null ? null : Number(latest.versionNumber),
+    ...(await strategyTradeMetrics(strategy.id)),
   };
 }
 
@@ -196,7 +223,22 @@ router.post("/strategies", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [created] = await db.insert(strategiesTable).values(parsed.data).returning();
+  const created = await db.transaction(async (tx) => {
+    const [strategy] = await tx.insert(strategiesTable).values(parsed.data).returning();
+    await tx.insert(strategyVersionsTable).values({
+      strategyId: strategy.id,
+      versionNumber: 1,
+      label: "Initial version",
+      marketId: strategy.marketId,
+      assetClass: strategy.assetClass,
+      direction: strategy.direction,
+      timeframes: strategy.timeframes,
+      riskManagementRules: strategy.riskManagementRules,
+      resetRules: strategy.resetRules,
+      alertRules: strategy.alertRules,
+    });
+    return strategy;
+  });
   res.status(201).json(CreateStrategyResponse.parse(await strategyView(created)));
 });
 
@@ -239,6 +281,16 @@ router.delete("/strategies/:strategyId", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
+  const [trade] = await db
+    .select({ id: tradesTable.id })
+    .from(tradesTable)
+    .innerJoin(strategyVersionsTable, eq(tradesTable.strategyVersionId, strategyVersionsTable.id))
+    .where(eq(strategyVersionsTable.strategyId, params.data.strategyId))
+    .limit(1);
+  if (trade) {
+    res.status(409).json({ error: "This strategy has recorded trades. Archive it instead so its version history remains intact." });
+    return;
+  }
   const [deleted] = await db.delete(strategiesTable).where(eq(strategiesTable.id, params.data.strategyId)).returning();
   if (!deleted) {
     res.status(404).json({ error: "Strategy not found" });
@@ -246,6 +298,95 @@ router.delete("/strategies/:strategyId", async (req, res): Promise<void> => {
   }
   res.sendStatus(204);
 });
+
+router.post("/strategies/:strategyId/duplicate", async (req, res): Promise<void> => {
+  const params = GetStrategyParams.safeParse(req.params);
+  const body = DuplicateStrategyBody.safeParse(req.body ?? {});
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: !params.success ? params.error.message : body.error.message });
+    return;
+  }
+  const [source] = await db.select().from(strategiesTable).where(eq(strategiesTable.id, params.data.strategyId));
+  if (!source) {
+    res.status(404).json({ error: "Strategy not found" });
+    return;
+  }
+  const duplicated = await db.transaction(async (tx) => {
+    const [strategy] = await tx.insert(strategiesTable).values({
+      name: body.data.name || `${source.name} Copy`,
+      description: source.description,
+      status: "draft",
+      marketId: source.marketId,
+      assetClass: source.assetClass,
+      direction: source.direction,
+      timeframes: source.timeframes,
+      riskManagementRules: source.riskManagementRules,
+      resetRules: source.resetRules,
+      alertRules: source.alertRules,
+    }).returning();
+    const [version] = await tx.insert(strategyVersionsTable).values({
+      strategyId: strategy.id,
+      versionNumber: 1,
+      label: "Initial copy",
+      marketId: strategy.marketId,
+      assetClass: strategy.assetClass,
+      direction: strategy.direction,
+      timeframes: strategy.timeframes,
+      riskManagementRules: strategy.riskManagementRules,
+      resetRules: strategy.resetRules,
+      alertRules: strategy.alertRules,
+    }).returning();
+    const conditions = await tx.select().from(strategyConditionsTable).where(eq(strategyConditionsTable.strategyId, source.id));
+    if (conditions.length) {
+      await tx.insert(strategyVersionConditionsTable).values(conditions.map(condition => ({
+        strategyVersionId: version.id,
+        conceptId: condition.conceptId,
+        stage: condition.stage,
+        name: condition.name,
+        description: condition.description,
+        timeframe: condition.timeframe,
+        direction: condition.direction,
+        requirement: condition.requirement,
+        conditionOrder: condition.conditionOrder,
+        triggerRules: condition.triggerRules,
+        invalidationRules: condition.invalidationRules,
+        resetBehavior: condition.resetBehavior,
+      })));
+      await tx.insert(strategyConditionsTable).values(conditions.map(condition => ({
+        strategyId: strategy.id,
+        conceptId: condition.conceptId,
+        stage: condition.stage,
+        name: condition.name,
+        description: condition.description,
+        timeframe: condition.timeframe,
+        direction: condition.direction,
+        requirement: condition.requirement,
+        conditionOrder: condition.conditionOrder,
+        triggerRules: condition.triggerRules,
+        invalidationRules: condition.invalidationRules,
+        resetBehavior: condition.resetBehavior,
+      })));
+    }
+    return strategy;
+  });
+  res.status(201).json(DuplicateStrategyResponse.parse(await strategyView(duplicated)));
+});
+
+async function strategyVersionView(version: typeof strategyVersionsTable.$inferSelect) {
+  const [conditionCount] = await db
+    .select({ value: count() })
+    .from(strategyVersionConditionsTable)
+    .where(eq(strategyVersionConditionsTable.strategyVersionId, version.id));
+  const trades = await db
+    .select({ status: tradesTable.status, pnl: tradesTable.pnl })
+    .from(tradesTable)
+    .where(eq(tradesTable.strategyVersionId, version.id));
+  return {
+    ...version,
+    conditionCount: Number(conditionCount?.value ?? 0),
+    ...calculateTradeMetrics(trades),
+  };
+}
 
 router.get("/strategies/:strategyId/versions", async (req, res): Promise<void> => {
   const params = ListStrategyVersionsParams.safeParse(req.params);
@@ -258,7 +399,7 @@ router.get("/strategies/:strategyId/versions", async (req, res): Promise<void> =
     .from(strategyVersionsTable)
     .where(eq(strategyVersionsTable.strategyId, params.data.strategyId))
     .orderBy(desc(strategyVersionsTable.versionNumber));
-  res.json(ListStrategyVersionsResponse.parse(rows));
+  res.json(ListStrategyVersionsResponse.parse(await Promise.all(rows.map(strategyVersionView))));
 });
 
 router.post("/strategies/:strategyId/versions", async (req, res): Promise<void> => {
@@ -273,15 +414,76 @@ router.post("/strategies/:strategyId/versions", async (req, res): Promise<void> 
     res.status(404).json({ error: "Strategy not found" });
     return;
   }
-  const [latest] = await db
-    .select({ versionNumber: max(strategyVersionsTable.versionNumber) })
+  const created = await db.transaction(async (tx) => {
+    const [latest] = await tx
+      .select({ versionNumber: max(strategyVersionsTable.versionNumber) })
+      .from(strategyVersionsTable)
+      .where(eq(strategyVersionsTable.strategyId, params.data.strategyId));
+    const [current] = await tx
+      .select()
+      .from(strategiesTable)
+      .where(eq(strategiesTable.id, params.data.strategyId));
+    const [version] = await tx
+      .insert(strategyVersionsTable)
+      .values({
+        ...body.data,
+        strategyId: params.data.strategyId,
+        versionNumber: Number(latest?.versionNumber ?? 0) + 1,
+        marketId: current.marketId,
+        assetClass: current.assetClass,
+        direction: current.direction,
+        timeframes: current.timeframes,
+        riskManagementRules: current.riskManagementRules,
+        resetRules: current.resetRules,
+        alertRules: current.alertRules,
+      })
+      .returning();
+    const conditions = await tx.select().from(strategyConditionsTable).where(eq(strategyConditionsTable.strategyId, params.data.strategyId));
+    if (conditions.length) {
+      await tx.insert(strategyVersionConditionsTable).values(conditions.map(condition => ({
+        strategyVersionId: version.id,
+        conceptId: condition.conceptId,
+        stage: condition.stage,
+        name: condition.name,
+        description: condition.description,
+        timeframe: condition.timeframe,
+        direction: condition.direction,
+        requirement: condition.requirement,
+        conditionOrder: condition.conditionOrder,
+        triggerRules: condition.triggerRules,
+        invalidationRules: condition.invalidationRules,
+        resetBehavior: condition.resetBehavior,
+      })));
+    }
+    return version;
+  });
+  res.status(201).json(CreateStrategyVersionResponse.parse(await strategyVersionView(created)));
+});
+
+router.get("/strategies/:strategyId/versions/:versionId/conditions", async (req, res): Promise<void> => {
+  const params = ListStrategyVersionConditionsParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [version] = await db
+    .select({ id: strategyVersionsTable.id })
     .from(strategyVersionsTable)
-    .where(eq(strategyVersionsTable.strategyId, params.data.strategyId));
-  const [created] = await db
-    .insert(strategyVersionsTable)
-    .values({ ...body.data, strategyId: params.data.strategyId, versionNumber: Number(latest?.versionNumber ?? 0) + 1 })
-    .returning();
-  res.status(201).json(CreateStrategyVersionResponse.parse(created));
+    .where(and(eq(strategyVersionsTable.id, params.data.versionId), eq(strategyVersionsTable.strategyId, params.data.strategyId)));
+  if (!version) {
+    res.status(404).json({ error: "Strategy version not found" });
+    return;
+  }
+  const rows = await db
+    .select()
+    .from(strategyVersionConditionsTable)
+    .where(eq(strategyVersionConditionsTable.strategyVersionId, params.data.versionId))
+    .orderBy(asc(strategyVersionConditionsTable.conditionOrder));
+  const withConcepts = await Promise.all(rows.map(async condition => {
+    const [concept] = await db.select({ name: tradingConceptsTable.name, category: tradingConceptsTable.category }).from(tradingConceptsTable).where(eq(tradingConceptsTable.id, condition.conceptId));
+    return { ...condition, conceptName: concept?.name ?? "Missing concept", conceptCategory: concept?.category ?? null, order: condition.conditionOrder };
+  }));
+  res.json(ListStrategyVersionConditionsResponse.parse(withConcepts));
 });
 
 async function strategyConditionView(condition: typeof strategyConditionsTable.$inferSelect) {
@@ -530,15 +732,24 @@ router.delete("/markets/:marketId", async (req, res): Promise<void> => {
 
 router.get("/trades", async (_req, res): Promise<void> => {
   const rows = await db
-    .select({ trade: tradesTable, symbol: marketsTable.symbol })
+    .select({
+      trade: tradesTable,
+      symbol: marketsTable.symbol,
+      strategyName: strategiesTable.name,
+      versionNumber: strategyVersionsTable.versionNumber,
+    })
     .from(tradesTable)
+    .innerJoin(strategyVersionsTable, eq(tradesTable.strategyVersionId, strategyVersionsTable.id))
+    .innerJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
     .leftJoin(marketsTable, eq(tradesTable.marketId, marketsTable.id))
     .orderBy(desc(tradesTable.createdAt));
   res.json(
     ListTradesResponse.parse(
-      rows.map(({ trade, symbol }) => ({
+      rows.map(({ trade, symbol, strategyName, versionNumber }) => ({
         ...trade,
         marketSymbol: symbol,
+        strategyName,
+        strategyVersionNumber: versionNumber,
         quantity: nullableNumber(trade.quantity),
         entryPrice: nullableNumber(trade.entryPrice),
         exitPrice: nullableNumber(trade.exitPrice),
@@ -564,10 +775,17 @@ router.post("/trades", async (req, res): Promise<void> => {
       pnl: parsed.data.pnl?.toString(),
     })
     .returning();
+  const [context] = await db
+    .select({ strategyName: strategiesTable.name, versionNumber: strategyVersionsTable.versionNumber })
+    .from(strategyVersionsTable)
+    .innerJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
+    .where(eq(strategyVersionsTable.id, created.strategyVersionId));
   res.status(201).json(
     CreateTradeResponse.parse({
       ...created,
       marketSymbol: await marketSymbol(created.marketId),
+      strategyName: context?.strategyName ?? null,
+      strategyVersionNumber: context?.versionNumber ?? null,
       quantity: nullableNumber(created.quantity),
       entryPrice: nullableNumber(created.entryPrice),
       exitPrice: nullableNumber(created.exitPrice),
@@ -599,10 +817,17 @@ router.patch("/trades/:tradeId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Trade not found" });
     return;
   }
+  const [context] = await db
+    .select({ strategyName: strategiesTable.name, versionNumber: strategyVersionsTable.versionNumber })
+    .from(strategyVersionsTable)
+    .innerJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
+    .where(eq(strategyVersionsTable.id, updated.strategyVersionId));
   res.json(
     UpdateTradeResponse.parse({
       ...updated,
       marketSymbol: await marketSymbol(updated.marketId),
+      strategyName: context?.strategyName ?? null,
+      strategyVersionNumber: context?.versionNumber ?? null,
       quantity: nullableNumber(updated.quantity),
       entryPrice: nullableNumber(updated.entryPrice),
       exitPrice: nullableNumber(updated.exitPrice),

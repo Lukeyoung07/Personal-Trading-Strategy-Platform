@@ -10,6 +10,11 @@ import type { TradeStatus } from './tradeStatus';
 
 export interface Trade {
   id: number;
+  strategyVersionId: number;
+  /** @nullable */
+  strategyName: string | null;
+  /** @nullable */
+  strategyVersionNumber: number | null;
   /** @nullable */
   marketId: number | null;
   /** @nullable */

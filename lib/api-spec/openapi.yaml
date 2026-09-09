@@ -129,6 +129,26 @@ paths:
       responses:
         "204":
           description: Deleted
+  /strategies/{strategyId}/duplicate:
+    post:
+      operationId: duplicateStrategy
+      tags: [strategies]
+      summary: Duplicate a strategy without its trade history
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyDuplicateInput"
+      responses:
+        "201":
+          description: Duplicated strategy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strategy"
   /strategies/{strategyId}/versions:
     get:
       operationId: listStrategyVersions
@@ -164,6 +184,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StrategyVersion"
+  /strategies/{strategyId}/versions/{versionId}/conditions:
+    get:
+      operationId: listStrategyVersionConditions
+      tags: [strategies]
+      summary: List the immutable conditions captured by a version
+      parameters:
+        - $ref: "#/components/parameters/StrategyId"
+        - $ref: "#/components/parameters/VersionId"
+      responses:
+        "200":
+          description: Version condition snapshot
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StrategyVersionCondition"
   /strategies/{strategyId}/conditions:
     get:
       operationId: listStrategyConditions
@@ -610,6 +647,11 @@ components:
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
+    VersionId:
+      name: versionId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
     MarketId:
       name: marketId
       in: path
@@ -659,7 +701,7 @@ components:
         latestTradeAt: { type: ["string", "null"], format: date-time }
     Strategy:
       type: object
-      required: [id, name, description, status, currentVersion, marketId, assetClass, direction, timeframes, riskManagementRules, resetRules, alertRules, createdAt, updatedAt]
+      required: [id, name, description, status, currentVersion, marketId, assetClass, direction, timeframes, riskManagementRules, resetRules, alertRules, tradeCount, winRate, createdAt, updatedAt]
       properties:
         id: { type: integer }
         name: { type: string }
@@ -680,6 +722,8 @@ components:
         riskManagementRules: { type: ["string", "null"] }
         resetRules: { type: ["string", "null"] }
         alertRules: { type: ["string", "null"] }
+        tradeCount: { type: integer }
+        winRate: { type: ["number", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     StrategyInput:
@@ -704,6 +748,10 @@ components:
         riskManagementRules: { type: ["string", "null"] }
         resetRules: { type: ["string", "null"] }
         alertRules: { type: ["string", "null"] }
+    StrategyDuplicateInput:
+      type: object
+      properties:
+        name: { type: ["string", "null"], minLength: 1 }
     StrategyUpdate:
       type: object
       properties:
@@ -725,7 +773,7 @@ components:
         alertRules: { type: ["string", "null"] }
     StrategyVersion:
       type: object
-      required: [id, strategyId, versionNumber, label, thesis, entryRules, exitRules, riskRules, notes, createdAt]
+      required: [id, strategyId, versionNumber, label, thesis, entryRules, exitRules, riskRules, notes, marketId, assetClass, direction, timeframes, riskManagementRules, resetRules, alertRules, conditionCount, tradeCount, winRate, netPnl, averagePnl, createdAt]
       properties:
         id: { type: integer }
         strategyId: { type: integer }
@@ -736,6 +784,22 @@ components:
         exitRules: { type: ["string", "null"] }
         riskRules: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
+        marketId: { type: ["integer", "null"] }
+        assetClass: { type: ["string", "null"] }
+        direction:
+          type: string
+          enum: [long, short, both]
+        timeframes:
+          type: array
+          items: { type: string }
+        riskManagementRules: { type: ["string", "null"] }
+        resetRules: { type: ["string", "null"] }
+        alertRules: { type: ["string", "null"] }
+        conditionCount: { type: integer }
+        tradeCount: { type: integer }
+        winRate: { type: ["number", "null"] }
+        netPnl: { type: ["number", "null"] }
+        averagePnl: { type: ["number", "null"] }
         createdAt: { type: string, format: date-time }
     StrategyVersionInput:
       type: object
@@ -746,6 +810,32 @@ components:
         exitRules: { type: ["string", "null"] }
         riskRules: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
+    StrategyVersionCondition:
+      type: object
+      required: [id, strategyVersionId, conceptId, conceptName, conceptCategory, stage, name, description, timeframe, direction, requirement, order, triggerRules, invalidationRules, resetBehavior, createdAt]
+      properties:
+        id: { type: integer }
+        strategyVersionId: { type: integer }
+        conceptId: { type: integer }
+        conceptName: { type: string }
+        conceptCategory: { type: ["string", "null"] }
+        stage:
+          type: string
+          enum: [entry, confirmation, invalidation, exit]
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        timeframe: { type: string }
+        direction:
+          type: string
+          enum: [long, short, both]
+        requirement:
+          type: string
+          enum: [required, optional]
+        order: { type: integer }
+        triggerRules: { type: ["string", "null"] }
+        invalidationRules: { type: ["string", "null"] }
+        resetBehavior: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
     StrategyCondition:
       type: object
       required: [id, strategyId, conceptId, conceptName, conceptCategory, stage, name, description, timeframe, direction, requirement, order, triggerRules, invalidationRules, resetBehavior, createdAt, updatedAt]
@@ -899,9 +989,12 @@ components:
         description: { type: ["string", "null"] }
     Trade:
       type: object
-      required: [id, marketId, side, status, quantity, entryPrice, exitPrice, openedAt, closedAt, thesis, notes, createdAt]
+      required: [id, strategyVersionId, strategyName, strategyVersionNumber, marketId, side, status, quantity, entryPrice, exitPrice, openedAt, closedAt, thesis, notes, createdAt]
       properties:
         id: { type: integer }
+        strategyVersionId: { type: integer }
+        strategyName: { type: ["string", "null"] }
+        strategyVersionNumber: { type: ["integer", "null"] }
         marketId: { type: ["integer", "null"] }
         marketSymbol: { type: ["string", "null"] }
         side:
@@ -923,6 +1016,7 @@ components:
       type: object
       required: [side, status]
       properties:
+        strategyVersionId: { type: integer, minimum: 1 }
         marketId: { type: ["integer", "null"] }
         side:
           type: string
@@ -941,6 +1035,7 @@ components:
     TradeUpdate:
       type: object
       properties:
+        strategyVersionId: { type: integer, minimum: 1 }
         marketId: { type: ["integer", "null"] }
         side:
           type: string
