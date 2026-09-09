@@ -53,6 +53,8 @@ import type {
   StrategyConditionUpdate,
   StrategyDuplicateInput,
   StrategyInput,
+  StrategyMonitor,
+  StrategyMonitoringEvaluationRequest,
   StrategyUpdate,
   StrategyVersion,
   StrategyVersionCloneInput,
@@ -691,6 +693,154 @@ export const useDuplicateStrategy = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDuplicateStrategyMutationOptions(options));
+    }
+
+export const getListStrategyMonitorsUrl = () => {
+
+
+
+
+  return `/api/strategy-monitoring`
+}
+
+/**
+ * @summary List monitoring state for active strategies
+ */
+export const listStrategyMonitors = async ( options?: Parameters<typeof customFetch>[1]): Promise<StrategyMonitor[]> => {
+
+  return customFetch<StrategyMonitor[]>(getListStrategyMonitorsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStrategyMonitorsQueryKey = () => {
+    return [
+    `/api/strategy-monitoring`
+    ] as const;
+    }
+
+
+export const getListStrategyMonitorsQueryOptions = <TData = Awaited<ReturnType<typeof listStrategyMonitors>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStrategyMonitors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStrategyMonitorsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStrategyMonitors>>> = ({ signal }) => listStrategyMonitors({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStrategyMonitors>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListStrategyMonitorsQueryResult = NonNullable<Awaited<ReturnType<typeof listStrategyMonitors>>>
+export type ListStrategyMonitorsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List monitoring state for active strategies
+ */
+
+export function useListStrategyMonitors<TData = Awaited<ReturnType<typeof listStrategyMonitors>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStrategyMonitors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListStrategyMonitorsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getEvaluateActiveStrategiesUrl = () => {
+
+
+
+
+  return `/api/strategy-monitoring/evaluate`
+}
+
+/**
+ * @summary Evaluate active strategies against available normalized market data
+ */
+export const evaluateActiveStrategies = async (strategyMonitoringEvaluationRequest?: StrategyMonitoringEvaluationRequest, options?: Parameters<typeof customFetch>[1]): Promise<StrategyMonitor[]> => {
+
+  return customFetch<StrategyMonitor[]>(getEvaluateActiveStrategiesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(strategyMonitoringEvaluationRequest)
+  }
+);}
+
+
+
+
+
+export const getEvaluateActiveStrategiesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof evaluateActiveStrategies>>, TError,{data?: BodyType<StrategyMonitoringEvaluationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof evaluateActiveStrategies>>, TError,{data?: BodyType<StrategyMonitoringEvaluationRequest>}, TContext> => {
+
+const mutationKey = ['evaluateActiveStrategies'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof evaluateActiveStrategies>>, {data?: BodyType<StrategyMonitoringEvaluationRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  evaluateActiveStrategies(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EvaluateActiveStrategiesMutationResult = NonNullable<Awaited<ReturnType<typeof evaluateActiveStrategies>>>
+    export type EvaluateActiveStrategiesMutationBody = BodyType<StrategyMonitoringEvaluationRequest> | undefined
+    export type EvaluateActiveStrategiesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Evaluate active strategies against available normalized market data
+ */
+export const useEvaluateActiveStrategies = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof evaluateActiveStrategies>>, TError,{data?: BodyType<StrategyMonitoringEvaluationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof evaluateActiveStrategies>>,
+        TError,
+        {data?: BodyType<StrategyMonitoringEvaluationRequest>},
+        TContext
+      > => {
+      return useMutation(getEvaluateActiveStrategiesMutationOptions(options));
     }
 
 export const getListStrategyVersionsUrl = (strategyId: number,) => {

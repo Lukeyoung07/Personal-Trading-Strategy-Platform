@@ -1,0 +1,190 @@
+Build Step 6 of my trading app: Strategy Monitoring Engine.
+
+Steps 1–5 are already complete. Do not rebuild, remove, or change their existing functionality.
+
+The purpose of Step 6 is to create the engine that evaluates a user's saved strategy against incoming market data.
+
+IMPORTANT:
+
+The user does NOT have a fixed trading strategy yet.
+
+The engine must therefore be completely generic and driven by the conditions configured in the Strategy Builder.
+
+Do NOT hard-code a specific strategy.
+
+Do NOT assume the user trades a specific market.
+
+Do NOT assume the user trades futures, forex, stocks, commodities, crypto, or any other specific instrument.
+
+The monitoring engine should work with whatever instrument, timeframe, concepts, rules, and conditions the user selects in their saved strategy.
+
+CORE FLOW:
+
+Market Data
+↓
+Strategy Monitoring Engine
+↓
+Evaluate Strategy Conditions
+↓
+Condition Status
+↓
+Overall Strategy Progress
+
+For each active strategy, the engine should be able to:
+
+- Load the currently active strategy version
+- Load its configured conditions in their saved order
+- Receive normalized market data from the Step 5 Market Data Service
+- Evaluate each condition when the required market data is available
+- Track whether each condition is:
+  - NOT MET
+  - MET
+  - WAITING / INSUFFICIENT DATA
+  - INVALID / UNABLE TO EVALUATE
+- Show the current progress of the strategy
+- Keep the evaluation tied to the exact strategy version being monitored
+
+Example:
+
+Strategy: My Strategy
+
+4H Market Bias       ✅ MET
+1H Market Bias       ✅ MET
+Liquidity Sweep      ✅ MET
+FVG Formation        ⏳ WAITING
+IFVG Confirmation    ❌ NOT MET
+
+Progress: 3/5 conditions met
+
+IMPORTANT CONDITION LOGIC:
+
+Do not simply mark a condition as permanently true.
+
+Conditions must be evaluated according to the rules and settings stored in the Strategy Builder.
+
+The engine must support conditions that may:
+
+- Become true
+- Become false
+- Remain waiting
+- Depend on multiple candles
+- Depend on a specific timeframe
+- Depend on previous market data
+- Require confirmation
+- Require a sequence of events
+
+If a strategy condition becomes invalid or the required sequence is broken, the engine must update its state accordingly.
+
+RESET LOGIC:
+
+The engine must support the reset rules configured by the strategy.
+
+A strategy should be able to reset its condition progress when the configured reset requirements occur.
+
+Do NOT invent reset rules.
+
+Use the reset settings already defined by the Strategy Builder.
+
+CONDITION DEPENDENCIES:
+
+Some conditions may depend on earlier conditions.
+
+Respect the order and dependencies configured by the strategy.
+
+The engine should not assume that every condition is independent.
+
+TIMEFRAMES:
+
+Conditions may use different timeframes.
+
+The engine must evaluate each condition using the timeframe configured for that condition rather than assuming every condition uses the same timeframe.
+
+CONCEPT INTEGRATION:
+
+Use the existing Trading Concept Library and Strategy Builder definitions.
+
+Do NOT create a second concept-definition system.
+
+Do NOT invent new definitions for concepts.
+
+The monitoring engine should use the existing concept identifiers/configuration supplied by the Strategy Builder.
+
+IMPORTANT:
+
+At this stage, only implement the monitoring/evaluation architecture.
+
+Do NOT add:
+
+- Live market-data providers
+- Trading 212 integration
+- Tradovate integration
+- Prop-firm integration
+- Automatic trade execution
+- BUY/SELL alerts
+- Notifications
+- News monitoring
+- AI
+- Backtesting
+- New trading concepts
+- Fake market data
+- Fake signals
+
+The existing Step 5 market-data architecture must remain provider-neutral.
+
+Create the necessary backend services, data structures, APIs, and frontend state needed to support strategy monitoring.
+
+The UI should allow me to see:
+
+- Which strategy is currently being monitored
+- Which strategy version is active
+- Instrument/market being monitored
+- Current condition status
+- Number of conditions met
+- Number of conditions remaining
+- Overall progress
+- Monitoring status
+- Last evaluation timestamp
+- Any condition that could not currently be evaluated and why
+
+Do not display a BUY or SELL recommendation at this stage.
+
+Do not create fake condition results.
+
+If there is no real market data available yet, clearly show that the condition cannot currently be evaluated rather than pretending it has been met.
+
+PERFORMANCE:
+
+Avoid unnecessary continuous database writes.
+
+Design the monitoring engine so it can process incoming market-data updates efficiently and only persist state when necessary.
+
+ARCHITECTURE:
+
+Market Data Service
+↓
+Strategy Monitoring Engine
+↓
+Condition Evaluation
+↓
+Strategy Monitoring State
+↓
+Future Alerts System
+
+Keep the monitoring engine modular so Step 7 can use its results to create alerts and news awareness.
+
+After implementation:
+
+- Run type checks
+- Run production builds
+- Test the monitoring APIs/services
+- Test strategy-version association
+- Test condition state transitions
+- Test reset behaviour
+- Test multiple timeframes
+- Test that incomplete market data produces a clear waiting/insufficient-data state
+- Test that existing Steps 1–5 have not been broken
+- Test desktop and mobile layouts
+
+Only implement Step 6.
+
+Do not begin Step 7.

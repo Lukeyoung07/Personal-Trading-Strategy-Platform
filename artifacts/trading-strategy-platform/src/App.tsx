@@ -26,6 +26,7 @@ import { TradeJournalPage as Journal } from '@/components/trade-journal';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
+import { StrategyMonitoringPage } from '@/components/strategy-monitoring';
 import '@/index.css';
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const nav = [
   { href:'/market-monitor', label:'Markets', icon:BarChart3 },
   { href:'/trade-journal', label:'Journal', icon:BookOpen },
   { href:'/performance', label:'Performance', icon:TrendingUp },
+  { href:'/strategy-monitoring', label:'Monitor', icon:Activity },
   { href:'/alerts', label:'Alerts', icon:Bell },
 ];
 
@@ -71,13 +73,13 @@ function Shell({ children }: { children: ReactNode }) {
   </div>;
 }
 function pageName(path:string) { return nav.find(n=>n.href===path)?.label || (path==='/backtesting'?'Backtesting':path==='/settings'?'Settings':'Workspace'); }
-function Page({ eyebrow, title, description, action, children }: { eyebrow:string; title:string; description?:string; action?:ReactNode; children:ReactNode }) {
+export function Page({ eyebrow, title, description, action, children }: { eyebrow:string; title:string; description?:string; action?:ReactNode; children:ReactNode }) {
   return <div className="page-wrap"><div className="flex items-start justify-between gap-5 mb-8"><div><div className="eyebrow mb-3">{eyebrow}</div><h1 className="display text-3xl md:text-4xl font-bold">{title}</h1>{description&&<p className="text-muted-foreground text-sm mt-3 max-w-2xl leading-relaxed">{description}</p>}</div>{action}</div>{children}</div>;
 }
-function Skeleton({ className='' }: {className?:string}) { return <div className={`skeleton ${className}`}/>; }
-function LoadingBlock() { return <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{[1,2,3].map(i=><div className="panel p-5" key={i}><Skeleton className="w-20 h-3 mb-4"/><Skeleton className="w-28 h-8"/></div>)}</div>; }
-function ErrorState({ retry }: {retry?:()=>void}) { return <div className="panel p-10 text-center"><AlertTriangle className="mx-auto text-destructive mb-3" size={22}/><div className="font-semibold">Couldn’t load these records</div><p className="text-muted-foreground text-sm mt-2">Your workspace is intact. Try again when you’re ready.</p>{retry&&<button className="btn btn-secondary mt-5" onClick={retry} data-testid="button-retry">Retry</button>}</div>; }
-function EmptyState({ icon:Icon=FileText, title, text, action, testId='empty-state' }: {icon?:typeof FileText;title:string;text:string;action?:ReactNode;testId?:string}) { return <div className="panel empty-grid p-10 md:p-14 text-center" data-testid={testId}><div className="w-11 h-11 mx-auto rounded-xl border border-primary/30 bg-primary/10 text-primary flex items-center justify-center mb-5"><Icon size={20}/></div><h3 className="font-semibold text-lg">{title}</h3><p className="text-sm text-muted-foreground max-w-md mx-auto mt-2 leading-relaxed">{text}</p>{action&&<div className="mt-6">{action}</div>}</div>; }
+export function Skeleton({ className='' }: {className?:string}) { return <div className={`skeleton ${className}`}/>; }
+export function LoadingBlock() { return <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{[1,2,3].map(i=><div className="panel p-5" key={i}><Skeleton className="w-20 h-3 mb-4"/><Skeleton className="w-28 h-8"/></div>)}</div>; }
+export function ErrorState({ retry }: {retry?:()=>void}) { return <div className="panel p-10 text-center"><AlertTriangle className="mx-auto text-destructive mb-3" size={22}/><div className="font-semibold">Couldn’t load these records</div><p className="text-muted-foreground text-sm mt-2">Your workspace is intact. Try again when you’re ready.</p>{retry&&<button className="btn btn-secondary mt-5" onClick={retry} data-testid="button-retry">Retry</button>}</div>; }
+export function EmptyState({ icon:Icon=FileText, title, text, action, testId='empty-state' }: {icon?:typeof FileText;title:string;text:string;action?:ReactNode;testId?:string}) { return <div className="panel empty-grid p-10 md:p-14 text-center" data-testid={testId}><div className="w-11 h-11 mx-auto rounded-xl border border-primary/30 bg-primary/10 text-primary flex items-center justify-center mb-5"><Icon size={20}/></div><h3 className="font-semibold text-lg">{title}</h3><p className="text-sm text-muted-foreground max-w-md mx-auto mt-2 leading-relaxed">{text}</p>{action&&<div className="mt-6">{action}</div>}</div>; }
 function Stat({ label, value, icon:Icon, sub }: {label:string;value:ReactNode;icon:typeof Activity;sub?:string}) { return <div className="panel panel-hover p-5 rise"><div className="flex justify-between items-start"><span className="eyebrow">{label}</span><Icon size={16} className="text-muted-foreground"/></div><div className="metric-value mt-4" data-testid={`metric-${label.toLowerCase().replaceAll(' ','-')}`}>{value}</div>{sub&&<div className="text-[11px] text-muted-foreground mt-2">{sub}</div>}</div>; }
 function Modal({ title, onClose, children }: {title:string;onClose:()=>void;children:ReactNode}) { return <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-5" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><div className="panel w-full max-w-lg max-h-[92dvh] overflow-y-auto p-6 rise"><div className="flex items-center justify-between mb-6"><h2 className="font-semibold text-lg">{title}</h2><button onClick={onClose} className="btn btn-ghost" data-testid="button-close-modal"><X size={17}/></button></div>{children}</div></div>; }
 function Field({ label, children }: {label:string;children:ReactNode}) { return <label className="block"><span className="label">{label}</span>{children}</label>; }
@@ -174,5 +176,5 @@ function SettingsPage() { const q=useGetSettings();const u=useUpdateSettings();c
 function Backtesting() { return <Page eyebrow="Utilities" title="Backtesting" description="A deliberate boundary, for now."><div className="panel empty-grid p-10 md:p-16 text-center max-w-2xl mx-auto"><div className="w-12 h-12 mx-auto rounded-xl border border-accent/30 bg-accent/10 text-accent flex items-center justify-center mb-5"><Clock3 size={21}/></div><span className="tag tag-draft">Not built yet</span><h2 className="display text-2xl font-bold mt-5">No simulated certainty here.</h2><p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto mt-3">Backtesting is intentionally a placeholder. This workspace is for building and reviewing your own records, not manufacturing a performance history.</p><Link href="/strategy-builder" className="btn btn-secondary mt-7" data-testid="link-backtesting-builder">Return to builder <ChevronRight size={14}/></Link></div></Page>; }
 
 function StrategyBuilderRoute() { return <StrategyBuilder/>; }
-function Router() { return <ErrorBoundary><Shell><Switch><Route path="/" component={Dashboard}/><Route path="/strategy-builder" component={StrategyBuilderRoute}/><Route path="/strategy-library" component={StrategyLibrary}/><Route path="/market-monitor" component={MarketMonitor}/><Route path="/trade-journal" component={Journal}/><Route path="/performance" component={Performance}/><Route path="/alerts" component={Alerts}/><Route path="/settings" component={SettingsPage}/><Route path="/backtesting" component={Backtesting}/><Route component={NotFound}/></Switch></Shell></ErrorBoundary>; }
+function Router() { return <ErrorBoundary><Shell><Switch><Route path="/" component={Dashboard}/><Route path="/strategy-builder" component={StrategyBuilderRoute}/><Route path="/strategy-library" component={StrategyLibrary}/><Route path="/market-monitor" component={MarketMonitor}/><Route path="/trade-journal" component={Journal}/><Route path="/performance" component={Performance}/><Route path="/strategy-monitoring" component={StrategyMonitoringPage}/><Route path="/alerts" component={Alerts}/><Route path="/settings" component={SettingsPage}/><Route path="/backtesting" component={Backtesting}/><Route component={NotFound}/></Switch></Shell></ErrorBoundary>; }
 export default function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><Router/><Toaster/></TooltipProvider></QueryClientProvider>; }

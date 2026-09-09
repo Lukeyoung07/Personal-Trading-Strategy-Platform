@@ -233,6 +233,115 @@ export const DuplicateStrategyResponse = zod.object({
 
 
 /**
+ * @summary List monitoring state for active strategies
+ */
+export const listStrategyMonitorsResponseProgressPercentMin = 0;
+export const listStrategyMonitorsResponseProgressPercentMax = 100;
+
+
+
+export const ListStrategyMonitorsResponseItem = zod.object({
+  "monitorSessionId": zod.number().int().nullable(),
+  "strategyId": zod.number().int(),
+  "strategyName": zod.string(),
+  "strategyVersionId": zod.number().int(),
+  "versionNumber": zod.number().int(),
+  "instrumentId": zod.number().int().nullable(),
+  "instrumentSymbol": zod.string().nullable(),
+  "sourceId": zod.number().int().nullable(),
+  "monitoringStatus": zod.enum(['not_started', 'waiting', 'monitoring', 'paused', 'error']),
+  "overallStatus": zod.enum(['not_met', 'met', 'waiting', 'invalid']),
+  "statusReason": zod.string().nullable(),
+  "conditionCount": zod.number().int(),
+  "metCount": zod.number().int(),
+  "notMetCount": zod.number().int(),
+  "waitingCount": zod.number().int(),
+  "invalidCount": zod.number().int(),
+  "remainingCount": zod.number().int(),
+  "progressPercent": zod.number().int().min(listStrategyMonitorsResponseProgressPercentMin).max(listStrategyMonitorsResponseProgressPercentMax),
+  "lastEvaluationAt": zod.coerce.date().nullable(),
+  "lastMarketDataAt": zod.coerce.date().nullable(),
+  "resetStatus": zod.enum(['not_configured', 'waiting', 'ready']),
+  "resetReason": zod.string().nullable(),
+  "conditions": zod.array(zod.object({
+  "strategyVersionConditionId": zod.number().int(),
+  "conceptId": zod.number().int(),
+  "conceptName": zod.string(),
+  "conditionOrder": zod.number().int(),
+  "name": zod.string(),
+  "stage": zod.string(),
+  "requirement": zod.enum(['required', 'optional']),
+  "timeframe": zod.string(),
+  "status": zod.enum(['not_met', 'met', 'waiting', 'invalid']),
+  "reasonCode": zod.string().nullable(),
+  "reason": zod.string().nullable(),
+  "lastEvaluationAt": zod.coerce.date().nullable(),
+  "lastMarketDataAt": zod.coerce.date().nullable()
+}))
+})
+export const ListStrategyMonitorsResponse = zod.array(ListStrategyMonitorsResponseItem)
+
+
+/**
+ * @summary Evaluate active strategies against available normalized market data
+ */
+
+
+
+
+export const EvaluateActiveStrategiesBody = zod.object({
+  "strategyId": zod.number().int().min(1).optional(),
+  "sourceId": zod.number().int().min(1).nullish()
+})
+
+export const evaluateActiveStrategiesResponseProgressPercentMin = 0;
+export const evaluateActiveStrategiesResponseProgressPercentMax = 100;
+
+
+
+export const EvaluateActiveStrategiesResponseItem = zod.object({
+  "monitorSessionId": zod.number().int().nullable(),
+  "strategyId": zod.number().int(),
+  "strategyName": zod.string(),
+  "strategyVersionId": zod.number().int(),
+  "versionNumber": zod.number().int(),
+  "instrumentId": zod.number().int().nullable(),
+  "instrumentSymbol": zod.string().nullable(),
+  "sourceId": zod.number().int().nullable(),
+  "monitoringStatus": zod.enum(['not_started', 'waiting', 'monitoring', 'paused', 'error']),
+  "overallStatus": zod.enum(['not_met', 'met', 'waiting', 'invalid']),
+  "statusReason": zod.string().nullable(),
+  "conditionCount": zod.number().int(),
+  "metCount": zod.number().int(),
+  "notMetCount": zod.number().int(),
+  "waitingCount": zod.number().int(),
+  "invalidCount": zod.number().int(),
+  "remainingCount": zod.number().int(),
+  "progressPercent": zod.number().int().min(evaluateActiveStrategiesResponseProgressPercentMin).max(evaluateActiveStrategiesResponseProgressPercentMax),
+  "lastEvaluationAt": zod.coerce.date().nullable(),
+  "lastMarketDataAt": zod.coerce.date().nullable(),
+  "resetStatus": zod.enum(['not_configured', 'waiting', 'ready']),
+  "resetReason": zod.string().nullable(),
+  "conditions": zod.array(zod.object({
+  "strategyVersionConditionId": zod.number().int(),
+  "conceptId": zod.number().int(),
+  "conceptName": zod.string(),
+  "conditionOrder": zod.number().int(),
+  "name": zod.string(),
+  "stage": zod.string(),
+  "requirement": zod.enum(['required', 'optional']),
+  "timeframe": zod.string(),
+  "status": zod.enum(['not_met', 'met', 'waiting', 'invalid']),
+  "reasonCode": zod.string().nullable(),
+  "reason": zod.string().nullable(),
+  "lastEvaluationAt": zod.coerce.date().nullable(),
+  "lastMarketDataAt": zod.coerce.date().nullable()
+}))
+})
+export const EvaluateActiveStrategiesResponse = zod.array(EvaluateActiveStrategiesResponseItem)
+
+
+/**
  * @summary List strategy versions
  */
 

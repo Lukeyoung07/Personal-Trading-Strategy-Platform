@@ -9,6 +9,7 @@ import {
   sourceInstrumentMappingsTable,
   strategiesTable,
   strategyConditionsTable,
+  strategyMonitorSessionsTable,
   strategyVersionConditionsTable,
   strategyVersionsTable,
   tradesTable,
@@ -519,13 +520,20 @@ async function activateVersionSnapshot(strategyId: number, versionId: number) {
       .from(strategyVersionsTable)
       .where(and(eq(strategyVersionsTable.id, versionId), eq(strategyVersionsTable.strategyId, strategyId)));
     if (!version) return null;
+    if (!version.isActive) {
+      await tx.delete(strategyMonitorSessionsTable)
+        .where(eq(strategyMonitorSessionsTable.strategyVersionId, version.id));
+    }
     const conditions = await tx
       .select()
       .from(strategyVersionConditionsTable)
       .where(eq(strategyVersionConditionsTable.strategyVersionId, version.id))
       .orderBy(asc(strategyVersionConditionsTable.conditionOrder));
     await tx.update(strategyVersionsTable).set({ isActive: false }).where(eq(strategyVersionsTable.strategyId, strategyId));
-    const [active] = await tx.update(strategyVersionsTable).set({ isActive: true }).where(eq(strategyVersionsTable.id, version.id)).returning();
+    const [active] = await tx.update(strategyVersionsTable).set({
+      isActive: true,
+      monitoringEpoch: sql`${strategyVersionsTable.monitoringEpoch} + 1`,
+    }).where(eq(strategyVersionsTable.id, version.id)).returning();
     await tx.update(strategiesTable).set({
       name: version.name,
       description: version.description,

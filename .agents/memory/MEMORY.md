@@ -1,3 +1,4 @@
 - [Strategy builder model](strategy-builder-model.md) — strategy-owned, concept-referencing checkpoints stay descriptive and manually ordered until market data is explicitly added.
 - [Strategy version integrity](strategy-version-integrity.md) — snapshots own historical display context; version allocation and activation are serialized per strategy.
 - [Market data boundaries](market-data-boundaries.md) — provider mappings feed service-owned connection, candle, and quote normalization; clients cannot assert connection truth.
+- [Strategy monitoring semantics](strategy-monitoring-semantics.md) — exact-version monitoring uses typed evaluators, honest waiting states, activation epochs, and durable sparse transitions.

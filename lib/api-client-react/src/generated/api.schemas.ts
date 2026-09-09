@@ -25,6 +25,122 @@ export interface DashboardSummary {
   latestTradeAt?: string | null;
 }
 
+export interface StrategyMonitoringEvaluationRequest {
+  /** @minimum 1 */
+  strategyId?: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  sourceId?: number | null;
+}
+
+export type StrategyMonitorConditionRequirement = typeof StrategyMonitorConditionRequirement[keyof typeof StrategyMonitorConditionRequirement];
+
+
+export const StrategyMonitorConditionRequirement = {
+  required: 'required',
+  optional: 'optional',
+} as const;
+
+export type StrategyMonitorConditionStatus = typeof StrategyMonitorConditionStatus[keyof typeof StrategyMonitorConditionStatus];
+
+
+export const StrategyMonitorConditionStatus = {
+  not_met: 'not_met',
+  met: 'met',
+  waiting: 'waiting',
+  invalid: 'invalid',
+} as const;
+
+export interface StrategyMonitorCondition {
+  strategyVersionConditionId: number;
+  conceptId: number;
+  conceptName: string;
+  conditionOrder: number;
+  name: string;
+  stage: string;
+  requirement: StrategyMonitorConditionRequirement;
+  timeframe: string;
+  status: StrategyMonitorConditionStatus;
+  /** @nullable */
+  reasonCode: string | null;
+  /** @nullable */
+  reason: string | null;
+  /** @nullable */
+  lastEvaluationAt: string | null;
+  /** @nullable */
+  lastMarketDataAt: string | null;
+}
+
+export type StrategyMonitorMonitoringStatus = typeof StrategyMonitorMonitoringStatus[keyof typeof StrategyMonitorMonitoringStatus];
+
+
+export const StrategyMonitorMonitoringStatus = {
+  not_started: 'not_started',
+  waiting: 'waiting',
+  monitoring: 'monitoring',
+  paused: 'paused',
+  error: 'error',
+} as const;
+
+export type StrategyMonitorOverallStatus = typeof StrategyMonitorOverallStatus[keyof typeof StrategyMonitorOverallStatus];
+
+
+export const StrategyMonitorOverallStatus = {
+  not_met: 'not_met',
+  met: 'met',
+  waiting: 'waiting',
+  invalid: 'invalid',
+} as const;
+
+export type StrategyMonitorResetStatus = typeof StrategyMonitorResetStatus[keyof typeof StrategyMonitorResetStatus];
+
+
+export const StrategyMonitorResetStatus = {
+  not_configured: 'not_configured',
+  waiting: 'waiting',
+  ready: 'ready',
+} as const;
+
+export interface StrategyMonitor {
+  /** @nullable */
+  monitorSessionId: number | null;
+  strategyId: number;
+  strategyName: string;
+  strategyVersionId: number;
+  versionNumber: number;
+  /** @nullable */
+  instrumentId: number | null;
+  /** @nullable */
+  instrumentSymbol: string | null;
+  /** @nullable */
+  sourceId: number | null;
+  monitoringStatus: StrategyMonitorMonitoringStatus;
+  overallStatus: StrategyMonitorOverallStatus;
+  /** @nullable */
+  statusReason: string | null;
+  conditionCount: number;
+  metCount: number;
+  notMetCount: number;
+  waitingCount: number;
+  invalidCount: number;
+  remainingCount: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  progressPercent: number;
+  /** @nullable */
+  lastEvaluationAt: string | null;
+  /** @nullable */
+  lastMarketDataAt: string | null;
+  resetStatus: StrategyMonitorResetStatus;
+  /** @nullable */
+  resetReason: string | null;
+  conditions: StrategyMonitorCondition[];
+}
+
 export type StrategyStatus = typeof StrategyStatus[keyof typeof StrategyStatus];
 
 

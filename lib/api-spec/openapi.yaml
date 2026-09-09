@@ -14,6 +14,8 @@ tags:
     description: Workspace overview
   - name: strategies
     description: Strategy design and versioning
+  - name: strategy-monitoring
+    description: Exact-version strategy evaluation state
   - name: concepts
     description: Trading concepts
   - name: conditions
@@ -149,6 +151,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Strategy"
+  /strategy-monitoring:
+    get:
+      operationId: listStrategyMonitors
+      tags: [strategy-monitoring]
+      summary: List monitoring state for active strategies
+      responses:
+        "200":
+          description: Exact-version monitoring snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StrategyMonitor"
+  /strategy-monitoring/evaluate:
+    post:
+      operationId: evaluateActiveStrategies
+      tags: [strategy-monitoring]
+      summary: Evaluate active strategies against available normalized market data
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyMonitoringEvaluationRequest"
+      responses:
+        "200":
+          description: Updated monitoring snapshots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StrategyMonitor"
   /strategies/{strategyId}/versions:
     get:
       operationId: listStrategyVersions
@@ -1060,6 +1096,68 @@ components:
         activeStrategyCount: { type: integer }
         hasPerformanceData: { type: boolean }
         latestTradeAt: { type: ["string", "null"], format: date-time }
+    StrategyMonitoringEvaluationRequest:
+      type: object
+      properties:
+        strategyId: { type: integer, minimum: 1 }
+        sourceId: { type: ["integer", "null"], minimum: 1 }
+    StrategyMonitorCondition:
+      type: object
+      required: [strategyVersionConditionId, conceptId, conceptName, conditionOrder, name, stage, requirement, timeframe, status, reasonCode, reason, lastEvaluationAt, lastMarketDataAt]
+      properties:
+        strategyVersionConditionId: { type: integer }
+        conceptId: { type: integer }
+        conceptName: { type: string }
+        conditionOrder: { type: integer }
+        name: { type: string }
+        stage: { type: string }
+        requirement:
+          type: string
+          enum: [required, optional]
+        timeframe: { type: string }
+        status:
+          type: string
+          enum: [not_met, met, waiting, invalid]
+        reasonCode: { type: ["string", "null"] }
+        reason: { type: ["string", "null"] }
+        lastEvaluationAt: { type: ["string", "null"], format: date-time }
+        lastMarketDataAt: { type: ["string", "null"], format: date-time }
+    StrategyMonitor:
+      type: object
+      required: [monitorSessionId, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, sourceId, monitoringStatus, overallStatus, statusReason, conditionCount, metCount, notMetCount, waitingCount, invalidCount, remainingCount, progressPercent, lastEvaluationAt, lastMarketDataAt, resetStatus, resetReason, conditions]
+      properties:
+        monitorSessionId: { type: ["integer", "null"] }
+        strategyId: { type: integer }
+        strategyName: { type: string }
+        strategyVersionId: { type: integer }
+        versionNumber: { type: integer }
+        instrumentId: { type: ["integer", "null"] }
+        instrumentSymbol: { type: ["string", "null"] }
+        sourceId: { type: ["integer", "null"] }
+        monitoringStatus:
+          type: string
+          enum: [not_started, waiting, monitoring, paused, error]
+        overallStatus:
+          type: string
+          enum: [not_met, met, waiting, invalid]
+        statusReason: { type: ["string", "null"] }
+        conditionCount: { type: integer }
+        metCount: { type: integer }
+        notMetCount: { type: integer }
+        waitingCount: { type: integer }
+        invalidCount: { type: integer }
+        remainingCount: { type: integer }
+        progressPercent: { type: integer, minimum: 0, maximum: 100 }
+        lastEvaluationAt: { type: ["string", "null"], format: date-time }
+        lastMarketDataAt: { type: ["string", "null"], format: date-time }
+        resetStatus:
+          type: string
+          enum: [not_configured, waiting, ready]
+        resetReason: { type: ["string", "null"] }
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/StrategyMonitorCondition"
     Strategy:
       type: object
       required: [id, name, description, status, currentVersion, currentVersionId, marketId, assetClass, direction, timeframes, riskManagementRules, resetRules, alertRules, tradeCount, winRate, createdAt, updatedAt]

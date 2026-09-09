@@ -34,6 +34,7 @@ export const strategyVersionsTable = pgTable("strategy_versions", {
   strategyId: integer("strategy_id").notNull().references(() => strategiesTable.id, { onDelete: "cascade" }),
   versionNumber: integer("version_number").notNull(),
   isActive: boolean("is_active").notNull().default(false),
+  monitoringEpoch: integer("monitoring_epoch").notNull().default(0),
   label: text("label"),
   name: text("name").notNull().default("Untitled strategy"),
   description: text("description"),
@@ -211,6 +212,64 @@ export const candlesTable = pgTable("candles", {
   uniqueIndex("candles_series_open_unique").on(table.instrumentId, table.sourceId, table.timeframeId, table.openTime),
 ]);
 
+export const strategyMonitorSessionsTable = pgTable("strategy_monitor_sessions", {
+  id: serial("id").primaryKey(),
+  strategyId: integer("strategy_id").notNull().references(() => strategiesTable.id, { onDelete: "cascade" }),
+  strategyVersionId: integer("strategy_version_id").notNull().references(() => strategyVersionsTable.id, { onDelete: "cascade" }),
+  instrumentId: integer("instrument_id").references(() => marketsTable.id, { onDelete: "restrict" }),
+  sourceId: integer("source_id").references(() => marketDataSourcesTable.id, { onDelete: "restrict" }),
+  monitoringStatus: text("monitoring_status").notNull().default("waiting"),
+  overallStatus: text("overall_status").notNull().default("waiting"),
+  statusReason: text("status_reason"),
+  conditionCount: integer("condition_count").notNull().default(0),
+  metCount: integer("met_count").notNull().default(0),
+  notMetCount: integer("not_met_count").notNull().default(0),
+  waitingCount: integer("waiting_count").notNull().default(0),
+  invalidCount: integer("invalid_count").notNull().default(0),
+  progressPercent: integer("progress_percent").notNull().default(0),
+  lastEvaluationAt: timestamp("last_evaluation_at", { withTimezone: true }),
+  lastMarketDataAt: timestamp("last_market_data_at", { withTimezone: true }),
+  resetStatus: text("reset_status").notNull().default("not_configured"),
+  resetReason: text("reset_reason"),
+  evaluationRevision: integer("evaluation_revision").notNull().default(0),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, table => [
+  uniqueIndex("strategy_monitor_session_version_unique").on(table.strategyVersionId),
+]);
+
+export const strategyMonitorConditionStatesTable = pgTable("strategy_monitor_condition_states", {
+  id: serial("id").primaryKey(),
+  monitorSessionId: integer("monitor_session_id").notNull().references(() => strategyMonitorSessionsTable.id, { onDelete: "cascade" }),
+  strategyVersionConditionId: integer("strategy_version_condition_id").notNull().references(() => strategyVersionConditionsTable.id, { onDelete: "restrict" }),
+  status: text("status").notNull().default("waiting"),
+  reasonCode: text("reason_code"),
+  reason: text("reason"),
+  timeframeCode: text("timeframe_code").notNull(),
+  timeframeId: integer("timeframe_id").references(() => timeframesTable.id, { onDelete: "restrict" }),
+  evidence: text("evidence"),
+  detectorId: text("detector_id"),
+  detectorVersion: text("detector_version"),
+  evaluatorState: text("evaluator_state"),
+  lastEvaluationAt: timestamp("last_evaluation_at", { withTimezone: true }),
+  lastMarketDataAt: timestamp("last_market_data_at", { withTimezone: true }),
+  metAt: timestamp("met_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, table => [
+  uniqueIndex("strategy_monitor_condition_state_unique").on(table.monitorSessionId, table.strategyVersionConditionId),
+]);
+
+export const strategyMonitorTransitionEventsTable = pgTable("strategy_monitor_transition_events", {
+  id: serial("id").primaryKey(),
+  monitorSessionId: integer("monitor_session_id").references(() => strategyMonitorSessionsTable.id, { onDelete: "set null" }),
+  strategyVersionId: integer("strategy_version_id").notNull().references(() => strategyVersionsTable.id, { onDelete: "cascade" }),
+  fromOverallStatus: text("from_overall_status"),
+  toOverallStatus: text("to_overall_status").notNull(),
+  changedConditionIds: integer("changed_condition_ids").array().notNull().default([]),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const tradesTable = pgTable("trades", {
   id: serial("id").primaryKey(),
   strategyVersionId: integer("strategy_version_id").notNull().references(() => strategyVersionsTable.id, { onDelete: "restrict" }),
@@ -270,6 +329,9 @@ export const insertSourceInstrumentMappingSchema = createInsertSchema(sourceInst
 export const insertTimeframeSchema = createInsertSchema(timeframesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMarketDataConnectionSchema = createInsertSchema(marketDataConnectionsTable).omit({ id: true, updatedAt: true });
 export const insertCandleSchema = createInsertSchema(candlesTable).omit({ id: true, receivedAt: true });
+export const insertStrategyMonitorSessionSchema = createInsertSchema(strategyMonitorSessionsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStrategyMonitorConditionStateSchema = createInsertSchema(strategyMonitorConditionStatesTable).omit({ id: true, updatedAt: true });
+export const insertStrategyMonitorTransitionEventSchema = createInsertSchema(strategyMonitorTransitionEventsTable).omit({ id: true, occurredAt: true });
 export const insertTradeSchema = createInsertSchema(tradesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPerformanceRecordSchema = createInsertSchema(performanceRecordsTable).omit({ id: true, createdAt: true });
 export const insertAlertSchema = createInsertSchema(alertsTable).omit({ id: true, createdAt: true, updatedAt: true });
@@ -288,6 +350,9 @@ export type SourceInstrumentMapping = typeof sourceInstrumentMappingsTable.$infe
 export type Timeframe = typeof timeframesTable.$inferSelect;
 export type MarketDataConnection = typeof marketDataConnectionsTable.$inferSelect;
 export type Candle = typeof candlesTable.$inferSelect;
+export type StrategyMonitorSession = typeof strategyMonitorSessionsTable.$inferSelect;
+export type StrategyMonitorConditionState = typeof strategyMonitorConditionStatesTable.$inferSelect;
+export type StrategyMonitorTransitionEvent = typeof strategyMonitorTransitionEventsTable.$inferSelect;
 export type Trade = typeof tradesTable.$inferSelect;
 export type PerformanceRecord = typeof performanceRecordsTable.$inferSelect;
 export type Alert = typeof alertsTable.$inferSelect;
@@ -305,6 +370,9 @@ export type InsertSourceInstrumentMapping = z.infer<typeof insertSourceInstrumen
 export type InsertTimeframe = z.infer<typeof insertTimeframeSchema>;
 export type InsertMarketDataConnection = z.infer<typeof insertMarketDataConnectionSchema>;
 export type InsertCandle = z.infer<typeof insertCandleSchema>;
+export type InsertStrategyMonitorSession = z.infer<typeof insertStrategyMonitorSessionSchema>;
+export type InsertStrategyMonitorConditionState = z.infer<typeof insertStrategyMonitorConditionStateSchema>;
+export type InsertStrategyMonitorTransitionEvent = z.infer<typeof insertStrategyMonitorTransitionEventSchema>;
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
 export type InsertPerformanceRecord = z.infer<typeof insertPerformanceRecordSchema>;
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
