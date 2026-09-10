@@ -17,27 +17,36 @@ import {
   federalReserveProvider,
   type EconomicCalendarProvider,
 } from "./federal-reserve";
+import { ecbProvider } from "./ecb";
+import { onsProvider } from "./ons";
 
 const providers = new Map<string, EconomicCalendarProvider>([
   [federalReserveProvider.key, federalReserveProvider],
+  [ecbProvider.key, ecbProvider],
+  [onsProvider.key, onsProvider],
 ]);
 const PROVIDER_SYNC_TTL_MS = 5 * 60 * 1000;
 let lastProviderSyncAt = 0;
 let providerSyncPromise: Promise<number> | null = null;
+let lastProviderErrors: string[] = [];
 
 export function getEconomicEventProviderStatus() {
-  const provider = providers.values().next().value as EconomicCalendarProvider | undefined;
-  if (!provider) {
+  const configured = [...providers.values()].filter(provider => provider.isConfigured());
+  if (!configured.length) {
     return {
       providerConnected: false,
       providerName: null,
       message: "No economic calendar data is currently connected.",
     };
   }
+  const providerName = configured.map(provider => provider.name).join(", ");
+  const unavailable = lastProviderErrors.length
+    ? ` Unavailable sources: ${lastProviderErrors.join("; ")}`
+    : "";
   return {
     providerConnected: true,
-    providerName: provider.name,
-    message: `${provider.name} economic calendar is connected.`,
+    providerName,
+    message: `Connected sources: ${providerName}.${unavailable}`,
   };
 }
 
@@ -157,25 +166,38 @@ export async function updateEconomicEvent(eventId: number, input: EconomicEventU
   return withMappings(updated);
 }
 
-function configuredProvider() {
-  return [...providers.values()].find(provider => provider.isConfigured());
+function configuredProviders() {
+  return [...providers.values()].filter(provider => provider.isConfigured());
 }
 
 export async function refreshEconomicEvents() {
-  const provider = configuredProvider();
-  if (!provider) return 0;
+  const configured = configuredProviders();
+  if (!configured.length) return 0;
   if (Date.now() - lastProviderSyncAt < PROVIDER_SYNC_TTL_MS) return 0;
   if (providerSyncPromise) return providerSyncPromise;
 
   providerSyncPromise = (async () => {
     const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const to = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-    const events = await provider.fetchEvents(from, to);
-    for (const event of events) {
-      await upsertEconomicEvent(event);
+    let synced = 0;
+    const errors: string[] = [];
+    for (const provider of configured) {
+      try {
+        const events = await provider.fetchEvents(from, to);
+        for (const event of events) {
+          await upsertEconomicEvent(event);
+        }
+        synced += events.length;
+      } catch (error) {
+        errors.push(`${provider.name}: ${error instanceof Error ? error.message : "source unavailable"}`);
+      }
+    }
+    lastProviderErrors = errors;
+    if (errors.length === configured.length) {
+      throw new Error(`All economic calendar sources are unavailable. ${errors.join(" ")}`);
     }
     lastProviderSyncAt = Date.now();
-    return events.length;
+    return synced;
   })();
 
   try {
@@ -200,7 +222,10 @@ export async function listEconomicEvents(params: ListEconomicEventsParams = {}) 
     const viewMatches =
       !params.view || params.view === "all" ||
       (params.view === "today" && when >= startOfToday.getTime() && when < endOfToday.getTime()) ||
-      (params.view === "upcoming" && when >= now.getTime() && ["upcoming", "delayed", "live"].includes(event.releaseStatus)) ||
+      (params.view === "upcoming" &&
+        (when >= now.getTime() ||
+          (event.timePrecision === "date" && when >= startOfToday.getTime() && when < endOfToday.getTime())) &&
+        ["upcoming", "delayed", "live"].includes(event.releaseStatus)) ||
       (params.view === "recently_released" && event.releaseStatus === "released" && when >= recentlyReleasedAfter.getTime() && when <= now.getTime());
     const search = params.search?.trim().toLowerCase();
     const text = [event.name, event.region, event.currency, ...event.affectedMarkets.map(m => m.marketLabel)]

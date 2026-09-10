@@ -1345,10 +1345,11 @@ components:
             $ref: "#/components/schemas/EconomicEventMarketMappingInput"
     EconomicEventsList:
       type: object
-      required: [providerConnected, providerName, events]
+      required: [providerConnected, providerName, message, events]
       properties:
         providerConnected: { type: boolean }
         providerName: { type: ["string", "null"] }
+        message: { type: string }
         events:
           type: array
           items:

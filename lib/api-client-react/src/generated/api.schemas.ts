@@ -202,6 +202,7 @@ export interface EconomicEventsList {
   providerConnected: boolean;
   /** @nullable */
   providerName: string | null;
+  message: string;
   events: EconomicEvent[];
 }
 

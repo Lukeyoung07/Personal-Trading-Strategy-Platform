@@ -39,8 +39,8 @@ describe("economic events service", () => {
   it("reports the configured public provider state", () => {
     expect(getEconomicEventProviderStatus()).toEqual({
       providerConnected: true,
-      providerName: "Federal Reserve FOMC",
-      message: "Federal Reserve FOMC economic calendar is connected.",
+      providerName: "Federal Reserve FOMC, European Central Bank, UK Office for National Statistics",
+      message: "Connected sources: Federal Reserve FOMC, European Central Bank, UK Office for National Statistics.",
     });
   });
 
@@ -77,8 +77,9 @@ describe("economic events service", () => {
     expect(second.affectedMarkets[0].marketLabel).toBe("US Dollar");
 
     const all = await listEconomicEvents({ view: "all", search: "consumer" });
-    expect(all.events).toHaveLength(1);
-    expect(all.events[0].id).toBe(first.id);
+    const testProviderEvents = all.events.filter(event => event.providerKey === providerKey);
+    expect(testProviderEvents).toHaveLength(1);
+    expect(testProviderEvents[0].id).toBe(first.id);
   });
 
   it("classifies upcoming and recently released views without fabricating timing", async () => {
@@ -97,10 +98,19 @@ describe("economic events service", () => {
       releaseStatus: "released",
       actual: "148k",
     });
+    await upsertEconomicEvent({
+      providerKey,
+      providerEventId: "date-only-today-001",
+      name: "Date-only policy meeting",
+      scheduledAt: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())),
+      timePrecision: "date",
+      releaseStatus: "upcoming",
+    });
 
     const upcoming = await listEconomicEvents({ view: "upcoming" });
     const released = await listEconomicEvents({ view: "recently_released" });
     expect(upcoming.events.map(event => event.name)).toContain("Future rate decision");
+    expect(upcoming.events.map(event => event.name)).toContain("Date-only policy meeting");
     expect(released.events.map(event => event.name)).toContain("Released employment report");
   });
 });

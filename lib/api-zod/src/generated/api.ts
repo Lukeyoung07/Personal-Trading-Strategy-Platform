@@ -25,6 +25,7 @@ export const ListEconomicEventsQueryParams = zod.object({
 export const ListEconomicEventsResponse = zod.object({
   "providerConnected": zod.boolean(),
   "providerName": zod.string().nullable(),
+  "message": zod.string(),
   "events": zod.array(zod.object({
   "id": zod.number().int(),
   "providerKey": zod.string(),

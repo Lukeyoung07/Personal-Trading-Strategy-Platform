@@ -168,7 +168,19 @@ function EventCard({ event }: { event: EconomicEvent }) {
               </span>
             )}
             <span data-testid={`text-event-source-${event.id}`}>
-              Source: {displayValue(event.sourceName)}
+              Source:{' '}
+              {event.sourceUrl ? (
+                <a
+                  href={event.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-muted-foreground/50 underline-offset-2 hover:text-foreground"
+                >
+                  {displayValue(event.sourceName)}
+                </a>
+              ) : (
+                displayValue(event.sourceName)
+              )}
             </span>
           </div>
         </div>
@@ -381,7 +393,10 @@ export function EconomicCalendar() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-[11px] text-muted-foreground" data-testid="text-economic-provider">
             <span className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              Connected source: <span className="text-foreground">{query.data.providerName}</span>
+              Connected sources: <span className="text-foreground">{query.data.providerName}</span>
+              {query.data.message?.includes('Unavailable sources:') && (
+                <span className="ml-3 text-destructive">{query.data.message}</span>
+              )}
             </span>
             <span className="flex items-center gap-1.5">
               <RefreshCw size={12} />
