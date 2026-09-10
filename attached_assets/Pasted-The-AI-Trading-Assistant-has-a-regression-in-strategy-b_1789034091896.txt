@@ -1,0 +1,81 @@
+The AI Trading Assistant has a regression in strategy-building requests.
+
+I just tested this exact request:
+
+"Create me a simple XAUUSD strategy."
+
+Instead of generating a structured strategy draft, the assistant replied:
+
+"I can't connect to trading platforms or execute orders. However, I can help you draft a strategy plan that you can implement yourself or with a compatible platform. Would you like me to create a strategy draft with those specifications?"
+
+This is incorrect for our application.
+
+The AI Trading Assistant is specifically intended to help users CREATE and BUILD strategy drafts. It does NOT need to connect to a trading platform or execute orders.
+
+IMPORTANT:
+Do NOT change OpenRouter.
+Do NOT change the API key.
+Do NOT change the model/provider.
+Do NOT change Backtesting.
+Do NOT change the Strategy Builder.
+Do NOT rebuild the assistant.
+
+Investigate ONLY why a strategy-building request is being treated as a generic question instead of a strategy-generation request.
+
+Verify:
+
+1. How the user's message is classified/routed.
+2. What system/context instructions are being sent to the AI for BUILD requests.
+3. Whether the structured strategy-draft response format is still being requested.
+4. Whether the application is accidentally sending a normal chat context instead of BUILD context.
+5. Whether the AI response parser is expecting the correct structured draft.
+6. Whether the frontend is correctly identifying BUILD requests.
+7. Whether the request "Create me a simple XAUUSD strategy" reaches the structured strategy-generation path.
+
+The intended behaviour is:
+
+User:
+"Create me a simple XAUUSD strategy."
+
+Assistant should generate a structured strategy draft containing, where appropriate:
+
+- Strategy name
+- Direction
+- Market/instrument
+- Timeframe
+- Entry conditions
+- Exit conditions
+- Stop loss
+- Take profit
+- Compatibility information
+
+It should NOT reply with a generic disclaimer about being unable to connect to trading platforms.
+
+IMPORTANT:
+Do not fabricate market data or claim the strategy is profitable.
+The AI is generating a strategy DRAFT for the existing Strategy Builder, not executing trades.
+
+Before making changes, reproduce the exact request in the real browser and trace the request through the application.
+
+Make the smallest possible fix to restore the existing BUILD strategy-generation behaviour.
+
+After fixing, verify in the real browser:
+
+1. Send:
+   "Create me a simple XAUUSD strategy."
+2. Confirm a genuine structured strategy draft is returned.
+3. Confirm the draft can still be sent to Review Strategy.
+4. Confirm the Strategy Builder handoff still works.
+5. Confirm normal AI questions still work.
+6. Confirm existing Backtesting functionality is untouched.
+
+Run relevant tests, typechecks and production builds.
+
+Do not change unrelated functionality.
+
+At the end report:
+- Exact cause of the regression.
+- Exact fix.
+- Example of the structured strategy draft returned.
+- Whether Review Strategy still works.
+- Tests/typechecks/build results.
