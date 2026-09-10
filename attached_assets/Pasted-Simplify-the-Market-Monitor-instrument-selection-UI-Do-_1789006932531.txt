@@ -1,0 +1,139 @@
+Simplify the Market Monitor instrument selection UI.
+
+Do not rebuild or change the existing BiQuote integration, Market Data Service, Strategy Monitoring Engine, or provider-neutral architecture.
+
+The current "Add Instrument" form is too technical for normal users. Replace the manual instrument-entry workflow with a simple user-friendly selection system.
+
+Instead of requiring users to manually enter:
+
+- Symbol
+- Asset class
+- Venue
+- Timezone
+- Base currency
+- Quote currency
+- Tick size
+- Multiplier
+- Contract expiry
+
+let users select instruments from predefined available instruments.
+
+The user-facing flow should be:
+
+1. Select Market Type
+   - Futures
+   - Forex
+   - Stocks
+   - Indices
+   - Commodities
+   - Crypto
+
+2. Select Instrument
+
+Examples:
+
+Futures:
+- MES — Micro E-mini S&P 500
+- ES — E-mini S&P 500
+- MNQ — Micro E-mini Nasdaq-100
+- NQ — E-mini Nasdaq-100
+- MGC — Micro Gold
+- GC — Gold
+- CL — Crude Oil
+
+Forex:
+- EURUSD
+- GBPUSD
+- USDJPY
+- etc.
+
+Stocks:
+- NVIDIA
+- Apple
+- Tesla
+- etc.
+
+Crypto:
+- BTC/USD
+- ETH/USD
+- etc.
+
+Do not assume every example above is currently supported by BiQuote.
+
+Only display instruments that are actually available/supported by the connected data provider.
+
+Where possible, populate the instrument list from the existing provider/instrument catalog rather than making users manually enter provider-specific information.
+
+3. Select Timeframe
+
+Provide a simple dropdown using the timeframes supported by the selected instrument/provider.
+
+For example:
+
+- 1 Minute
+- 5 Minutes
+- 15 Minutes
+- 30 Minutes
+- 1 Hour
+- 4 Hours
+- 1 Day
+
+Only show timeframes that are actually supported.
+
+The application should automatically handle the technical fields and provider mapping behind the scenes.
+
+Users should NOT need to understand:
+
+- Provider symbols
+- Venues
+- Tick sizes
+- Multipliers
+- Timezones
+- Currencies
+- Provider-specific identifiers
+
+Keep those fields available internally for the data architecture, but hide them from the normal user.
+
+Add clear search functionality so users can quickly find an instrument.
+
+Example:
+
+Search: "gold"
+
+Results:
+
+Gold
+MGC — Micro Gold
+GC — Gold
+
+The instrument selection should be easy enough for someone with no technical knowledge of market-data systems to understand.
+
+IMPORTANT:
+
+Do not invent unsupported instruments.
+
+Do not create fake market data.
+
+Do not change how real BiQuote data is retrieved.
+
+Do not change the provider-neutral architecture.
+
+Do not change the Strategy Monitoring Engine.
+
+Do not redesign the rest of the application.
+
+Only simplify the instrument-selection experience and connect it to the existing instrument/provider catalog.
+
+After implementation:
+
+- Run type checks
+- Run production builds
+- Test instrument selection
+- Test search
+- Test supported/unsupported instruments
+- Test timeframe selection
+- Test that selected instruments still connect to the existing BiQuote data flow
+- Test desktop and mobile layouts
+- Run relevant regression tests
+
+Fix only genuine bugs directly related to this change.
