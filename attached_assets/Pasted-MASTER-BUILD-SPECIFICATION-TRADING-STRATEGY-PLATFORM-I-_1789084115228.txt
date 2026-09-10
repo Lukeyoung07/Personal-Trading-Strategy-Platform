@@ -1,0 +1,928 @@
+MASTER BUILD SPECIFICATION — TRADING STRATEGY PLATFORM
+
+I want you to take the existing trading application and continue building it toward the complete finished product described below.
+
+IMPORTANT:
+This is a master implementation task.
+
+Do NOT blindly rebuild the application.
+First inspect the existing codebase and determine what is already implemented and working.
+
+The application already contains substantial completed functionality. Preserve all working functionality and data.
+
+Do not replace working systems simply because you would implement them differently.
+
+Do not create mock/fake functionality just to make a feature appear complete.
+
+Do not fabricate market data, trading results, AI responses, backtest results, broker connections, or profitability.
+
+The application is a strategy monitoring and analysis platform.
+It is NOT an automatic trading/execution platform.
+
+The user must remain in control of creating, reviewing, saving and using strategies.
+
+==================================================
+CORE PRODUCT GOAL
+==================================================
+
+The finished application should allow a trader to:
+
+1. Understand and select trading concepts.
+2. Build strategies manually.
+3. Ask an AI assistant to help create or modify strategies.
+4. Save strategies and immutable versions.
+5. Monitor strategies against live market data.
+6. Receive useful alerts.
+7. See relevant economic/news events.
+8. Journal trades.
+9. Backtest compatible strategies using historical data.
+10. Analyse the results.
+11. Use the AI assistant to explain strategies and real backtest results.
+12. Use the application comfortably on desktop and mobile.
+
+The application should be beginner-friendly while still being useful for more advanced traders.
+
+==================================================
+PHASE 0 — AUDIT EXISTING APPLICATION
+==================================================
+
+Before implementing anything:
+
+Inspect the current application, database, APIs, frontend, shared types, existing tests and workflows.
+
+Create an internal implementation checklist containing:
+
+- Already complete
+- Partially complete
+- Missing
+- Broken
+- Needs improvement
+
+Do NOT rebuild features that are already working.
+
+Pay particular attention to the following existing functionality.
+
+==================================================
+ALREADY IMPLEMENTED — PRESERVE
+==================================================
+
+FOUNDATION
+
+Preserve the existing application foundation, routing, authentication/state architecture, database architecture and existing UI structure.
+
+TRADING CONCEPT LIBRARY
+
+The application already has a trading concept library.
+
+Preserve it and extend it only where necessary.
+
+The AI currently recognises concepts including:
+
+- EMA / SMA
+- Fair Value Gaps
+- Liquidity sweeps
+- Order blocks
+- Market structure
+- BOS
+- CHoCH
+- Support and resistance
+- Supply and demand
+- Premium / discount
+- Higher-timeframe analysis
+- Multi-timeframe analysis
+- Stop loss
+- Take profit
+
+The AI must continue distinguishing between:
+
+SUPPORTED / EXECUTABLE
+and
+UNDERSTOOD BUT NOT CURRENTLY EXECUTABLE
+
+Never claim that a concept can be backtested unless the backtesting engine genuinely supports it.
+
+STRATEGY BUILDER
+
+Preserve the current beginner-friendly Strategy Builder.
+
+It already contains:
+
+- Strategy details
+- Entry conditions
+- Trade direction
+- Exit rules
+- Strategy summary
+- Beginner-friendly condition choices
+- BUY / SELL / BUY or SELL controls
+- Stop loss
+- Take profit
+- Plain-English summaries
+- Compatibility warnings
+- Advanced settings behind disclosures
+- Responsive desktop/mobile layouts
+
+Do not replace this Builder.
+
+Improve it only when necessary for the features in this specification.
+
+STRATEGY VERSIONING
+
+Preserve the immutable version architecture.
+
+Versions must remain immutable.
+
+A strategy can have:
+
+- v1
+- v2
+- v3
+etc.
+
+Existing versions must not silently change.
+
+Trades and performance must remain associated with the exact strategy version used.
+
+STRATEGY MONITORING
+
+Preserve the existing monitoring engine.
+
+It currently evaluates the exact active strategy version against market candles.
+
+Existing states include:
+
+- MET
+- NOT MET
+- WAITING
+- INVALID
+
+Preserve:
+
+- closed-candle evaluation
+- ordered candle evaluation
+- missing-data handling
+- missing detector handling
+- exact strategy-version association
+
+MARKET DATA
+
+Preserve the provider-neutral market data architecture.
+
+The application must remain broker/provider independent.
+
+The existing architecture supports instruments/categories such as:
+
+- futures
+- forex
+- stocks
+- indices
+- commodities
+- crypto
+
+Preserve the existing BiQuote integration and provider-neutral service.
+
+Do not hard-code the application around one broker.
+
+The user may use different brokers/platforms in the future.
+
+AI ASSISTANT
+
+Preserve the existing central AI Trading Assistant.
+
+It currently supports:
+
+- BUILD
+- MODIFY
+- ANALYSE
+- LEARN
+- Natural-language questions
+- Structured strategy drafts
+- Beginner prompt suggestions
+- Strategy Builder handoff
+- Review Strategy
+- Save as New Version handoff
+- Strategy/version context
+- Backtest context
+- Compatibility warnings
+
+The existing AI uses a server-side OpenRouter free route.
+
+Do NOT change:
+
+- OpenRouter provider
+- API key handling
+- existing server-side security
+- current AI configuration
+
+unless a genuine bug requires it.
+
+The AI must never claim to execute trades or connect to a broker when it cannot.
+
+The AI should generate drafts, explanations and analysis only.
+
+CURRENT AI → BUILDER BEHAVIOUR
+
+The existing Review Strategy workflow has been tested and works.
+
+Do NOT break it.
+
+Current successful behaviour:
+
+AI generates structured strategy
+→ Review Strategy
+→ Strategy Builder opens
+→ AI draft is populated
+→ user reviews/edits
+→ nothing is automatically saved
+
+The Market / Instrument field has also been fixed to correctly handle asynchronous market loading.
+
+Preserve this behaviour.
+
+The Save as New Version workflow may currently use the same populated Builder handoff as Review Strategy.
+
+Do NOT break it while improving the rest of the application.
+
+BACKTESTING
+
+Preserve the existing backtesting engine and calculations.
+
+Existing functionality includes:
+
+- Historical candle snapshots
+- Persisted backtests
+- Strategy-version association
+- Winning/losing trades
+- Win rate
+- Total P/L
+- Average winner
+- Average loser
+- Largest winner
+- Largest loser
+- Maximum drawdown
+- Profit factor
+- Equity curve
+- Historical OHLC chart
+- Entry markers
+- Exit markers
+- Stop-loss markers
+- Take-profit markers
+- Trade table
+- Individual trade details
+- Fee/slippage disclosure
+- Backtest history
+- Run Again
+- Exact strategy/version context
+
+DO NOT change the calculations simply to add features.
+
+The AI must never invent backtest results.
+
+If there is no completed backtest, the AI must clearly say that it needs a completed backtest.
+
+==================================================
+REMAINING PRODUCT DEVELOPMENT
+==================================================
+
+After auditing the existing application, implement the remaining functionality required to turn the application into a polished complete product.
+
+Work through the remaining areas in dependency order.
+
+Do not stop and ask me for approval after every small feature.
+
+Continue through the plan automatically.
+
+Create sensible checkpoints between major phases.
+
+==================================================
+PHASE 1 — AI TRADING CONCEPT SYSTEM
+==================================================
+
+Make the AI's trading-concept understanding comprehensive.
+
+Support recognition and explanation of concepts including, where applicable:
+
+MARKET STRUCTURE
+
+- HH
+- HL
+- LH
+- LL
+- BOS
+- CHoCH
+
+LIQUIDITY
+
+- Buy-side liquidity
+- Sell-side liquidity
+- Liquidity sweep
+- Liquidity grab
+- Equal highs
+- Equal lows
+- Previous high
+- Previous low
+
+SUPPORT / RESISTANCE
+
+- Support
+- Resistance
+- Break and retest
+- Rejection
+- Previous day high/low
+- Previous week high/low
+
+SUPPLY / DEMAND
+
+- Supply
+- Demand
+- Zone reaction
+- Zone retest
+
+FVG
+
+- Bullish FVG
+- Bearish FVG
+- FVG fill
+- FVG retest
+- IFVG
+
+ORDER BLOCKS
+
+- Bullish order block
+- Bearish order block
+- Order block retest
+- Breaker block
+
+PRICE ACTION
+
+- Displacement
+- Breakout
+- Pullback
+- Retest
+- Rejection candle
+- Bullish candle
+- Bearish candle
+
+PREMIUM / DISCOUNT
+
+- Premium
+- Discount
+- Equilibrium
+- Range-based premium/discount
+
+MULTI-TIMEFRAME
+
+- Higher-timeframe bias
+- Lower-timeframe confirmation
+- 4H → 1H → 15M → 5M style workflows
+- Higher-timeframe levels
+- Lower-timeframe entries
+
+ICT / SMC
+
+- IRL
+- ERL
+- SMT divergence
+- AMD
+- Power of 3
+
+MOVING AVERAGES
+
+- EMA
+- SMA
+- Price above/below EMA
+- EMA crossover
+- EMA rejection
+- EMA trend confirmation
+
+RISK
+
+- Stop loss
+- Take profit
+- Risk/reward
+- Percentage risk
+- Position sizing
+- Maximum risk per trade
+
+The AI must understand these terms without pretending that unsupported concepts are executable by the backtester.
+
+==================================================
+PHASE 2 — AI STRATEGY CREATION
+==================================================
+
+Make the AI excellent at turning natural-language requests into structured strategy drafts.
+
+Examples:
+
+"Build me a simple XAUUSD strategy."
+
+"Create a BUY strategy using the 20 EMA."
+
+"Build me a strategy using a liquidity sweep."
+
+"Create an FVG strategy using a 4H bias and 15M entries."
+
+"Use a bullish 4H trend and wait for a liquidity sweep on the 15M."
+
+"Build me an SMC strategy using BOS and an order block."
+
+The AI should identify:
+
+- Market
+- Direction
+- Timeframe
+- Concepts
+- Entry conditions
+- Confirmation conditions
+- Exit conditions
+- Stop loss
+- Take profit
+- Risk rules
+- Compatibility
+- Unsupported concepts
+
+Do not silently change what the user requested.
+
+If the requested concept cannot currently be executed by Backtesting, preserve it and clearly mark it as unsupported.
+
+==================================================
+PHASE 3 — BEGINNER AI GUIDANCE
+==================================================
+
+Make the AI Assistant extremely easy to use for beginners.
+
+Include visible hints explaining what users can type.
+
+Organise examples into categories such as:
+
+BUILD
+
+"Create me a simple XAUUSD strategy."
+
+"Build me a BUY strategy."
+
+"Create a strategy using the 20 EMA."
+
+LIQUIDITY
+
+"Build a liquidity sweep strategy."
+
+"Create a strategy using previous-day highs and lows."
+
+FVG
+
+"Build a bullish FVG strategy."
+
+MARKET STRUCTURE
+
+"Create a strategy using BOS and CHoCH."
+
+MULTI-TIMEFRAME
+
+"Use the 4H trend and find entries on the 15M."
+
+RISK
+
+"Use a 1% stop loss and 2% take profit."
+
+LEARN
+
+"What is a liquidity sweep?"
+
+"What is an FVG?"
+
+"What does BOS mean?"
+
+The examples should be clickable.
+
+Do not make the examples fake functionality.
+
+==================================================
+PHASE 4 — STRATEGY BUILDER POLISH
+==================================================
+
+After the core AI system is stable, inspect the Strategy Builder for genuine usability improvements.
+
+Make it:
+
+- Extremely easy to understand
+- Clear for beginners
+- Fast to navigate
+- Mobile friendly
+- Clear about what each condition means
+- Clear about unsupported rules
+- Clear about what can be backtested
+- Clear about what is being saved
+
+Do not make advanced functionality clutter the beginner experience.
+
+Do not break existing strategies.
+
+==================================================
+PHASE 5 — ALERTS
+==================================================
+
+Complete the Alerts system.
+
+Alerts should support the strategy monitoring engine and notify users when appropriate strategy conditions are met.
+
+Include the existing planned news/economic calendar functionality.
+
+News/events should include, where real data is available:
+
+- Event
+- Date/time
+- Currency/market affected
+- Impact
+- Upcoming/released state
+
+Do not invent:
+
+- forecast
+- actual
+- impact
+- release time
+- economic values
+
+If a public source does not provide a value, leave it unavailable rather than guessing.
+
+The existing no-key public-source approach should be preserved unless there is a genuine reason to change it.
+
+==================================================
+PHASE 6 — TRADE JOURNAL
+==================================================
+
+Build/complete the Trade Journal.
+
+Users should be able to record trades and associate them with:
+
+- Strategy
+- Exact strategy version
+- Instrument
+- Direction
+- Entry
+- Exit
+- Stop loss
+- Take profit
+- Position/risk information where supported
+- Result
+- P/L
+- Notes
+- Date/time
+
+The journal should make it easy to review historical performance.
+
+Do not automatically fabricate trades.
+
+Do not confuse simulated backtest trades with real journal trades.
+
+==================================================
+PHASE 7 — STRATEGY PERFORMANCE
+==================================================
+
+Build useful strategy-performance views from real stored data.
+
+Where data exists, show:
+
+- Win rate
+- Number of trades
+- Winning trades
+- Losing trades
+- P/L
+- Average winner
+- Average loser
+- Largest winner
+- Largest loser
+- Drawdown
+- Profit factor
+- Performance over time
+- Performance by strategy version
+
+Use real persisted data only.
+
+Do not create fake historical performance.
+
+==================================================
+PHASE 8 — AI ANALYSIS
+==================================================
+
+Make the AI Assistant capable of analysing real application data.
+
+Examples:
+
+"Explain my backtest results."
+
+"Why did this strategy perform badly?"
+
+"Compare these two strategy versions."
+
+"What are the strengths and weaknesses of this strategy?"
+
+"Explain my trading performance."
+
+The AI must use the actual stored context.
+
+If the required data does not exist, clearly tell the user what is missing.
+
+Never invent:
+
+- trades
+- win rates
+- P/L
+- drawdowns
+- profit factors
+- market data
+
+==================================================
+PHASE 9 — BACKTESTING INTEGRATION
+==================================================
+
+Improve the workflow between:
+
+Strategy Builder
+→ Backtesting
+→ Results
+→ AI Analysis
+→ Strategy version
+
+Make the workflow intuitive.
+
+Users should always know:
+
+- Which strategy they are testing
+- Which exact version they are testing
+- Which instrument
+- Which timeframe
+- Which historical period
+- Whether the strategy is compatible
+- What assumptions are being used
+
+Do not modify the existing backtest calculations unless required to fix a proven bug.
+
+==================================================
+PHASE 10 — MARKET / INSTRUMENT EXPERIENCE
+==================================================
+
+Improve the instrument-selection experience where necessary.
+
+Users should be able to easily find instruments such as:
+
+- Gold / XAUUSD
+- Major forex pairs
+- Indices
+- Futures
+- Stocks
+- Crypto
+
+Do not hard-code a single provider.
+
+Do not claim an instrument exists unless it is actually available from the configured market-data provider.
+
+Make category/search/selection clear and beginner friendly.
+
+==================================================
+PHASE 11 — MOBILE EXPERIENCE
+==================================================
+
+Review the entire application on mobile.
+
+Make sure:
+
+- Navigation works
+- AI Assistant works
+- Strategy Builder works
+- Backtesting works
+- Results work
+- Monitoring works
+- Alerts work
+- Journal works
+
+No important functionality should depend on desktop-only interactions.
+
+==================================================
+PHASE 12 — FINAL PRODUCT POLISH
+==================================================
+
+After functionality is complete, improve the overall product experience.
+
+Focus on:
+
+- Clear navigation
+- Consistent terminology
+- Clean visual hierarchy
+- Beginner-friendly wording
+- Useful empty states
+- Useful error messages
+- Loading states
+- Success states
+- Mobile responsiveness
+- Clear confirmation before destructive/save actions
+- Clear explanation of unsupported functionality
+
+Do not add unnecessary complexity.
+
+The user should always understand:
+
+"What am I looking at?"
+
+"What can I do here?"
+
+"What happens if I click this?"
+
+"Has anything been saved?"
+
+==================================================
+IMPORTANT AI SAFETY / ACCURACY RULES
+==================================================
+
+The AI must NEVER:
+
+- Execute trades
+- Claim it executed trades
+- Claim broker connectivity when none exists
+- Invent market data
+- Invent economic events
+- Invent backtest results
+- Invent trade history
+- Claim profitability without real evidence
+- Turn unsupported concepts into fake backtest-compatible rules
+- Pretend a strategy is guaranteed to work
+
+The AI is a strategy-building and analysis assistant.
+
+It can help users design strategies, understand concepts and analyse real application data.
+
+==================================================
+DEVELOPMENT PROCESS
+==================================================
+
+Work through the phases in dependency order.
+
+Do not repeatedly ask for permission between phases.
+
+For each major phase:
+
+1. Inspect existing implementation.
+2. Implement only what is actually missing.
+3. Preserve existing working functionality.
+4. Run relevant tests.
+5. Run typechecks.
+6. Run production builds where appropriate.
+7. Test important workflows.
+8. Create a checkpoint.
+9. Continue to the next phase.
+
+If you discover an obvious bug while implementing a phase, fix it if the fix is directly related to the current work.
+
+Do not stop for minor issues.
+
+If a problem requires a major architectural decision that cannot safely be inferred, stop and report it rather than guessing.
+
+==================================================
+TESTING REQUIREMENTS
+==================================================
+
+Continuously test:
+
+AI:
+
+- Normal questions
+- Concept explanations
+- Simple strategy creation
+- Complex strategy creation
+- Unsupported concepts
+- Strategy modification
+- Real backtest explanation
+
+Strategy Builder:
+
+- New strategy
+- Edit strategy
+- AI draft
+- Review Strategy
+- Save workflow
+- Existing strategy
+- Existing version
+- Mobile
+
+Backtesting:
+
+- Compatible strategy
+- Unsupported strategy
+- Results
+- Run Again
+- Strategy/version association
+
+Monitoring:
+
+- Active strategy version
+- Candle evaluation
+- Missing data
+- Invalid conditions
+
+Alerts:
+
+- Strategy alerts
+- News/event handling
+- Missing data
+
+Journal:
+
+- Create trade
+- Edit trade
+- View history
+- Strategy/version association
+
+==================================================
+CRITICAL REGRESSION RULE
+==================================================
+
+Existing working functionality is more important than adding a new feature.
+
+If a new change breaks:
+
+- AI Assistant
+- Review Strategy
+- Strategy Builder
+- Versioning
+- Market Data
+- Monitoring
+- Backtesting
+
+STOP and fix the regression before continuing.
+
+Do not stack new features on top of a broken core workflow.
+
+==================================================
+FINAL AUDIT
+==================================================
+
+When all planned implementation phases are complete, perform a full application audit.
+
+Check:
+
+- Every route
+- Every major workflow
+- AI
+- Strategy Builder
+- Strategy versioning
+- Market data
+- Monitoring
+- Alerts
+- News
+- Trade Journal
+- Backtesting
+- Results
+- Mobile UI
+- Error states
+- Empty states
+- Loading states
+- Database consistency
+- API contracts
+- Frontend types
+- Production builds
+
+Run the complete available test suite.
+
+Run:
+
+- Frontend tests
+- API tests
+- Shared/library tests where applicable
+- Typechecks
+- Production builds
+- git diff/checks where applicable
+
+Use real browser verification for important user workflows.
+
+Do not use mock data to claim a workflow works.
+
+==================================================
+FINAL REPORT
+==================================================
+
+When the master implementation is complete, provide:
+
+1. What was already complete when you started.
+2. What you implemented.
+3. What was improved.
+4. What remains unsupported.
+5. What remains intentionally unimplemented.
+6. Any bugs discovered and fixed.
+7. AI capabilities added.
+8. Trading concepts supported.
+9. Backtesting compatibility limitations.
+10. Alerts/news functionality.
+11. Trade Journal functionality.
+12. Mobile improvements.
+13. Tests passed.
+14. Typechecks passed.
+15. Production builds passed.
+16. Any remaining warnings or limitations.
+
+Most importantly:
+
+DO NOT claim the entire application is complete unless the relevant functionality has actually been implemented and verified.
+
+Do not fabricate completion.
+
+Begin by auditing the existing application and then proceed through the implementation phases automatically.
