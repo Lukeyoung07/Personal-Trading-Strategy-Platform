@@ -33,6 +33,24 @@ tags:
   - name: settings
     description: Workspace settings
 paths:
+  /assistant/chat:
+    post:
+      operationId: chatAssistant
+      tags: [assistant]
+      summary: Send a message to the AI Trading Assistant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantChatInput"
+      responses:
+        "200":
+          description: Assistant response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantChatResponse"
   /economic-events:
     get:
       operationId: listEconomicEvents
@@ -2389,6 +2407,114 @@ components:
           enum: [last_7_days, last_30_days, last_90_days, custom]
         startDate: { type: string, format: date-time }
         endDate: { type: string, format: date-time }
+    AssistantMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content: { type: string, minLength: 1, maxLength: 6000 }
+    AssistantContext:
+      type: object
+      properties:
+        page: { type: string, maxLength: 120 }
+        strategyId: { type: ["integer", "null"], minimum: 1 }
+        versionId: { type: ["integer", "null"], minimum: 1 }
+        backtestId: { type: ["integer", "null"], minimum: 1 }
+        instrumentId: { type: ["integer", "null"], minimum: 1 }
+        timeframeId: { type: ["integer", "null"], minimum: 1 }
+        startDate: { type: ["string", "null"], format: date-time }
+        endDate: { type: ["string", "null"], format: date-time }
+    AssistantChatInput:
+      type: object
+      required: [message, messages, context]
+      properties:
+        message: { type: string, minLength: 1, maxLength: 2000 }
+        messages:
+          type: array
+          maxItems: 12
+          items:
+            $ref: "#/components/schemas/AssistantMessage"
+        context:
+          $ref: "#/components/schemas/AssistantContext"
+    AssistantStrategyCondition:
+      type: object
+      required: [name, stage, requirement, conceptName, timeframe, triggerRules]
+      properties:
+        name: { type: string }
+        stage:
+          type: string
+          enum: [entry, confirmation, invalidation, exit]
+        requirement:
+          type: string
+          enum: [required, optional]
+        conceptName: { type: string }
+        timeframe: { type: string }
+        triggerRules: { type: string }
+        supported: { type: boolean }
+    AssistantCompatibility:
+      type: object
+      required: [compatible, unsupportedConditions]
+      properties:
+        compatible: { type: boolean }
+        unsupportedConditions:
+          type: array
+          items: { type: string }
+    AssistantStrategyDraft:
+      type: object
+      required: [name, description, direction, marketSymbol, timeframes, conditions, riskManagementRules, compatibility]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        direction:
+          type: string
+          enum: [long, short, both]
+        marketSymbol: { type: ["string", "null"] }
+        timeframes:
+          type: array
+          items: { type: string }
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantStrategyCondition"
+        riskManagementRules: { type: ["string", "null"] }
+        compatibility:
+          $ref: "#/components/schemas/AssistantCompatibility"
+    AssistantBacktestSetup:
+      type: object
+      required: [strategyId, versionId, instrumentId, timeframeId, startDate, endDate]
+      properties:
+        strategyId: { type: ["integer", "null"] }
+        versionId: { type: ["integer", "null"] }
+        instrumentId: { type: ["integer", "null"] }
+        timeframeId: { type: ["integer", "null"] }
+        startDate: { type: ["string", "null"], format: date-time }
+        endDate: { type: ["string", "null"], format: date-time }
+    AssistantChatResponse:
+      type: object
+      required: [status, reply, provider]
+      properties:
+        status:
+          type: string
+          enum: [available, unavailable, rate_limited]
+        reply: { type: string }
+        provider:
+          type: string
+          enum: [openrouter/free]
+        intent: { type: ["string", "null"] }
+        strategyDraft:
+          oneOf:
+            - $ref: "#/components/schemas/AssistantStrategyDraft"
+            - type: "null"
+        compatibility:
+          oneOf:
+            - $ref: "#/components/schemas/AssistantCompatibility"
+            - type: "null"
+        backtestSetup:
+          oneOf:
+            - $ref: "#/components/schemas/AssistantBacktestSetup"
+            - type: "null"
     UserSettings:
       type: object
       required: [id, timezone, baseCurrency, defaultRiskUnit, compactMode, updatedAt]

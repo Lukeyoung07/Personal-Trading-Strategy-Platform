@@ -23,6 +23,7 @@ import {
   type Strategy,
   type StrategyCondition,
   type TradingConcept,
+  type AssistantStrategyDraft,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { StrategyVersionManager } from "@/components/strategy-versioning";
@@ -155,7 +156,7 @@ function SearchableConcept({ concepts, value, onChange }: { concepts: TradingCon
   </div>;
 }
 
-function StrategyForm({ strategy, markets, onClose, onSaved }: { strategy: Strategy | null; markets: Market[]; onClose?: () => void; onSaved: (strategy: Strategy) => void }) {
+function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { strategy: Strategy | null; markets: Market[]; onClose?: () => void; onSaved: (strategy: Strategy) => void; initialDraft?: AssistantStrategyDraft | null }) {
   const create = useCreateStrategy();
   const update = useUpdateStrategy();
   const queryClient = useQueryClient();
@@ -172,7 +173,7 @@ function StrategyForm({ strategy, markets, onClose, onSaved }: { strategy: Strat
     const data = {
       name,
       description: String(form.get("description") || "") || null,
-      marketId: form.get("marketId") ? Number(form.get("marketId")) : null,
+       marketId: form.get("marketId") ? Number(form.get("marketId")) : null,
       assetClass: String(form.get("assetClass") || "") || null,
       direction: String(form.get("direction") || "both") as "long" | "short" | "both",
       timeframes,
@@ -192,28 +193,29 @@ function StrategyForm({ strategy, markets, onClose, onSaved }: { strategy: Strat
     else create.mutate({ data }, { onSuccess: done, onError });
   };
   const busy = create.isPending || update.isPending;
-  return <form onSubmit={save} className="space-y-6" key={strategy?.id ?? "new-strategy"}>
+  const draftMarketId = initialDraft?.marketSymbol ? markets.find(market => market.symbol.toLowerCase() === initialDraft.marketSymbol?.toLowerCase())?.id : undefined;
+  return <form onSubmit={save} className="space-y-6" key={strategy?.id ?? initialDraft?.name ?? "new-strategy"}>
     {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive" role="alert" data-testid="status-builder-strategy-error">{error}</div>}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Field label="Strategy name"><input className="input" name="name" required defaultValue={strategy?.name || ""} placeholder="Name your hypothesis" data-testid="input-builder-strategy-name" /></Field>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <Field label="Strategy name"><input className="input" name="name" required defaultValue={strategy?.name || initialDraft?.name || ""} placeholder="Name your hypothesis" data-testid="input-builder-strategy-name" /></Field>
       <Field label="Asset class" hint="Keep this general if the strategy is not asset-specific."><input className="input" name="assetClass" defaultValue={strategy?.assetClass || ""} placeholder="Optional — e.g. equity, FX, crypto" data-testid="input-builder-asset-class" /></Field>
     </div>
-    <Field label="Description"><textarea className="textarea" name="description" defaultValue={strategy?.description || ""} placeholder="What is this strategy trying to explain or capture?" data-testid="input-builder-strategy-description" /></Field>
+     <Field label="Description"><textarea className="textarea" name="description" defaultValue={strategy?.description || initialDraft?.description || ""} placeholder="What is this strategy trying to explain or capture?" data-testid="input-builder-strategy-description" /></Field>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Field label="Market / instrument" hint="Optional. Add instruments from Market Monitor first, or leave this strategy broad.">
-        <select className="select" name="marketId" defaultValue={strategy?.marketId || ""} data-testid="select-builder-market">
+        <select className="select" name="marketId" defaultValue={strategy?.marketId || draftMarketId || ""} data-testid="select-builder-market">
           <option value="">No specific instrument</option>
           {markets.map(market => <option key={market.id} value={market.id}>{market.symbol} · {market.assetClass}</option>)}
         </select>
       </Field>
       <Field label="Trading direction">
-        <select className="select" name="direction" defaultValue={strategy?.direction || "both"} data-testid="select-builder-direction">
+         <select className="select" name="direction" defaultValue={strategy?.direction || initialDraft?.direction || "both"} data-testid="select-builder-direction">
           {DIRECTIONS.map(direction => <option key={direction.value} value={direction.value}>{direction.label}</option>)}
         </select>
       </Field>
     </div>
     <Field label="Timeframes" hint="Separate multiple timeframes with commas. This is descriptive only; it does not connect to market data.">
-      <input className="input mono" name="timeframes" defaultValue={strategy?.timeframes?.join(", ") || ""} placeholder="e.g. Daily, 4H, 15m" data-testid="input-builder-timeframes" />
+       <input className="input mono" name="timeframes" defaultValue={strategy?.timeframes?.join(", ") || initialDraft?.timeframes.join(", ") || ""} placeholder="e.g. Daily, 4H, 15m" data-testid="input-builder-timeframes" />
     </Field>
     <details className="border-t border-border pt-6 group" data-testid="builder-advanced-notes">
       <summary className="cursor-pointer list-none flex items-center justify-between">
@@ -221,7 +223,7 @@ function StrategyForm({ strategy, markets, onClose, onSaved }: { strategy: Strat
         <ChevronDown size={16} className="text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
-        <Field label="Risk-management notes"><textarea className="textarea" name="riskManagementRules" defaultValue={strategy?.riskManagementRules || ""} placeholder="For simple percentage exits, use the Exit Rules section after saving." data-testid="input-builder-risk-rules" /></Field>
+         <Field label="Risk-management notes"><textarea className="textarea" name="riskManagementRules" defaultValue={strategy?.riskManagementRules || initialDraft?.riskManagementRules || ""} placeholder="For simple percentage exits, use the Exit Rules section after saving." data-testid="input-builder-risk-rules" /></Field>
         <Field label="Reset notes"><textarea className="textarea" name="resetRules" defaultValue={strategy?.resetRules || ""} placeholder="When does this process reset or begin again?" data-testid="input-builder-reset-rules" /></Field>
       </div>
       <Field label="Review reminders" hint="Personal notes only. No live detection or notifications are connected."><textarea className="textarea" name="alertRules" defaultValue={strategy?.alertRules || ""} placeholder="What should prompt you to review this strategy?" data-testid="input-builder-alert-rules" /></Field>
@@ -554,29 +556,79 @@ export function StrategyBuilder() {
   const queryClient = useQueryClient();
   const requestedStrategyId = Number(new URLSearchParams(window.location.search).get("strategyId")) || null;
   const requestedVersionId = Number(new URLSearchParams(window.location.search).get("versionId")) || null;
+  const requestedAssistantDraft = new URLSearchParams(window.location.search).get("assistantDraft") === "1";
   const [selectedStrategyId, setSelectedStrategyId] = useState<number | null>(requestedStrategyId);
   const [strategyModal, setStrategyModal] = useState<"new" | "edit" | false>(false);
   const [conditionModal, setConditionModal] = useState<StrategyCondition | "new" | false>(false);
+  const [assistantDraft, setAssistantDraft] = useState<AssistantStrategyDraft | null>(() => {
+    if (!requestedAssistantDraft) return null;
+    try {
+      const stored = sessionStorage.getItem("assistant-strategy-draft");
+      return stored ? JSON.parse(stored) as AssistantStrategyDraft : null;
+    } catch {
+      return null;
+    }
+  });
+  const [draftImportMessage, setDraftImportMessage] = useState("");
+  const createDraftCondition = useCreateStrategyCondition();
   const activeStrategy = useMemo(() => {
     const rows = strategies.data || [];
     return rows.find(strategy => strategy.id === selectedStrategyId) || rows[0] || null;
   }, [selectedStrategyId, strategies.data]);
   const strategyId = activeStrategy?.id || 0;
   const strategyConditions = useListStrategyConditions(strategyId, { query: { enabled: !!strategyId, queryKey: getListStrategyConditionsQueryKey(strategyId) } });
-  const savedStrategy = (strategy: Strategy) => setSelectedStrategyId(strategy.id);
+  const savedStrategy = async (strategy: Strategy) => {
+    setSelectedStrategyId(strategy.id);
+    if (!assistantDraft) return;
+    const unmatched: string[] = [];
+    for (const [index, condition] of assistantDraft.conditions.entries()) {
+      const concept = concepts.data?.find(item => item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase());
+      if (!concept) {
+        unmatched.push(condition.name);
+        continue;
+      }
+      try {
+        await createDraftCondition.mutateAsync({
+          strategyId: strategy.id,
+          data: {
+            conceptId: concept.id,
+            stage: condition.stage,
+            name: condition.name,
+            description: `Prepared by AI Assistant from the ${condition.conceptName} concept.`,
+            timeframe: condition.timeframe || strategy.timeframes?.[0] || "Not specified",
+            direction: strategy.direction,
+            requirement: condition.requirement,
+            triggerRules: condition.triggerRules || null,
+            invalidationRules: null,
+            resetBehavior: null,
+          },
+        });
+      } catch {
+        unmatched.push(condition.name);
+      }
+      if (index === assistantDraft.conditions.length - 1) {
+        queryClient.invalidateQueries({ queryKey: getListStrategyConditionsQueryKey(strategy.id) });
+      }
+    }
+    setDraftImportMessage(unmatched.length ? `Strategy created. These draft conditions need review before they can be added: ${unmatched.join(", ")}.` : "Strategy created with the assistant’s conditions. Review it, then save a new immutable version.");
+    setAssistantDraft(null);
+    sessionStorage.removeItem("assistant-strategy-draft");
+  };
   const refreshConditions = () => queryClient.invalidateQueries({ queryKey: getListStrategyConditionsQueryKey(strategyId) });
   const action = <button className="btn btn-primary" onClick={() => setStrategyModal("new")} data-testid="button-new-builder-strategy"><Plus size={15} /> New strategy</button>;
 
   if (strategies.isLoading) return <BuilderPage><div className="panel p-10 text-center text-sm text-muted-foreground">Loading your strategies…</div></BuilderPage>;
   if (strategies.isError || markets.isError || concepts.isError) return <BuilderPage><div className="panel p-10 text-center"><div className="font-semibold">Couldn’t load the builder records</div><p className="text-sm text-muted-foreground mt-2">Your workspace is intact. Try refreshing the page.</p></div></BuilderPage>;
   return <BuilderPage action={action}>
-    {!activeStrategy ? <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5">
+     {!activeStrategy ? <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5">
       <Panel title="Create the strategy foundation" eyebrow="Start without assumptions">
+         {assistantDraft && <div className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-4 text-xs leading-relaxed" data-testid="assistant-draft-builder-preview"><div className="eyebrow text-primary">Assistant draft ready</div><p className="font-semibold mt-2">{assistantDraft.name}</p><p className="text-muted-foreground mt-2">The form below is prefilled from the assistant. Review every field before creating the strategy; conditions with concepts not in your library will remain for manual review.</p></div>}
         <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">Give your strategy a name and describe the market context in your own words. Everything else can stay open until you are ready to define it.</p>
-        <div className="mt-6"><StrategyForm markets={markets.data || []} strategy={null} onSaved={savedStrategy} /></div>
+         <div className="mt-6"><StrategyForm markets={markets.data || []} strategy={null} initialDraft={assistantDraft} onSaved={savedStrategy} /></div>
       </Panel>
       <ConceptsCard concepts={concepts.data || []} />
-    </div> : <div className="space-y-5">
+     </div> : <div className="space-y-5">
+       {draftImportMessage && <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-xs leading-relaxed" role="status" data-testid="assistant-draft-import-status">{draftImportMessage}</div>}
       <div className="panel p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><FileText size={16} /></div>

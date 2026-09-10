@@ -9,6 +9,83 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Send a message to the AI Trading Assistant
+ */
+export const chatAssistantBodyMessageMax = 2000;
+
+export const chatAssistantBodyMessagesItemContentMax = 6000;
+
+export const chatAssistantBodyMessagesMax = 12;
+
+export const chatAssistantBodyContextPageMax = 120;
+
+
+
+
+
+
+
+
+export const ChatAssistantBody = zod.object({
+  "message": zod.string().min(1).max(chatAssistantBodyMessageMax),
+  "messages": zod.array(zod.object({
+  "role": zod.enum(['user', 'assistant']),
+  "content": zod.string().min(1).max(chatAssistantBodyMessagesItemContentMax)
+})).max(chatAssistantBodyMessagesMax),
+  "context": zod.object({
+  "page": zod.string().max(chatAssistantBodyContextPageMax).optional(),
+  "strategyId": zod.number().int().min(1).nullish(),
+  "versionId": zod.number().int().min(1).nullish(),
+  "backtestId": zod.number().int().min(1).nullish(),
+  "instrumentId": zod.number().int().min(1).nullish(),
+  "timeframeId": zod.number().int().min(1).nullish(),
+  "startDate": zod.coerce.date().nullish(),
+  "endDate": zod.coerce.date().nullish()
+})
+})
+
+export const ChatAssistantResponse = zod.object({
+  "status": zod.enum(['available', 'unavailable', 'rate_limited']),
+  "reply": zod.string(),
+  "provider": zod.enum(['openrouter/free']),
+  "intent": zod.string().nullish(),
+  "strategyDraft": zod.union([zod.object({
+  "name": zod.string(),
+  "description": zod.string(),
+  "direction": zod.enum(['long', 'short', 'both']),
+  "marketSymbol": zod.string().nullable(),
+  "timeframes": zod.array(zod.string()),
+  "conditions": zod.array(zod.object({
+  "name": zod.string(),
+  "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
+  "requirement": zod.enum(['required', 'optional']),
+  "conceptName": zod.string(),
+  "timeframe": zod.string(),
+  "triggerRules": zod.string(),
+  "supported": zod.boolean().optional()
+})),
+  "riskManagementRules": zod.string().nullable(),
+  "compatibility": zod.object({
+  "compatible": zod.boolean(),
+  "unsupportedConditions": zod.array(zod.string())
+})
+}),zod.null()]).optional(),
+  "compatibility": zod.union([zod.object({
+  "compatible": zod.boolean(),
+  "unsupportedConditions": zod.array(zod.string())
+}),zod.null()]).optional(),
+  "backtestSetup": zod.union([zod.object({
+  "strategyId": zod.number().int().nullable(),
+  "versionId": zod.number().int().nullable(),
+  "instrumentId": zod.number().int().nullable(),
+  "timeframeId": zod.number().int().nullable(),
+  "startDate": zod.coerce.date().nullable(),
+  "endDate": zod.coerce.date().nullable()
+}),zod.null()]).optional()
+})
+
+
+/**
  * @summary List economic calendar events
  */
 export const listEconomicEventsQueryViewDefault = `all`;

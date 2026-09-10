@@ -30,6 +30,7 @@ import NotFound from '@/pages/not-found';
 import { StrategyMonitoringPage } from '@/components/strategy-monitoring';
 import { EconomicCalendar } from '@/components/economic-calendar';
 import { BacktestResultsPanel } from '@/components/backtest-results';
+import { AssistantPanel, type AssistantPanelContext } from '@/components/assistant-panel';
 import '@/index.css';
 
 const queryClient = new QueryClient();
@@ -46,8 +47,39 @@ const nav = [
 ];
 
 function Shell({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const assistantContext = useMemo<AssistantPanelContext>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const resultId = location.match(/^\/backtesting\/(\d+)/)?.[1];
+    return {
+      page: location,
+      strategyId: Number(params.get("strategyId")) || null,
+      versionId: Number(params.get("versionId") || params.get("strategyVersionId")) || null,
+      backtestId: resultId ? Number(resultId) : null,
+      instrumentId: Number(params.get("instrumentId")) || null,
+      timeframeId: Number(params.get("timeframeId")) || null,
+      startDate: params.get("startDate") || null,
+      endDate: params.get("endDate") || null,
+    };
+  }, [location]);
+  const reviewStrategyDraft = (draft: unknown) => {
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+    setAssistantOpen(false);
+    setLocation("/strategy-builder?assistantDraft=1");
+  };
+  const openAssistantBacktest = (setup: any) => {
+    const query = new URLSearchParams();
+    if (setup?.strategyId) query.set("strategyId", String(setup.strategyId));
+    if (setup?.versionId) query.set("strategyVersionId", String(setup.versionId));
+    if (setup?.instrumentId) query.set("instrumentId", String(setup.instrumentId));
+    if (setup?.timeframeId) query.set("timeframeId", String(setup.timeframeId));
+    if (setup?.startDate) query.set("startDate", String(setup.startDate).slice(0, 10));
+    if (setup?.endDate) query.set("endDate", String(setup.endDate).slice(0, 10));
+    setAssistantOpen(false);
+    setLocation(`/backtesting${query.toString() ? `?${query.toString()}` : ""}`);
+  };
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? 'block' : ''}`}>
       <div className="px-5 pt-6 pb-7 flex items-center gap-3">
@@ -73,6 +105,22 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-3 ml-auto"><span className="mono text-[10px] text-muted-foreground mobile-hide">LOCAL RECORDS / NO FEED</span><div className="w-7 h-7 rounded-full border border-primary/40 text-primary flex items-center justify-center text-[10px] font-bold">TR</div></div>
       </header>
       {children}
+      <button
+        type="button"
+        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full border border-primary/35 bg-card px-4 py-3 text-xs font-semibold text-primary shadow-xl shadow-background/40 transition-transform hover:-translate-y-0.5"
+        onClick={() => setAssistantOpen(true)}
+        aria-label="Open AI Trading Assistant"
+        data-testid="button-open-assistant"
+      >
+        <Sparkles size={15} /> AI Assistant
+      </button>
+      <AssistantPanel
+        open={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        context={assistantContext}
+        onReviewStrategy={reviewStrategyDraft}
+        onOpenBacktest={openAssistantBacktest}
+      />
     </main>
   </div>;
 }

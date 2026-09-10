@@ -7,3 +7,4 @@
 - [Market selection persistence](market-selection-persistence.md) — persisted monitor selections must be cleared when their instrument no longer exists, or stale streams reconnect against deleted records.
 - [Market catalog presentation](market-catalog-presentation.md) — provider descriptions are the only human-facing names; empty provider categories stay visible but unavailable with an explicit explanation.
 - [Economic calendar boundaries](economic-calendar-boundaries.md) — provider-neutral events use stable source deduplication, structured market mappings, and an honest disconnected state until a calendar provider is connected.
+- [Assistant provider boundary](assistant-provider-boundary.md) — the assistant uses only server-side OpenRouter free routing with no paid fallback or fabricated data.

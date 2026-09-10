@@ -24,6 +24,8 @@ import type {
   Alert,
   AlertInput,
   AlertUpdate,
+  AssistantChatInput,
+  AssistantChatResponse,
   Backtest,
   BacktestInput,
   BacktestResults,
@@ -115,6 +117,77 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getChatAssistantUrl = () => {
+
+
+
+
+  return `/api/assistant/chat`
+}
+
+/**
+ * @summary Send a message to the AI Trading Assistant
+ */
+export const chatAssistant = async (assistantChatInput: AssistantChatInput, options?: Parameters<typeof customFetch>[1]): Promise<AssistantChatResponse> => {
+
+  return customFetch<AssistantChatResponse>(getChatAssistantUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(assistantChatInput)
+  }
+);}
+
+
+
+
+
+export const getChatAssistantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof chatAssistant>>, TError,{data: BodyType<AssistantChatInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof chatAssistant>>, TError,{data: BodyType<AssistantChatInput>}, TContext> => {
+
+const mutationKey = ['chatAssistant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof chatAssistant>>, {data: BodyType<AssistantChatInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  chatAssistant(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChatAssistantMutationResult = NonNullable<Awaited<ReturnType<typeof chatAssistant>>>
+    export type ChatAssistantMutationBody = BodyType<AssistantChatInput>
+    export type ChatAssistantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send a message to the AI Trading Assistant
+ */
+export const useChatAssistant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof chatAssistant>>, TError,{data: BodyType<AssistantChatInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof chatAssistant>>,
+        TError,
+        {data: BodyType<AssistantChatInput>},
+        TContext
+      > => {
+      return useMutation(getChatAssistantMutationOptions(options));
+    }
 
 export const getListEconomicEventsUrl = (params?: ListEconomicEventsParams,) => {
   const normalizedParams = new URLSearchParams();

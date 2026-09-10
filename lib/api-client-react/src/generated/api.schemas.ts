@@ -1778,6 +1778,165 @@ export interface BacktestInput {
   endDate: string;
 }
 
+export type AssistantMessageRole = typeof AssistantMessageRole[keyof typeof AssistantMessageRole];
+
+
+export const AssistantMessageRole = {
+  user: 'user',
+  assistant: 'assistant',
+} as const;
+
+export interface AssistantMessage {
+  role: AssistantMessageRole;
+  /**
+     * @minLength 1
+     * @maxLength 6000
+     */
+  content: string;
+}
+
+export interface AssistantContext {
+  /** @maxLength 120 */
+  page?: string;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  strategyId?: number | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  versionId?: number | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  backtestId?: number | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  instrumentId?: number | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  timeframeId?: number | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+}
+
+export interface AssistantChatInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  message: string;
+  /** @maxItems 12 */
+  messages: AssistantMessage[];
+  context: AssistantContext;
+}
+
+export type AssistantStrategyConditionStage = typeof AssistantStrategyConditionStage[keyof typeof AssistantStrategyConditionStage];
+
+
+export const AssistantStrategyConditionStage = {
+  entry: 'entry',
+  confirmation: 'confirmation',
+  invalidation: 'invalidation',
+  exit: 'exit',
+} as const;
+
+export type AssistantStrategyConditionRequirement = typeof AssistantStrategyConditionRequirement[keyof typeof AssistantStrategyConditionRequirement];
+
+
+export const AssistantStrategyConditionRequirement = {
+  required: 'required',
+  optional: 'optional',
+} as const;
+
+export interface AssistantStrategyCondition {
+  name: string;
+  stage: AssistantStrategyConditionStage;
+  requirement: AssistantStrategyConditionRequirement;
+  conceptName: string;
+  timeframe: string;
+  triggerRules: string;
+  supported?: boolean;
+}
+
+export interface AssistantCompatibility {
+  compatible: boolean;
+  unsupportedConditions: string[];
+}
+
+export type AssistantStrategyDraftDirection = typeof AssistantStrategyDraftDirection[keyof typeof AssistantStrategyDraftDirection];
+
+
+export const AssistantStrategyDraftDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
+export interface AssistantStrategyDraft {
+  name: string;
+  description: string;
+  direction: AssistantStrategyDraftDirection;
+  /** @nullable */
+  marketSymbol: string | null;
+  timeframes: string[];
+  conditions: AssistantStrategyCondition[];
+  /** @nullable */
+  riskManagementRules: string | null;
+  compatibility: AssistantCompatibility;
+}
+
+export interface AssistantBacktestSetup {
+  /** @nullable */
+  strategyId: number | null;
+  /** @nullable */
+  versionId: number | null;
+  /** @nullable */
+  instrumentId: number | null;
+  /** @nullable */
+  timeframeId: number | null;
+  /** @nullable */
+  startDate: string | null;
+  /** @nullable */
+  endDate: string | null;
+}
+
+export type AssistantChatResponseStatus = typeof AssistantChatResponseStatus[keyof typeof AssistantChatResponseStatus];
+
+
+export const AssistantChatResponseStatus = {
+  available: 'available',
+  unavailable: 'unavailable',
+  rate_limited: 'rate_limited',
+} as const;
+
+export type AssistantChatResponseProvider = typeof AssistantChatResponseProvider[keyof typeof AssistantChatResponseProvider];
+
+
+export const AssistantChatResponseProvider = {
+  'openrouter/free': 'openrouter/free',
+} as const;
+
+export interface AssistantChatResponse {
+  status: AssistantChatResponseStatus;
+  reply: string;
+  provider: AssistantChatResponseProvider;
+  /** @nullable */
+  intent?: string | null;
+  strategyDraft?: AssistantStrategyDraft | null;
+  compatibility?: AssistantCompatibility | null;
+  backtestSetup?: AssistantBacktestSetup | null;
+}
+
 export type UserSettingsDefaultRiskUnit = typeof UserSettingsDefaultRiskUnit[keyof typeof UserSettingsDefaultRiskUnit];
 
 
