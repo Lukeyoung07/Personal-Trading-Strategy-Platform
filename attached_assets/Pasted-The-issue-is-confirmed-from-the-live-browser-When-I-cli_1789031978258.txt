@@ -1,0 +1,127 @@
+The issue is confirmed from the live browser.
+
+When I click "Review Strategy" on an AI-generated strategy, the app navigates correctly to the Strategy Builder and the AI Assistant closes, BUT the Strategy Builder is completely empty/default.
+
+The Builder currently shows:
+- Strategy name: "Name your hypothesis"
+- Asset class: empty
+- Market/instrument: "No specific instrument"
+- Trading direction: "Both"
+- No imported entry conditions
+- No imported exit conditions
+- No imported stop loss
+- No imported take profit
+
+This means the AI draft is NOT actually being applied to the Builder.
+
+Do NOT change OpenRouter.
+Do NOT change AI generation.
+Do NOT change Backtesting.
+Do NOT change the Strategy Builder design.
+Do NOT add new features.
+
+Fix ONLY the actual application of the AI draft to the Builder.
+
+IMPORTANT:
+The previous implementation already has a shared pending-draft store and sessionStorage fallback. Do NOT simply implement another storage mechanism without finding why the existing draft is not being consumed correctly.
+
+Trace the exact live workflow:
+
+AI generates draft
+→ Review Strategy clicked
+→ draft stored
+→ navigation to /strategy-builder
+→ Builder reads draft
+→ Builder converts draft into Builder form state
+→ Builder renders populated fields
+
+Find the exact point where the real draft is being lost or ignored.
+
+Use the real AI-generated draft, not hard-coded test values.
+
+Test with:
+
+"Create me a simple XAUUSD BUY strategy that is compatible with my current Backtesting system. Use a bullish candle for entry, a bearish candle for exit, with a 1% stop loss and 2% take profit."
+
+The actual AI response previously generated a structured draft containing:
+- XAUUSD
+- Long
+- Bullish candle entry
+- Bearish candle exit
+- 1% stop loss
+- 2% take profit
+
+Verify that EXACT draft reaches the Builder.
+
+The Builder should then visibly show:
+
+Strategy name:
+XAUUSD Simple BUY Strategy
+
+Market/instrument:
+XAUUSD
+
+Trading direction:
+Long / BUY
+
+Entry condition:
+Bullish candle / close > open
+
+Exit condition:
+Bearish candle / close < open
+
+Stop loss:
+1%
+
+Take profit:
+2%
+
+Do NOT hard-code those values into the Builder. They must come from the actual AI draft.
+
+Also verify the "Save as New Version" action separately:
+
+AI draft
+→ Save as New Version
+→ Builder opens populated with the draft
+→ user reviews/edits it
+→ user explicitly confirms the save
+→ new version is created
+
+Nothing should automatically save merely from opening the Builder.
+
+CRITICAL:
+The previous screenshot/test showed the Builder opening completely empty. Do not consider this fixed because:
+- the URL contains assistantDraft=1
+- the shared store contains the draft
+- a unit test passes
+- navigation works
+
+It is only fixed when the actual rendered Builder fields contain the AI-generated draft.
+
+After fixing it, test the REAL running browser workflow and inspect the rendered Builder.
+
+If possible, physically click:
+1. AI generated strategy
+2. Review Strategy
+3. Verify Builder fields
+4. Go back
+5. Generate/restore the draft
+6. Click Save as New Version
+7. Verify Builder fields
+8. Explicitly save
+9. Verify the new version exists
+
+Run the relevant frontend tests, API tests, typechecks and production builds.
+
+At the end report:
+- The exact root cause of why the Builder was still empty.
+- The exact code/state path that was failing.
+- The fix.
+- Proof that the real AI draft populated the Builder.
+- Proof that Review Strategy works.
+- Proof that Save as New Version works.
+- Whether a new version was actually created.
+- Tests/builds passed.
+- Any remaining limitations.
+
+Do not make unrelated changes.
