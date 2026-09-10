@@ -1,0 +1,283 @@
+Build Step 10: Market-Specific Economic Event Context.
+
+IMPORTANT:
+
+Steps 1–9 are already implemented and working.
+
+Do NOT rebuild or redesign the existing:
+
+- Strategy Builder
+- Strategy Library
+- Strategy Versioning
+- Trade Journal
+- BiQuote integration
+- Market Data Service
+- Live candlestick charts
+- Strategy Monitoring Engine
+- News / Economic Calendar
+- Federal Reserve integration
+- ONS integration
+- ECB integration
+
+This task is ONLY about showing relevant economic events in the context of the currently selected market/instrument.
+
+GOAL:
+
+When a user is viewing a specific instrument in the Market Monitor, show the economic events that are potentially relevant to that instrument.
+
+Examples:
+
+If viewing XAUUSD:
+
+Show potentially relevant:
+- USD events
+- Gold-relevant events
+- US Federal Reserve events
+- Major US economic releases that are available from connected sources
+
+If viewing EURUSD:
+
+Show potentially relevant:
+- EUR events
+- USD events
+- ECB events
+- Relevant euro-area/US events available from connected sources
+
+If viewing GBPUSD:
+
+Show potentially relevant:
+- GBP events
+- USD events
+- UK events
+- Relevant US events available from connected sources
+
+If viewing a US index:
+
+Show relevant US/USD economic events.
+
+IMPORTANT:
+
+This is informational context only.
+
+DO NOT make predictions.
+
+DO NOT tell the user to BUY or SELL.
+
+DO NOT generate trading signals.
+
+DO NOT claim that an event will definitely move a market.
+
+Do not use wording such as:
+
+"Buy because CPI is coming."
+
+Instead use wording such as:
+
+"Potentially relevant economic event."
+
+MARKET MATCHING:
+
+Use the existing structured event-to-market mappings from Step 7–9.
+
+Do not create a completely separate mapping system.
+
+An event can be relevant through:
+
+- Currency
+- Market
+- Instrument
+- Region
+- Existing event-to-market mapping
+
+Keep the matching rules transparent and deterministic.
+
+Do not assume every event affects every instrument.
+
+UI:
+
+Add a compact "Market News" / "Economic Events" area to the existing Market Monitor.
+
+Do not redesign the existing chart.
+
+The chart must remain exactly as it currently works.
+
+The user should be able to immediately see something like:
+
+ECONOMIC EVENTS
+
+🔴 HIGH IMPACT
+US CPI
+USD
+14:30
+Potentially relevant to XAUUSD
+
+🟡 MEDIUM IMPACT
+ECB event
+EUR
+Upcoming
+
+or, when the source does not provide impact:
+
+ECB Governing Council meeting
+EUR
+15 September
+Impact: Not classified
+
+Do not invent HIGH/MEDIUM/LOW ratings.
+
+Use the actual source-provided classification when available.
+
+If no classification is available, display "Not classified."
+
+UPCOMING EVENTS:
+
+Prioritize upcoming events relevant to the selected instrument.
+
+Show:
+
+- Event name
+- Date
+- Time when genuinely available
+- Currency/region
+- Impact or "Not classified"
+- Time until event when reliable timing is available
+- Source
+
+Do not fabricate times or countdowns.
+
+RELEASED EVENTS:
+
+Allow the user to see recently released relevant events.
+
+If actual values are provided by the source, display them.
+
+If actual values are unavailable, leave them unavailable.
+
+Do not fabricate economic values.
+
+FILTERING:
+
+Allow the user to switch between:
+
+- Relevant to this market
+- All economic events
+
+The existing /news page must continue working independently.
+
+Do not remove or alter its existing filters.
+
+NO API CHANGES:
+
+Do not introduce a new paid API.
+
+Do not add Trading Economics.
+
+Do not add API keys.
+
+Continue using the existing official public sources already connected.
+
+If the existing sources do not contain enough information for a particular event, simply show the information that is genuinely available.
+
+DATA FRESHNESS:
+
+Use the existing economic-event refresh/cache system.
+
+Do not mark stale information as live/current.
+
+If the economic-event service is unavailable, clearly show:
+
+"Economic event data unavailable"
+
+Do not replace it with fake data.
+
+ARCHITECTURE:
+
+Keep the economic-event service separate from:
+
+- Market Data Service
+- Strategy Monitoring Engine
+- Trading execution
+- AI
+
+Use existing APIs/contracts where possible.
+
+Avoid duplicating economic-event data in the frontend.
+
+The Market Monitor should request the relevant events for the selected instrument.
+
+PERFORMANCE:
+
+Do not repeatedly request the same event data unnecessarily.
+
+Reuse the existing cached/normalized event data.
+
+Avoid causing the live chart to refresh or flicker when economic events update.
+
+The live chart and quote stream must continue working exactly as they do now.
+
+MOBILE:
+
+Make the economic-event section work cleanly on mobile.
+
+It should not cover or interfere with the candlestick chart.
+
+DESKTOP:
+
+Make the event context easy to see without making the Market Monitor cluttered.
+
+IMPORTANT:
+
+Do NOT add:
+
+- AI analysis
+- BUY/SELL recommendations
+- Trading signals
+- Automatic trading
+- Broker integrations
+- Push notifications
+- Alerts
+- Backtesting
+- Strategy execution
+
+This is ONLY informational market-specific economic context.
+
+VERIFICATION:
+
+After implementation:
+
+1. Test XAUUSD.
+2. Test EURUSD.
+3. Test GBPUSD.
+4. Test a US index if currently available.
+5. Verify relevant events are correctly matched.
+6. Verify unrelated events are not incorrectly shown as relevant.
+7. Verify upcoming events.
+8. Verify recently released events.
+9. Verify events with missing impact information.
+10. Verify events with missing times.
+11. Verify source attribution.
+12. Verify unavailable/error state.
+13. Verify the existing live chart still works.
+14. Verify live quotes still work.
+15. Verify all existing timeframes still work.
+16. Test desktop.
+17. Test mobile.
+18. Run existing API tests.
+19. Run existing frontend tests.
+20. Run API/frontend typechecks.
+21. Run production builds.
+22. Run the existing Steps 1–9 regression tests.
+23. Run existing BiQuote regression tests.
+
+Do not modify unrelated functionality.
+
+At the end report:
+
+1. What was implemented.
+2. Which instruments were tested.
+3. Which events were successfully matched.
+4. How the matching works.
+5. How missing impact/time/value information is handled.
+6. Tests passed.
+7. Any remaining limitations.
+8. Confirm that no AI, BUY/SELL signals, alerts, trading execution, or paid APIs were added.
