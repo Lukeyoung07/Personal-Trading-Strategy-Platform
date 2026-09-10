@@ -1,0 +1,64 @@
+Improve ONLY the AI Trading Assistant "Save as New Version" workflow.
+
+IMPORTANT:
+The current workflow now successfully transfers the AI-generated strategy into the Strategy Builder. Do NOT break or rewrite the working AI → Builder handoff.
+
+Current behaviour:
+- Clicking "Review Strategy" correctly opens the Builder with the AI draft populated.
+- Clicking "Save as New Version" also opens the populated Builder, but it only scrolls down to "Create Strategy".
+- This makes it unclear what the user is supposed to do next.
+
+I want the Save as New Version workflow to be extremely clear and beginner-friendly.
+
+Desired behaviour:
+
+1. Clicking "Review Strategy"
+   - Keep the current working behaviour exactly as it is.
+   - Open the populated AI draft in the Builder in REVIEW mode.
+   - Nothing is saved automatically.
+
+2. Clicking "Save as New Version"
+   - Keep the current working AI draft transfer.
+   - Open the populated Builder in SAVE AS NEW VERSION mode.
+   - Clearly show that this is an AI-generated draft intended to become a new immutable strategy version.
+   - Do not automatically save anything.
+
+3. In SAVE AS NEW VERSION mode, make the next action obvious.
+   - The user should clearly understand that they need to create/select the strategy foundation first if required.
+   - Then they should be taken directly to the existing version-save confirmation flow.
+   - Do not require the user to figure out what to click next.
+
+4. If the current architecture requires "Create Strategy" before a version can exist:
+   - Keep that architecture.
+   - Make the UI explain this clearly.
+   - After the strategy is created, immediately guide the user into the existing "Save as New Version" confirmation.
+   - Preserve all AI-generated conditions and risk rules.
+
+5. Do NOT create a second save system.
+6. Do NOT automatically save without explicit user confirmation.
+7. Do NOT change OpenRouter or the AI provider.
+8. Do NOT change Backtesting.
+9. Do NOT change the Strategy Builder condition model.
+10. Do NOT change the existing immutable version architecture.
+11. Do NOT change the working Review Strategy flow.
+
+Before changing anything, trace the existing:
+AI draft → Save as New Version → Builder → Create Strategy → version confirmation → saved version
+
+Then make the smallest change necessary to make the workflow obvious and reliable.
+
+Verification MUST include a real browser test:
+- Generate a real AI strategy.
+- Click Save as New Version.
+- Confirm the populated Builder appears.
+- Confirm the UI clearly explains the next step.
+- Create the strategy.
+- Confirm the version-save confirmation appears.
+- Explicitly confirm the save.
+- Verify the new immutable version contains the AI-generated conditions and risk rules.
+- Verify nothing is saved before the user explicitly confirms.
+- Also verify Review Strategy still works exactly as before.
+
+Run existing frontend/API tests, typechecks and production builds.
+
+At the end report exactly what was changed and what the real browser test confirmed.
