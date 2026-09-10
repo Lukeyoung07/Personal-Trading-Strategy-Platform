@@ -9,3 +9,4 @@
 - [Economic calendar boundaries](economic-calendar-boundaries.md) — provider-neutral events use stable source deduplication, structured market mappings, and an honest disconnected state until a calendar provider is connected.
 - [Assistant provider boundary](assistant-provider-boundary.md) — the assistant uses only server-side OpenRouter free routing with no paid fallback or fabricated data.
 - [Assistant backtest context](assistant-backtest-context.md) — result explanations require an explicit completed persisted backtest and honest no-data handling.
+- [Strategy builder assistant handoff](strategy-builder-assistant-handoff.md) — AI drafts enter a forced review state; saving remains explicit and versioned.

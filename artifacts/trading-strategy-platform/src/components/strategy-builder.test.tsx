@@ -75,6 +75,8 @@ const condition = {
 
 afterEach(() => {
   cleanup();
+  sessionStorage.removeItem("assistant-strategy-draft");
+  window.history.pushState({}, "", "/strategy-builder");
   state.strategies = [];
   state.conditions = [];
   state.createCondition.mockReset();
@@ -82,6 +84,52 @@ afterEach(() => {
 });
 
 describe("StrategyBuilder", () => {
+  it("renders the complete AI draft before any strategy is created", () => {
+    const draft = {
+      name: "XAUUSD candle review",
+      description: "A simple candle-based strategy.",
+      direction: "long",
+      marketSymbol: "XAUUSD",
+      timeframes: ["1H"],
+      conditions: [
+        {
+          name: "Bullish entry",
+          stage: "entry",
+          requirement: "required",
+          conceptName: "Candle Direction",
+          timeframe: "1H",
+          triggerRules: "bullish",
+          supported: true,
+        },
+        {
+          name: "Bearish exit",
+          stage: "exit",
+          requirement: "required",
+          conceptName: "Candle Direction",
+          timeframe: "1H",
+          triggerRules: "bearish",
+          supported: true,
+        },
+      ],
+      riskManagementRules: "Stop loss: 1%; Take profit: 2%",
+      compatibility: { compatible: true, unsupportedConditions: [] },
+    };
+    state.strategies = [strategy];
+    state.markets = [{ id: 25, symbol: "XAUUSD", assetClass: "metals" }];
+    window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=save-version");
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+
+    render(<StrategyBuilder />);
+
+    expect(screen.getByTestId("assistant-draft-builder-preview")).toHaveTextContent("AI draft · save as new version");
+    expect(screen.getByTestId("assistant-draft-builder-preview")).toHaveTextContent("XAUUSD candle review");
+    expect(screen.getByTestId("assistant-draft-entry-conditions")).toHaveTextContent("Bullish entry");
+    expect(screen.getByTestId("assistant-draft-exit-conditions")).toHaveTextContent("Bearish exit");
+    expect(screen.getByTestId("assistant-draft-builder-preview")).toHaveTextContent("Stop loss: 1%; Take profit: 2%");
+    expect(screen.getByTestId("input-builder-strategy-name")).toHaveValue("XAUUSD candle review");
+    expect(screen.getByTestId("select-builder-direction")).toHaveValue("long");
+  });
+
   it("loads an existing strategy and keeps the live summary in plain language", () => {
     state.strategies = [strategy];
     state.conditions = [condition];

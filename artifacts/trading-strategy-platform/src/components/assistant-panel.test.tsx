@@ -98,7 +98,8 @@ describe("AssistantPanel", () => {
     fireEvent.click(screen.getByTestId("button-send-assistant"));
     fireEvent.click(screen.getByTestId("button-review-strategy"));
     expect(onReviewStrategy).toHaveBeenCalledWith(expect.objectContaining({ name: "Opening range" }));
-    expect(screen.getByTestId("button-save-new-version")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("button-save-new-version"));
+    expect(onReviewStrategy).toHaveBeenLastCalledWith(expect.objectContaining({ name: "Opening range" }), "save-version");
   });
 
   it("shows an honest rate-limit state without inventing a result", async () => {

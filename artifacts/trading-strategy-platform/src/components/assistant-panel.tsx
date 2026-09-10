@@ -35,7 +35,7 @@ export interface AssistantPanelProps {
   open: boolean;
   onClose: () => void;
   context: AssistantPanelContext;
-  onReviewStrategy: (draft: unknown) => void;
+  onReviewStrategy: (draft: unknown, action?: 'review' | 'save-version') => void;
   onOpenBacktest: (setup: unknown) => void;
 }
 
@@ -99,7 +99,7 @@ function StrategyDraftCard({
   onReview,
 }: {
   draft: AssistantStrategyDraft;
-  onReview: (draft: AssistantStrategyDraft) => void;
+  onReview: (draft: AssistantStrategyDraft, action?: 'review' | 'save-version') => void;
 }) {
   return (
     <section className="mt-4 overflow-hidden rounded-lg border border-primary/30 bg-primary/[0.045]" data-testid="assistant-strategy-draft">
@@ -169,7 +169,7 @@ function StrategyDraftCard({
           <button
             type="button"
             className="btn btn-secondary flex-1"
-            onClick={() => onReview(draft)}
+            onClick={() => onReview(draft, 'save-version')}
             data-testid="button-save-new-version"
           >
             <Save size={14} />

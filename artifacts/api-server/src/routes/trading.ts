@@ -94,6 +94,7 @@ import {
 const router: IRouter = Router();
 
 const DEFAULT_CONCEPTS = [
+  ["PRICE ACTION", "Candle Direction"],
   ["MARKET STRUCTURE", "Higher High"],
   ["MARKET STRUCTURE", "Higher Low"],
   ["MARKET STRUCTURE", "Lower High"],

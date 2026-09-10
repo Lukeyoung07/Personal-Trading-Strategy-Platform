@@ -26,22 +26,44 @@ type AssistantContext = AssistantInput["context"];
 type AssistantResponse = typeof ChatAssistantResponse._output;
 
 function supportedRule(rule: string | null | undefined) {
-  if (!rule?.trim()) return false;
-  const normalized = rule.trim().toLowerCase().replace(/[()[\],]/g, " ").replace(/\s+/g, " ");
+  const normalized = normalizeSupportedRule(rule);
+  if (!normalized) return false;
   if (["always", "bullish", "bullish candle", "bearish", "bearish candle"].includes(normalized)) return true;
   if (/^(open|high|low|close) crosses (above|below) previous[_ ](open|high|low|close)$/.test(normalized)) return true;
   return /^(open|high|low|close|previous[_ ](?:open|high|low|close))\s*(>=|<=|>|<|=|==)\s*(open|high|low|close|previous[_ ](?:open|high|low|close)|\d+(?:\.\d+)?)$/.test(normalized);
 }
 
+function normalizeSupportedRule(rule: string | null | undefined) {
+  if (!rule?.trim()) return "";
+  const normalized = rule.trim().toLowerCase().replace(/[()[\],]/g, " ").replace(/\s+/g, " ");
+  if (normalized === "close > open" || normalized === "close < open") return normalized;
+  if (/^(?:close|candle close)\s*(?:(?:is\s*)?(?:greater than|above)|>)\s*(?:the\s*)?(?:candle\s*)?open(?:\s+(?:on|for)\s+(?:the\s+)?(?:entry|exit|signal)\s+candle)?$/.test(normalized)) return "close > open";
+  if (/^(?:close|candle close)\s*(?:(?:is\s*)?(?:less than|below)|<)\s*(?:the\s*)?(?:candle\s*)?open(?:\s+(?:on|for)\s+(?:the\s+)?(?:entry|exit|signal)\s+candle)?$/.test(normalized)) return "close < open";
+  if (normalized === "bullish candle") return "bullish";
+  if (normalized === "bearish candle") return "bearish";
+  return normalized;
+}
+
+function normalizeConditionRule(condition: any) {
+  const normalized = normalizeSupportedRule(String(condition?.triggerRules || ""));
+  if (supportedRule(normalized)) return normalized;
+  const descriptor = `${condition?.name || ""} ${condition?.conceptName || ""} ${condition?.triggerRules || ""}`.toLowerCase();
+  if (/\bbullish\b/.test(descriptor)) return "bullish";
+  if (/\bbearish\b/.test(descriptor)) return "bearish";
+  return normalized;
+}
+
 function compatibleRiskRules(rules: string | null | undefined) {
   if (!rules?.trim() || !/(?:stop[- ]loss|sl|take[- ]profit|tp)/i.test(rules)) return true;
-  return /(?:stop[- ]loss|sl|take[- ]profit|tp)\s*[:=]?\s*\d+(?:\.\d+)?\s*%/i.test(rules);
+  const hasStopLoss = /(?:stop[- ]loss|sl)\s*[:=]?\s*\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%\s*(?:stop[- ]loss|sl)/i.test(rules);
+  const hasTakeProfit = /(?:take[- ]profit|tp)\s*[:=]?\s*\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%\s*(?:take[- ]profit|tp)/i.test(rules);
+  return hasStopLoss && hasTakeProfit;
 }
 
 function compatibilityForDraft(draft: any) {
   const conditions = Array.isArray(draft?.conditions) ? draft.conditions : [];
   const unsupported: string[] = conditions
-    .filter((condition: any) => !supportedRule(condition?.triggerRules))
+    .filter((condition: any) => !supportedRule(normalizeConditionRule(condition)))
     .map((condition: any) => String(condition?.name || condition?.triggerRules || "Unnamed condition"));
   if (!conditions.some((condition: any) => condition?.stage === "entry" || condition?.stage === "confirmation")) {
     unsupported.unshift("No entry condition has been added");
@@ -81,10 +103,12 @@ function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | 
       name: String(condition?.name || "Assistant condition").slice(0, 160),
       stage: ["entry", "confirmation", "invalidation", "exit"].includes(condition?.stage) ? condition.stage : "entry",
       requirement: condition?.requirement === "optional" ? "optional" : "required",
-      conceptName: String(condition?.conceptName || "Assistant draft").slice(0, 160),
+      conceptName: supportedRule(normalizeConditionRule(condition)) && /(?:bullish|bearish|close|open)/i.test(`${condition?.triggerRules || ""} ${condition?.conceptName || ""}`)
+        ? "Candle Direction"
+        : String(condition?.conceptName || "Assistant draft").slice(0, 160),
       timeframe: String(condition?.timeframe || "Not specified").slice(0, 40),
-      triggerRules: String(condition?.triggerRules || "").slice(0, 400),
-      supported: supportedRule(condition?.triggerRules),
+      triggerRules: normalizeConditionRule(condition).slice(0, 400),
+      supported: supportedRule(normalizeConditionRule(condition)),
     })).slice(0, 20) : [],
     riskManagementRules: draft.riskManagementRules ? String(draft.riskManagementRules).slice(0, 400) : null,
     compatibility: compatibilityForDraft(draft),

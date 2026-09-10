@@ -64,10 +64,10 @@ function Shell({ children }: { children: ReactNode }) {
       endDate: params.get("endDate") || null,
     };
   }, [location]);
-  const reviewStrategyDraft = (draft: unknown) => {
+  const reviewStrategyDraft = (draft: unknown, action: "review" | "save-version" = "review") => {
     sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
     setAssistantOpen(false);
-    setLocation("/strategy-builder?assistantDraft=1");
+    setLocation(`/strategy-builder?assistantDraft=1&assistantAction=${action}`);
   };
   const openAssistantBacktest = (setup: any) => {
     const query = new URLSearchParams();

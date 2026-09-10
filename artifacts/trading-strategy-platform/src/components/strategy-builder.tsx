@@ -413,8 +413,10 @@ function ConditionFlow({ strategyId, conditions, concepts, onAdd, onEdit, onChan
 }
 
 function riskPercent(value: string | null, label: "stop-loss" | "take-profit") {
-  const match = value?.match(new RegExp(`${label}\\s*[:=]?\\s*(\\d+(?:\\.\\d+)?)\\s*%`, "i"));
-  return match ? match[1] : "";
+  const labelPattern = label === "stop-loss" ? "stop[- ]loss" : "take[- ]profit";
+  const labelFirst = value?.match(new RegExp(`${labelPattern}\\s*[:=]?\\s*(\\d+(?:\\.\\d+)?)\\s*%`, "i"));
+  const numberFirst = value?.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*%\\s*${labelPattern}`, "i"));
+  return labelFirst?.[1] || numberFirst?.[1] || "";
 }
 
 function riskNarrative(value: string | null) {
@@ -549,14 +551,72 @@ function ConceptsCard({ concepts }: { concepts: TradingConcept[] }) {
   </Panel>;
 }
 
+function AssistantDraftReview({ draft, action }: { draft: AssistantStrategyDraft; action: "review" | "save-version" }) {
+  const entryConditions = draft.conditions.filter(condition => condition.stage === "entry" || condition.stage === "confirmation");
+  const exitConditions = draft.conditions.filter(condition => condition.stage === "exit" || condition.stage === "invalidation");
+  const unsupported = draft.compatibility.unsupportedConditions;
+  return <section className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-4 md:p-5" data-testid="assistant-draft-builder-preview">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <div className="eyebrow text-primary">{action === "save-version" ? "AI draft · save as new version" : "AI draft · review"}</div>
+        <h2 className="font-semibold mt-2">{draft.name}</h2>
+        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+          {action === "save-version"
+            ? "Review and edit this AI-generated draft first. Nothing is saved until you create the strategy and explicitly save a new immutable version."
+            : "Review and edit this AI-generated draft before creating the strategy. Nothing has been saved."}
+        </p>
+      </div>
+      <span className={`tag shrink-0 ${draft.compatibility.compatible ? "tag-active" : "tag-draft"}`}>
+        {draft.compatibility.compatible ? "Backtest compatible" : "Compatibility review"}
+      </span>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+      <Summary label="Direction" value={draft.direction} />
+      <Summary label="Market" value={draft.marketSymbol || "Open"} />
+      <Summary label="Timeframes" value={draft.timeframes.length ? draft.timeframes.join(", ") : "Open"} />
+      <Summary label="Risk rules" value={draft.riskManagementRules || "Not set"} />
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      <div className="rounded-md border border-border p-3" data-testid="assistant-draft-entry-conditions">
+        <div className="eyebrow">Entry conditions</div>
+        {entryConditions.length ? <div className="space-y-3 mt-3">{entryConditions.map(condition => <DraftCondition key={`${condition.stage}-${condition.name}`} condition={condition} />)}</div> : <p className="text-xs text-muted-foreground mt-2">No entry conditions supplied.</p>}
+      </div>
+      <div className="rounded-md border border-border p-3" data-testid="assistant-draft-exit-conditions">
+        <div className="eyebrow">Exit conditions</div>
+        {exitConditions.length ? <div className="space-y-3 mt-3">{exitConditions.map(condition => <DraftCondition key={`${condition.stage}-${condition.name}`} condition={condition} />)}</div> : <p className="text-xs text-muted-foreground mt-2">No exit conditions supplied.</p>}
+      </div>
+    </div>
+    {unsupported.length > 0 && <div className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100" data-testid="assistant-draft-compatibility-warning">
+      <div className="font-semibold">Compatibility warnings</div>
+      <p className="mt-1 leading-relaxed">These draft items are preserved for review and are not silently removed or replaced:</p>
+      <ul className="mt-2 space-y-1">{unsupported.map(condition => <li key={condition}>• {condition}</li>)}</ul>
+    </div>}
+  </section>;
+}
+
+function DraftCondition({ condition }: { condition: AssistantStrategyDraft["conditions"][number] }) {
+  return <div className="rounded-md bg-secondary/50 p-3">
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="tag tag-active">{condition.stage}</span>
+      <span className="tag tag-draft">{condition.requirement}</span>
+      {!condition.supported && <span className="tag border-amber-500/40 text-amber-200">Review</span>}
+    </div>
+    <div className="text-xs font-semibold mt-2">{condition.name}</div>
+    <div className="text-[11px] text-primary mt-1">{condition.conceptName}</div>
+    <div className="text-[11px] text-muted-foreground mt-2 leading-relaxed">{condition.triggerRules}</div>
+  </div>;
+}
+
 export function StrategyBuilder() {
   const strategies = useListStrategies();
   const markets = useListMarkets();
   const concepts = useListConcepts();
   const queryClient = useQueryClient();
-  const requestedStrategyId = Number(new URLSearchParams(window.location.search).get("strategyId")) || null;
-  const requestedVersionId = Number(new URLSearchParams(window.location.search).get("versionId")) || null;
-  const requestedAssistantDraft = new URLSearchParams(window.location.search).get("assistantDraft") === "1";
+  const searchParams = new URLSearchParams(window.location.search);
+  const requestedStrategyId = Number(searchParams.get("strategyId")) || null;
+  const requestedVersionId = Number(searchParams.get("versionId")) || null;
+  const requestedAssistantDraft = searchParams.get("assistantDraft") === "1";
+  const assistantDraftAction = searchParams.get("assistantAction") === "save-version" ? "save-version" : "review";
   const [selectedStrategyId, setSelectedStrategyId] = useState<number | null>(requestedStrategyId);
   const [strategyModal, setStrategyModal] = useState<"new" | "edit" | false>(false);
   const [conditionModal, setConditionModal] = useState<StrategyCondition | "new" | false>(false);
@@ -570,21 +630,23 @@ export function StrategyBuilder() {
     }
   });
   const [draftImportMessage, setDraftImportMessage] = useState("");
+  const [unmatchedDraftConditions, setUnmatchedDraftConditions] = useState<AssistantStrategyDraft["conditions"]>([]);
   const createDraftCondition = useCreateStrategyCondition();
   const activeStrategy = useMemo(() => {
+    if (assistantDraft) return null;
     const rows = strategies.data || [];
     return rows.find(strategy => strategy.id === selectedStrategyId) || rows[0] || null;
-  }, [selectedStrategyId, strategies.data]);
+  }, [assistantDraft, selectedStrategyId, strategies.data]);
   const strategyId = activeStrategy?.id || 0;
   const strategyConditions = useListStrategyConditions(strategyId, { query: { enabled: !!strategyId, queryKey: getListStrategyConditionsQueryKey(strategyId) } });
   const savedStrategy = async (strategy: Strategy) => {
     setSelectedStrategyId(strategy.id);
     if (!assistantDraft) return;
-    const unmatched: string[] = [];
+    const unmatched: AssistantStrategyDraft["conditions"] = [];
     for (const [index, condition] of assistantDraft.conditions.entries()) {
       const concept = concepts.data?.find(item => item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase());
       if (!concept) {
-        unmatched.push(condition.name);
+        unmatched.push(condition);
         continue;
       }
       try {
@@ -604,13 +666,14 @@ export function StrategyBuilder() {
           },
         });
       } catch {
-        unmatched.push(condition.name);
+        unmatched.push(condition);
       }
       if (index === assistantDraft.conditions.length - 1) {
         queryClient.invalidateQueries({ queryKey: getListStrategyConditionsQueryKey(strategy.id) });
       }
     }
-    setDraftImportMessage(unmatched.length ? `Strategy created. These draft conditions need review before they can be added: ${unmatched.join(", ")}.` : "Strategy created with the assistant’s conditions. Review it, then save a new immutable version.");
+    setUnmatchedDraftConditions(unmatched);
+    setDraftImportMessage(unmatched.length ? `Strategy created. These draft conditions need review before they can be added: ${unmatched.map(condition => condition.name).join(", ")}.` : "Strategy created with the assistant’s conditions. Review it, then save a new immutable version.");
     setAssistantDraft(null);
     sessionStorage.removeItem("assistant-strategy-draft");
   };
@@ -622,13 +685,14 @@ export function StrategyBuilder() {
   return <BuilderPage action={action}>
      {!activeStrategy ? <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5">
       <Panel title="Create the strategy foundation" eyebrow="Start without assumptions">
-         {assistantDraft && <div className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-4 text-xs leading-relaxed" data-testid="assistant-draft-builder-preview"><div className="eyebrow text-primary">Assistant draft ready</div><p className="font-semibold mt-2">{assistantDraft.name}</p><p className="text-muted-foreground mt-2">The form below is prefilled from the assistant. Review every field before creating the strategy; conditions with concepts not in your library will remain for manual review.</p></div>}
+         {assistantDraft && <AssistantDraftReview draft={assistantDraft} action={assistantDraftAction} />}
         <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">Give your strategy a name and describe the market context in your own words. Everything else can stay open until you are ready to define it.</p>
          <div className="mt-6"><StrategyForm markets={markets.data || []} strategy={null} initialDraft={assistantDraft} onSaved={savedStrategy} /></div>
       </Panel>
       <ConceptsCard concepts={concepts.data || []} />
      </div> : <div className="space-y-5">
        {draftImportMessage && <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-xs leading-relaxed" role="status" data-testid="assistant-draft-import-status">{draftImportMessage}</div>}
+       {unmatchedDraftConditions.length > 0 && <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-100 leading-relaxed" data-testid="assistant-draft-unmatched-conditions"><div className="font-semibold">AI draft conditions still need review</div><p className="mt-1">The following information was preserved because it could not be imported into the concept library:</p><div className="space-y-2 mt-3">{unmatchedDraftConditions.map(condition => <DraftCondition key={`${condition.stage}-${condition.name}`} condition={condition} />)}</div></div>}
       <div className="panel p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><FileText size={16} /></div>
