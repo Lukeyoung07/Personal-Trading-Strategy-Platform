@@ -1,0 +1,363 @@
+Improve the existing Strategy Builder to make it significantly easier to use and more beginner-friendly.
+
+IMPORTANT:
+
+Do NOT rebuild the strategy engine.
+Do NOT change the existing strategy/version data model unless absolutely necessary.
+Do NOT change the Backtesting engine.
+Do NOT remove any existing strategy functionality.
+
+This task is primarily a USER EXPERIENCE improvement.
+
+==================================================
+1. SIMPLIFY THE MAIN SCREEN
+==================================================
+
+Make the Strategy Builder feel simple and easy to understand.
+
+Organize the page into clear sections:
+
+1. Strategy Details
+2. Entry Conditions
+3. Trade Direction
+4. Exit Rules
+5. Strategy Summary
+6. Save Strategy
+
+Avoid presenting the user with a large technical-looking form.
+
+Use clear headings and short explanations.
+
+==================================================
+2. STRATEGY DETAILS
+==================================================
+
+Keep this simple:
+
+Strategy Name
+[________________]
+
+Description
+[________________]
+
+Instrument
+[Select instrument ▼]
+
+Timeframe
+[Select timeframe ▼]
+
+Use searchable dropdowns where there are many instruments.
+
+Do not make the user type technical IDs or provider symbols.
+
+==================================================
+3. ENTRY CONDITIONS
+==================================================
+
+Make conditions visual and structured.
+
+Instead of requiring the user to write technical rule descriptions manually, provide:
+
+WHEN
+
+[Select what to measure ▼]
+[Select condition ▼]
+[Enter/select value]
+
+Examples:
+
+Price
+[is above]
+EMA 20
+
+Price
+[crosses above]
+EMA 20
+
+Candle
+[is]
+Bullish
+
+Price
+[breaks above]
+Previous High
+
+Use dropdowns wherever possible.
+
+Do NOT make users understand database fields, provider identifiers, or technical implementation details.
+
+==================================================
+4. ADD CONDITION
+==================================================
+
+Provide a clear:
+
+[ + Add Condition ]
+
+button.
+
+When another condition is added, allow:
+
+AND
+OR
+
+between conditions.
+
+Example:
+
+WHEN
+Price crosses above EMA 20
+
+AND
+
+Candle is Bullish
+
+AND
+
+RSI is above 50
+
+Do not make the user manually type AND/OR.
+
+==================================================
+5. TRADE DIRECTION
+==================================================
+
+Make BUY and SELL extremely obvious.
+
+Show:
+
+Trade Direction
+
+[ BUY ]   [ SELL ]
+
+Use large, simple selectable buttons.
+
+Only one direction should be selectable unless the existing strategy model explicitly supports both.
+
+==================================================
+6. EXIT RULES
+==================================================
+
+Keep exits simple.
+
+Show:
+
+Stop Loss
+[ 1 ] %
+
+Take Profit
+[ 2 ] %
+
+Allow the user to enable/disable each one.
+
+Also provide an optional:
+
+Exit Condition
+
+[ Select exit condition ▼ ]
+
+Do not force the user to configure complicated exit logic if they only want SL/TP.
+
+==================================================
+7. STRATEGY SUMMARY
+==================================================
+
+Add a live summary that automatically explains the strategy in plain English.
+
+Example:
+
+YOUR STRATEGY
+
+Buy when:
+Price crosses above EMA 20
+
+AND
+
+The candle is bullish
+
+Stop Loss:
+1%
+
+Take Profit:
+2%
+
+This summary should update automatically whenever the user changes a condition.
+
+The summary should be understandable without knowing how the application stores the strategy internally.
+
+==================================================
+8. VALIDATION
+==================================================
+
+Make validation friendly.
+
+Instead of technical errors such as:
+
+"Invalid condition payload"
+
+show something like:
+
+"Please choose an entry condition."
+
+or:
+
+"Please select a trade direction."
+
+Clearly identify what needs fixing.
+
+Prevent saving incomplete strategies.
+
+==================================================
+9. BEGINNER-FRIENDLY EMPTY STATES
+==================================================
+
+If there are no conditions yet, show:
+
+"No entry conditions yet."
+
+Then:
+
+"Add a condition to tell the strategy when to enter a trade."
+
+[ + Add Condition ]
+
+Do not leave large empty technical areas.
+
+==================================================
+10. ADVANCED DETAILS
+==================================================
+
+Hide technical information by default.
+
+If technical information is necessary, put it behind:
+
+"Advanced"
+
+or
+
+"Technical details"
+
+Do not expose provider IDs, database IDs, internal condition IDs, or implementation details in the normal workflow.
+
+==================================================
+11. EXISTING STRATEGIES
+==================================================
+
+Do not break existing saved strategies.
+
+Existing strategies must still:
+
+- Load
+- Display
+- Edit
+- Save
+- Create new versions
+
+Existing strategy versions must remain unchanged unless the user explicitly creates a new version.
+
+==================================================
+12. BACKTEST COMPATIBILITY
+==================================================
+
+This is very important.
+
+Any newly created structured conditions must be stored in a way that the existing Backtesting engine can understand.
+
+Do NOT create UI-only conditions that cannot be represented by the existing strategy model.
+
+If a condition is not currently supported by the backtest engine, clearly mark it as:
+
+"Not currently supported by Backtesting"
+
+rather than pretending it will work.
+
+Do not modify the backtest engine in this task.
+
+==================================================
+13. RESPONSIVE DESIGN
+==================================================
+
+The Strategy Builder must work well on:
+
+- Desktop
+- Tablet
+- Mobile
+
+On mobile, conditions should stack vertically rather than becoming cramped.
+
+Buttons should be easy to tap.
+
+==================================================
+14. KEEP IT SIMPLE
+==================================================
+
+Do NOT add dozens of new indicators or advanced ICT/SMC rules in this task.
+
+Do NOT turn the Strategy Builder into a complicated professional trading terminal.
+
+The priority is usability.
+
+A beginner should be able to understand the page immediately.
+
+==================================================
+15. DO NOT CHANGE
+==================================================
+
+Do not modify:
+
+- Live BiQuote market data
+- Market Monitor
+- News
+- Economic Calendar
+- Alerts
+- Backtesting engine
+- Existing backtest results
+- Existing strategy versions
+- Trade Journal
+
+Only improve the Strategy Builder experience and its existing structured-condition workflow.
+
+==================================================
+16. TESTING
+==================================================
+
+After implementation verify:
+
+- Existing strategies still load.
+- Existing strategy versions still load.
+- New strategies can be created.
+- Conditions can be added.
+- Conditions can be edited.
+- Conditions can be removed.
+- AND/OR works correctly.
+- BUY/SELL selection works.
+- SL/TP settings save correctly.
+- Strategy summary updates correctly.
+- Validation works.
+- Existing strategies are not corrupted.
+- Newly created supported conditions remain compatible with Backtesting.
+
+Run:
+
+- Frontend tests
+- API tests
+- Typechecks
+- Production builds
+- Existing regression tests
+
+Also verify the page visually on desktop and mobile.
+
+Do not stop after changing the appearance.
+
+Actually implement and verify the improved user experience.
+
+At the end report:
+
+1. What was changed.
+2. How the Strategy Builder is now easier to use.
+3. What conditions are supported.
+4. How the plain-English summary works.
+5. How validation works.
+6. How compatibility with Backtesting was preserved.
+7. Tests passed.
+8. Any limitations.
