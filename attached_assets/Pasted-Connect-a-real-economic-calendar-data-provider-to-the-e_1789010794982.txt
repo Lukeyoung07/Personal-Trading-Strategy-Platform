@@ -1,0 +1,222 @@
+Connect a real economic-calendar data provider to the existing News / Economic Calendar foundation.
+
+IMPORTANT:
+
+The News / Economic Calendar foundation is already implemented and working.
+
+Do NOT rebuild or redesign it.
+
+Do NOT modify the existing:
+- Strategy Builder
+- Strategy Library
+- Strategy Versioning
+- Trade Journal
+- Market Data Service
+- BiQuote integration
+- Live candlestick charts
+- Strategy Monitoring Engine
+
+The existing provider-neutral economic-event architecture must remain intact.
+
+GOAL:
+
+Connect one legitimate real economic-calendar provider so the /news page can display genuine upcoming and recently released economic events.
+
+Do not use:
+- Fake events
+- Hard-coded events
+- Mock events
+- Fabricated forecasts
+- Fabricated actual values
+- Scraped data that violates the provider's terms
+- Sample/demo data presented as real data
+
+The existing empty state should only disappear when genuine provider data is successfully available.
+
+PROVIDER:
+
+First inspect the current project and determine whether an authorized economic-calendar provider/API is already configured.
+
+If no provider is configured, do NOT invent credentials or pretend that a provider is connected.
+
+Instead:
+
+- Keep the provider-neutral architecture intact.
+- Implement the provider adapter/interface required for a real provider.
+- Add environment-variable configuration for the provider credentials/API key.
+- Clearly report that the provider still requires credentials/configuration.
+
+Do not expose API keys in frontend code.
+
+Use server-side environment variables.
+
+Do not commit secrets to the repository.
+
+DATA:
+
+When a real provider is configured, retrieve genuine economic-calendar events and normalize them into the existing economic-event model.
+
+Support:
+
+- Event name
+- Date
+- Time
+- Impact
+- Country/region
+- Currency
+- Previous
+- Forecast
+- Actual
+- Release status
+- Provider ID
+- Provider/source
+- Affected-market mappings
+
+Respect the provider's actual available fields.
+
+If a field is unavailable, leave it empty/null rather than inventing a value.
+
+UPDATES:
+
+The provider data should be safely upserted using the existing deduplication system.
+
+Do not create duplicate events when the provider returns the same event repeatedly.
+
+Allow provider updates to change:
+
+- Forecast
+- Actual
+- Impact
+- Status
+- Event time
+- Other fields supported by the provider
+
+Do not corrupt or incorrectly overwrite historical events.
+
+TIMING:
+
+Use the provider's actual event timestamps and timezone information.
+
+Correctly distinguish:
+
+- Upcoming
+- Live/releasing, if supported
+- Released
+
+Do not create fake countdowns.
+
+Do not mark an event LIVE unless the provider data supports that state.
+
+MARKET MAPPINGS:
+
+Use the existing event-to-market mapping system.
+
+Create mappings based on reliable structured information from the provider and existing mapping rules.
+
+Examples of potentially affected markets may include:
+
+USD-related events → USD instruments / Gold / US indices
+
+GBP-related events → GBP instruments / UK markets
+
+However, do not invent mappings where there is insufficient information.
+
+The mapping system should remain extensible.
+
+NEWS PAGE:
+
+Keep the existing /news UI.
+
+The existing filters should continue working:
+
+- Today
+- Upcoming
+- Recently released
+- All
+- Impact
+- Region
+- Currency
+- Affected market
+- Search
+
+Do not redesign the page.
+
+Do not add AI analysis yet.
+
+Do not add trading recommendations.
+
+Do not add BUY/SELL signals.
+
+Do not add alerts or push notifications.
+
+Do not add broker integrations.
+
+Do not add backtesting.
+
+Do not add automatic trading.
+
+PERSONAL DEVELOPMENT:
+
+This is currently for my personal development/testing environment.
+
+Do not build public redistribution or customer subscription functionality.
+
+Before this app is eventually sold publicly, the data provider's licensing and redistribution permissions will need to be checked separately.
+
+RELIABILITY:
+
+Handle:
+
+- API failures
+- Authentication failures
+- Rate limits
+- Timeouts
+- Invalid provider responses
+- Missing fields
+- Duplicate events
+- Provider downtime
+
+The UI must clearly show when data is unavailable.
+
+Never silently show stale data as current.
+
+VERIFICATION:
+
+After implementation:
+
+- Run API tests.
+- Run frontend tests.
+- Run API typecheck.
+- Run frontend typecheck.
+- Run production builds.
+- Test provider authentication/configuration.
+- Test genuine event retrieval when credentials are available.
+- Test normalization.
+- Test deduplication.
+- Test event updates.
+- Test filters.
+- Test upcoming/released states.
+- Test empty-provider state.
+- Test API failure handling.
+- Test mobile layout.
+- Test desktop layout.
+- Run existing Steps 1–7 regression tests.
+- Run existing BiQuote regression tests.
+
+IMPORTANT:
+
+If a provider/API cannot be connected because credentials are not available, do NOT fabricate successful live data.
+
+In that situation, finish the provider adapter/configuration work that can legitimately be completed and clearly state what credential or provider setup is still required.
+
+Do not add any unrelated features.
+
+At the end, report:
+
+1. Which provider was integrated.
+2. Whether genuine economic-calendar data was successfully retrieved.
+3. Whether credentials/configuration are still required.
+4. How many genuine events were retrieved during testing, if available.
+5. Tests passed.
+6. Any remaining issues.
+7. Confirm that no fake events or fabricated economic values were used.
