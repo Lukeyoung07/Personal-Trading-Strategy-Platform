@@ -16,6 +16,8 @@ import {
   CreateSourceInstrumentMappingResponse,
   CreateInstrumentBody,
   CreateInstrumentResponse,
+  AddBiQuoteMarketBody,
+  AddBiQuoteMarketResponse,
   CreateMarketDataSourceBody,
   CreateMarketDataSourceResponse,
   CreateTimeframeBody,
@@ -45,6 +47,7 @@ import {
   UpdateTimeframeParams,
   UpdateTimeframeResponse,
 } from "@workspace/api-zod";
+import { biQuoteAdapter } from "../services/biquote";
 import { marketDataService } from "../services/market-data";
 import { logger } from "../lib/logger";
 
@@ -72,6 +75,93 @@ function candleView(candle: typeof candlesTable.$inferSelect) {
 router.get("/instruments", async (_req, res): Promise<void> => {
   const rows = await db.select().from(marketsTable).orderBy(asc(marketsTable.symbol));
   res.json(ListInstrumentsResponse.parse(rows.map(instrumentView)));
+});
+
+router.get("/market-data/biquote/catalog", async (_req, res): Promise<void> => {
+  res.json((await biQuoteAdapter.catalog()).map(item => ({
+    ...item,
+    sourceName: "BiQuote",
+  })));
+});
+
+router.post("/market-data/biquote/markets", async (req, res): Promise<void> => {
+  const parsed = AddBiQuoteMarketBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const [source] = await db.select().from(marketDataSourcesTable).where(eq(marketDataSourcesTable.providerKey, "biquote"));
+  const [timeframe] = await db.select().from(timeframesTable).where(eq(timeframesTable.id, parsed.data.timeframeId));
+  const catalogItem = (await biQuoteAdapter.catalog()).find(item => item.providerSymbol === parsed.data.providerSymbol.toUpperCase());
+
+  if (!source || !catalogItem) {
+    res.status(400).json({ error: "That instrument is not currently supported by BiQuote." });
+    return;
+  }
+  if (!timeframe || !timeframe.isActive) {
+    res.status(400).json({ error: "Select an active timeframe." });
+    return;
+  }
+
+  const result = await db.transaction(async tx => {
+    const [existingMapping] = await tx.select().from(sourceInstrumentMappingsTable).where(and(
+      eq(sourceInstrumentMappingsTable.sourceId, source.id),
+      eq(sourceInstrumentMappingsTable.providerSymbol, catalogItem.providerSymbol),
+    ));
+
+    let instrumentId = existingMapping?.instrumentId;
+    if (!instrumentId) {
+      const [existingInstrument] = await tx.select().from(marketsTable).where(eq(marketsTable.symbol, catalogItem.providerSymbol));
+      if (existingInstrument) {
+        instrumentId = existingInstrument.id;
+      } else {
+        const [created] = await tx.insert(marketsTable).values({
+          assetClass: catalogItem.assetClass,
+          instrumentType: catalogItem.instrumentType,
+          venue: catalogItem.venue,
+          symbol: catalogItem.providerSymbol,
+          displayName: catalogItem.description ?? catalogItem.displayName,
+          quoteCurrency: catalogItem.quoteCurrency,
+          tickSize: catalogItem.tickSize?.toString() ?? null,
+          contractMultiplier: catalogItem.contractMultiplier?.toString() ?? null,
+          isActive: true,
+          description: catalogItem.description,
+        }).returning();
+        instrumentId = created.id;
+      }
+    }
+
+    const [mapping] = existingMapping
+      ? [existingMapping]
+      : await tx.insert(sourceInstrumentMappingsTable).values({
+        sourceId: source.id,
+        instrumentId,
+        providerSymbol: catalogItem.providerSymbol,
+      }).returning();
+    const [instrument] = await tx.select().from(marketsTable).where(eq(marketsTable.id, instrumentId));
+    return { instrument: instrumentView(instrument), mapping, timeframe };
+  });
+
+  try {
+    await marketDataService.refreshCandles({
+      sourceId: source.id,
+      instrumentId: result.instrument.id,
+      timeframeId: result.timeframe.id,
+      limit: 500,
+    });
+  } catch (error) {
+    logger.warn({ err: error, providerSymbol: catalogItem.providerSymbol }, "BiQuote candles could not be retrieved after adding market");
+  }
+
+  res.status(201).json(AddBiQuoteMarketResponse.parse({
+    ...result,
+    mapping: {
+      ...result.mapping,
+      sourceName: source.name,
+      instrumentSymbol: result.instrument.symbol,
+    },
+  }));
 });
 
 router.post("/instruments", async (req, res): Promise<void> => {

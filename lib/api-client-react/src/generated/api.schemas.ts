@@ -851,6 +851,84 @@ export interface InstrumentUpdate {
   description?: string | null;
 }
 
+export type BiQuoteCatalogItemAssetClass = typeof BiQuoteCatalogItemAssetClass[keyof typeof BiQuoteCatalogItemAssetClass];
+
+
+export const BiQuoteCatalogItemAssetClass = {
+  Forex: 'Forex',
+  Stock: 'Stock',
+  Index: 'Index',
+  Commodity: 'Commodity',
+  Crypto: 'Crypto',
+} as const;
+
+export type BiQuoteCatalogItemInstrumentType = typeof BiQuoteCatalogItemInstrumentType[keyof typeof BiQuoteCatalogItemInstrumentType];
+
+
+export const BiQuoteCatalogItemInstrumentType = {
+  forex: 'forex',
+  stock: 'stock',
+  index: 'index',
+  commodity: 'commodity',
+  crypto: 'crypto',
+} as const;
+
+export interface BiQuoteCatalogItem {
+  providerSymbol: string;
+  sourceName: string;
+  displayName: string;
+  assetClass: BiQuoteCatalogItemAssetClass;
+  instrumentType: BiQuoteCatalogItemInstrumentType;
+  /** @nullable */
+  venue: string | null;
+  /** @nullable */
+  quoteCurrency: string | null;
+  /** @nullable */
+  tickSize: number | null;
+  /** @nullable */
+  contractMultiplier: number | null;
+  /** @nullable */
+  description: string | null;
+}
+
+export interface AddBiQuoteMarketInput {
+  /** @minLength 1 */
+  providerSymbol: string;
+  /** @minimum 1 */
+  timeframeId: number;
+}
+
+export interface SourceInstrumentMapping {
+  id: number;
+  sourceId: number;
+  sourceName: string;
+  instrumentId: number;
+  instrumentSymbol: string;
+  providerSymbol: string;
+  /** @nullable */
+  providerMetadata: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Timeframe {
+  id: number;
+  code: string;
+  label: string;
+  durationSeconds: number;
+  /** @nullable */
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BiQuoteMarketResult {
+  instrument: Instrument;
+  mapping: SourceInstrumentMapping;
+  timeframe: Timeframe;
+}
+
 export type MarketDataSourceSourceType = typeof MarketDataSourceSourceType[keyof typeof MarketDataSourceSourceType];
 
 
@@ -979,19 +1057,6 @@ export interface MarketDataSourceUpdate {
   isEnabled?: boolean;
 }
 
-export interface SourceInstrumentMapping {
-  id: number;
-  sourceId: number;
-  sourceName: string;
-  instrumentId: number;
-  instrumentSymbol: string;
-  providerSymbol: string;
-  /** @nullable */
-  providerMetadata: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface SourceInstrumentMappingInput {
   /** @minimum 1 */
   sourceId: number;
@@ -1012,18 +1077,6 @@ export interface SourceInstrumentMappingUpdate {
   providerSymbol?: string;
   /** @nullable */
   providerMetadata?: string | null;
-}
-
-export interface Timeframe {
-  id: number;
-  code: string;
-  label: string;
-  durationSeconds: number;
-  /** @nullable */
-  description: string | null;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface TimeframeInput {

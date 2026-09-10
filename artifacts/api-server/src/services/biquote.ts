@@ -25,6 +25,21 @@ const BIQUOTE_INTERVALS = [
   { code: "1d", label: "1 day", durationSeconds: 86400 },
 ] as const;
 
+const BIQUOTE_CATALOG_TYPES = ["Forex", "Stock", "Index", "Commodity", "Crypto"] as const;
+type BiQuoteCatalogType = typeof BIQUOTE_CATALOG_TYPES[number];
+
+export type BiQuoteCatalogItem = {
+  providerSymbol: string;
+  displayName: string;
+  assetClass: BiQuoteCatalogType;
+  instrumentType: "forex" | "stock" | "index" | "commodity" | "crypto";
+  venue: string | null;
+  quoteCurrency: string | null;
+  tickSize: number | null;
+  contractMultiplier: number | null;
+  description: string | null;
+};
+
 type BiQuoteTick = {
   symbol?: unknown;
   bid?: unknown;
@@ -88,6 +103,7 @@ class BiQuoteAdapter implements MarketDataProviderAdapter {
   private statusMessage = "BiQuote is disconnected.";
   private readonly marketStates = new Map<string, { state: string; quoteAgeSeconds: number | null }>();
   private readonly waiters = new Set<(quote: NormalizedProviderQuote) => void>();
+  private catalogCache: { expiresAt: number; items: BiQuoteCatalogItem[] } | null = null;
 
   async connect() {
     if (this.connection?.state === "Connected" || this.connection?.state === "Connecting") return;
@@ -177,6 +193,49 @@ class BiQuoteAdapter implements MarketDataProviderAdapter {
 
   async connectionState() {
     return { state: this.state, message: this.statusMessage };
+  }
+
+  async catalog(): Promise<BiQuoteCatalogItem[]> {
+    if (this.catalogCache && this.catalogCache.expiresAt > Date.now()) return this.catalogCache.items;
+
+    const query = new URLSearchParams({
+      activeOnly: "true",
+      quotedWithinDays: "7",
+    });
+    const symbols = await biquoteJson<Array<{
+      name?: unknown;
+      description?: unknown;
+      exchange?: unknown;
+      type?: unknown;
+      tickSize?: unknown;
+      contractSize?: unknown;
+      currency?: unknown;
+      isActive?: unknown;
+      hasData?: unknown;
+    }>>("/api/symbols", query);
+
+    const items = symbols
+      .filter((symbol): symbol is typeof symbol & { name: string; type: BiQuoteCatalogType } =>
+        typeof symbol.name === "string"
+        && BIQUOTE_CATALOG_TYPES.includes(symbol.type as BiQuoteCatalogType)
+        && symbol.isActive === true
+        && symbol.hasData === true,
+      )
+      .map(symbol => ({
+        providerSymbol: symbol.name.toUpperCase(),
+        displayName: symbol.name.toUpperCase(),
+        assetClass: symbol.type,
+        instrumentType: symbol.type.toLowerCase() as BiQuoteCatalogItem["instrumentType"],
+        venue: typeof symbol.exchange === "string" ? symbol.exchange : null,
+        quoteCurrency: typeof symbol.currency === "string" ? symbol.currency : null,
+        tickSize: finiteNumber(symbol.tickSize),
+        contractMultiplier: finiteNumber(symbol.contractSize),
+        description: typeof symbol.description === "string" ? symbol.description : null,
+      }))
+      .sort((a, b) => a.providerSymbol.localeCompare(b.providerSymbol));
+
+    this.catalogCache = { expiresAt: Date.now() + 60_000, items };
+    return items;
   }
 
   async candles(request: ProviderCandleRequest): Promise<NormalizedCandle[]> {

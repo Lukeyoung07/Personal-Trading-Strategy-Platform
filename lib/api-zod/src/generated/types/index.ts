@@ -6,12 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './addBiQuoteMarketInput';
 export * from './alert';
 export * from './alertInput';
 export * from './alertInputStatus';
 export * from './alertStatus';
 export * from './alertUpdate';
 export * from './alertUpdateStatus';
+export * from './biQuoteCatalogItem';
+export * from './biQuoteCatalogItemAssetClass';
+export * from './biQuoteCatalogItemInstrumentType';
+export * from './biQuoteMarketResult';
 export * from './candle';
 export * from './condition';
 export * from './conditionInput';

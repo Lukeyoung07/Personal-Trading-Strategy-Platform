@@ -1,10 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MarketMonitor } from "./market-monitor";
+import { AddMarketTab, MarketMonitor } from "./market-monitor";
 
 const eventSources = vi.hoisted(() => [] as FakeEventSource[]);
+const addMarketMutate = vi.hoisted(() => vi.fn());
 
 class FakeEventSource {
   static readonly OPEN = 1;
@@ -47,16 +48,37 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("@workspace/api-client-react", () => ({
   useGetMarketDataSummary: () => ({ data: { instrumentCount: 1, sourceCount: 1, timeframeCount: 1, candleCount: 1, connectedSourceCount: 1, latestDataAt: null } }),
+  getGetMarketDataSummaryQueryKey: () => ["market-data-summary"],
   useListInstruments: () => ({ data: [{ id: 18, symbol: "EURUSD", displayName: "Euro / US Dollar", assetClass: "Forex", instrumentType: "forex", isActive: true }], isLoading: false, isError: false, refetch: vi.fn() }),
+  getListInstrumentsQueryKey: () => ["instruments"],
   useListMarketDataSources: () => ({ data: [{ id: 5, name: "BiQuote", providerKey: "biquote", sourceType: "websocket", capabilities: ["realtime", "candles", "historical"], configurationStatus: "configured", isEnabled: true }], isLoading: false, isError: false, refetch: vi.fn() }),
   useListTimeframes: () => ({ data: [{ id: 20, code: "1h", label: "1 hour", durationSeconds: 3600 }], isLoading: false, isError: false, refetch: vi.fn() }),
+  useGetBiQuoteCatalog: () => ({
+    data: [
+      { providerSymbol: "EURUSD", sourceName: "BiQuote", displayName: "EURUSD", assetClass: "Forex", instrumentType: "forex", venue: "FOREX", quoteCurrency: "USD", tickSize: 0.00001, contractMultiplier: 100000, description: "Euro / US Dollar" },
+      { providerSymbol: "XAUUSD", sourceName: "BiQuote", displayName: "XAUUSD", assetClass: "Commodity", instrumentType: "commodity", venue: "COMEX", quoteCurrency: "USD", tickSize: 0.01, contractMultiplier: 100, description: "Gold / US Dollar" },
+    ],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useAddBiQuoteMarket: () => ({ isPending: false, isError: false, mutate: addMarketMutate }),
   useListCandles: () => ({ data: [{ id: 1, openTime: "2026-09-10T01:00:00.000Z", open: 1.1, high: 1.2, low: 1.05, close: 1.15, isClosed: true }], isLoading: false, isError: false, refetch: vi.fn() }),
   useRefreshMarketDataCandles: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
   getListCandlesQueryKey: (params: unknown) => ["candles", params],
+  getListSourceInstrumentMappingsQueryKey: () => ["mappings"],
 }));
 
 beforeEach(() => {
   eventSources.length = 0;
+  addMarketMutate.mockReset();
+  addMarketMutate.mockImplementation((_request: unknown, options: { onSuccess?: (result: unknown) => void }) => {
+    options.onSuccess?.({
+      instrument: { id: 19 },
+      mapping: { id: 9 },
+      timeframe: { id: 20 },
+    });
+  });
   vi.stubGlobal("EventSource", FakeEventSource);
 });
 
@@ -146,5 +168,26 @@ describe("Market Monitor live state", () => {
     stream.fail();
     expect(await screen.findByText("DISCONNECTED")).toBeInTheDocument();
     expect(screen.queryByText("LIVE")).not.toBeInTheDocument();
+  });
+
+  it("searches only the supported catalog and submits the selected timeframe", async () => {
+    const onAdded = vi.fn();
+    render(<AddMarketTab onAdded={onAdded} />);
+
+    fireEvent.change(screen.getByTestId("select-market-category"), { target: { value: "Commodities" } });
+    fireEvent.change(screen.getByTestId("input-search-supported-instruments"), { target: { value: "gold" } });
+
+    await waitFor(() => expect(screen.getByRole("option", { name: /XAUUSD.*Gold/ })).toBeInTheDocument());
+    expect(screen.queryByRole("option", { name: /EURUSD/ })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("select-supported-instrument"), { target: { value: "XAUUSD" } });
+    fireEvent.change(screen.getByTestId("select-market-timeframe"), { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add Market" }));
+
+    expect(addMarketMutate).toHaveBeenCalledWith(
+      { data: { providerSymbol: "XAUUSD", timeframeId: 20 } },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    expect(onAdded).toHaveBeenCalled();
   });
 });

@@ -15,10 +15,31 @@ import {
   useGetMarketDataSummary, getGetMarketDataSummaryQueryKey,
   getListMarketsQueryKey,
   useListSourceInstrumentMappings, useCreateSourceInstrumentMapping, useUpdateSourceInstrumentMapping, useDeleteSourceInstrumentMapping, getListSourceInstrumentMappingsQueryKey,
-  type Instrument, type MarketDataSource, type Timeframe, type MarketDataConnection, type Candle, type MarketDataSummary, type SourceInstrumentMapping
+  useGetBiQuoteCatalog, useAddBiQuoteMarket,
+  type Instrument, type MarketDataSource, type Timeframe, type MarketDataConnection, type Candle, type MarketDataSummary, type SourceInstrumentMapping, type BiQuoteCatalogItem, type BiQuoteMarketResult
 } from "@workspace/api-client-react";
 
 type Tab = "live-chart" | "instruments" | "sources" | "mappings" | "timeframes" | "connections" | "candles";
+const MARKET_SELECTION_STORAGE_KEY = "market-monitor-selection";
+const MARKET_CATEGORIES = ["Futures", "Forex", "Stocks", "Indices", "Commodities", "Crypto"] as const;
+type MarketCategory = typeof MARKET_CATEGORIES[number];
+
+function readSavedMarketSelection() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(MARKET_SELECTION_STORAGE_KEY) ?? "null");
+    return {
+      instrumentId: typeof saved?.instrumentId === "number" ? saved.instrumentId : null,
+      timeframeId: typeof saved?.timeframeId === "number" ? saved.timeframeId : null,
+    };
+  } catch {
+    return { instrumentId: null, timeframeId: null };
+  }
+}
+
+function saveMarketSelection(instrumentId: number | "", timeframeId: number | "") {
+  if (instrumentId === "" || timeframeId === "") return;
+  window.localStorage.setItem(MARKET_SELECTION_STORAGE_KEY, JSON.stringify({ instrumentId, timeframeId }));
+}
 
 export function MarketMonitor() {
   const [tab, setTab] = useState<Tab>("live-chart");
@@ -58,21 +79,14 @@ export function MarketMonitor() {
 
       <div className="panel p-1 flex overflow-x-auto gap-1 mb-5">
         <TabButton current={tab} id="live-chart" icon={CandlestickChart} label="Live Chart" onClick={setTab} />
-        <TabButton current={tab} id="instruments" icon={BarChart3} label="Instruments" onClick={setTab} />
-        <TabButton current={tab} id="sources" icon={Database} label="Sources" onClick={setTab} />
-        <TabButton current={tab} id="mappings" icon={Link2} label="Mappings" onClick={setTab} />
-        <TabButton current={tab} id="timeframes" icon={Clock} label="Timeframes" onClick={setTab} />
-        <TabButton current={tab} id="connections" icon={Network} label="Connections" onClick={setTab} />
-        <TabButton current={tab} id="candles" icon={DatabaseZap} label="Candles" onClick={setTab} />
+         <TabButton current={tab} id="instruments" icon={Plus} label="Add Market" onClick={setTab} />
       </div>
 
-      {tab === "live-chart" && <LiveChartTab />}
-      {tab === "instruments" && <InstrumentsTab />}
-      {tab === "sources" && <SourcesTab />}
-      {tab === "mappings" && <MappingsTab />}
-      {tab === "timeframes" && <TimeframesTab />}
-      {tab === "connections" && <ConnectionsTab />}
-      {tab === "candles" && <CandlesTab />}
+      {tab === "live-chart" && <LiveChartTab onAddMarket={() => setTab("instruments")} />}
+      {tab === "instruments" && <AddMarketTab onAdded={(result) => {
+        saveMarketSelection(result.instrument.id, result.timeframe.id);
+        setTab("live-chart");
+      }} />}
     </div>
   );
 }
@@ -130,7 +144,7 @@ type FormingCandle = {
   isClosed: false;
 };
 
-function LiveChartTab() {
+function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
   const instruments = useListInstruments();
   const sources = useListMarketDataSources();
   const timeframes = useListTimeframes();
@@ -154,14 +168,36 @@ function LiveChartTab() {
     }
   }, [sourceId, sources.data]);
   useEffect(() => {
-    if (instrumentId === "" && instruments.data?.length) setInstrumentId(instruments.data[0].id);
+    if (!instruments.data?.length) {
+      setInstrumentId(previous => previous === "" ? previous : "");
+      setTimeframeId(previous => previous === "" ? previous : "");
+      window.localStorage.removeItem(MARKET_SELECTION_STORAGE_KEY);
+    }
+  }, [instruments.data]);
+  useEffect(() => {
+    if (instrumentId !== "" || !instruments.data?.length) return;
+    const saved = readSavedMarketSelection();
+    setInstrumentId(
+      saved.instrumentId != null && instruments.data.some(item => item.id === saved.instrumentId)
+        ? saved.instrumentId
+        : instruments.data[0].id,
+    );
   }, [instrumentId, instruments.data]);
   useEffect(() => {
-    if (timeframeId === "" && timeframes.data?.length) {
-      const hourly = timeframes.data.find(timeframe => timeframe.code === "1h") ?? timeframes.data[0];
-      setTimeframeId(hourly.id);
-    }
+    if (timeframeId !== "" || !timeframes.data?.length) return;
+    const saved = readSavedMarketSelection();
+    const savedTimeframe = saved.timeframeId != null
+      ? timeframes.data.find(timeframe => timeframe.id === saved.timeframeId && timeframe.isActive)
+      : undefined;
+    const hourly = timeframes.data.find(timeframe => timeframe.code === "1h" && timeframe.isActive)
+      ?? timeframes.data.find(timeframe => timeframe.isActive)
+      ?? timeframes.data[0];
+    setTimeframeId(savedTimeframe?.id ?? hourly.id);
   }, [timeframeId, timeframes.data]);
+
+  useEffect(() => {
+    saveMarketSelection(instrumentId, timeframeId);
+  }, [instrumentId, timeframeId]);
 
   const ready = sourceId !== "" && instrumentId !== "" && timeframeId !== "";
   const selectedTimeframe = timeframes.data?.find(timeframe => timeframe.id === timeframeId);
@@ -278,6 +314,16 @@ function LiveChartTab() {
 
   if (instruments.isLoading || sources.isLoading || timeframes.isLoading) return <LoadingBlock />;
   if (instruments.isError || sources.isError || timeframes.isError) return <ErrorBlock retry={() => { instruments.refetch(); sources.refetch(); timeframes.refetch(); }} />;
+  if (!instruments.data?.length) {
+    return (
+      <EmptyState
+        icon={BarChart3}
+        title="No markets added yet"
+        text="Choose a supported BiQuote market to start watching genuine candles and live quotes."
+        action={<button className="btn btn-primary" onClick={onAddMarket}><Plus size={14} /> Add Market</button>}
+      />
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -433,7 +479,157 @@ function ErrorBlock({ retry }: { retry: () => void }) {
   return <div className="panel p-10 text-center"><AlertTriangle size={19} className="text-destructive mx-auto" /><p className="text-sm text-muted-foreground mt-3">This market-data section could not be loaded.</p><button className="btn btn-secondary mt-4" onClick={retry}>Try again</button></div>;
 }
 
-// INSTRUMENTS
+export function AddMarketTab({ onAdded }: { onAdded: (result: BiQuoteMarketResult) => void }) {
+  const catalog = useGetBiQuoteCatalog();
+  const timeframes = useListTimeframes();
+  const instruments = useListInstruments();
+  const addMarket = useAddBiQuoteMarket();
+  const qc = useQueryClient();
+  const [category, setCategory] = useState<MarketCategory>("Forex");
+  const [search, setSearch] = useState("");
+  const [providerSymbol, setProviderSymbol] = useState("");
+  const [timeframeId, setTimeframeId] = useState<number | "">("");
+
+  useEffect(() => {
+    if (timeframeId !== "" || !timeframes.data?.length) return;
+    const preferred = timeframes.data.find(timeframe => timeframe.code === "5m" && timeframe.isActive)
+      ?? timeframes.data.find(timeframe => timeframe.isActive)
+      ?? timeframes.data[0];
+    setTimeframeId(preferred.id);
+  }, [timeframeId, timeframes.data]);
+
+  const categoryType = category === "Stocks"
+    ? "Stock"
+    : category === "Indices"
+      ? "Index"
+      : category === "Commodities"
+        ? "Commodity"
+        : category === "Crypto"
+          ? "Crypto"
+          : category === "Forex"
+            ? "Forex"
+            : null;
+  const results = (catalog.data ?? []).filter(item =>
+    item.assetClass === categoryType
+    && `${item.providerSymbol} ${item.displayName} ${item.description ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+
+  useEffect(() => {
+    if (!results.some(item => item.providerSymbol === providerSymbol)) {
+      setProviderSymbol(results[0]?.providerSymbol ?? "");
+    }
+  }, [providerSymbol, results]);
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (providerSymbol === "" || timeframeId === "") return;
+    addMarket.mutate({
+      data: { providerSymbol, timeframeId: Number(timeframeId) },
+    }, {
+      onSuccess: result => {
+        saveMarketSelection(result.instrument.id, result.timeframe.id);
+        qc.invalidateQueries({ queryKey: getListInstrumentsQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetMarketDataSummaryQueryKey() });
+        qc.invalidateQueries({ queryKey: getListSourceInstrumentMappingsQueryKey() });
+        onAdded(result);
+      },
+    });
+  };
+
+  if (catalog.isLoading || timeframes.isLoading || instruments.isLoading) return <LoadingBlock />;
+  if (catalog.isError || timeframes.isError || instruments.isError) {
+    return <ErrorBlock retry={() => { catalog.refetch(); timeframes.refetch(); instruments.refetch(); }} />;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="panel p-5 md:p-6">
+        <div className="eyebrow mb-2">Add market</div>
+        <h2 className="text-xl font-semibold">Choose a market to monitor</h2>
+        <p className="text-sm text-muted-foreground mt-2 max-w-2xl leading-relaxed">
+          Select from instruments currently supported by BiQuote. Provider symbols and mappings are configured automatically.
+        </p>
+
+        <form onSubmit={submit} className="space-y-5 mt-6">
+          <Field label="Market type">
+            <select className="select" value={category} onChange={event => {
+              setCategory(event.target.value as MarketCategory);
+              setProviderSymbol("");
+            }} data-testid="select-market-category">
+              {MARKET_CATEGORIES.map(item => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Search instruments">
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />
+              <input
+                className="input pl-9"
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+                placeholder={category === "Futures" ? "Futures are not currently available through BiQuote" : "Search by symbol or name, e.g. gold"}
+                data-testid="input-search-supported-instruments"
+              />
+            </div>
+          </Field>
+
+          <Field label="Instrument" hint={category === "Futures" ? "BiQuote does not currently publish supported futures in its catalog." : `${results.length} supported instrument${results.length === 1 ? "" : "s"}`}>
+            <select className="select" value={providerSymbol} onChange={event => setProviderSymbol(event.target.value)} disabled={!results.length} data-testid="select-supported-instrument">
+              <option value="">{results.length ? "Choose an instrument…" : "No supported instruments found"}</option>
+              {results.map(item => (
+                <option key={item.providerSymbol} value={item.providerSymbol}>
+                  {item.providerSymbol} — {item.description ?? item.displayName}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Timeframe">
+            <select className="select" value={timeframeId} onChange={event => setTimeframeId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-timeframe">
+              <option value="">Choose a timeframe…</option>
+              {(timeframes.data ?? []).filter(timeframe => timeframe.isActive).map(timeframe => (
+                <option key={timeframe.id} value={timeframe.id}>{timeframe.label} ({timeframe.code})</option>
+              ))}
+            </select>
+          </Field>
+
+          {addMarket.isError && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              {addMarket.error instanceof Error ? addMarket.error.message : "This market could not be added."}
+            </div>
+          )}
+          <button className="btn btn-primary w-full sm:w-auto" type="submit" disabled={!providerSymbol || timeframeId === "" || addMarket.isPending}>
+            <Plus size={14} /> {addMarket.isPending ? "Adding market…" : "Add Market"}
+          </button>
+        </form>
+      </div>
+
+      <div className="panel p-5">
+        <div className="eyebrow mb-2">Your markets</div>
+        <h2 className="font-semibold">Markets currently available in Monitor</h2>
+        {!instruments.data?.length ? (
+          <p className="text-sm text-muted-foreground mt-3">No markets added yet.</p>
+        ) : (
+          <div className="divide-y divide-border mt-3">
+            {instruments.data.map(instrument => (
+              <div key={instrument.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-3">
+                <div>
+                  <div className="font-semibold mono">{instrument.symbol}</div>
+                  <div className="text-xs text-muted-foreground">{instrument.displayName ?? instrument.assetClass}</div>
+                </div>
+                <span className="tag tag-open">{instrument.assetClass}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// LEGACY TECHNICAL CATALOG
 function InstrumentsTab() {
   const q = useListInstruments();
   const create = useCreateInstrument();

@@ -1117,6 +1117,79 @@ export const CreateInstrumentResponse = zod.object({
 
 
 /**
+ * @summary List currently supported BiQuote instruments
+ */
+export const GetBiQuoteCatalogResponseItem = zod.object({
+  "providerSymbol": zod.string(),
+  "sourceName": zod.string(),
+  "displayName": zod.string(),
+  "assetClass": zod.enum(['Forex', 'Stock', 'Index', 'Commodity', 'Crypto']),
+  "instrumentType": zod.enum(['forex', 'stock', 'index', 'commodity', 'crypto']),
+  "venue": zod.string().nullable(),
+  "quoteCurrency": zod.string().nullable(),
+  "tickSize": zod.number().nullable(),
+  "contractMultiplier": zod.number().nullable(),
+  "description": zod.string().nullable()
+})
+export const GetBiQuoteCatalogResponse = zod.array(GetBiQuoteCatalogResponseItem)
+
+
+/**
+ * @summary Add a supported BiQuote market
+ */
+
+
+
+
+export const AddBiQuoteMarketBody = zod.object({
+  "providerSymbol": zod.string().min(1),
+  "timeframeId": zod.number().int().min(1)
+})
+
+export const AddBiQuoteMarketResponse = zod.object({
+  "instrument": zod.object({
+  "id": zod.number().int(),
+  "assetClass": zod.string(),
+  "instrumentType": zod.enum(['future', 'forex', 'stock', 'index', 'commodity', 'crypto', 'other']),
+  "venue": zod.string().nullable(),
+  "symbol": zod.string(),
+  "displayName": zod.string().nullable(),
+  "baseCurrency": zod.string().nullable(),
+  "quoteCurrency": zod.string().nullable(),
+  "exchangeTimezone": zod.string().nullable(),
+  "tickSize": zod.number().nullable(),
+  "contractMultiplier": zod.number().nullable(),
+  "expiry": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "description": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "mapping": zod.object({
+  "id": zod.number().int(),
+  "sourceId": zod.number().int(),
+  "sourceName": zod.string(),
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "providerSymbol": zod.string(),
+  "providerMetadata": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "timeframe": zod.object({
+  "id": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "durationSeconds": zod.number().int(),
+  "description": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+})
+
+
+/**
  * @summary Update a provider-neutral instrument
  */
 

@@ -123,6 +123,51 @@ describe("BiQuote adapter", () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain("/api/EURUSD/ohlc?interval=1h&limit=20");
   });
 
+  it("returns only active catalog instruments with recent provider data", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify([
+      {
+        name: "EURUSD",
+        description: "Euro / US Dollar",
+        exchange: "FOREX",
+        type: "Forex",
+        tickSize: 0.00001,
+        contractSize: 100000,
+        currency: "USD",
+        isActive: true,
+        hasData: true,
+      },
+      {
+        name: "OLD",
+        description: "No longer quoted",
+        exchange: "FOREX",
+        type: "Forex",
+        isActive: true,
+        hasData: false,
+      },
+      {
+        name: "FUTURE",
+        description: "Unsupported category",
+        exchange: "CME",
+        type: "Future",
+        isActive: true,
+        hasData: true,
+      },
+    ]), { status: 200, headers: { "content-type": "application/json" } }));
+
+    await expect(biQuoteAdapter.catalog()).resolves.toEqual([{
+      providerSymbol: "EURUSD",
+      displayName: "EURUSD",
+      assetClass: "Forex",
+      instrumentType: "forex",
+      venue: "FOREX",
+      quoteCurrency: "USD",
+      tickSize: 0.00001,
+      contractMultiplier: 100000,
+      description: "Euro / US Dollar",
+    }]);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/symbols?activeOnly=true&quotedWithinDays=7");
+  });
+
   it("rejects unsupported timeframes, unsupported symbols, and invalid provider messages", async () => {
     await expect(biQuoteAdapter.candles({
       providerSymbol: "EURUSD",

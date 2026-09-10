@@ -572,6 +572,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Instrument"
+  /market-data/biquote/catalog:
+    get:
+      operationId: getBiQuoteCatalog
+      tags: [market-data]
+      summary: List currently supported BiQuote instruments
+      responses:
+        "200":
+          description: BiQuote-supported instrument catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BiQuoteCatalogItem"
+  /market-data/biquote/markets:
+    post:
+      operationId: addBiQuoteMarket
+      tags: [market-data]
+      summary: Add a supported BiQuote market
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddBiQuoteMarketInput"
+      responses:
+        "201":
+          description: Added or reused BiQuote market
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BiQuoteMarketResult"
   /instruments/{instrumentId}:
     patch:
       operationId: updateInstrument
@@ -1588,6 +1620,40 @@ components:
         expiry: { type: ["string", "null"] }
         isActive: { type: boolean }
         description: { type: ["string", "null"] }
+    BiQuoteCatalogItem:
+      type: object
+      required: [providerSymbol, sourceName, displayName, assetClass, instrumentType, venue, quoteCurrency, tickSize, contractMultiplier, description]
+      properties:
+        providerSymbol: { type: string }
+        sourceName: { type: string }
+        displayName: { type: string }
+        assetClass:
+          type: string
+          enum: [Forex, Stock, Index, Commodity, Crypto]
+        instrumentType:
+          type: string
+          enum: [forex, stock, index, commodity, crypto]
+        venue: { type: ["string", "null"] }
+        quoteCurrency: { type: ["string", "null"] }
+        tickSize: { type: ["number", "null"] }
+        contractMultiplier: { type: ["number", "null"] }
+        description: { type: ["string", "null"] }
+    AddBiQuoteMarketInput:
+      type: object
+      required: [providerSymbol, timeframeId]
+      properties:
+        providerSymbol: { type: string, minLength: 1 }
+        timeframeId: { type: integer, minimum: 1 }
+    BiQuoteMarketResult:
+      type: object
+      required: [instrument, mapping, timeframe]
+      properties:
+        instrument:
+          $ref: "#/components/schemas/Instrument"
+        mapping:
+          $ref: "#/components/schemas/SourceInstrumentMapping"
+        timeframe:
+          $ref: "#/components/schemas/Timeframe"
     MarketDataSource:
       type: object
       required: [id, name, providerKey, sourceType, description, capabilities, configurationStatus, isEnabled, createdAt, updatedAt]

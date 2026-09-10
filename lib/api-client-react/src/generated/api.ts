@@ -20,9 +20,12 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AddBiQuoteMarketInput,
   Alert,
   AlertInput,
   AlertUpdate,
+  BiQuoteCatalogItem,
+  BiQuoteMarketResult,
   Candle,
   Condition,
   ConditionInput,
@@ -2611,6 +2614,154 @@ export const useCreateInstrument = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateInstrumentMutationOptions(options));
+    }
+
+export const getGetBiQuoteCatalogUrl = () => {
+
+
+
+
+  return `/api/market-data/biquote/catalog`
+}
+
+/**
+ * @summary List currently supported BiQuote instruments
+ */
+export const getBiQuoteCatalog = async ( options?: Parameters<typeof customFetch>[1]): Promise<BiQuoteCatalogItem[]> => {
+
+  return customFetch<BiQuoteCatalogItem[]>(getGetBiQuoteCatalogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBiQuoteCatalogQueryKey = () => {
+    return [
+    `/api/market-data/biquote/catalog`
+    ] as const;
+    }
+
+
+export const getGetBiQuoteCatalogQueryOptions = <TData = Awaited<ReturnType<typeof getBiQuoteCatalog>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBiQuoteCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBiQuoteCatalogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBiQuoteCatalog>>> = ({ signal }) => getBiQuoteCatalog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBiQuoteCatalog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBiQuoteCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof getBiQuoteCatalog>>>
+export type GetBiQuoteCatalogQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List currently supported BiQuote instruments
+ */
+
+export function useGetBiQuoteCatalog<TData = Awaited<ReturnType<typeof getBiQuoteCatalog>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBiQuoteCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBiQuoteCatalogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAddBiQuoteMarketUrl = () => {
+
+
+
+
+  return `/api/market-data/biquote/markets`
+}
+
+/**
+ * @summary Add a supported BiQuote market
+ */
+export const addBiQuoteMarket = async (addBiQuoteMarketInput: AddBiQuoteMarketInput, options?: Parameters<typeof customFetch>[1]): Promise<BiQuoteMarketResult> => {
+
+  return customFetch<BiQuoteMarketResult>(getAddBiQuoteMarketUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(addBiQuoteMarketInput)
+  }
+);}
+
+
+
+
+
+export const getAddBiQuoteMarketMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addBiQuoteMarket>>, TError,{data: BodyType<AddBiQuoteMarketInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addBiQuoteMarket>>, TError,{data: BodyType<AddBiQuoteMarketInput>}, TContext> => {
+
+const mutationKey = ['addBiQuoteMarket'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addBiQuoteMarket>>, {data: BodyType<AddBiQuoteMarketInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  addBiQuoteMarket(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddBiQuoteMarketMutationResult = NonNullable<Awaited<ReturnType<typeof addBiQuoteMarket>>>
+    export type AddBiQuoteMarketMutationBody = BodyType<AddBiQuoteMarketInput>
+    export type AddBiQuoteMarketMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a supported BiQuote market
+ */
+export const useAddBiQuoteMarket = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addBiQuoteMarket>>, TError,{data: BodyType<AddBiQuoteMarketInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addBiQuoteMarket>>,
+        TError,
+        {data: BodyType<AddBiQuoteMarketInput>},
+        TContext
+      > => {
+      return useMutation(getAddBiQuoteMarketMutationOptions(options));
     }
 
 export const getUpdateInstrumentUrl = (instrumentId: number,) => {
