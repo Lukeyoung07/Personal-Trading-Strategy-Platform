@@ -1,0 +1,205 @@
+Do NOT use Trading Economics.
+
+Do NOT use an API key.
+
+Do NOT require any paid news or economic-calendar subscription.
+
+I want the News / Economic Calendar feature to obtain data from free public/official web sources without requiring an API.
+
+IMPORTANT:
+
+Do not rebuild the existing News / Economic Calendar foundation.
+
+Do not modify:
+- Strategy Builder
+- Strategy Library
+- Strategy Versioning
+- Trade Journal
+- BiQuote
+- Market Data Service
+- Live charts
+- Strategy Monitoring Engine
+
+The existing provider-neutral Economic Events architecture must remain intact.
+
+GOAL:
+
+Make the /news page capable of displaying genuine economic-calendar information using free public/official sources that can be accessed without an API.
+
+Prioritize official sources such as:
+
+- Federal Reserve
+- Bureau of Labor Statistics
+- BEA
+- Other official government/central-bank economic release calendars
+
+Only use sources whose published terms permit the intended retrieval and use.
+
+IMPORTANT:
+
+Do NOT scrape a website if its terms prohibit scraping or automated retrieval.
+
+Do NOT bypass:
+- CAPTCHAs
+- Login systems
+- Anti-bot systems
+- Rate limits
+- Access controls
+
+Do NOT fabricate events.
+
+Do NOT hard-code future events.
+
+Do NOT invent:
+- Forecasts
+- Previous values
+- Actual values
+- Impact levels
+- Dates
+- Times
+
+If a source does not provide a field, leave it empty/null.
+
+The application must clearly identify the source of each event.
+
+SOURCE ARCHITECTURE:
+
+Create a dedicated public-source adapter behind the existing provider-neutral Economic Events service.
+
+Do not hard-code source-specific logic throughout the frontend.
+
+The adapter should normalize available information into the existing event model:
+
+- Event name
+- Date/time
+- Region
+- Currency
+- Impact
+- Previous
+- Forecast
+- Actual
+- Release status
+- Source
+- Provider/source identifier where available
+
+IMPORTANT LIMITATION:
+
+Official sources may not provide every field, especially trader-style impact ratings and consensus forecasts.
+
+Do not invent these.
+
+If necessary, display:
+
+"Not provided by source"
+
+rather than creating fake values.
+
+IMPACT CLASSIFICATION:
+
+Where an official source provides enough information to determine importance, use a transparent rules-based classification.
+
+Otherwise, leave the impact as:
+
+"Not classified"
+
+Do not pretend that an official source supplied a HIGH/MEDIUM/LOW rating when it did not.
+
+MARKET MAPPINGS:
+
+Keep the existing event-to-market mapping system.
+
+Use conservative mappings based on the event's country/currency and known market relationships.
+
+Do not claim that an event will definitely move a market.
+
+For example, an official US inflation release may be marked as potentially relevant to:
+
+- USD
+- Gold
+- US indices
+
+but this should be treated as an informational market relevance mapping, not a trading prediction.
+
+NEWS PAGE:
+
+Keep the existing /news page and its current functionality:
+
+- Today
+- Upcoming
+- Recently released
+- All
+- Impact
+- Region
+- Currency
+- Affected market
+- Search
+
+Do not redesign the page.
+
+EMPTY/UNAVAILABLE STATES:
+
+If a public source cannot currently be accessed, clearly display that the source is unavailable.
+
+Never replace missing real data with fake sample data.
+
+If no usable free public source can be implemented reliably, stop and report that rather than creating a fake solution.
+
+COMMERCIAL FUTURE USE:
+
+This application may eventually become a paid public product.
+
+Therefore:
+
+- Do not knowingly use a source that prohibits redistribution of its data.
+- Clearly identify the source and any important usage restrictions.
+- Do not assume that "free to view" means "free to redistribute."
+
+For now this is personal development/testing.
+
+Do not build customer subscriptions or public redistribution functionality yet.
+
+VERIFICATION:
+
+After implementation:
+
+- Test retrieval from each implemented public source.
+- Test normalization.
+- Test duplicate prevention.
+- Test event updates.
+- Test dates and times.
+- Test source attribution.
+- Test missing fields.
+- Test unavailable-source handling.
+- Test filters.
+- Test search.
+- Test upcoming/released states.
+- Test desktop.
+- Test mobile.
+- Run existing Steps 1–7 regression tests.
+- Run existing BiQuote regression tests.
+- Run API/frontend typechecks.
+- Run production builds.
+
+Do not add:
+
+- AI
+- Trading signals
+- BUY/SELL recommendations
+- Alerts
+- Push notifications
+- Broker integrations
+- Automatic trading
+- Backtesting
+
+At the end report:
+
+1. Which public sources were successfully implemented.
+2. Whether they require an API key.
+3. Whether they cost £0.
+4. What information each source provides.
+5. What information is unavailable.
+6. Any important usage/licensing limitations.
+7. Whether genuine events successfully appear on /news.
+8. Any remaining limitations.
+
+Do not claim the system works if genuine source data has not been successfully retrieved.
