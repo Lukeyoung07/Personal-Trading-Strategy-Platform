@@ -2056,14 +2056,21 @@ export const ListBacktestsResponseItem = zod.object({
   "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
-  "status": zod.enum(['configured']),
+  "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "tradeCount": zod.number().int(),
+  "resultMessage": zod.string().nullable(),
+  "executionAssumptions": zod.string().nullable(),
+  "errorMessage": zod.string().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
 export const ListBacktestsResponse = zod.array(ListBacktestsResponseItem)
 
 
 /**
- * @summary Save a backtest configuration
+ * @summary Run a backtest from a configuration
  */
 
 
@@ -2094,9 +2101,118 @@ export const CreateBacktestResponse = zod.object({
   "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
-  "status": zod.enum(['configured']),
+  "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "tradeCount": zod.number().int(),
+  "resultMessage": zod.string().nullable(),
+  "executionAssumptions": zod.string().nullable(),
+  "errorMessage": zod.string().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Retrieve backtest status and assumptions
+ */
+
+
+
+export const GetBacktestParams = zod.object({
+  "backtestId": zod.coerce.number().int().min(1)
+})
+
+export const GetBacktestResponse = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "strategyName": zod.string(),
+  "strategyVersionId": zod.number().int(),
+  "versionNumber": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "timeframeId": zod.number().int(),
+  "timeframeLabel": zod.string(),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date(),
+  "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "tradeCount": zod.number().int(),
+  "resultMessage": zod.string().nullable(),
+  "executionAssumptions": zod.string().nullable(),
+  "errorMessage": zod.string().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Run an existing backtest configuration
+ */
+
+
+
+export const RunBacktestParams = zod.object({
+  "backtestId": zod.coerce.number().int().min(1)
+})
+
+export const RunBacktestResponse = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "strategyName": zod.string(),
+  "strategyVersionId": zod.number().int(),
+  "versionNumber": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "timeframeId": zod.number().int(),
+  "timeframeLabel": zod.string(),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date(),
+  "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "tradeCount": zod.number().int(),
+  "resultMessage": zod.string().nullable(),
+  "executionAssumptions": zod.string().nullable(),
+  "errorMessage": zod.string().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Retrieve simulated trades for a backtest
+ */
+
+
+
+export const ListBacktestTradesParams = zod.object({
+  "backtestId": zod.coerce.number().int().min(1)
+})
+
+export const ListBacktestTradesResponseItem = zod.object({
+  "id": zod.number().int(),
+  "backtestId": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "strategyVersionId": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "timeframeId": zod.number().int(),
+  "side": zod.enum(['long', 'short']),
+  "entryTime": zod.coerce.date(),
+  "entryPrice": zod.number(),
+  "stopLoss": zod.number().nullable(),
+  "takeProfit": zod.number().nullable(),
+  "exitTime": zod.coerce.date(),
+  "exitPrice": zod.number(),
+  "pnl": zod.number(),
+  "entryReason": zod.string(),
+  "exitReason": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListBacktestTradesResponse = zod.array(ListBacktestTradesResponseItem)
 
 
 /**

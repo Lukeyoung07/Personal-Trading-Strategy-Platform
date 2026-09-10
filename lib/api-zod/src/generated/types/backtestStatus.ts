@@ -11,4 +11,8 @@ export type BacktestStatus = typeof BacktestStatus[keyof typeof BacktestStatus];
 
 export const BacktestStatus = {
   configured: 'configured',
+  pending: 'pending',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
 } as const;

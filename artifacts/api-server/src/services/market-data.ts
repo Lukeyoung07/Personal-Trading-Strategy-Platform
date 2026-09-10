@@ -176,6 +176,58 @@ export class MarketDataService {
     return candles.length;
   }
 
+  async historicalCandles(request: CanonicalCandleRequest) {
+    const [{ adapter }, [mapping], [timeframe]] = await Promise.all([
+      this.resolveSourceAdapter(request.sourceId),
+      db.select().from(sourceInstrumentMappingsTable).where(and(
+        eq(sourceInstrumentMappingsTable.sourceId, request.sourceId),
+        eq(sourceInstrumentMappingsTable.instrumentId, request.instrumentId),
+      )),
+      db.select().from(timeframesTable).where(eq(timeframesTable.id, request.timeframeId)),
+    ]);
+    if (!mapping) throw new Error("No provider-symbol mapping exists for this source and instrument");
+    if (!timeframe) throw new Error("Timeframe not found");
+    if (!adapter.capabilities.includes("historical")) {
+      throw new Error("The selected market-data provider does not support historical candles");
+    }
+
+    const totalLimit = request.limit ?? 200_000;
+    const collected = new Map<number, NormalizedCandle>();
+    let cursor = request.from;
+    let batches = 0;
+    while (collected.size < totalLimit && batches < 2_000) {
+      const batch = await adapter.candles({
+        providerSymbol: mapping.providerSymbol,
+        timeframeCode: timeframe.code,
+        from: cursor,
+        to: request.to,
+        limit: Math.min(1_000, totalLimit - collected.size),
+      });
+      batch.forEach(validateCandle);
+      const filteredBatch = batch.filter(candle => (!request.from || candle.openTime >= request.from!)
+        && (!request.to || candle.openTime <= request.to!));
+      const before = collected.size;
+      filteredBatch.forEach(candle => {
+        const timestamp = candle.openTime.getTime();
+        if (collected.has(timestamp)) throw new Error("Historical provider data contains duplicate candle timestamps");
+        collected.set(timestamp, candle);
+      });
+      const latest = filteredBatch.reduce<Date | null>((value, candle) => !value || candle.openTime > value ? candle.openTime : value, null);
+      if (!latest || collected.size === before || !request.to || latest >= request.to || batch.length < 1_000) break;
+      cursor = new Date(latest.getTime() + timeframe.durationSeconds * 1_000);
+      batches += 1;
+    }
+    const filtered = [...collected.values()]
+      .sort((a, b) => a.openTime.getTime() - b.openTime.getTime());
+    const seen = new Set<number>();
+    for (const candle of filtered) {
+      const timestamp = candle.openTime.getTime();
+      if (seen.has(timestamp)) throw new Error("Historical provider data contains duplicate candle timestamps");
+      seen.add(timestamp);
+    }
+    return filtered;
+  }
+
   async *streamQuotes(request: CanonicalQuoteRequest): AsyncIterable<CanonicalQuote> {
     const [{ adapter }, [mapping]] = await Promise.all([
       this.resolveSourceAdapter(request.sourceId),

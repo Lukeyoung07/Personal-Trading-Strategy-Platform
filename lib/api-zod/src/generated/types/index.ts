@@ -18,6 +18,8 @@ export * from './backtestInput';
 export * from './backtestInputPreset';
 export * from './backtestPreset';
 export * from './backtestStatus';
+export * from './backtestTrade';
+export * from './backtestTradeSide';
 export * from './biQuoteCatalogItem';
 export * from './biQuoteCatalogItemAssetClass';
 export * from './biQuoteCatalogItemInstrumentType';

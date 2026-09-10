@@ -246,7 +246,7 @@ function Backtesting() {
   };
   const chosenVersion = versions.data?.find(version => version.id === versionId);
 
-  return <Page eyebrow="Utilities" title="Backtesting" description="Configure a historical review from your saved strategy versions. Results are not calculated yet.">
+  return <Page eyebrow="Utilities" title="Backtesting" description="Run a historical review from your saved strategy versions using genuine provider candles.">
     <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5">
       <form className="panel p-6 md:p-8 space-y-6" onSubmit={save}>
         <div>
@@ -292,20 +292,21 @@ function Backtesting() {
           <Field label="End date"><input className="input" type="date" value={endDate} onChange={event => setEndDate(event.target.value)} required data-testid="input-backtest-end-date" /></Field>
         </div>}
         <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
-          <p className="text-xs text-muted-foreground">Part 1 saves the setup only. No trades or performance are generated.</p>
+          <p className="text-xs text-muted-foreground">The server evaluates completed candles chronologically and saves simulated trades separately from the journal.</p>
           <button className="btn btn-primary whitespace-nowrap" type="submit" disabled={create.isPending || strategies.isLoading || markets.isLoading || timeframes.isLoading}>{create.isPending ? "Saving…" : "Run Backtest"}</button>
         </div>
-        {create.isSuccess && <p className="text-sm text-primary">Backtest configuration saved. The engine is not active yet.</p>}
-        {create.isError && <p className="text-sm text-destructive">Could not save this configuration. Check the selected dates and try again.</p>}
+        {create.isSuccess && create.data?.status === "completed" && <p className="text-sm text-primary">Backtest completed: {create.data.candlesProcessed} candles processed and {create.data.tradeCount} simulated trades saved. {create.data.resultMessage}</p>}
+        {create.isSuccess && create.data?.status === "failed" && <p className="text-sm text-destructive">Backtest failed: {create.data.errorMessage || "Historical data or strategy rules were not available."}</p>}
+        {create.isError && <p className="text-sm text-destructive">Could not start this backtest. Check the selected dates and try again.</p>}
       </form>
       <div className="space-y-5">
         <div className="panel p-6">
           <div className="eyebrow">Saved setups</div>
-          {saved.isLoading ? <LoadingBlock /> : saved.data?.length ? <div className="mt-4 space-y-3">{saved.data.slice(0, 5).map((backtest: Backtest) => <div className="rounded-md bg-secondary/60 p-3" key={backtest.id} data-testid={`row-backtest-${backtest.id}`}><div className="flex items-center justify-between gap-3"><span className="font-semibold text-sm">{backtest.strategyName} · v{backtest.versionNumber}</span><span className="tag tag-draft">{backtest.status}</span></div><div className="text-xs text-muted-foreground mt-2">{backtest.instrumentSymbol} · {backtest.timeframeLabel}</div><div className="text-xs text-muted-foreground mt-1">{formatDate(backtest.startDate)} – {formatDate(backtest.endDate)}</div></div>)}</div> : <p className="text-sm text-muted-foreground mt-4">No configurations saved yet.</p>}
+          {saved.isLoading ? <LoadingBlock /> : saved.data?.length ? <div className="mt-4 space-y-3">{saved.data.slice(0, 5).map((backtest: Backtest) => <div className="rounded-md bg-secondary/60 p-3" key={backtest.id} data-testid={`row-backtest-${backtest.id}`}><div className="flex items-center justify-between gap-3"><span className="font-semibold text-sm">{backtest.strategyName} · v{backtest.versionNumber}</span><span className="tag tag-active">{backtest.status}</span></div><div className="text-xs text-muted-foreground mt-2">{backtest.instrumentSymbol} · {backtest.timeframeLabel}</div><div className="text-xs text-muted-foreground mt-1">{formatDate(backtest.startDate)} – {formatDate(backtest.endDate)}</div><div className="text-xs text-muted-foreground mt-1">{backtest.candlesProcessed} candles · {backtest.tradeCount} simulated trades</div>{backtest.status === "failed" && backtest.errorMessage && <div className="text-xs text-destructive mt-2">{backtest.errorMessage}</div>}{backtest.status === "completed" && backtest.resultMessage && <div className="text-xs text-muted-foreground mt-2">{backtest.resultMessage}</div>}</div>)}</div> : <p className="text-sm text-muted-foreground mt-4">No backtests run yet.</p>}
         </div>
         <div className="panel p-6">
           <div className="eyebrow">What happens next</div>
-          <p className="text-sm text-muted-foreground leading-relaxed mt-4">This setup is saved against your immutable strategy version and selected instrument. Historical candles, simulated trades, and performance calculations will be added in a later part.</p>
+          <p className="text-sm text-muted-foreground leading-relaxed mt-4">This run stays tied to your immutable strategy version and selected instrument. Historical candles and simulated trades are saved here; performance analysis will be added later.</p>
         </div>
       </div>
     </div>

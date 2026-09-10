@@ -1628,6 +1628,10 @@ export type BacktestStatus = typeof BacktestStatus[keyof typeof BacktestStatus];
 
 export const BacktestStatus = {
   configured: 'configured',
+  pending: 'pending',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
 } as const;
 
 export interface Backtest {
@@ -1644,6 +1648,48 @@ export interface Backtest {
   startDate: string;
   endDate: string;
   status: BacktestStatus;
+  candlesProcessed: number;
+  tradeCount: number;
+  /** @nullable */
+  resultMessage: string | null;
+  /** @nullable */
+  executionAssumptions: string | null;
+  /** @nullable */
+  errorMessage: string | null;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export type BacktestTradeSide = typeof BacktestTradeSide[keyof typeof BacktestTradeSide];
+
+
+export const BacktestTradeSide = {
+  long: 'long',
+  short: 'short',
+} as const;
+
+export interface BacktestTrade {
+  id: number;
+  backtestId: number;
+  strategyId: number;
+  strategyVersionId: number;
+  instrumentId: number;
+  timeframeId: number;
+  side: BacktestTradeSide;
+  entryTime: string;
+  entryPrice: number;
+  /** @nullable */
+  stopLoss: number | null;
+  /** @nullable */
+  takeProfit: number | null;
+  exitTime: string;
+  exitPrice: number;
+  pnl: number;
+  entryReason: string;
+  exitReason: string;
   createdAt: string;
 }
 

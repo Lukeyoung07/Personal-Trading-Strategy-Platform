@@ -1121,7 +1121,7 @@ paths:
     post:
       operationId: createBacktest
       tags: [backtesting]
-      summary: Save a backtest configuration
+      summary: Run a backtest from a configuration
       requestBody:
         required: true
         content:
@@ -1135,6 +1135,56 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Backtest"
+  /backtests/{backtestId}:
+    get:
+      operationId: getBacktest
+      tags: [backtesting]
+      summary: Retrieve backtest status and assumptions
+      parameters:
+        - $ref: "#/components/parameters/BacktestId"
+      responses:
+        "200":
+          description: Backtest status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Backtest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /backtests/{backtestId}/run:
+    post:
+      operationId: runBacktest
+      tags: [backtesting]
+      summary: Run an existing backtest configuration
+      parameters:
+        - $ref: "#/components/parameters/BacktestId"
+      responses:
+        "200":
+          description: Completed or failed backtest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Backtest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /backtests/{backtestId}/trades:
+    get:
+      operationId: listBacktestTrades
+      tags: [backtesting]
+      summary: Retrieve simulated trades for a backtest
+      parameters:
+        - $ref: "#/components/parameters/BacktestId"
+      responses:
+        "200":
+          description: Simulated backtest trades
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BacktestTrade"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /alerts/{alertId}:
     patch:
       operationId: updateAlert
@@ -1242,6 +1292,11 @@ components:
       schema: { type: integer, minimum: 1 }
     TradeId:
       name: tradeId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    BacktestId:
+      name: backtestId
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
@@ -2196,7 +2251,7 @@ components:
           enum: [active, paused]
     Backtest:
       type: object
-      required: [id, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, timeframeId, timeframeLabel, preset, startDate, endDate, status, createdAt]
+      required: [id, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, timeframeId, timeframeLabel, preset, startDate, endDate, status, candlesProcessed, tradeCount, resultMessage, executionAssumptions, errorMessage, startedAt, completedAt, createdAt]
       properties:
         id: { type: integer }
         strategyId: { type: integer }
@@ -2214,7 +2269,37 @@ components:
         endDate: { type: string, format: date-time }
         status:
           type: string
-          enum: [configured]
+          enum: [configured, pending, running, completed, failed]
+        candlesProcessed: { type: integer }
+        tradeCount: { type: integer }
+        resultMessage: { type: ["string", "null"] }
+        executionAssumptions: { type: ["string", "null"] }
+        errorMessage: { type: ["string", "null"] }
+        startedAt: { type: ["string", "null"], format: date-time }
+        completedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    BacktestTrade:
+      type: object
+      required: [id, backtestId, strategyId, strategyVersionId, instrumentId, timeframeId, side, entryTime, entryPrice, stopLoss, takeProfit, exitTime, exitPrice, pnl, entryReason, exitReason, createdAt]
+      properties:
+        id: { type: integer }
+        backtestId: { type: integer }
+        strategyId: { type: integer }
+        strategyVersionId: { type: integer }
+        instrumentId: { type: integer }
+        timeframeId: { type: integer }
+        side:
+          type: string
+          enum: [long, short]
+        entryTime: { type: string, format: date-time }
+        entryPrice: { type: number }
+        stopLoss: { type: ["number", "null"] }
+        takeProfit: { type: ["number", "null"] }
+        exitTime: { type: string, format: date-time }
+        exitPrice: { type: number }
+        pnl: { type: number }
+        entryReason: { type: string }
+        exitReason: { type: string }
         createdAt: { type: string, format: date-time }
     BacktestInput:
       type: object

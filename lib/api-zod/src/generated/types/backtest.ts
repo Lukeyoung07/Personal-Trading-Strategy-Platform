@@ -22,5 +22,17 @@ export interface Backtest {
   startDate: Date;
   endDate: Date;
   status: BacktestStatus;
+  candlesProcessed: number;
+  tradeCount: number;
+  /** @nullable */
+  resultMessage: string | null;
+  /** @nullable */
+  executionAssumptions: string | null;
+  /** @nullable */
+  errorMessage: string | null;
+  /** @nullable */
+  startedAt: Date | null;
+  /** @nullable */
+  completedAt: Date | null;
   createdAt: Date;
 }

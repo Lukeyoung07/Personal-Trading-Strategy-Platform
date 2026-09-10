@@ -319,6 +319,33 @@ export const backtestConfigurationsTable = pgTable("backtest_configurations", {
   startDate: timestamp("start_date", { withTimezone: true }).notNull(),
   endDate: timestamp("end_date", { withTimezone: true }).notNull(),
   status: text("status").notNull().default("configured"),
+  candlesProcessed: integer("candles_processed").notNull().default(0),
+  tradeCount: integer("trade_count").notNull().default(0),
+  resultMessage: text("result_message"),
+  executionAssumptions: text("execution_assumptions"),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const backtestTradesTable = pgTable("backtest_trades", {
+  id: serial("id").primaryKey(),
+  backtestId: integer("backtest_id").notNull().references(() => backtestConfigurationsTable.id, { onDelete: "cascade" }),
+  strategyId: integer("strategy_id").notNull().references(() => strategiesTable.id, { onDelete: "cascade" }),
+  strategyVersionId: integer("strategy_version_id").notNull().references(() => strategyVersionsTable.id, { onDelete: "cascade" }),
+  instrumentId: integer("instrument_id").notNull().references(() => marketsTable.id, { onDelete: "restrict" }),
+  timeframeId: integer("timeframe_id").notNull().references(() => timeframesTable.id, { onDelete: "restrict" }),
+  side: text("side").notNull(),
+  entryTime: timestamp("entry_time", { withTimezone: true }).notNull(),
+  entryPrice: numeric("entry_price").notNull(),
+  stopLoss: numeric("stop_loss"),
+  takeProfit: numeric("take_profit"),
+  exitTime: timestamp("exit_time", { withTimezone: true }).notNull(),
+  exitPrice: numeric("exit_price").notNull(),
+  pnl: numeric("pnl").notNull(),
+  entryReason: text("entry_reason").notNull(),
+  exitReason: text("exit_reason").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -389,6 +416,7 @@ export const insertTradeSchema = createInsertSchema(tradesTable).omit({ id: true
 export const insertPerformanceRecordSchema = createInsertSchema(performanceRecordsTable).omit({ id: true, createdAt: true });
 export const insertAlertSchema = createInsertSchema(alertsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBacktestConfigurationSchema = createInsertSchema(backtestConfigurationsTable).omit({ id: true, createdAt: true });
+export const insertBacktestTradeSchema = createInsertSchema(backtestTradesTable).omit({ id: true, createdAt: true });
 export const insertEconomicEventSchema = createInsertSchema(economicEventsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEconomicEventMarketMappingSchema = createInsertSchema(economicEventMarketMappingsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertUserSettingsSchema = createInsertSchema(userSettingsTable).omit({ id: true, updatedAt: true });
@@ -413,6 +441,7 @@ export type Trade = typeof tradesTable.$inferSelect;
 export type PerformanceRecord = typeof performanceRecordsTable.$inferSelect;
 export type Alert = typeof alertsTable.$inferSelect;
 export type BacktestConfiguration = typeof backtestConfigurationsTable.$inferSelect;
+export type BacktestTrade = typeof backtestTradesTable.$inferSelect;
 export type EconomicEvent = typeof economicEventsTable.$inferSelect;
 export type EconomicEventMarketMapping = typeof economicEventMarketMappingsTable.$inferSelect;
 export type UserSettings = typeof userSettingsTable.$inferSelect;
@@ -434,6 +463,7 @@ export type InsertStrategyMonitorConditionState = z.infer<typeof insertStrategyM
 export type InsertStrategyMonitorTransitionEvent = z.infer<typeof insertStrategyMonitorTransitionEventSchema>;
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
 export type InsertBacktestConfiguration = z.infer<typeof insertBacktestConfigurationSchema>;
+export type InsertBacktestTrade = z.infer<typeof insertBacktestTradeSchema>;
 export type InsertPerformanceRecord = z.infer<typeof insertPerformanceRecordSchema>;
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type InsertEconomicEvent = z.infer<typeof insertEconomicEventSchema>;
