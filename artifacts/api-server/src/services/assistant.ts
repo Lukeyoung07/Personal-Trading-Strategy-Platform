@@ -19,6 +19,7 @@ const OPENROUTER_MODEL = "openrouter/free";
 const OPENROUTER_TIMEOUT_MS = 60000;
 const UNAVAILABLE_MESSAGE = "AI Assistant is currently unavailable.";
 const RATE_LIMIT_MESSAGE = "AI is temporarily unavailable because the free AI service has reached its current limit. Please try again later.";
+const NO_BACKTEST_MESSAGE = "I need a completed backtest to explain. Open a completed backtest result first, then ask me to explain it.";
 
 type AssistantInput = typeof ChatAssistantBody._output;
 type AssistantContext = AssistantInput["context"];
@@ -189,12 +190,36 @@ async function contextForRequest(context: AssistantContext, message: string) {
       .innerJoin(timeframesTable, eq(backtestConfigurationsTable.timeframeId, timeframesTable.id))
       .where(eq(backtestConfigurationsTable.id, context.backtestId));
     if (backtest) {
-      const trades = await db.select({ pnl: backtestTradesTable.pnl, entryTime: backtestTradesTable.entryTime, exitTime: backtestTradesTable.exitTime, id: backtestTradesTable.id })
+      const trades = await db.select({
+        id: backtestTradesTable.id,
+        side: backtestTradesTable.side,
+        entryTime: backtestTradesTable.entryTime,
+        entryPrice: backtestTradesTable.entryPrice,
+        stopLoss: backtestTradesTable.stopLoss,
+        takeProfit: backtestTradesTable.takeProfit,
+        exitTime: backtestTradesTable.exitTime,
+        exitPrice: backtestTradesTable.exitPrice,
+        pnl: backtestTradesTable.pnl,
+        entryReason: backtestTradesTable.entryReason,
+        exitReason: backtestTradesTable.exitReason,
+      })
         .from(backtestTradesTable).where(eq(backtestTradesTable.backtestId, context.backtestId));
       const statistics = backtest.status === "completed"
         ? calculateBacktestStatistics(trades.map(trade => ({ ...trade, pnl: Number(trade.pnl) })), backtest.startDate)
         : null;
-      result.backtest = { ...backtest, tradeCount: trades.length, statistics };
+      result.backtest = {
+        ...backtest,
+        tradeCount: trades.length,
+        statistics,
+        trades: trades.map(trade => ({
+          ...trade,
+          entryPrice: Number(trade.entryPrice),
+          stopLoss: trade.stopLoss == null ? null : Number(trade.stopLoss),
+          takeProfit: trade.takeProfit == null ? null : Number(trade.takeProfit),
+          exitPrice: Number(trade.exitPrice),
+          pnl: Number(trade.pnl),
+        })),
+      };
     }
   }
   if (/compare|strateg(y|ies)|backtest|perform|result/i.test(message)) {
@@ -253,11 +278,49 @@ Current workspace context:
 ${JSON.stringify(context)}`;
 }
 
+function isBacktestExplanation(message: string) {
+  return /(?:explain|analyse|analyze|review|understand).*(?:backtest|results?)|(?:backtest).*(?:results?|performance)/i.test(message);
+}
+
+function localAssistantResponse(reply: string): AssistantResponse {
+  return ChatAssistantResponse.parse({
+    status: "available",
+    reply,
+    provider: OPENROUTER_MODEL,
+    intent: "result_explanation",
+    strategyDraft: null,
+    compatibility: null,
+    backtestSetup: null,
+  });
+}
+
 export async function answerAssistant(input: AssistantInput): Promise<AssistantResponse> {
+  const requestingBacktestExplanation = isBacktestExplanation(input.message);
+  if (requestingBacktestExplanation && !input.context.backtestId) {
+    return localAssistantResponse(NO_BACKTEST_MESSAGE);
+  }
   if (!process.env.OPENROUTER_API_KEY) {
     return ChatAssistantResponse.parse({ status: "unavailable", reply: UNAVAILABLE_MESSAGE, provider: OPENROUTER_MODEL, intent: null, strategyDraft: null, compatibility: null, backtestSetup: null });
   }
-  const context = await contextForRequest(input.context, input.message);
+  let context: Record<string, unknown>;
+  try {
+    context = await contextForRequest(input.context, input.message);
+  } catch (error) {
+    logger.error({
+      error: error instanceof Error ? error.message : "Unknown context error",
+      backtestId: input.context.backtestId ?? null,
+    }, "Assistant context could not be loaded");
+    if (requestingBacktestExplanation) {
+      return localAssistantResponse("I couldn't load the stored backtest results right now. Please reopen the completed result and try again.");
+    }
+    return ChatAssistantResponse.parse({ status: "unavailable", reply: UNAVAILABLE_MESSAGE, provider: OPENROUTER_MODEL, intent: null, strategyDraft: null, compatibility: null, backtestSetup: null });
+  }
+  if (requestingBacktestExplanation) {
+    const backtest = context.backtest as { status?: string; statistics?: unknown } | undefined;
+    if (!backtest || backtest.statistics == null || backtest.status !== "completed") {
+      return localAssistantResponse(NO_BACKTEST_MESSAGE);
+    }
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
   try {

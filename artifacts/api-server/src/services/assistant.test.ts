@@ -21,4 +21,17 @@ describe("AI Trading Assistant provider boundary", () => {
     expect(response.provider).toBe("openrouter/free");
     expect(response.reply).toContain("unavailable");
   });
+
+  it("gives a useful result-context message when no backtest is selected", async () => {
+    const response = await answerAssistant({
+      message: "Explain my backtest results.",
+      messages: [],
+      context: { page: "/backtesting" },
+    });
+
+    expect(response.status).toBe("available");
+    expect(response.intent).toBe("result_explanation");
+    expect(response.reply).toBe("I need a completed backtest to explain. Open a completed backtest result first, then ask me to explain it.");
+    expect(response.strategyDraft).toBeNull();
+  });
 });
