@@ -2041,6 +2041,65 @@ export const CreateAlertResponse = zod.object({
 
 
 /**
+ * @summary List saved backtest configurations
+ */
+export const ListBacktestsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "strategyName": zod.string(),
+  "strategyVersionId": zod.number().int(),
+  "versionNumber": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "timeframeId": zod.number().int(),
+  "timeframeLabel": zod.string(),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date(),
+  "status": zod.enum(['configured']),
+  "createdAt": zod.coerce.date()
+})
+export const ListBacktestsResponse = zod.array(ListBacktestsResponseItem)
+
+
+/**
+ * @summary Save a backtest configuration
+ */
+
+
+
+
+
+
+export const CreateBacktestBody = zod.object({
+  "strategyId": zod.number().int().min(1),
+  "strategyVersionId": zod.number().int().min(1),
+  "instrumentId": zod.number().int().min(1),
+  "timeframeId": zod.number().int().min(1),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date()
+})
+
+export const CreateBacktestResponse = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "strategyName": zod.string(),
+  "strategyVersionId": zod.number().int(),
+  "versionNumber": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "timeframeId": zod.number().int(),
+  "timeframeLabel": zod.string(),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date(),
+  "status": zod.enum(['configured']),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Update alert
  */
 

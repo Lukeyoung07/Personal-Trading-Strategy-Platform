@@ -1613,6 +1613,64 @@ export interface AlertUpdate {
   status?: AlertUpdateStatus;
 }
 
+export type BacktestPreset = typeof BacktestPreset[keyof typeof BacktestPreset];
+
+
+export const BacktestPreset = {
+  last_7_days: 'last_7_days',
+  last_30_days: 'last_30_days',
+  last_90_days: 'last_90_days',
+  custom: 'custom',
+} as const;
+
+export type BacktestStatus = typeof BacktestStatus[keyof typeof BacktestStatus];
+
+
+export const BacktestStatus = {
+  configured: 'configured',
+} as const;
+
+export interface Backtest {
+  id: number;
+  strategyId: number;
+  strategyName: string;
+  strategyVersionId: number;
+  versionNumber: number;
+  instrumentId: number;
+  instrumentSymbol: string;
+  timeframeId: number;
+  timeframeLabel: string;
+  preset: BacktestPreset;
+  startDate: string;
+  endDate: string;
+  status: BacktestStatus;
+  createdAt: string;
+}
+
+export type BacktestInputPreset = typeof BacktestInputPreset[keyof typeof BacktestInputPreset];
+
+
+export const BacktestInputPreset = {
+  last_7_days: 'last_7_days',
+  last_30_days: 'last_30_days',
+  last_90_days: 'last_90_days',
+  custom: 'custom',
+} as const;
+
+export interface BacktestInput {
+  /** @minimum 1 */
+  strategyId: number;
+  /** @minimum 1 */
+  strategyVersionId: number;
+  /** @minimum 1 */
+  instrumentId: number;
+  /** @minimum 1 */
+  timeframeId: number;
+  preset: BacktestInputPreset;
+  startDate: string;
+  endDate: string;
+}
+
 export type UserSettingsDefaultRiskUnit = typeof UserSettingsDefaultRiskUnit[keyof typeof UserSettingsDefaultRiskUnit];
 
 
