@@ -52,11 +52,11 @@ vi.mock("@workspace/api-client-react", () => ({
   useListInstruments: () => ({ data: [{ id: 18, symbol: "EURUSD", displayName: "Euro / US Dollar", assetClass: "Forex", instrumentType: "forex", isActive: true }], isLoading: false, isError: false, refetch: vi.fn() }),
   getListInstrumentsQueryKey: () => ["instruments"],
   useListMarketDataSources: () => ({ data: [{ id: 5, name: "BiQuote", providerKey: "biquote", sourceType: "websocket", capabilities: ["realtime", "candles", "historical"], configurationStatus: "configured", isEnabled: true }], isLoading: false, isError: false, refetch: vi.fn() }),
-  useListTimeframes: () => ({ data: [{ id: 20, code: "1h", label: "1 hour", durationSeconds: 3600 }], isLoading: false, isError: false, refetch: vi.fn() }),
+  useListTimeframes: () => ({ data: [{ id: 20, code: "1h", label: "1 hour", durationSeconds: 3600, isActive: true }], isLoading: false, isError: false, refetch: vi.fn() }),
   useGetBiQuoteCatalog: () => ({
     data: [
       { providerSymbol: "EURUSD", sourceName: "BiQuote", displayName: "EURUSD", assetClass: "Forex", instrumentType: "forex", venue: "FOREX", quoteCurrency: "USD", tickSize: 0.00001, contractMultiplier: 100000, description: "Euro / US Dollar" },
-      { providerSymbol: "XAUUSD", sourceName: "BiQuote", displayName: "XAUUSD", assetClass: "Commodity", instrumentType: "commodity", venue: "COMEX", quoteCurrency: "USD", tickSize: 0.01, contractMultiplier: 100, description: "Gold / US Dollar" },
+      { providerSymbol: "XAUUSD", sourceName: "BiQuote", displayName: "XAUUSD", assetClass: "Commodity", instrumentType: "commodity", venue: "COMEX", quoteCurrency: "USD", tickSize: 0.01, contractMultiplier: 100, description: "Gold" },
     ],
     isLoading: false,
     isError: false,
@@ -170,17 +170,22 @@ describe("Market Monitor live state", () => {
     expect(screen.queryByText("LIVE")).not.toBeInTheDocument();
   });
 
-  it("searches only the supported catalog and submits the selected timeframe", async () => {
+  it("searches by human name or provider symbol and submits the selected timeframe", async () => {
     const onAdded = vi.fn();
     render(<AddMarketTab onAdded={onAdded} />);
 
+    expect(screen.getByRole("option", { name: /Futures.*not currently available/ })).toBeDisabled();
+    expect(screen.getByRole("option", { name: /Stocks.*not currently available/ })).toBeDisabled();
     fireEvent.change(screen.getByTestId("select-market-category"), { target: { value: "Commodities" } });
-    fireEvent.change(screen.getByTestId("input-search-supported-instruments"), { target: { value: "gold" } });
+    fireEvent.change(screen.getByTestId("input-search-markets"), { target: { value: "gold" } });
 
-    await waitFor(() => expect(screen.getByRole("option", { name: /XAUUSD.*Gold/ })).toBeInTheDocument());
-    expect(screen.queryByRole("option", { name: /EURUSD/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("market-card-XAUUSD")).toBeInTheDocument());
+    expect(screen.getByText("Gold")).toBeInTheDocument();
+    expect(screen.queryByTestId("market-card-EURUSD")).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId("select-supported-instrument"), { target: { value: "XAUUSD" } });
+    fireEvent.change(screen.getByTestId("input-search-markets"), { target: { value: "XAU" } });
+    expect(screen.getByTestId("market-card-XAUUSD")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("market-card-XAUUSD"));
     fireEvent.change(screen.getByTestId("select-market-timeframe"), { target: { value: "20" } });
     fireEvent.click(screen.getByRole("button", { name: "Add Market" }));
 
@@ -189,5 +194,14 @@ describe("Market Monitor live state", () => {
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
     expect(onAdded).toHaveBeenCalled();
+  });
+
+  it("explains an empty provider category without inventing markets", async () => {
+    render(<AddMarketTab onAdded={vi.fn()} />);
+
+    fireEvent.change(screen.getByTestId("select-market-category"), { target: { value: "Futures" } });
+
+    expect(await screen.findByText("No futures markets are currently available from this data provider.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add Market" })).toBeDisabled();
   });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  BarChart3, Database, Globe, Network, Clock, DatabaseZap, Search, Plus,
+  BarChart3, Database, Globe, Network, Clock, DatabaseZap, Search, Plus, Check,
   Pencil, Trash2, X, Info, Activity, AlertTriangle, FileText, Settings2, ShieldAlert, Link2,
   Radio, RefreshCw, WifiOff, CandlestickChart
 } from "lucide-react";
@@ -23,6 +23,18 @@ type Tab = "live-chart" | "instruments" | "sources" | "mappings" | "timeframes" 
 const MARKET_SELECTION_STORAGE_KEY = "market-monitor-selection";
 const MARKET_CATEGORIES = ["Futures", "Forex", "Stocks", "Indices", "Commodities", "Crypto"] as const;
 type MarketCategory = typeof MARKET_CATEGORIES[number];
+const CATEGORY_ASSET_CLASSES: Record<MarketCategory, BiQuoteCatalogItem["assetClass"] | null> = {
+  Futures: null,
+  Forex: "Forex",
+  Stocks: "Stock",
+  Indices: "Index",
+  Commodities: "Commodity",
+  Crypto: "Crypto",
+};
+
+function catalogMarketName(item: BiQuoteCatalogItem) {
+  return item.description?.trim() || item.displayName || item.providerSymbol;
+}
 
 function readSavedMarketSelection() {
   try {
@@ -498,27 +510,35 @@ export function AddMarketTab({ onAdded }: { onAdded: (result: BiQuoteMarketResul
     setTimeframeId(preferred.id);
   }, [timeframeId, timeframes.data]);
 
-  const categoryType = category === "Stocks"
-    ? "Stock"
-    : category === "Indices"
-      ? "Index"
-      : category === "Commodities"
-        ? "Commodity"
-        : category === "Crypto"
-          ? "Crypto"
-          : category === "Forex"
-            ? "Forex"
-            : null;
-  const results = (catalog.data ?? []).filter(item =>
-    item.assetClass === categoryType
-    && `${item.providerSymbol} ${item.displayName} ${item.description ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()),
-  );
+  const categoryCounts = useMemo(() => MARKET_CATEGORIES.reduce<Record<MarketCategory, number>>((counts, marketCategory) => {
+    const assetClass = CATEGORY_ASSET_CLASSES[marketCategory];
+    counts[marketCategory] = assetClass
+      ? (catalog.data ?? []).filter(item => item.assetClass === assetClass).length
+      : 0;
+    return counts;
+  }, {} as Record<MarketCategory, number>), [catalog.data]);
+
+  useEffect(() => {
+    const firstAvailable = MARKET_CATEGORIES.find(marketCategory => categoryCounts[marketCategory] > 0);
+    if (firstAvailable && categoryCounts[category] === 0) setCategory(firstAvailable);
+  }, [category, categoryCounts]);
+
+  const results = useMemo(() => {
+    const assetClass = CATEGORY_ASSET_CLASSES[category];
+    const normalizedSearch = search.trim().toLowerCase();
+    return (catalog.data ?? []).filter(item =>
+      item.assetClass === assetClass
+      && `${catalogMarketName(item)} ${item.providerSymbol}`.toLowerCase().includes(normalizedSearch),
+    );
+  }, [catalog.data, category, search]);
 
   useEffect(() => {
     if (!results.some(item => item.providerSymbol === providerSymbol)) {
-      setProviderSymbol(results[0]?.providerSymbol ?? "");
+      setProviderSymbol("");
     }
   }, [providerSymbol, results]);
+
+  const selectedMarket = results.find(item => item.providerSymbol === providerSymbol);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -557,43 +577,73 @@ export function AddMarketTab({ onAdded }: { onAdded: (result: BiQuoteMarketResul
               setProviderSymbol("");
             }} data-testid="select-market-category">
               {MARKET_CATEGORIES.map(item => (
-                <option key={item} value={item}>{item}</option>
+                <option key={item} value={item} disabled={categoryCounts[item] === 0}>
+                  {item}{categoryCounts[item] === 0 ? " — not currently available" : ""}
+                </option>
               ))}
             </select>
           </Field>
 
-          <Field label="Search instruments">
+          <Field label="Search markets">
             <div className="relative">
               <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />
               <input
                 className="input pl-9"
                 value={search}
                 onChange={event => setSearch(event.target.value)}
-                placeholder={category === "Futures" ? "Futures are not currently available through BiQuote" : "Search by symbol or name, e.g. gold"}
-                data-testid="input-search-supported-instruments"
+                placeholder="Search markets by name or symbol…"
+                data-testid="input-search-markets"
               />
             </div>
           </Field>
 
-          <Field label="Instrument" hint={category === "Futures" ? "BiQuote does not currently publish supported futures in its catalog." : `${results.length} supported instrument${results.length === 1 ? "" : "s"}`}>
-            <select className="select" value={providerSymbol} onChange={event => setProviderSymbol(event.target.value)} disabled={!results.length} data-testid="select-supported-instrument">
-              <option value="">{results.length ? "Choose an instrument…" : "No supported instruments found"}</option>
-              {results.map(item => (
-                <option key={item.providerSymbol} value={item.providerSymbol}>
-                  {item.providerSymbol} — {item.description ?? item.displayName}
-                </option>
-              ))}
-            </select>
+          <Field label="Available markets" hint={`${results.length} available`}>
+            {results.length ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1" role="listbox" aria-label={`${category} markets`}>
+                {results.map(item => {
+                  const selected = item.providerSymbol === providerSymbol;
+                  return (
+                    <button
+                      key={item.providerSymbol}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`text-left rounded-lg border px-4 py-3 transition-colors ${selected
+                        ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                        : "border-border bg-secondary/30 hover:bg-secondary/65 hover:border-primary/40"}`}
+                      onClick={() => setProviderSymbol(item.providerSymbol)}
+                      data-testid={`market-card-${item.providerSymbol}`}
+                    >
+                      <span className="flex items-start justify-between gap-3">
+                        <span className="min-w-0">
+                          <span className="block font-semibold leading-snug">{catalogMarketName(item)}</span>
+                          <span className="block mono text-xs text-muted-foreground mt-1">{item.providerSymbol}</span>
+                        </span>
+                        {selected && <Check size={16} className="text-primary shrink-0 mt-0.5" aria-hidden="true" />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-secondary/20 px-4 py-5 text-sm text-muted-foreground">
+                No {category.toLowerCase()} markets are currently available from this data provider.
+              </div>
+            )}
           </Field>
 
-          <Field label="Timeframe">
-            <select className="select" value={timeframeId} onChange={event => setTimeframeId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-timeframe">
-              <option value="">Choose a timeframe…</option>
-              {(timeframes.data ?? []).filter(timeframe => timeframe.isActive).map(timeframe => (
-                <option key={timeframe.id} value={timeframe.id}>{timeframe.label} ({timeframe.code})</option>
-              ))}
-            </select>
-          </Field>
+          {selectedMarket ? (
+            <Field label="Timeframe">
+              <select className="select" value={timeframeId} onChange={event => setTimeframeId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-timeframe">
+                <option value="">Choose a timeframe…</option>
+                {(timeframes.data ?? []).filter(timeframe => timeframe.isActive).map(timeframe => (
+                  <option key={timeframe.id} value={timeframe.id}>{timeframe.label} ({timeframe.code})</option>
+                ))}
+              </select>
+            </Field>
+          ) : (
+            <p className="text-sm text-muted-foreground">Select a market above to choose its timeframe.</p>
+          )}
 
           {addMarket.isError && (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">

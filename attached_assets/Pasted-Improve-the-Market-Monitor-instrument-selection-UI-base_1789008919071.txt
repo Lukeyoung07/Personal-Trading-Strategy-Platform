@@ -1,0 +1,253 @@
+Improve the Market Monitor instrument-selection UI based on the current implementation.
+
+IMPORTANT:
+
+The BiQuote integration is working correctly. Do NOT rebuild, replace, or modify the BiQuote integration.
+
+Do NOT modify:
+- MarketDataService
+- BiQuote adapter
+- Provider mappings
+- Live quote streaming
+- SSE
+- Live candlestick chart
+- Strategy Monitoring Engine
+- Existing market-data architecture
+
+This task is specifically to improve the user experience of selecting instruments.
+
+CURRENT PROBLEM:
+
+The current instrument selector is difficult to understand.
+
+The provider-style names such as:
+
+"AUS200 — Australia S&P ASX 200 Index"
+"US500_X10"
+"US30_X10"
+
+are too technical and cluttered for normal users.
+
+The current search field + large native dropdown also feels awkward.
+
+Create a cleaner, beginner-friendly market selector.
+
+NEW UX:
+
+When the user clicks "Add Market", show:
+
+MARKET TYPE
+
+[ Forex ▼ ]
+
+SEARCH MARKETS
+
+[ 🔍 Search markets... ]
+
+AVAILABLE MARKETS
+
+Display instruments as clean selectable results/cards rather than relying on a large native HTML dropdown.
+
+Each result should show:
+
+Human-friendly name
+Provider symbol in smaller secondary text
+
+Examples:
+
+EUR/USD
+EURUSD
+
+Gold
+XAUUSD
+
+Silver
+XAGUSD
+
+US 500
+US500
+
+Germany 40
+DE30
+
+UK 100
+UK100
+
+Do NOT invent names or instruments.
+
+Use the existing BiQuote catalogue as the source of truth.
+
+Only display instruments that are actually available from the connected provider.
+
+SEARCH:
+
+Make search work against both:
+- Human-friendly display name
+- Provider symbol
+
+For example:
+
+Searching "gold" should find Gold/XAUUSD.
+
+Searching "XAU" should also find Gold/XAUUSD.
+
+Searching "EUR" should find EUR/USD.
+
+Searching "500" should find the relevant US 500 instrument.
+
+Do not require the user to know the provider symbol.
+
+MARKET CATEGORIES:
+
+Keep the existing categories:
+
+- Futures
+- Forex
+- Stocks
+- Indices
+- Commodities
+- Crypto
+
+However, only show/select categories that contain instruments currently available from the provider.
+
+If a category has zero available instruments, show a clear message:
+
+"No [category] markets are currently available from this data provider."
+
+Do NOT create fake instruments to populate empty categories.
+
+IMPORTANT FUTURES/STOCKS:
+
+The current BiQuote catalogue reports:
+
+- Futures: 0
+- Stocks: 0
+
+Do NOT try to manufacture futures or stocks.
+
+Do NOT add fake MES, ES, MNQ, NQ, MGC, GC, AAPL, NVIDIA, etc.
+
+Leave those categories empty with a clear explanation.
+
+When a future provider supplies those markets, the same selector should be capable of displaying them automatically.
+
+INSTRUMENT INFORMATION:
+
+Keep provider-specific information internally.
+
+Normal users should not need to see:
+
+- Venue
+- Timezone
+- Tick size
+- Multiplier
+- Base currency
+- Quote currency
+- Provider mapping
+- Provider-specific identifiers
+
+The existing backend/provider architecture should continue handling these automatically.
+
+TIMEFRAME:
+
+After selecting an instrument, show the timeframe selector using only timeframes supported by the selected instrument/provider.
+
+Keep the existing supported timeframe functionality.
+
+SELECTION FLOW:
+
+The final flow should be:
+
+1. Choose Market Type
+2. Search/select a Market
+3. Choose Timeframe
+4. Add Market
+
+Make the selected market visually obvious.
+
+Example:
+
+Market Type:
+[ Commodities ▼ ]
+
+Search:
+[ gold ]
+
+Results:
+
+┌─────────────────────────┐
+│ Gold                    │
+│ XAUUSD                  │
+└─────────────────────────┘
+
+Then:
+
+Timeframe:
+[ 5 Minutes ▼ ]
+
+[ Add Market ]
+
+IMPORTANT:
+
+Do not change how data is retrieved.
+
+Do not change how live candles work.
+
+Do not change the existing LIVE/STALE/DISCONNECTED/MARKET CLOSED states.
+
+Do not add AI.
+
+Do not add alerts.
+
+Do not add news.
+
+Do not add backtesting.
+
+Do not add broker integrations.
+
+Do not add trading execution.
+
+Do not add new market-data providers.
+
+Do not redesign the rest of the application.
+
+Only improve the instrument-selection experience.
+
+PERSISTENCE:
+
+Preserve the existing selected instrument/timeframe persistence.
+
+Preserve the existing behaviour when an instrument is removed.
+
+VERIFICATION:
+
+After implementation:
+
+- Test the instrument selector.
+- Test every currently available market category.
+- Test searching by human-friendly name.
+- Test searching by provider symbol.
+- Test selecting an instrument.
+- Test timeframe selection.
+- Test adding an instrument.
+- Verify the existing BiQuote mapping is still created/reused correctly.
+- Verify genuine BiQuote candles still load.
+- Verify genuine live quotes still arrive.
+- Verify LIVE/STALE/DISCONNECTED/MARKET CLOSED states still work.
+- Test page refresh/persistence.
+- Test empty categories.
+- Test unsupported instruments.
+- Test desktop layout.
+- Test mobile layout.
+- Run existing BiQuote regression tests.
+- Run API and frontend typechecks.
+- Run production builds.
+
+Fix only genuine bugs directly related to this UI change.
+
+At the end, report:
+1. What changed.
+2. Tests passed.
+3. Which market categories currently contain instruments.
+4. Whether the live chart still works after selecting and adding an instrument.
+5. Any remaining issues.
