@@ -21,6 +21,7 @@ import {
 } from "./federal-reserve";
 import { ecbProvider } from "./ecb";
 import { onsProvider } from "./ons";
+import { classifyEconomicEventImpact } from "./economic-event-impact";
 
 const providers = new Map<string, EconomicCalendarProvider>([
   [federalReserveProvider.key, federalReserveProvider],
@@ -165,11 +166,26 @@ async function withMappings(event: EconomicEvent, query = db) {
     .from(economicEventMarketMappingsTable)
     .where(eq(economicEventMarketMappingsTable.eventId, event.id))
     .orderBy(asc(economicEventMarketMappingsTable.id));
-  return { ...event, affectedMarkets };
+  const applicationClassification = event.impact
+    ? null
+    : event.applicationImpact
+      ? { impact: event.applicationImpact as "high" | "medium" | "low", reason: event.impactClassificationReason ?? "Application rule classification." }
+      : classifyEconomicEventImpact(event.name);
+  const effectiveImpact = event.impact ?? applicationClassification?.impact ?? null;
+  return {
+    ...event,
+    impact: effectiveImpact,
+    providerImpact: event.impact,
+    applicationImpact: applicationClassification?.impact ?? null,
+    impactSource: event.impact ? "provider" as const : applicationClassification ? "application" as const : "unclassified" as const,
+    impactClassificationReason: applicationClassification?.reason ?? null,
+    affectedMarkets,
+  };
 }
 
 export async function upsertEconomicEvent(input: EconomicEventInput) {
   const dedupeKey = input.dedupeKey?.trim() || stableDedupeKey(input);
+  const applicationClassification = input.impact ? null : classifyEconomicEventImpact(input.name);
   const event = await db.transaction(async tx => {
     const existing = input.providerEventId
       ? (await tx.select().from(economicEventsTable).where(and(
@@ -186,6 +202,8 @@ export async function upsertEconomicEvent(input: EconomicEventInput) {
       scheduledAt: input.scheduledAt,
       timePrecision: input.timePrecision ?? "datetime",
       impact: input.impact ?? null,
+      applicationImpact: applicationClassification?.impact ?? null,
+      impactClassificationReason: applicationClassification?.reason ?? null,
       region: input.region?.trim() || null,
       currency: input.currency?.trim().toUpperCase() || null,
       previous: input.previous ?? null,
@@ -216,12 +234,18 @@ export async function upsertEconomicEvent(input: EconomicEventInput) {
 }
 
 export async function updateEconomicEvent(eventId: number, input: EconomicEventUpdate) {
+  const existing = (await db.select().from(economicEventsTable).where(eq(economicEventsTable.id, eventId)))[0];
+  if (!existing) return null;
+  const providerImpact = input.impact === undefined ? existing.impact : input.impact;
+  const applicationClassification = providerImpact ? null : classifyEconomicEventImpact(input.name ?? existing.name);
   const [updated] = await db.update(economicEventsTable).set({
     providerEventId: input.providerEventId === undefined ? undefined : input.providerEventId?.trim() || null,
     name: input.name?.trim(),
     scheduledAt: input.scheduledAt,
     timePrecision: input.timePrecision,
-    impact: input.impact,
+    impact: providerImpact,
+    applicationImpact: applicationClassification?.impact ?? null,
+    impactClassificationReason: applicationClassification?.reason ?? null,
     region: input.region === undefined ? undefined : input.region?.trim() || null,
     currency: input.currency === undefined ? undefined : input.currency?.trim().toUpperCase() || null,
     previous: input.previous,

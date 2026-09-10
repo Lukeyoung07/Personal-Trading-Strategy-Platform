@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { EconomicEventImpact } from './economicEventImpact';
+import type { EconomicEventImpactSource } from './economicEventImpactSource';
 import type { EconomicEventMarketMapping } from './economicEventMarketMapping';
 import type { EconomicEventReleaseStatus } from './economicEventReleaseStatus';
 import type { EconomicEventTimePrecision } from './economicEventTimePrecision';
@@ -19,7 +20,18 @@ export interface EconomicEvent {
   name: string;
   scheduledAt: Date;
   timePrecision: EconomicEventTimePrecision;
+  /** Effective impact for display and filtering. Use providerImpact to inspect the original provider value. */
   impact: EconomicEventImpact | null;
+  /** Original impact supplied by the provider, if any. */
+  providerImpact: EconomicEventImpact | null;
+  /** Deterministic application classification when providerImpact is absent. */
+  applicationImpact: EconomicEventImpact | null;
+  impactSource: EconomicEventImpactSource;
+  /**
+     * Rule or explanation for the application classification.
+     * @nullable
+     */
+  impactClassificationReason: string | null;
   /** @nullable */
   region: string | null;
   /** @nullable */

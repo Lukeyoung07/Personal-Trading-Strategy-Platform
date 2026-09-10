@@ -318,6 +318,8 @@ export const economicEventsTable = pgTable("economic_events", {
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
   timePrecision: text("time_precision").notNull().default("datetime"),
   impact: text("impact"),
+  applicationImpact: text("application_impact"),
+  impactClassificationReason: text("impact_classification_reason"),
   region: text("region"),
   currency: text("currency"),
   previous: text("previous"),

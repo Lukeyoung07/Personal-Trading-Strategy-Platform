@@ -25,6 +25,10 @@ vi.mock("@workspace/api-client-react", () => ({
               name: "Consumer Price Index",
               scheduledAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
               impact: "high",
+               providerImpact: null,
+               applicationImpact: "high",
+               impactSource: "application",
+               impactClassificationReason: "CPI is classified as high importance. Rule: inflation-release.",
               region: "United States",
               currency: "USD",
               previous: "2.4%",
@@ -67,6 +71,8 @@ describe("EconomicCalendar", () => {
     render(<EconomicCalendar />);
     expect(screen.getByTestId("text-event-name-1")).toHaveTextContent("Consumer Price Index");
     expect(screen.getByTestId("status-event-impact-1")).toHaveTextContent("high impact");
+    expect(screen.getByTestId("text-event-impact-classification-1")).toHaveTextContent("Application rule");
+    expect(screen.getByTestId("text-event-impact-reason-1")).toHaveTextContent("inflation-release");
     expect(screen.getByTestId("text-high-impact-1")).toHaveTextContent("High-impact event");
     expect(screen.getByTestId("text-event-forecast-1")).toHaveTextContent("2.5%");
     expect(screen.getByTestId("text-event-timing-1")).toHaveTextContent(/In|Starting now/);

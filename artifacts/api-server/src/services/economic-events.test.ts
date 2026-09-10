@@ -82,6 +82,47 @@ describe("economic events service", () => {
     expect(testProviderEvents[0].id).toBe(first.id);
   });
 
+  it("stores application classification separately when the provider omits impact", async () => {
+    const classified = await upsertEconomicEvent({
+      providerKey,
+      providerEventId: "cpi-application-001",
+      name: "Consumer Price Index",
+      scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+      region: "United States",
+      currency: "USD",
+    });
+    expect(classified.impact).toBe("high");
+    expect(classified.providerImpact).toBeNull();
+    expect(classified.applicationImpact).toBe("high");
+    expect(classified.impactSource).toBe("application");
+    expect(classified.impactClassificationReason).toContain("inflation");
+
+    const persisted = (await db.select({
+      impact: economicEventsTable.impact,
+      applicationImpact: economicEventsTable.applicationImpact,
+      impactClassificationReason: economicEventsTable.impactClassificationReason,
+    }).from(economicEventsTable).where(eq(economicEventsTable.id, classified.id)))[0];
+    expect(persisted).toEqual({
+      impact: null,
+      applicationImpact: "high",
+      impactClassificationReason: expect.stringContaining("inflation"),
+    });
+  });
+
+  it("preserves provider impact instead of replacing it with an application rule", async () => {
+    const providerRated = await upsertEconomicEvent({
+      providerKey,
+      providerEventId: "provider-impact-001",
+      name: "Consumer Price Index",
+      scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+      impact: "medium",
+    });
+    expect(providerRated.impact).toBe("medium");
+    expect(providerRated.providerImpact).toBe("medium");
+    expect(providerRated.applicationImpact).toBeNull();
+    expect(providerRated.impactSource).toBe("provider");
+  });
+
   it("classifies upcoming and recently released views without fabricating timing", async () => {
     await upsertEconomicEvent({
       providerKey,

@@ -21,6 +21,7 @@ export interface EconomicEventInput {
   name: string;
   scheduledAt: Date;
   timePrecision?: EconomicEventInputTimePrecision;
+  /** Optional impact supplied by the provider. Application classification is calculated when omitted. */
   impact?: EconomicEventImpact | null;
   /** @nullable */
   region?: string | null;

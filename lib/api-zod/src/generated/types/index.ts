@@ -24,6 +24,7 @@ export * from './conditionUpdate';
 export * from './dashboardSummary';
 export * from './economicEvent';
 export * from './economicEventImpact';
+export * from './economicEventImpactSource';
 export * from './economicEventInput';
 export * from './economicEventInputReleaseStatus';
 export * from './economicEventInputTimePrecision';

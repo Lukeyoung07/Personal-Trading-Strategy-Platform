@@ -98,6 +98,12 @@ function marketOptions(events: EconomicEvent[]) {
   ).sort((a, b) => a.localeCompare(b));
 }
 
+function impactClassificationLabel(event: EconomicEvent) {
+  if (event.impactSource === 'provider' || (!event.impactSource && event.providerImpact)) return 'Provider';
+  if (event.impactSource === 'application' || event.applicationImpact) return 'Application rule';
+  return 'Not enough information';
+}
+
 function EventCard({ event }: { event: EconomicEvent }) {
   const relativeTime = formatRelativeTime(event.scheduledAt, event.releaseStatus);
   const isHighImpact = event.impact === 'high';
@@ -144,6 +150,12 @@ function EventCard({ event }: { event: EconomicEvent }) {
               {event.impact ? `${event.impact} impact` : 'Not classified'}
             </span>
             <span
+              className="text-[11px] text-muted-foreground"
+              data-testid={`text-event-impact-classification-${event.id}`}
+            >
+              Classification: {impactClassificationLabel(event)}
+            </span>
+            <span
               className={`tag ${
                 isLive ? 'bg-accent/15 text-accent' : 'bg-secondary text-muted-foreground'
               }`}
@@ -160,6 +172,11 @@ function EventCard({ event }: { event: EconomicEvent }) {
           <h2 className="mt-3 text-base font-semibold tracking-tight" data-testid={`text-event-name-${event.id}`}>
             {event.name}
           </h2>
+          {event.impactClassificationReason && (
+            <p className="mt-2 text-xs text-muted-foreground" data-testid={`text-event-impact-reason-${event.id}`}>
+              {event.impactClassificationReason}
+            </p>
+          )}
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span data-testid={`text-event-region-${event.id}`}>{displayValue(event.region)}</span>
             {event.affectedMarkets.length > 0 && (

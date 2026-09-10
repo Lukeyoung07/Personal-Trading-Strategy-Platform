@@ -445,6 +445,12 @@ function marketImpactLabel(event: EconomicEvent) {
   return event.impact ? event.impact.toUpperCase() : "NOT CLASSIFIED";
 }
 
+function marketImpactSourceLabel(event: EconomicEvent) {
+  if (event.impactSource === "provider" || (!event.impactSource && event.providerImpact)) return "Provider";
+  if (event.impactSource === "application" || event.applicationImpact) return "Application rule";
+  return "Not enough information";
+}
+
 function marketImpactClass(event: EconomicEvent) {
   if (event.impact === "high") return "tag tag-danger";
   if (event.impact === "medium") return "tag tag-warn";
@@ -535,6 +541,10 @@ function MarketEconomicEvents({ instrument }: { instrument: Instrument }) {
                       <span className="text-[11px] text-muted-foreground">{event.releaseStatus === "released" ? "Released" : "Upcoming"}</span>
                     </div>
                     <h3 className="mt-2 text-sm font-semibold">{event.name}</h3>
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      Classification: {marketImpactSourceLabel(event)}
+                      {event.impactClassificationReason ? ` · ${event.impactClassificationReason}` : ""}
+                    </div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span>{marketEventDate(event)}</span>
                       {event.region && <span>{event.region}</span>}

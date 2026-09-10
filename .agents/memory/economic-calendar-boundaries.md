@@ -20,3 +20,9 @@ Market-specific event context must be resolved on the server from the selected i
 **Why:** A single matching rule prevents each client surface from inventing different interpretations of event relevance, while still allowing the calendar to remain provider-neutral.
 
 **How to apply:** Add instrument-aware query parameters to the existing normalized event endpoint, preserve an explicit all-events scope, and keep unavailable-source errors distinct from an empty relevant result.
+
+Impact must distinguish the provider value from the application’s conservative event-type classification; effective display impact may use the application result only when the provider value is absent.
+
+**Why:** Public official calendars often omit trader-style impact ratings, but replacing that missing field with an unlabeled guess would misrepresent source data.
+
+**How to apply:** Preserve provider impact separately, store the application rule result and reason, expose the classification source, and leave unmatched event names unclassified.

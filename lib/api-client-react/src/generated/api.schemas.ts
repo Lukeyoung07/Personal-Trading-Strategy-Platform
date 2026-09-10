@@ -34,6 +34,15 @@ export const EconomicEventTimePrecision = {
   datetime: 'datetime',
 } as const;
 
+export type EconomicEventImpactSource = typeof EconomicEventImpactSource[keyof typeof EconomicEventImpactSource];
+
+
+export const EconomicEventImpactSource = {
+  provider: 'provider',
+  application: 'application',
+  unclassified: 'unclassified',
+} as const;
+
 export type EconomicEventReleaseStatus = typeof EconomicEventReleaseStatus[keyof typeof EconomicEventReleaseStatus];
 
 
@@ -64,7 +73,18 @@ export interface EconomicEvent {
   name: string;
   scheduledAt: string;
   timePrecision: EconomicEventTimePrecision;
+  /** Effective impact for display and filtering. Use providerImpact to inspect the original provider value. */
   impact: EconomicEventImpact | null;
+  /** Original impact supplied by the provider, if any. */
+  providerImpact: EconomicEventImpact | null;
+  /** Deterministic application classification when providerImpact is absent. */
+  applicationImpact: EconomicEventImpact | null;
+  impactSource: EconomicEventImpactSource;
+  /**
+     * Rule or explanation for the application classification.
+     * @nullable
+     */
+  impactClassificationReason: string | null;
   /** @nullable */
   region: string | null;
   /** @nullable */
@@ -129,6 +149,7 @@ export interface EconomicEventInput {
   name: string;
   scheduledAt: string;
   timePrecision?: EconomicEventInputTimePrecision;
+  /** Optional impact supplied by the provider. Application classification is calculated when omitted. */
   impact?: EconomicEventImpact | null;
   /** @nullable */
   region?: string | null;
@@ -177,6 +198,7 @@ export interface EconomicEventUpdate {
   name?: string;
   scheduledAt?: string;
   timePrecision?: EconomicEventUpdateTimePrecision;
+  /** Optional impact supplied by the provider. Application classification is calculated when omitted. */
   impact?: EconomicEventImpact | null;
   /** @nullable */
   region?: string | null;

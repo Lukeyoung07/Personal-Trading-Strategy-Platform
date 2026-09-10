@@ -1256,7 +1256,7 @@ components:
         notes: { type: ["string", "null"] }
     EconomicEvent:
       type: object
-      required: [id, providerKey, providerEventId, dedupeKey, name, scheduledAt, timePrecision, impact, region, currency, previous, forecast, actual, releaseStatus, sourceName, sourceUrl, sourceUpdatedAt, createdAt, updatedAt, affectedMarkets]
+      required: [id, providerKey, providerEventId, dedupeKey, name, scheduledAt, timePrecision, impact, providerImpact, applicationImpact, impactSource, impactClassificationReason, region, currency, previous, forecast, actual, releaseStatus, sourceName, sourceUrl, sourceUpdatedAt, createdAt, updatedAt, affectedMarkets]
       properties:
         id: { type: integer }
         providerKey: { type: string }
@@ -1269,6 +1269,23 @@ components:
           anyOf:
             - $ref: "#/components/schemas/EconomicEventImpact"
             - type: "null"
+          description: Effective impact for display and filtering. Use providerImpact to inspect the original provider value.
+        providerImpact:
+          anyOf:
+            - $ref: "#/components/schemas/EconomicEventImpact"
+            - type: "null"
+          description: Original impact supplied by the provider, if any.
+        applicationImpact:
+          anyOf:
+            - $ref: "#/components/schemas/EconomicEventImpact"
+            - type: "null"
+          description: Deterministic application classification when providerImpact is absent.
+        impactSource:
+          type: string
+          enum: [provider, application, unclassified]
+        impactClassificationReason:
+          type: ["string", "null"]
+          description: Rule or explanation for the application classification.
         region: { type: ["string", "null"] }
         currency: { type: ["string", "null"] }
         previous: { type: ["string", "null"] }
@@ -1298,6 +1315,7 @@ components:
           anyOf:
             - $ref: "#/components/schemas/EconomicEventImpact"
             - type: "null"
+          description: Optional impact supplied by the provider. Application classification is calculated when omitted.
         region: { type: ["string", "null"] }
         currency: { type: ["string", "null"] }
         previous: { type: ["string", "null"] }
@@ -1332,6 +1350,7 @@ components:
           anyOf:
             - $ref: "#/components/schemas/EconomicEventImpact"
             - type: "null"
+          description: Optional impact supplied by the provider. Application classification is calculated when omitted.
         region: { type: ["string", "null"] }
         currency: { type: ["string", "null"] }
         previous: { type: ["string", "null"] }
