@@ -27,6 +27,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { StrategyVersionManager } from "@/components/strategy-versioning";
+import { clearPendingAssistantDraft, getPendingAssistantDraft } from "@/lib/assistant-draft-store";
 
 const STAGES = [
   { value: "entry", label: "Entry" },
@@ -622,12 +623,7 @@ export function StrategyBuilder() {
   const [conditionModal, setConditionModal] = useState<StrategyCondition | "new" | false>(false);
   const [assistantDraft, setAssistantDraft] = useState<AssistantStrategyDraft | null>(() => {
     if (!requestedAssistantDraft) return null;
-    try {
-      const stored = sessionStorage.getItem("assistant-strategy-draft");
-      return stored ? JSON.parse(stored) as AssistantStrategyDraft : null;
-    } catch {
-      return null;
-    }
+    return getPendingAssistantDraft();
   });
   const [draftImportMessage, setDraftImportMessage] = useState("");
   const [unmatchedDraftConditions, setUnmatchedDraftConditions] = useState<AssistantStrategyDraft["conditions"]>([]);
@@ -675,7 +671,7 @@ export function StrategyBuilder() {
     setUnmatchedDraftConditions(unmatched);
     setDraftImportMessage(unmatched.length ? `Strategy created. These draft conditions need review before they can be added: ${unmatched.map(condition => condition.name).join(", ")}.` : "Strategy created with the assistant’s conditions. Review it, then save a new immutable version.");
     setAssistantDraft(null);
-    sessionStorage.removeItem("assistant-strategy-draft");
+    clearPendingAssistantDraft();
   };
   const refreshConditions = () => queryClient.invalidateQueries({ queryKey: getListStrategyConditionsQueryKey(strategyId) });
   const action = <button className="btn btn-primary" onClick={() => setStrategyModal("new")} data-testid="button-new-builder-strategy"><Plus size={15} /> New strategy</button>;

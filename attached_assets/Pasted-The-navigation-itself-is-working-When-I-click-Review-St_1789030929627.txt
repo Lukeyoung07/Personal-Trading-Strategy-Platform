@@ -1,0 +1,75 @@
+The navigation itself is working.
+
+When I click "Review Strategy" or "Save as New Version", I am correctly taken to the Strategy Builder page.
+
+The problem is that the AI-generated strategy draft is NOT appearing in the Strategy Builder. It just opens the normal Strategy Builder page.
+
+Fix ONLY the AI draft data handoff.
+
+Do NOT change the OpenRouter setup.
+Do NOT change the AI generation.
+Do NOT change Backtesting.
+Do NOT redesign the Strategy Builder.
+Do NOT add new trading concepts.
+
+Investigate exactly how the structured AI strategy draft is transferred from the AI Assistant to `/strategy-builder`.
+
+The workflow must be:
+
+AI generates structured strategy
+→ user clicks "Review Strategy"
+→ `/strategy-builder` opens
+→ the generated AI draft is available to the Builder
+→ Builder automatically populates the draft fields
+→ user can review/edit the draft
+→ nothing is saved automatically
+
+Also make "Save as New Version" behave the same way, except the Builder should clearly indicate that the user intends to save the AI draft as a new version after reviewing it.
+
+Check whether the existing implementation is:
+
+- Losing the draft during navigation
+- Not serializing the draft correctly
+- Not passing the draft through URL/query state
+- Not storing the draft in temporary client state
+- Not reading the draft when the Builder loads
+- Clearing the draft when the Builder component mounts
+- Using the wrong draft field names
+- Falling back to the normal first strategy instead of the AI draft
+
+Use the existing structured AI draft data. Do NOT create a second strategy/draft format.
+
+Test this with the real AI request:
+
+"Create me a simple XAUUSD BUY strategy that is compatible with my current Backtesting system. Use a bullish candle for entry, a bearish candle for exit, with a 1% stop loss and 2% take profit."
+
+Then verify in the running browser:
+
+1. AI generates the structured draft.
+2. Click "Review Strategy".
+3. Strategy Builder opens.
+4. The Builder displays the generated:
+   - XAUUSD
+   - BUY direction
+   - Bullish candle entry
+   - Bearish candle exit
+   - 1% stop loss
+   - 2% take profit
+5. Confirm the user can edit the draft.
+6. Confirm nothing is automatically saved.
+
+Then repeat using "Save as New Version" and verify the same draft is populated.
+
+Do NOT consider this fixed merely because the user reaches `/strategy-builder`.
+
+The feature is only fixed when the actual AI-generated values appear inside the Builder.
+
+Run the relevant frontend tests, typecheck and production build.
+
+At the end report:
+- What was causing the draft to disappear.
+- How the draft is now transferred.
+- Whether the real AI-generated values appeared in the Builder.
+- Whether both Review Strategy and Save as New Version were tested.
+- Tests/builds passed.
+- Any remaining limitations.

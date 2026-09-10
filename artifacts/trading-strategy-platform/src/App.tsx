@@ -31,6 +31,7 @@ import { StrategyMonitoringPage } from '@/components/strategy-monitoring';
 import { EconomicCalendar } from '@/components/economic-calendar';
 import { BacktestResultsPanel } from '@/components/backtest-results';
 import { AssistantPanel, type AssistantPanelContext } from '@/components/assistant-panel';
+import { setPendingAssistantDraft } from '@/lib/assistant-draft-store';
 import '@/index.css';
 
 const queryClient = new QueryClient();
@@ -65,7 +66,7 @@ function Shell({ children }: { children: ReactNode }) {
     };
   }, [location]);
   const reviewStrategyDraft = (draft: unknown, action: "review" | "save-version" = "review") => {
-    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+    setPendingAssistantDraft(draft as AssistantStrategyDraft);
     setAssistantOpen(false);
     setLocation(`/strategy-builder?assistantDraft=1&assistantAction=${action}`);
   };
