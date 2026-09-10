@@ -1,0 +1,675 @@
+Continue building Step 12: Historical Strategy Backtesting.
+
+IMPORTANT:
+
+The Backtesting Part 1 setup interface has ALREADY been implemented and verified.
+
+Do NOT rebuild Part 1.
+
+Do NOT redesign the existing Backtesting setup.
+
+The existing setup already allows the user to select:
+
+- Strategy
+- Exact strategy version
+- Instrument
+- Timeframe
+- Last 7 Days
+- Last 30 Days
+- Last 90 Days
+- Custom date range
+
+The goal now is to finish the ENTIRE remaining Backtesting feature.
+
+Keep the experience simple and beginner-friendly.
+
+==================================================
+PART 2 — BACKTEST ENGINE
+==================================================
+
+Implement the actual historical backtest engine behind the existing Backtesting setup.
+
+Use the existing Market Data Service and genuine historical OHLC candle data from BiQuote.
+
+Use the selected:
+
+- Strategy
+- Exact strategy version
+- Instrument
+- Timeframe
+- Start date
+- End date
+
+Do NOT create fake candles.
+
+Do NOT fabricate prices.
+
+Do NOT interpolate missing candles.
+
+Do NOT duplicate candles.
+
+Do NOT stretch candles.
+
+Do NOT create placeholder results.
+
+If sufficient historical data is unavailable, clearly tell the user instead of producing misleading results.
+
+==================================================
+EXACT STRATEGY VERSION
+==================================================
+
+The selected strategy version must be used exactly.
+
+For example:
+
+Gold Strategy
+v1
+v2
+v3
+
+If the user selects v2, the backtest must use v2.
+
+Do NOT automatically use the newest version.
+
+The backtest must preserve the exact strategy version ID.
+
+Creating or editing another strategy version later must NOT change an existing backtest.
+
+Reuse the existing strategy definitions and logic wherever possible.
+
+Do NOT create a separate unrelated strategy-definition system.
+
+Use the strategy's existing:
+
+- Conditions
+- Entry rules
+- Exit rules
+- Stop-loss rules
+- Take-profit rules
+- Reset rules
+- Risk settings
+
+Do not silently replace these with generic trading rules.
+
+==================================================
+CHRONOLOGICAL BACKTESTING
+==================================================
+
+Process historical candles strictly from oldest to newest.
+
+For each candle:
+
+1. Evaluate the strategy using only information available at that point in time.
+2. Evaluate the strategy conditions.
+3. Determine whether an entry should occur.
+4. Manage any existing simulated position.
+5. Determine whether an exit occurs.
+6. Record completed trades.
+7. Continue to the next candle.
+
+IMPORTANT:
+
+Prevent look-ahead bias.
+
+Never use future candles to make decisions about earlier candles.
+
+Never use future prices to determine an earlier entry or exit.
+
+Do not use information from a candle before that information would have been available.
+
+==================================================
+SIMULATED TRADES
+==================================================
+
+When a valid historical entry occurs, create a simulated trade.
+
+Record:
+
+- Backtest ID
+- Strategy ID
+- Exact strategy version ID
+- Instrument
+- Timeframe
+- Entry timestamp
+- Entry price
+- Direction
+- Stop-loss when applicable
+- Take-profit when applicable
+- Exit timestamp
+- Exit price
+- Profit/loss
+- Entry reason
+- Exit reason
+
+These are simulated backtest trades.
+
+Do NOT add them to the user's real Trade Journal.
+
+==================================================
+EXECUTION ASSUMPTIONS
+==================================================
+
+Historical data is OHLC candle data rather than tick-by-tick data.
+
+Therefore:
+
+- Do not claim tick-level execution accuracy.
+- Do not use impossible entry prices.
+- Do not use future information.
+- Use a consistent execution convention.
+
+If the strategy produces a signal on a completed candle, use a clearly defined execution convention that avoids look-ahead bias.
+
+Store the execution convention with the backtest.
+
+Show the user a simple explanation of the convention in the results.
+
+==================================================
+STOP LOSS / TAKE PROFIT
+==================================================
+
+If the selected strategy version contains:
+
+- Stop-loss
+- Take-profit
+
+simulate these using the available historical OHLC data.
+
+If both SL and TP could have been reached within the same candle and OHLC data cannot determine which happened first:
+
+Do NOT guess.
+
+Use a clearly defined conservative handling rule and document it.
+
+Do not pretend candle data provides intrabar ordering when it does not.
+
+==================================================
+BACKTEST STORAGE
+==================================================
+
+Save the completed backtest.
+
+Store:
+
+- Strategy
+- Exact strategy version
+- Instrument
+- Timeframe
+- Start date
+- End date
+- Number of candles processed
+- Number of trades
+- Completion status
+- Execution assumptions
+- Created timestamp
+
+Store all simulated trades associated with the backtest.
+
+A completed backtest must remain associated with the exact strategy version used.
+
+==================================================
+ZERO TRADES
+==================================================
+
+If the strategy produces zero trades:
+
+Show:
+
+"No trades found for this strategy and period."
+
+Do not fabricate statistics.
+
+Still save the completed backtest configuration and show:
+
+- Strategy
+- Version
+- Instrument
+- Timeframe
+- Period
+- Candles processed
+- 0 trades
+
+==================================================
+MISSING DATA
+==================================================
+
+If historical data is unavailable or insufficient:
+
+Show a clear message.
+
+Examples:
+
+"Historical data unavailable for this instrument."
+
+or
+
+"Insufficient historical data for the selected period."
+
+Do not silently run a partial test and present it as a complete backtest.
+
+==================================================
+PART 3 — BACKTEST RESULTS
+==================================================
+
+Once the backtest engine is working, add the results interface.
+
+Keep it simple.
+
+After clicking:
+
+[ RUN BACKTEST ]
+
+show a loading state while the historical calculation is running.
+
+When complete, show:
+
+BACKTEST COMPLETE
+
+[Strategy Name] [Version]
+
+[Instrument] · [Timeframe]
+
+[Date Range]
+
+Then show the main statistics.
+
+==================================================
+RESULT SUMMARY
+==================================================
+
+Display:
+
+- Total trades
+- Winning trades
+- Losing trades
+- Win rate
+- Total profit/loss
+- Average winning trade
+- Average losing trade
+- Largest winning trade
+- Largest losing trade
+- Maximum drawdown
+- Profit factor when meaningful
+
+Keep the most important information near the top.
+
+Example:
+
+87 Trades
+
+64% Win Rate
+
++£42.80
+
+8.4% Max Drawdown
+
+Clearly label the results:
+
+HISTORICAL BACKTEST
+
+Do not imply that historical performance guarantees future results.
+
+==================================================
+STARTING BALANCE
+==================================================
+
+Use the existing strategy/account configuration if one already exists.
+
+Do NOT create a complicated financial configuration screen.
+
+If the system requires a default starting balance for the backtest, use a clearly documented default and make it easy to understand.
+
+Do not invent broker-specific assumptions.
+
+==================================================
+EQUITY CURVE
+==================================================
+
+Add a simple equity curve showing the simulated account balance over the backtest period.
+
+The equity curve must be calculated from the actual simulated trades.
+
+Do NOT fabricate points.
+
+It must match the recorded backtest results.
+
+Keep the chart simple.
+
+==================================================
+HISTORICAL CANDLE CHART
+==================================================
+
+Show the historical candlestick data used by the backtest.
+
+Overlay the simulated trades.
+
+Show:
+
+- Entry markers
+- Exit markers
+- Buy/sell direction
+- Stop-loss when applicable
+- Take-profit when applicable
+
+Use the same general visual language as the existing trading charts.
+
+Do NOT change or redesign the existing live BiQuote chart.
+
+This is a separate historical backtest chart.
+
+==================================================
+TRADE LIST
+==================================================
+
+Display the simulated trades in a simple table.
+
+Columns:
+
+- #
+- Direction
+- Entry
+- Exit
+- P/L
+- Result
+- Entry Time
+- Exit Time
+
+Clearly show:
+
+WIN
+
+or
+
+LOSS
+
+Do not overwhelm the user with unnecessary technical fields.
+
+==================================================
+TRADE DETAILS
+==================================================
+
+Allow the user to click/select a trade.
+
+Show:
+
+Trade #XX
+
+Direction:
+BUY / SELL
+
+Entry:
+[Instrument] @ [Price]
+
+Entry Time:
+[Date/time]
+
+Exit:
+[Instrument] @ [Price]
+
+Exit Time:
+[Date/time]
+
+Result:
++£X.XX / -£X.XX
+
+Entry Reason:
+[Reason]
+
+Exit Reason:
+[Reason]
+
+When possible, highlight that trade's entry and exit on the historical chart.
+
+==================================================
+BACKTEST HISTORY
+==================================================
+
+Add a simple section showing previous completed backtests.
+
+Each entry should show:
+
+- Strategy
+- Version
+- Instrument
+- Timeframe
+- Period
+- Number of trades
+- Win rate
+- P/L
+
+Allow the user to open a previous backtest.
+
+Previous backtests must remain unchanged if the strategy is edited or a new strategy version is created.
+
+==================================================
+PART 4 — SIMPLE USER EXPERIENCE
+==================================================
+
+The entire feature must remain easy to use.
+
+The normal workflow should be:
+
+1. Select Strategy
+2. Select Version
+3. Select Instrument
+4. Select Timeframe
+5. Select Last 7 / 30 / 90 Days or Custom
+6. Press RUN BACKTEST
+7. Wait for calculation
+8. See results
+
+Do NOT expose unnecessary technical settings.
+
+Do NOT make the user configure:
+
+- Provider IDs
+- Database IDs
+- API settings
+- Data-provider settings
+- Complex execution settings
+- Complex risk settings
+
+Advanced technical information can be placed inside a small expandable:
+
+"Backtest assumptions"
+
+section.
+
+==================================================
+DATA QUALITY
+==================================================
+
+Before running:
+
+Validate:
+
+- Strategy
+- Strategy version
+- Instrument
+- Timeframe
+- Date range
+- Historical candle availability
+
+Reject invalid dates.
+
+Reject invalid ranges.
+
+Do not silently alter the user's selected dates.
+
+Do not silently substitute another instrument or timeframe.
+
+==================================================
+FEES AND SLIPPAGE
+==================================================
+
+Do not invent broker-specific fees or slippage.
+
+If verified fee/slippage information is not available:
+
+Display:
+
+"Fees and slippage are not included."
+
+Leave the architecture ready for verified costs to be added later.
+
+==================================================
+SECURITY
+==================================================
+
+Users must only be able to access:
+
+- Their own strategies
+- Their own strategy versions
+- Their own backtests
+- Their own backtest trades
+
+Validate ownership server-side.
+
+Do not expose provider credentials.
+
+==================================================
+ARCHITECTURE
+==================================================
+
+Keep backtesting completely separate from live trading.
+
+Architecture:
+
+Historical Candles
+↓
+Backtest Engine
+↓
+Exact Strategy Version
+↓
+Simulated Trades
+↓
+Backtest Results
+
+Backtesting must NEVER:
+
+- Place real orders
+- Connect to a broker for execution
+- Modify live positions
+- Trigger automatic trading
+- Modify the live Strategy Monitoring engine
+
+==================================================
+TESTING
+==================================================
+
+Add focused tests for:
+
+1. Historical candles are retrieved correctly.
+2. Candles are processed chronologically.
+3. Exact strategy version is used.
+4. Future candles cannot affect earlier decisions.
+5. Valid entry creates a simulated trade.
+6. Valid exit closes the simulated trade.
+7. Stop-loss works when applicable.
+8. Take-profit works when applicable.
+9. Same-candle SL/TP ambiguity is handled consistently.
+10. Zero-trade results work.
+11. Missing historical data is handled correctly.
+12. Backtest results are saved.
+13. Simulated trades are saved.
+14. Backtest trades remain separate from the real Trade Journal.
+15. Equity curve matches the simulated trades.
+16. Trade list matches the stored trades.
+17. Trade details show the correct trade.
+18. Historical chart markers correspond to the correct trades.
+19. Previous backtests can be reopened.
+20. Previous backtests remain tied to their original strategy version.
+21. Users cannot access another user's backtests.
+22. Invalid date ranges are rejected.
+
+==================================================
+REGRESSION TESTING
+==================================================
+
+After implementation run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+- Existing BiQuote tests
+- Existing Strategy Monitoring tests
+- Existing Strategy Builder tests
+- Existing regression tests
+
+Verify that:
+
+- Live BiQuote data still works.
+- Live candlestick charts still work.
+- All existing timeframes still work.
+- Market Monitor still works.
+- News still works.
+- Economic Calendar still works.
+- Existing strategy functionality still works.
+- Alerts remain unchanged.
+
+Do not modify unrelated functionality.
+
+==================================================
+IMPORTANT SCOPE LIMIT
+==================================================
+
+This is ONLY Step 12: Historical Strategy Backtesting.
+
+Do NOT add:
+
+- AI
+- AI-generated strategies
+- Automatic trading
+- Broker integration
+- Real order execution
+- Live trading
+- BUY/SELL recommendations
+- Strategy optimization
+- Parameter optimization
+- Genetic algorithms
+- Monte Carlo simulation
+- External notifications
+- Push notifications
+- New market-data providers
+- Paid market-data providers
+
+Those can be added separately later.
+
+==================================================
+FINAL PRIORITY
+==================================================
+
+The priority is:
+
+1. REAL HISTORICAL DATA
+2. EXACT STRATEGY VERSION
+3. ACCURATE CHRONOLOGICAL BACKTESTING
+4. NO LOOK-AHEAD BIAS
+5. REAL SIMULATED TRADES
+6. SIMPLE RESULTS
+7. EASY-TO-UNDERSTAND CHART
+8. USEFUL TRADE DETAILS
+9. RELIABLE DATA HANDLING
+10. DO NOT BREAK EXISTING FEATURES
+
+Keep the user experience simple.
+
+The user should be able to go from selecting a strategy to understanding its historical performance without needing to understand technical backtesting terminology.
+
+At the end report:
+
+1. What was implemented.
+2. How genuine historical data is used.
+3. How the exact strategy version is preserved.
+4. How chronological evaluation works.
+5. How look-ahead bias is prevented.
+6. How entries and exits are simulated.
+7. How SL/TP ambiguity is handled.
+8. What performance statistics were implemented.
+9. What chart functionality was implemented.
+10. What trade-history functionality was implemented.
+11. What tests passed.
+12. Any limitations.
+13. Confirm that existing functionality remains intact.
