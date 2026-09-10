@@ -309,6 +309,41 @@ export const alertsTable = pgTable("alerts", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
+export const economicEventsTable = pgTable("economic_events", {
+  id: serial("id").primaryKey(),
+  providerKey: text("provider_key").notNull(),
+  providerEventId: text("provider_event_id"),
+  dedupeKey: text("dedupe_key").notNull(),
+  name: text("name").notNull(),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+  impact: text("impact").notNull().default("low"),
+  region: text("region"),
+  currency: text("currency"),
+  previous: text("previous"),
+  forecast: text("forecast"),
+  actual: text("actual"),
+  releaseStatus: text("release_status").notNull().default("upcoming"),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, table => [
+  uniqueIndex("economic_events_dedupe_key_unique").on(table.dedupeKey),
+  uniqueIndex("economic_events_provider_event_unique").on(table.providerKey, table.providerEventId),
+]);
+
+export const economicEventMarketMappingsTable = pgTable("economic_event_market_mappings", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => economicEventsTable.id, { onDelete: "cascade" }),
+  marketId: integer("market_id").references(() => marketsTable.id, { onDelete: "set null" }),
+  marketLabel: text("market_label"),
+  impactDirection: text("impact_direction"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+}, table => [
+  uniqueIndex("economic_event_market_mapping_unique").on(table.eventId, table.marketId, table.marketLabel),
+]);
+
 export const userSettingsTable = pgTable("user_settings", {
   id: serial("id").primaryKey(),
   timezone: text("timezone").notNull().default("Europe/London"),
@@ -335,6 +370,8 @@ export const insertStrategyMonitorTransitionEventSchema = createInsertSchema(str
 export const insertTradeSchema = createInsertSchema(tradesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPerformanceRecordSchema = createInsertSchema(performanceRecordsTable).omit({ id: true, createdAt: true });
 export const insertAlertSchema = createInsertSchema(alertsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEconomicEventSchema = createInsertSchema(economicEventsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEconomicEventMarketMappingSchema = createInsertSchema(economicEventMarketMappingsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertUserSettingsSchema = createInsertSchema(userSettingsTable).omit({ id: true, updatedAt: true });
 
 export type Strategy = typeof strategiesTable.$inferSelect;
@@ -356,6 +393,8 @@ export type StrategyMonitorTransitionEvent = typeof strategyMonitorTransitionEve
 export type Trade = typeof tradesTable.$inferSelect;
 export type PerformanceRecord = typeof performanceRecordsTable.$inferSelect;
 export type Alert = typeof alertsTable.$inferSelect;
+export type EconomicEvent = typeof economicEventsTable.$inferSelect;
+export type EconomicEventMarketMapping = typeof economicEventMarketMappingsTable.$inferSelect;
 export type UserSettings = typeof userSettingsTable.$inferSelect;
 export type InsertStrategy = z.infer<typeof insertStrategySchema>;
 export type InsertStrategyVersion = z.infer<typeof insertStrategyVersionSchema>;
@@ -376,4 +415,6 @@ export type InsertStrategyMonitorTransitionEvent = z.infer<typeof insertStrategy
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
 export type InsertPerformanceRecord = z.infer<typeof insertPerformanceRecordSchema>;
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
+export type InsertEconomicEvent = z.infer<typeof insertEconomicEventSchema>;
+export type InsertEconomicEventMarketMapping = z.infer<typeof insertEconomicEventMarketMappingSchema>;
 export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;

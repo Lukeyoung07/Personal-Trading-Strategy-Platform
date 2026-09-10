@@ -13,6 +13,181 @@ export interface Error {
   error: string;
 }
 
+export interface EconomicEventMarketMapping {
+  id: number;
+  eventId: number;
+  /** @nullable */
+  marketId: number | null;
+  /** @nullable */
+  marketLabel: string | null;
+  /** @nullable */
+  impactDirection: string | null;
+  /** @nullable */
+  notes: string | null;
+}
+
+export type EconomicEventImpact = typeof EconomicEventImpact[keyof typeof EconomicEventImpact];
+
+
+export const EconomicEventImpact = {
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
+
+export type EconomicEventReleaseStatus = typeof EconomicEventReleaseStatus[keyof typeof EconomicEventReleaseStatus];
+
+
+export const EconomicEventReleaseStatus = {
+  upcoming: 'upcoming',
+  live: 'live',
+  released: 'released',
+  delayed: 'delayed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface EconomicEvent {
+  id: number;
+  providerKey: string;
+  /** @nullable */
+  providerEventId: string | null;
+  dedupeKey: string;
+  name: string;
+  scheduledAt: string;
+  impact: EconomicEventImpact;
+  /** @nullable */
+  region: string | null;
+  /** @nullable */
+  currency: string | null;
+  /** @nullable */
+  previous: string | null;
+  /** @nullable */
+  forecast: string | null;
+  /** @nullable */
+  actual: string | null;
+  releaseStatus: EconomicEventReleaseStatus;
+  /** @nullable */
+  sourceUpdatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  affectedMarkets: EconomicEventMarketMapping[];
+}
+
+export type EconomicEventInputImpact = typeof EconomicEventInputImpact[keyof typeof EconomicEventInputImpact];
+
+
+export const EconomicEventInputImpact = {
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
+
+export type EconomicEventInputReleaseStatus = typeof EconomicEventInputReleaseStatus[keyof typeof EconomicEventInputReleaseStatus];
+
+
+export const EconomicEventInputReleaseStatus = {
+  upcoming: 'upcoming',
+  live: 'live',
+  released: 'released',
+  delayed: 'delayed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface EconomicEventMarketMappingInput {
+  /** @nullable */
+  marketId?: number | null;
+  /** @nullable */
+  marketLabel?: string | null;
+  /** @nullable */
+  impactDirection?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export interface EconomicEventInput {
+  /** @minLength 1 */
+  providerKey: string;
+  /** @nullable */
+  providerEventId?: string | null;
+  /** @nullable */
+  dedupeKey?: string | null;
+  /** @minLength 1 */
+  name: string;
+  scheduledAt: string;
+  impact?: EconomicEventInputImpact;
+  /** @nullable */
+  region?: string | null;
+  /** @nullable */
+  currency?: string | null;
+  /** @nullable */
+  previous?: string | null;
+  /** @nullable */
+  forecast?: string | null;
+  /** @nullable */
+  actual?: string | null;
+  releaseStatus?: EconomicEventInputReleaseStatus;
+  /** @nullable */
+  sourceUpdatedAt?: string | null;
+  affectedMarkets?: EconomicEventMarketMappingInput[];
+}
+
+export type EconomicEventUpdateImpact = typeof EconomicEventUpdateImpact[keyof typeof EconomicEventUpdateImpact];
+
+
+export const EconomicEventUpdateImpact = {
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
+
+export type EconomicEventUpdateReleaseStatus = typeof EconomicEventUpdateReleaseStatus[keyof typeof EconomicEventUpdateReleaseStatus];
+
+
+export const EconomicEventUpdateReleaseStatus = {
+  upcoming: 'upcoming',
+  live: 'live',
+  released: 'released',
+  delayed: 'delayed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface EconomicEventUpdate {
+  /** @nullable */
+  providerEventId?: string | null;
+  /** @minLength 1 */
+  name?: string;
+  scheduledAt?: string;
+  impact?: EconomicEventUpdateImpact;
+  /** @nullable */
+  region?: string | null;
+  /** @nullable */
+  currency?: string | null;
+  /** @nullable */
+  previous?: string | null;
+  /** @nullable */
+  forecast?: string | null;
+  /** @nullable */
+  actual?: string | null;
+  releaseStatus?: EconomicEventUpdateReleaseStatus;
+  /** @nullable */
+  sourceUpdatedAt?: string | null;
+  affectedMarkets?: EconomicEventMarketMappingInput[];
+}
+
+export interface EconomicEventsList {
+  providerConnected: boolean;
+  /** @nullable */
+  providerName: string | null;
+  events: EconomicEvent[];
+}
+
+export interface EconomicEventProviderStatus {
+  providerConnected: boolean;
+  /** @nullable */
+  providerName: string | null;
+  message: string;
+}
+
 export interface DashboardSummary {
   strategyCount: number;
   tradeCount: number;
@@ -1431,6 +1606,34 @@ export interface UserSettingsUpdate {
  * Resource not found
  */
 export type NotFoundResponse = Error;
+
+export type ListEconomicEventsParams = {
+view?: ListEconomicEventsView;
+impact?: ListEconomicEventsImpact;
+region?: string;
+currency?: string;
+market?: string;
+search?: string;
+};
+
+export type ListEconomicEventsView = typeof ListEconomicEventsView[keyof typeof ListEconomicEventsView];
+
+
+export const ListEconomicEventsView = {
+  today: 'today',
+  upcoming: 'upcoming',
+  recently_released: 'recently_released',
+  all: 'all',
+} as const;
+
+export type ListEconomicEventsImpact = typeof ListEconomicEventsImpact[keyof typeof ListEconomicEventsImpact];
+
+
+export const ListEconomicEventsImpact = {
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
 
 export type StreamMarketDataQuotesParams = {
 /**

@@ -31,11 +31,17 @@ import type {
   ConditionInput,
   ConditionUpdate,
   DashboardSummary,
+  EconomicEvent,
+  EconomicEventInput,
+  EconomicEventProviderStatus,
+  EconomicEventUpdate,
+  EconomicEventsList,
   HealthStatus,
   Instrument,
   InstrumentInput,
   InstrumentUpdate,
   ListCandlesParams,
+  ListEconomicEventsParams,
   Market,
   MarketDataConnection,
   MarketDataSource,
@@ -105,6 +111,310 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getListEconomicEventsUrl = (params?: ListEconomicEventsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/economic-events?${stringifiedParams}` : `/api/economic-events`
+}
+
+/**
+ * @summary List economic calendar events
+ */
+export const listEconomicEvents = async (params?: ListEconomicEventsParams, options?: Parameters<typeof customFetch>[1]): Promise<EconomicEventsList> => {
+
+  return customFetch<EconomicEventsList>(getListEconomicEventsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEconomicEventsQueryKey = (params?: ListEconomicEventsParams,) => {
+    return [
+    `/api/economic-events`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListEconomicEventsQueryOptions = <TData = Awaited<ReturnType<typeof listEconomicEvents>>, TError = ErrorType<unknown>>(params?: ListEconomicEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEconomicEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEconomicEventsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEconomicEvents>>> = ({ signal }) => listEconomicEvents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEconomicEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEconomicEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listEconomicEvents>>>
+export type ListEconomicEventsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List economic calendar events
+ */
+
+export function useListEconomicEvents<TData = Awaited<ReturnType<typeof listEconomicEvents>>, TError = ErrorType<unknown>>(
+ params?: ListEconomicEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEconomicEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEconomicEventsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpsertEconomicEventUrl = () => {
+
+
+
+
+  return `/api/economic-events`
+}
+
+/**
+ * @summary Upsert a provider economic event
+ */
+export const upsertEconomicEvent = async (economicEventInput: EconomicEventInput, options?: Parameters<typeof customFetch>[1]): Promise<EconomicEvent> => {
+
+  return customFetch<EconomicEvent>(getUpsertEconomicEventUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(economicEventInput)
+  }
+);}
+
+
+
+
+
+export const getUpsertEconomicEventMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertEconomicEvent>>, TError,{data: BodyType<EconomicEventInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertEconomicEvent>>, TError,{data: BodyType<EconomicEventInput>}, TContext> => {
+
+const mutationKey = ['upsertEconomicEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertEconomicEvent>>, {data: BodyType<EconomicEventInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  upsertEconomicEvent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertEconomicEventMutationResult = NonNullable<Awaited<ReturnType<typeof upsertEconomicEvent>>>
+    export type UpsertEconomicEventMutationBody = BodyType<EconomicEventInput>
+    export type UpsertEconomicEventMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Upsert a provider economic event
+ */
+export const useUpsertEconomicEvent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertEconomicEvent>>, TError,{data: BodyType<EconomicEventInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof upsertEconomicEvent>>,
+        TError,
+        {data: BodyType<EconomicEventInput>},
+        TContext
+      > => {
+      return useMutation(getUpsertEconomicEventMutationOptions(options));
+    }
+
+export const getUpdateEconomicEventUrl = (eventId: number,) => {
+
+
+
+
+  return `/api/economic-events/${eventId}`
+}
+
+/**
+ * @summary Update a provider economic event
+ */
+export const updateEconomicEvent = async (eventId: number,
+    economicEventUpdate: EconomicEventUpdate, options?: Parameters<typeof customFetch>[1]): Promise<EconomicEvent> => {
+
+  return customFetch<EconomicEvent>(getUpdateEconomicEventUrl(eventId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(economicEventUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateEconomicEventMutationOptions = <TError = ErrorType<NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEconomicEvent>>, TError,{eventId: number;data: BodyType<EconomicEventUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEconomicEvent>>, TError,{eventId: number;data: BodyType<EconomicEventUpdate>}, TContext> => {
+
+const mutationKey = ['updateEconomicEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEconomicEvent>>, {eventId: number;data: BodyType<EconomicEventUpdate>}> = (props) => {
+          const {eventId,data} = props ?? {};
+
+          return  updateEconomicEvent(eventId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateEconomicEventMutationResult = NonNullable<Awaited<ReturnType<typeof updateEconomicEvent>>>
+    export type UpdateEconomicEventMutationBody = BodyType<EconomicEventUpdate>
+    export type UpdateEconomicEventMutationError = ErrorType<NotFoundResponse>
+
+    /**
+ * @summary Update a provider economic event
+ */
+export const useUpdateEconomicEvent = <TError = ErrorType<NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEconomicEvent>>, TError,{eventId: number;data: BodyType<EconomicEventUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateEconomicEvent>>,
+        TError,
+        {eventId: number;data: BodyType<EconomicEventUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateEconomicEventMutationOptions(options));
+    }
+
+export const getGetEconomicEventProviderStatusUrl = () => {
+
+
+
+
+  return `/api/economic-events/providers`
+}
+
+/**
+ * @summary Get economic calendar provider availability
+ */
+export const getEconomicEventProviderStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<EconomicEventProviderStatus> => {
+
+  return customFetch<EconomicEventProviderStatus>(getGetEconomicEventProviderStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEconomicEventProviderStatusQueryKey = () => {
+    return [
+    `/api/economic-events/providers`
+    ] as const;
+    }
+
+
+export const getGetEconomicEventProviderStatusQueryOptions = <TData = Awaited<ReturnType<typeof getEconomicEventProviderStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEconomicEventProviderStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEconomicEventProviderStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEconomicEventProviderStatus>>> = ({ signal }) => getEconomicEventProviderStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEconomicEventProviderStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEconomicEventProviderStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getEconomicEventProviderStatus>>>
+export type GetEconomicEventProviderStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get economic calendar provider availability
+ */
+
+export function useGetEconomicEventProviderStatus<TData = Awaited<ReturnType<typeof getEconomicEventProviderStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEconomicEventProviderStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEconomicEventProviderStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getHealthCheckUrl = () => {
 

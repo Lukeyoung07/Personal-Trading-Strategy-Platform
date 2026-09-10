@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Link, Route, Switch, useLocation, useParams } from 'wouter';
 import {
-  Activity, AlertTriangle, Archive, ArrowDownRight, ArrowUpRight, BarChart3, Bell, BookOpen,
+  Activity, AlertTriangle, Archive, ArrowDownRight, ArrowUpRight, BarChart3, Bell, BookOpen, CalendarClock,
   Boxes, Check, ChevronDown, ChevronRight, CircleHelp, ClipboardList, Clock3, Edit3, FileText, Filter, Gauge,
   LayoutDashboard, Menu, MoreHorizontal, Pencil, Plus, Search, Settings, SlidersHorizontal,
   Sparkles, Target, Trash2, TrendingUp, X, Zap
@@ -27,6 +27,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { StrategyMonitoringPage } from '@/components/strategy-monitoring';
+import { EconomicCalendar } from '@/components/economic-calendar';
 import '@/index.css';
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const nav = [
   { href:'/performance', label:'Performance', icon:TrendingUp },
   { href:'/strategy-monitoring', label:'Monitor', icon:Activity },
   { href:'/alerts', label:'Alerts', icon:Bell },
+  { href:'/news', label:'News', icon:CalendarClock },
 ];
 
 function Shell({ children }: { children: ReactNode }) {
@@ -176,5 +178,5 @@ function SettingsPage() { const q=useGetSettings();const u=useUpdateSettings();c
 function Backtesting() { return <Page eyebrow="Utilities" title="Backtesting" description="A deliberate boundary, for now."><div className="panel empty-grid p-10 md:p-16 text-center max-w-2xl mx-auto"><div className="w-12 h-12 mx-auto rounded-xl border border-accent/30 bg-accent/10 text-accent flex items-center justify-center mb-5"><Clock3 size={21}/></div><span className="tag tag-draft">Not built yet</span><h2 className="display text-2xl font-bold mt-5">No simulated certainty here.</h2><p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto mt-3">Backtesting is intentionally a placeholder. This workspace is for building and reviewing your own records, not manufacturing a performance history.</p><Link href="/strategy-builder" className="btn btn-secondary mt-7" data-testid="link-backtesting-builder">Return to builder <ChevronRight size={14}/></Link></div></Page>; }
 
 function StrategyBuilderRoute() { return <StrategyBuilder/>; }
-function Router() { return <ErrorBoundary><Shell><Switch><Route path="/" component={Dashboard}/><Route path="/strategy-builder" component={StrategyBuilderRoute}/><Route path="/strategy-library" component={StrategyLibrary}/><Route path="/market-monitor" component={MarketMonitor}/><Route path="/trade-journal" component={Journal}/><Route path="/performance" component={Performance}/><Route path="/strategy-monitoring" component={StrategyMonitoringPage}/><Route path="/alerts" component={Alerts}/><Route path="/settings" component={SettingsPage}/><Route path="/backtesting" component={Backtesting}/><Route component={NotFound}/></Switch></Shell></ErrorBoundary>; }
+function Router() { return <ErrorBoundary><Shell><Switch><Route path="/" component={Dashboard}/><Route path="/strategy-builder" component={StrategyBuilderRoute}/><Route path="/strategy-library" component={StrategyLibrary}/><Route path="/market-monitor" component={MarketMonitor}/><Route path="/trade-journal" component={Journal}/><Route path="/performance" component={Performance}/><Route path="/strategy-monitoring" component={StrategyMonitoringPage}/><Route path="/alerts" component={Alerts}/><Route path="/news" component={EconomicCalendar}/><Route path="/settings" component={SettingsPage}/><Route path="/backtesting" component={Backtesting}/><Route component={NotFound}/></Switch></Shell></ErrorBoundary>; }
 export default function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><Router/><Toaster/></TooltipProvider></QueryClientProvider>; }

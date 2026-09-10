@@ -3,6 +3,7 @@ import healthRouter from "./health";
 import tradingRouter from "./trading";
 import marketDataRouter from "./market-data";
 import strategyMonitoringRouter from "./strategy-monitoring";
+import economicEventsRouter from "./economic-events";
 
 const router: IRouter = Router();
 
@@ -10,5 +11,6 @@ router.use(healthRouter);
 router.use(tradingRouter);
 router.use(marketDataRouter);
 router.use(strategyMonitoringRouter);
+router.use(economicEventsRouter);
 
 export default router;

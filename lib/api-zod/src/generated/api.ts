@@ -9,6 +9,180 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary List economic calendar events
+ */
+export const listEconomicEventsQueryViewDefault = `all`;
+
+export const ListEconomicEventsQueryParams = zod.object({
+  "view": zod.enum(['today', 'upcoming', 'recently_released', 'all']).default(listEconomicEventsQueryViewDefault),
+  "impact": zod.enum(['high', 'medium', 'low']).optional(),
+  "region": zod.coerce.string().optional(),
+  "currency": zod.coerce.string().optional(),
+  "market": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional()
+})
+
+export const ListEconomicEventsResponse = zod.object({
+  "providerConnected": zod.boolean(),
+  "providerName": zod.string().nullable(),
+  "events": zod.array(zod.object({
+  "id": zod.number().int(),
+  "providerKey": zod.string(),
+  "providerEventId": zod.string().nullable(),
+  "dedupeKey": zod.string(),
+  "name": zod.string(),
+  "scheduledAt": zod.coerce.date(),
+  "impact": zod.enum(['high', 'medium', 'low']),
+  "region": zod.string().nullable(),
+  "currency": zod.string().nullable(),
+  "previous": zod.string().nullable(),
+  "forecast": zod.string().nullable(),
+  "actual": zod.string().nullable(),
+  "releaseStatus": zod.enum(['upcoming', 'live', 'released', 'delayed', 'cancelled']),
+  "sourceUpdatedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "affectedMarkets": zod.array(zod.object({
+  "id": zod.number().int(),
+  "eventId": zod.number().int(),
+  "marketId": zod.number().int().nullable(),
+  "marketLabel": zod.string().nullable(),
+  "impactDirection": zod.string().nullable(),
+  "notes": zod.string().nullable()
+}))
+}))
+})
+
+
+/**
+ * @summary Upsert a provider economic event
+ */
+
+
+
+
+export const UpsertEconomicEventBody = zod.object({
+  "providerKey": zod.string().min(1),
+  "providerEventId": zod.string().nullish(),
+  "dedupeKey": zod.string().nullish(),
+  "name": zod.string().min(1),
+  "scheduledAt": zod.coerce.date(),
+  "impact": zod.enum(['high', 'medium', 'low']).optional(),
+  "region": zod.string().nullish(),
+  "currency": zod.string().nullish(),
+  "previous": zod.string().nullish(),
+  "forecast": zod.string().nullish(),
+  "actual": zod.string().nullish(),
+  "releaseStatus": zod.enum(['upcoming', 'live', 'released', 'delayed', 'cancelled']).optional(),
+  "sourceUpdatedAt": zod.coerce.date().nullish(),
+  "affectedMarkets": zod.array(zod.object({
+  "marketId": zod.number().int().nullish(),
+  "marketLabel": zod.string().nullish(),
+  "impactDirection": zod.string().nullish(),
+  "notes": zod.string().nullish()
+})).optional()
+})
+
+export const UpsertEconomicEventResponse = zod.object({
+  "id": zod.number().int(),
+  "providerKey": zod.string(),
+  "providerEventId": zod.string().nullable(),
+  "dedupeKey": zod.string(),
+  "name": zod.string(),
+  "scheduledAt": zod.coerce.date(),
+  "impact": zod.enum(['high', 'medium', 'low']),
+  "region": zod.string().nullable(),
+  "currency": zod.string().nullable(),
+  "previous": zod.string().nullable(),
+  "forecast": zod.string().nullable(),
+  "actual": zod.string().nullable(),
+  "releaseStatus": zod.enum(['upcoming', 'live', 'released', 'delayed', 'cancelled']),
+  "sourceUpdatedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "affectedMarkets": zod.array(zod.object({
+  "id": zod.number().int(),
+  "eventId": zod.number().int(),
+  "marketId": zod.number().int().nullable(),
+  "marketLabel": zod.string().nullable(),
+  "impactDirection": zod.string().nullable(),
+  "notes": zod.string().nullable()
+}))
+})
+
+
+/**
+ * @summary Update a provider economic event
+ */
+
+
+
+export const UpdateEconomicEventParams = zod.object({
+  "eventId": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const UpdateEconomicEventBody = zod.object({
+  "providerEventId": zod.string().nullish(),
+  "name": zod.string().min(1).optional(),
+  "scheduledAt": zod.coerce.date().optional(),
+  "impact": zod.enum(['high', 'medium', 'low']).optional(),
+  "region": zod.string().nullish(),
+  "currency": zod.string().nullish(),
+  "previous": zod.string().nullish(),
+  "forecast": zod.string().nullish(),
+  "actual": zod.string().nullish(),
+  "releaseStatus": zod.enum(['upcoming', 'live', 'released', 'delayed', 'cancelled']).optional(),
+  "sourceUpdatedAt": zod.coerce.date().nullish(),
+  "affectedMarkets": zod.array(zod.object({
+  "marketId": zod.number().int().nullish(),
+  "marketLabel": zod.string().nullish(),
+  "impactDirection": zod.string().nullish(),
+  "notes": zod.string().nullish()
+})).optional()
+})
+
+export const UpdateEconomicEventResponse = zod.object({
+  "id": zod.number().int(),
+  "providerKey": zod.string(),
+  "providerEventId": zod.string().nullable(),
+  "dedupeKey": zod.string(),
+  "name": zod.string(),
+  "scheduledAt": zod.coerce.date(),
+  "impact": zod.enum(['high', 'medium', 'low']),
+  "region": zod.string().nullable(),
+  "currency": zod.string().nullable(),
+  "previous": zod.string().nullable(),
+  "forecast": zod.string().nullable(),
+  "actual": zod.string().nullable(),
+  "releaseStatus": zod.enum(['upcoming', 'live', 'released', 'delayed', 'cancelled']),
+  "sourceUpdatedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "affectedMarkets": zod.array(zod.object({
+  "id": zod.number().int(),
+  "eventId": zod.number().int(),
+  "marketId": zod.number().int().nullable(),
+  "marketLabel": zod.string().nullable(),
+  "impactDirection": zod.string().nullable(),
+  "notes": zod.string().nullable()
+}))
+})
+
+
+/**
+ * @summary Get economic calendar provider availability
+ */
+export const GetEconomicEventProviderStatusResponse = zod.object({
+  "providerConnected": zod.boolean(),
+  "providerName": zod.string().nullable(),
+  "message": zod.string()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

@@ -28,9 +28,87 @@ tags:
     description: Performance tracking
   - name: alerts
     description: User-created alerts
+  - name: economic-events
+    description: Provider-neutral economic calendar data
   - name: settings
     description: Workspace settings
 paths:
+  /economic-events:
+    get:
+      operationId: listEconomicEvents
+      tags: [economic-events]
+      summary: List economic calendar events
+      parameters:
+        - { name: view, in: query, schema: { type: string, enum: [today, upcoming, recently_released, all], default: all } }
+        - { name: impact, in: query, schema: { type: string, enum: [high, medium, low] } }
+        - { name: region, in: query, schema: { type: string } }
+        - { name: currency, in: query, schema: { type: string } }
+        - { name: market, in: query, schema: { type: string } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Economic calendar events and provider availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EconomicEventsList"
+    post:
+      operationId: upsertEconomicEvent
+      tags: [economic-events]
+      summary: Upsert a provider economic event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EconomicEventInput"
+      responses:
+        "200":
+          description: Upserted event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EconomicEvent"
+        "201":
+          description: Created event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EconomicEvent"
+  /economic-events/{eventId}:
+    patch:
+      operationId: updateEconomicEvent
+      tags: [economic-events]
+      summary: Update a provider economic event
+      parameters:
+        - $ref: "#/components/parameters/EconomicEventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EconomicEventUpdate"
+      responses:
+        "200":
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EconomicEvent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /economic-events/providers:
+    get:
+      operationId: getEconomicEventProviderStatus
+      tags: [economic-events]
+      summary: Get economic calendar provider availability
+      responses:
+        "200":
+          description: Provider availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EconomicEventProviderStatus"
   /healthz:
     get:
       operationId: healthCheck
@@ -1139,6 +1217,11 @@ components:
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
+    EconomicEventId:
+      name: eventId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
   responses:
     NotFound:
       description: Resource not found
@@ -1159,6 +1242,103 @@ components:
       properties:
         error: { type: string }
       required: [error]
+    EconomicEventMarketMapping:
+      type: object
+      required: [id, eventId, marketId, marketLabel, impactDirection, notes]
+      properties:
+        id: { type: integer }
+        eventId: { type: integer }
+        marketId: { type: ["integer", "null"] }
+        marketLabel: { type: ["string", "null"] }
+        impactDirection: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+    EconomicEvent:
+      type: object
+      required: [id, providerKey, providerEventId, dedupeKey, name, scheduledAt, impact, region, currency, previous, forecast, actual, releaseStatus, sourceUpdatedAt, createdAt, updatedAt, affectedMarkets]
+      properties:
+        id: { type: integer }
+        providerKey: { type: string }
+        providerEventId: { type: ["string", "null"] }
+        dedupeKey: { type: string }
+        name: { type: string }
+        scheduledAt: { type: string, format: date-time }
+        impact: { type: string, enum: [high, medium, low] }
+        region: { type: ["string", "null"] }
+        currency: { type: ["string", "null"] }
+        previous: { type: ["string", "null"] }
+        forecast: { type: ["string", "null"] }
+        actual: { type: ["string", "null"] }
+        releaseStatus: { type: string, enum: [upcoming, live, released, delayed, cancelled] }
+        sourceUpdatedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        affectedMarkets:
+          type: array
+          items:
+            $ref: "#/components/schemas/EconomicEventMarketMapping"
+    EconomicEventInput:
+      type: object
+      required: [providerKey, name, scheduledAt]
+      properties:
+        providerKey: { type: string, minLength: 1 }
+        providerEventId: { type: ["string", "null"] }
+        dedupeKey: { type: ["string", "null"] }
+        name: { type: string, minLength: 1 }
+        scheduledAt: { type: string, format: date-time }
+        impact: { type: string, enum: [high, medium, low] }
+        region: { type: ["string", "null"] }
+        currency: { type: ["string", "null"] }
+        previous: { type: ["string", "null"] }
+        forecast: { type: ["string", "null"] }
+        actual: { type: ["string", "null"] }
+        releaseStatus: { type: string, enum: [upcoming, live, released, delayed, cancelled] }
+        sourceUpdatedAt: { type: ["string", "null"], format: date-time }
+        affectedMarkets:
+          type: array
+          items:
+            $ref: "#/components/schemas/EconomicEventMarketMappingInput"
+    EconomicEventMarketMappingInput:
+      type: object
+      properties:
+        marketId: { type: ["integer", "null"] }
+        marketLabel: { type: ["string", "null"] }
+        impactDirection: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+    EconomicEventUpdate:
+      type: object
+      properties:
+        providerEventId: { type: ["string", "null"] }
+        name: { type: string, minLength: 1 }
+        scheduledAt: { type: string, format: date-time }
+        impact: { type: string, enum: [high, medium, low] }
+        region: { type: ["string", "null"] }
+        currency: { type: ["string", "null"] }
+        previous: { type: ["string", "null"] }
+        forecast: { type: ["string", "null"] }
+        actual: { type: ["string", "null"] }
+        releaseStatus: { type: string, enum: [upcoming, live, released, delayed, cancelled] }
+        sourceUpdatedAt: { type: ["string", "null"], format: date-time }
+        affectedMarkets:
+          type: array
+          items:
+            $ref: "#/components/schemas/EconomicEventMarketMappingInput"
+    EconomicEventsList:
+      type: object
+      required: [providerConnected, providerName, events]
+      properties:
+        providerConnected: { type: boolean }
+        providerName: { type: ["string", "null"] }
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/EconomicEvent"
+    EconomicEventProviderStatus:
+      type: object
+      required: [providerConnected, providerName, message]
+      properties:
+        providerConnected: { type: boolean }
+        providerName: { type: ["string", "null"] }
+        message: { type: string }
     DashboardSummary:
       type: object
       required: [strategyCount, tradeCount, alertCount, conceptCount, marketCount, activeStrategyCount, hasPerformanceData]
