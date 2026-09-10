@@ -1,0 +1,57 @@
+Review Strategy is still broken even after I rolled the project back to the previous version.
+
+DO NOT make changes yet.
+
+I want you to diagnose the problem first using the actual running browser.
+
+The Review Strategy workflow previously worked, but it now does not, even after rollback.
+
+Trace this exact flow step-by-step:
+
+1. Open the AI Trading Assistant.
+2. Ask it to create a strategy, for example:
+   "Create me a simple XAUUSD BUY strategy using a bullish candle for entry, a bearish candle for exit, 1% stop loss and 2% take profit."
+3. Confirm the AI returns a structured strategy draft.
+4. Inspect the Review Strategy button/action.
+5. Click Review Strategy.
+6. Inspect the URL after navigation.
+7. Inspect whether the AI draft is stored before navigation.
+8. Inspect whether the Builder receives the draft after navigation.
+9. Inspect the Builder's route/query parameters.
+10. Inspect the Builder's draft-loading logic.
+11. Identify the EXACT point where the draft is lost or ignored.
+12. Check whether an existing strategy/default Builder state is overriding the incoming AI draft.
+13. Check whether the Assistant closes because navigation is intentionally closing it or because the route change causes the draft state to disappear.
+
+IMPORTANT:
+
+Do not assume the cause is sessionStorage, useLocation, routing, the draft store, or anything else.
+
+Prove the cause from the live browser.
+
+Do NOT change:
+- OpenRouter
+- API key
+- AI provider
+- Backtesting
+- Strategy Builder architecture
+- trading concepts
+- save/version architecture
+
+Do NOT redesign anything.
+
+Do NOT implement a fix until you have identified the exact failure.
+
+After diagnosis, report:
+
+- What happens when Review Strategy is clicked.
+- The exact URL produced.
+- Whether the draft exists before navigation.
+- Whether the draft exists after navigation.
+- Whether the Builder receives it.
+- The exact component/state/function where it is lost.
+- The minimal fix required.
+
+Then STOP and wait for me.
+
+Do not claim the issue is fixed until the actual browser path has been reproduced and the exact cause identified.
