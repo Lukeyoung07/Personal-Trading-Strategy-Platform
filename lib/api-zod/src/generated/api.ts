@@ -64,6 +64,11 @@ export const ChatAssistantResponse = zod.object({
   "triggerRules": zod.string(),
   "supported": zod.boolean().optional()
 })),
+  "conceptsUsed": zod.array(zod.object({
+  "name": zod.string(),
+  "supported": zod.boolean(),
+  "explanation": zod.string()
+})).optional(),
   "riskManagementRules": zod.string().nullable(),
   "compatibility": zod.object({
   "compatible": zod.boolean(),

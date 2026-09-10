@@ -2461,6 +2461,13 @@ components:
         unsupportedConditions:
           type: array
           items: { type: string }
+    AssistantConceptReference:
+      type: object
+      required: [name, supported, explanation]
+      properties:
+        name: { type: string }
+        supported: { type: boolean }
+        explanation: { type: string }
     AssistantStrategyDraft:
       type: object
       required: [name, description, direction, marketSymbol, timeframes, conditions, riskManagementRules, compatibility]
@@ -2478,6 +2485,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AssistantStrategyCondition"
+        conceptsUsed:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantConceptReference"
         riskManagementRules: { type: ["string", "null"] }
         compatibility:
           $ref: "#/components/schemas/AssistantCompatibility"

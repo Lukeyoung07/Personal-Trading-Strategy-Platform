@@ -47,7 +47,7 @@ type PanelMessage = {
 };
 
 type PromptGroup = {
-  label: 'BUILD' | 'MODIFY' | 'ANALYSE' | 'LEARN';
+  label: 'BUILD' | 'ICT / SMC' | 'PRICE ACTION' | 'MULTI-TIMEFRAME' | 'RISK' | 'MODIFY' | 'ANALYSE' | 'LEARN';
   icon: typeof Hammer;
   prompts: string[];
 };
@@ -56,7 +56,44 @@ const promptGroups: PromptGroup[] = [
   {
     label: 'BUILD',
     icon: Hammer,
-    prompts: ['Build a simple trend-following strategy', 'Help me define an entry rule'],
+    prompts: [
+      'Build me a simple XAUUSD strategy',
+      'Create a BUY strategy using the 20 EMA',
+      'Build a strategy using support and resistance',
+    ],
+  },
+  {
+    label: 'ICT / SMC',
+    icon: Sparkles,
+    prompts: [
+      'Build a liquidity sweep strategy',
+      'Create an FVG strategy',
+      'Use market structure and BOS',
+    ],
+  },
+  {
+    label: 'PRICE ACTION',
+    icon: FileText,
+    prompts: [
+      'Build a breakout and retest strategy',
+      'Create a bullish candle confirmation strategy',
+    ],
+  },
+  {
+    label: 'MULTI-TIMEFRAME',
+    icon: CalendarDays,
+    prompts: [
+      'Use the 4H trend and find entries on the 15M',
+      'Create a higher-timeframe bias strategy',
+    ],
+  },
+  {
+    label: 'RISK',
+    icon: ShieldCheck,
+    prompts: [
+      'Use a 1% stop loss and 2% take profit',
+      'Explain position sizing for this strategy',
+    ],
   },
   {
     label: 'MODIFY',
@@ -145,6 +182,24 @@ function StrategyDraftCard({
                     <span className="tag tag-draft shrink-0">{condition.conceptName}</span>
                   </div>
                   <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{condition.triggerRules}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {draft.conceptsUsed && draft.conceptsUsed.length > 0 && (
+          <div className="border-t border-primary/15 pt-3" data-testid="assistant-draft-concepts">
+            <div className="eyebrow mb-2">Concepts identified</div>
+            <div className="space-y-2">
+              {draft.conceptsUsed.map((concept) => (
+                <div key={concept.name} className="flex items-start gap-2 rounded-md border border-border/70 bg-background/35 px-3 py-2">
+                  <span className={`tag shrink-0 ${concept.supported ? 'tag-active' : 'tag-draft'}`}>
+                    {concept.supported ? 'Executable' : 'AI understanding'}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold">{concept.name}</div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{concept.explanation}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -403,6 +458,12 @@ export function AssistantPanel({
                 </h3>
                 <p className="mt-3 max-w-[380px] text-xs leading-relaxed text-muted-foreground">
                   I can turn a rough idea into a reviewable draft, explain the trade-offs, or prepare a backtest setup. You stay in control of every save.
+                </p>
+              </div>
+              <div className="mb-3">
+                <div className="text-xs font-semibold">What can I ask?</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  Try a plain-English idea. I can identify trading concepts, explain them simply, and prepare a draft for your review.
                 </p>
               </div>
               <div className="space-y-2.5">

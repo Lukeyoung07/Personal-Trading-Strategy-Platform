@@ -128,4 +128,134 @@ describe("AI Trading Assistant provider boundary", () => {
     expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
     expect(response.strategyDraft?.conditions.map(condition => condition.triggerRules)).toEqual(["bullish", "bearish"]);
   });
+
+  it("does not trust a model-supported flag for concepts the engine cannot execute", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared an FVG draft with an execution limitation.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "FVG draft",
+              description: "A fair value gap strategy.",
+              direction: "long",
+              marketSymbol: "XAUUSD",
+              timeframes: ["15m"],
+              conditions: [{
+                name: "Bullish FVG",
+                stage: "entry",
+                requirement: "required",
+                conceptName: "Fair Value Gap (FVG)",
+                timeframe: "15m",
+                triggerRules: "bullish",
+              }],
+              conceptsUsed: [{
+                name: "Fair Value Gap (FVG)",
+                supported: true,
+                explanation: "The model should not be able to override this guardrail.",
+              }],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: "Build a bullish FVG strategy",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conceptsUsed).toEqual(expect.arrayContaining([{
+      name: "Fair Value Gap (FVG)",
+      supported: false,
+      explanation: "The model should not be able to override this guardrail.",
+    }]));
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("Fair Value Gap (FVG)");
+  });
+
+  it("keeps an unsupported strategy request as a reviewable draft when the model omits one", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "The 20 EMA is understood but unsupported for historical execution.",
+            intent: "education",
+            strategyDraft: null,
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: "Build me a strategy using the 20 EMA.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.intent).toBe("strategy_proposal");
+    expect(response.strategyDraft?.marketSymbol).toBeNull();
+    expect(response.strategyDraft?.conceptsUsed).toEqual([{
+      name: "Exponential Moving Average (EMA)",
+      supported: false,
+      explanation: "Understood by the assistant, but not currently executable by historical backtesting.",
+    }]);
+    expect(response.strategyDraft?.compatibility.compatible).toBe(false);
+  });
+
+  it("preserves explicitly requested concepts even when the model omits their canonical names", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared an FVG draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "FVG draft",
+              description: "A four-hour bias with fifteen-minute entries.",
+              direction: "both",
+              marketSymbol: null,
+              timeframes: ["4H", "15M"],
+              conditions: [{
+                name: "FVG entry",
+                stage: "entry",
+                requirement: "required",
+                conceptName: "Candle Direction",
+                timeframe: "15M",
+                triggerRules: "bullish",
+              }],
+              conceptsUsed: [{
+                name: "Candle Direction",
+                supported: true,
+                explanation: "Represented by the current historical rule set.",
+              }],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: "Create an FVG strategy using a 4H bias and 15M entry.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).toEqual(expect.arrayContaining([
+      "Fair Value Gap (FVG)",
+      "Higher-timeframe bias",
+      "Multi-timeframe analysis",
+    ]));
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).toEqual(expect.arrayContaining([
+      "Fair Value Gap (FVG)",
+      "Higher-timeframe bias",
+      "Multi-timeframe analysis",
+    ]));
+  });
 });

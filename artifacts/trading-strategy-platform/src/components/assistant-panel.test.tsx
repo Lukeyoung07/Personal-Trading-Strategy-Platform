@@ -43,8 +43,8 @@ describe("AssistantPanel", () => {
     );
 
     expect(screen.getByText("Tell me what you want to build, test, or understand.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Help me define an entry rule" }));
-    expect(screen.getByDisplayValue("Help me define an entry rule")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Build me a simple XAUUSD strategy" }));
+    expect(screen.getByDisplayValue("Build me a simple XAUUSD strategy")).toBeTruthy();
   });
 
   it("sends the current message with exact workspace ids", () => {
@@ -88,6 +88,11 @@ describe("AssistantPanel", () => {
           supported: true,
         }],
         riskManagementRules: "Stop-loss 1%.",
+         conceptsUsed: [{
+           name: "Price action",
+           supported: true,
+           explanation: "Represented by the current historical rule set.",
+         }],
         compatibility: { compatible: true, unsupportedConditions: [] },
       },
       compatibility: { compatible: true, unsupportedConditions: [] },
@@ -96,6 +101,7 @@ describe("AssistantPanel", () => {
     render(<AssistantPanel open onClose={vi.fn()} context={context} onReviewStrategy={onReviewStrategy} onOpenBacktest={vi.fn()} />);
     fireEvent.change(screen.getByTestId("input-assistant-message"), { target: { value: "Build this strategy" } });
     fireEvent.click(screen.getByTestId("button-send-assistant"));
+    expect(screen.getByTestId("assistant-draft-concepts").textContent).toContain("Price action");
     fireEvent.click(screen.getByTestId("button-review-strategy"));
     expect(onReviewStrategy).toHaveBeenCalledWith(expect.objectContaining({ name: "Opening range" }));
     fireEvent.click(screen.getByTestId("button-save-new-version"));

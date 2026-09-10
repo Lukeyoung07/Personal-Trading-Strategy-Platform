@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AssistantCompatibility } from './assistantCompatibility';
+import type { AssistantConceptReference } from './assistantConceptReference';
 import type { AssistantStrategyCondition } from './assistantStrategyCondition';
 import type { AssistantStrategyDraftDirection } from './assistantStrategyDraftDirection';
 
@@ -17,6 +18,7 @@ export interface AssistantStrategyDraft {
   marketSymbol: string | null;
   timeframes: string[];
   conditions: AssistantStrategyCondition[];
+  conceptsUsed?: AssistantConceptReference[];
   /** @nullable */
   riskManagementRules: string | null;
   compatibility: AssistantCompatibility;

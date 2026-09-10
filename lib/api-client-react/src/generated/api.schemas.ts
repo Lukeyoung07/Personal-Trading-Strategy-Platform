@@ -1873,6 +1873,12 @@ export interface AssistantCompatibility {
   unsupportedConditions: string[];
 }
 
+export interface AssistantConceptReference {
+  name: string;
+  supported: boolean;
+  explanation: string;
+}
+
 export type AssistantStrategyDraftDirection = typeof AssistantStrategyDraftDirection[keyof typeof AssistantStrategyDraftDirection];
 
 
@@ -1890,6 +1896,7 @@ export interface AssistantStrategyDraft {
   marketSymbol: string | null;
   timeframes: string[];
   conditions: AssistantStrategyCondition[];
+  conceptsUsed?: AssistantConceptReference[];
   /** @nullable */
   riskManagementRules: string | null;
   compatibility: AssistantCompatibility;

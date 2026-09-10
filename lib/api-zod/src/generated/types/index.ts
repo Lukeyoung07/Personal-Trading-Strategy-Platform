@@ -19,6 +19,7 @@ export * from './assistantChatResponse';
 export * from './assistantChatResponseProvider';
 export * from './assistantChatResponseStatus';
 export * from './assistantCompatibility';
+export * from './assistantConceptReference';
 export * from './assistantContext';
 export * from './assistantMessage';
 export * from './assistantMessageRole';

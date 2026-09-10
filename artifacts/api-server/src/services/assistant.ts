@@ -65,11 +65,91 @@ function compatibilityForDraft(draft: any) {
   const unsupported: string[] = conditions
     .filter((condition: any) => !supportedRule(normalizeConditionRule(condition)))
     .map((condition: any) => String(condition?.name || condition?.triggerRules || "Unnamed condition"));
+  const unsupportedConcepts = Array.isArray(draft?.conceptsUsed)
+    ? draft.conceptsUsed
+      .filter((concept: any) => concept && concept.supported === false)
+      .map((concept: any) => String(concept.name || "Unnamed concept"))
+    : [];
+  unsupported.push(...unsupportedConcepts);
   if (!conditions.some((condition: any) => condition?.stage === "entry" || condition?.stage === "confirmation")) {
     unsupported.unshift("No entry condition has been added");
   }
   if (!compatibleRiskRules(draft?.riskManagementRules)) unsupported.push("The current risk rules");
   return { compatible: unsupported.length === 0, unsupportedConditions: [...new Set<string>(unsupported)] };
+}
+
+function knownUnsupportedConcept(name: string) {
+  return /fair value gap|\bfvg\b|ifvg|liquidity sweep|liquidity grab|buy[- ]side liquidity|sell[- ]side liquidity|equal highs?|equal lows?|order block|breaker block|supply|demand|premium|discount|equilibrium|higher[- ]timeframe|lower[- ]timeframe|multi[- ]timeframe|\bema\b|\bsma\b|moving average|break of structure|\bbos\b|change of character|\bchoch\b|smt divergence|\bamd\b|power of 3|\birl\b|\berl\b|session concept|position sizing|maximum risk|risk.reward|stop loss|take profit|fixed stop|fixed take/i.test(name);
+}
+
+function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName: string; supported: boolean }>) {
+  const concepts = new Map<string, { name: string; supported: boolean; explanation: string }>();
+  const addConcept = (raw: any, fallbackName?: string) => {
+    const name = String(typeof raw === "string" ? raw : raw?.name || fallbackName || "").trim().slice(0, 120);
+    if (!name) return;
+    const matchingConditions = conditions.filter(condition => condition.conceptName.toLowerCase() === name.toLowerCase());
+    const supported = knownUnsupportedConcept(name)
+      ? false
+      : matchingConditions.length > 0
+        ? matchingConditions.every(condition => condition.supported) && raw?.supported !== false
+        : raw?.supported === true;
+    const explanation = String(
+      typeof raw === "object" && raw?.explanation
+        ? raw.explanation
+        : supported
+          ? "Represented by the current historical rule set."
+          : "Understood by the assistant, but not currently executable by historical backtesting.",
+    ).slice(0, 300);
+    const existing = concepts.get(name.toLowerCase());
+    concepts.set(name.toLowerCase(), {
+      name,
+      supported: existing ? existing.supported && supported : supported,
+      explanation: existing?.explanation || explanation,
+    });
+  };
+
+  if (Array.isArray(rawConcepts)) rawConcepts.forEach(concept => addConcept(concept));
+  conditions.forEach(condition => addConcept(condition.conceptName));
+  return [...concepts.values()].slice(0, 30);
+}
+
+function conceptsRequestedInMessage(message: string) {
+  const requested: Array<{ name: string; supported: false; explanation: string }> = [];
+  const add = (pattern: RegExp, name: string, explanation = "Understood by the assistant, but not currently executable by historical backtesting.") => {
+    if (pattern.test(message)) requested.push({ name, supported: false, explanation });
+  };
+  add(/fair value gap|\bfvg\b|ifvg/i, "Fair Value Gap (FVG)");
+  add(/liquidity sweep|liquidity grab/i, "Liquidity Sweep");
+  add(/market structure|\bbos\b|break of structure|choch|change of character/i, "Market Structure");
+  add(/support|resistance/i, "Support and Resistance");
+  add(/supply|demand/i, "Supply and Demand");
+  add(/order block|breaker block/i, "Order Block");
+  add(/premium|discount|equilibrium/i, "Premium / Discount");
+  add(/\bema\b|exponential moving average/i, "Exponential Moving Average (EMA)");
+  add(/\bsma\b|simple moving average/i, "Simple Moving Average (SMA)");
+  add(/higher[- ]timeframe|lower[- ]timeframe|\b\d+\s*h\b.*\b\d+\s*m\b|multi[- ]timeframe/i, "Higher-timeframe bias");
+  if (/higher[- ]timeframe|lower[- ]timeframe|\b\d+\s*h\b.*\b\d+\s*m\b|multi[- ]timeframe/i.test(message)) {
+    requested.push({
+      name: "Multi-timeframe analysis",
+      supported: false,
+      explanation: "The engine backtests one timeframe at a time and cannot combine higher-timeframe bias with lower-timeframe entries.",
+    });
+  }
+  add(/stop[- ]loss|\bsl\b/i, "Stop loss");
+  add(/take[- ]profit|\btp\b/i, "Take profit");
+  return requested;
+}
+
+function enrichDraftConcepts(draft: any, message: string) {
+  const conceptsUsed = normalizeConcepts([
+    ...(Array.isArray(draft.conceptsUsed) ? draft.conceptsUsed : []),
+    ...conceptsRequestedInMessage(message),
+  ], draft.conditions || []);
+  return {
+    ...draft,
+    conceptsUsed,
+    compatibility: compatibilityForDraft({ ...draft, conceptsUsed }),
+  };
 }
 
 function parseDateOrNull(value: unknown) {
@@ -93,25 +173,31 @@ function parseModelJson(content: string) {
 function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | "provider"> | null {
   if (!model || typeof model.reply !== "string" || !model.reply.trim()) return null;
   const draft = model.strategyDraft && typeof model.strategyDraft === "object" ? model.strategyDraft : null;
+  const conditions = draft && Array.isArray(draft.conditions) ? draft.conditions.map((condition: any) => ({
+    name: String(condition?.name || "Assistant condition").slice(0, 160),
+    stage: ["entry", "confirmation", "invalidation", "exit"].includes(condition?.stage) ? condition.stage : "entry",
+    requirement: condition?.requirement === "optional" ? "optional" : "required",
+    conceptName: supportedRule(normalizeConditionRule(condition)) && /(?:bullish|bearish|close|open)/i.test(`${condition?.triggerRules || ""} ${condition?.conceptName || ""}`)
+      ? "Candle Direction"
+      : String(condition?.conceptName || "Assistant draft").slice(0, 160),
+    timeframe: String(condition?.timeframe || "Not specified").slice(0, 40),
+    triggerRules: normalizeConditionRule(condition).slice(0, 400),
+    supported: supportedRule(normalizeConditionRule(condition)),
+  })).slice(0, 20) : [];
+  const conceptsUsed = draft ? normalizeConcepts(draft.conceptsUsed, conditions) : [];
+  const compatibility = draft
+    ? compatibilityForDraft({ ...draft, conditions, conceptsUsed })
+    : { compatible: true, unsupportedConditions: [] };
   const strategyDraft = draft ? {
     name: String(draft.name || "Assistant strategy draft").slice(0, 160),
     description: String(draft.description || "").slice(0, 2000),
     direction: ["long", "short", "both"].includes(draft.direction) ? draft.direction : "both",
     marketSymbol: draft.marketSymbol ? String(draft.marketSymbol).slice(0, 80) : null,
     timeframes: Array.isArray(draft.timeframes) ? draft.timeframes.map(String).slice(0, 8) : [],
-    conditions: Array.isArray(draft.conditions) ? draft.conditions.map((condition: any) => ({
-      name: String(condition?.name || "Assistant condition").slice(0, 160),
-      stage: ["entry", "confirmation", "invalidation", "exit"].includes(condition?.stage) ? condition.stage : "entry",
-      requirement: condition?.requirement === "optional" ? "optional" : "required",
-      conceptName: supportedRule(normalizeConditionRule(condition)) && /(?:bullish|bearish|close|open)/i.test(`${condition?.triggerRules || ""} ${condition?.conceptName || ""}`)
-        ? "Candle Direction"
-        : String(condition?.conceptName || "Assistant draft").slice(0, 160),
-      timeframe: String(condition?.timeframe || "Not specified").slice(0, 40),
-      triggerRules: normalizeConditionRule(condition).slice(0, 400),
-      supported: supportedRule(normalizeConditionRule(condition)),
-    })).slice(0, 20) : [],
+    conditions,
+    conceptsUsed,
     riskManagementRules: draft.riskManagementRules ? String(draft.riskManagementRules).slice(0, 400) : null,
-    compatibility: compatibilityForDraft(draft),
+    compatibility,
   } : null;
   return {
     reply: model.reply.trim().slice(0, 6000),
@@ -128,6 +214,87 @@ function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | 
     } : null,
   };
 }
+
+function isStrategyDraftRequest(message: string) {
+  return /(?:build|create|make|design|draft).*(?:strategy|setup|system)|(?:strategy|setup).*(?:using|with|based on)/i.test(message);
+}
+
+function unsupportedConceptFromRequest(message: string) {
+  const candidates = [
+    { pattern: /fair value gap|\bfvg\b|ifvg/i, name: "Fair Value Gap (FVG)" },
+    { pattern: /liquidity sweep|liquidity grab/i, name: "Liquidity Sweep" },
+    { pattern: /order block|breaker block/i, name: "Order Block" },
+    { pattern: /market structure|\bbos\b|break of structure|choch|change of character/i, name: "Market Structure" },
+    { pattern: /\bema\b|exponential moving average/i, name: "Exponential Moving Average (EMA)" },
+    { pattern: /\bsma\b|simple moving average/i, name: "Simple Moving Average (SMA)" },
+    { pattern: /support|resistance/i, name: "Support and Resistance" },
+    { pattern: /supply|demand/i, name: "Supply and Demand" },
+    { pattern: /premium|discount|equilibrium/i, name: "Premium / Discount" },
+  ];
+  return candidates.find(candidate => candidate.pattern.test(message)) || {
+    name: "Requested strategy concept",
+    pattern: /./i,
+  };
+}
+
+function fallbackDraftForUnsupportedRequest(message: string, reply: string) {
+  const concept = unsupportedConceptFromRequest(message);
+  const marketSymbol = message.match(/\b(?:XAUUSD|USTEC|US30|NAS100|SPX500|EURUSD|GBPUSD|USDJPY|BTCUSD|ETHUSD)\b/i)?.[0]?.toUpperCase() || null;
+  const timeframes = [...message.matchAll(/\b\d+\s*(?:m|min|minute|h|hour|d|day|w|week)s?\b/gi)]
+    .map(match => match[0].replace(/\s+/g, " ").trim())
+    .slice(0, 4);
+  const conditionName = `Requested ${concept.name}`;
+  const explanation = "Understood by the assistant, but not currently executable by historical backtesting.";
+  return {
+    name: `${marketSymbol ? `${marketSymbol} ` : ""}${concept.name} strategy`.slice(0, 160),
+    description: reply.slice(0, 2000),
+    direction: (/\b(?:buy|long|bullish)\b/i.test(message) && !/\b(?:sell|short|bearish)\b/i.test(message)
+      ? "long"
+      : /\b(?:sell|short|bearish)\b/i.test(message) && !/\b(?:buy|long|bullish)\b/i.test(message)
+        ? "short"
+        : "both") as "long" | "short" | "both",
+    marketSymbol,
+    timeframes,
+    conditions: [{
+      name: conditionName,
+      stage: "entry" as const,
+      requirement: "required" as const,
+      conceptName: concept.name,
+      timeframe: timeframes[0] || "Not specified",
+      triggerRules: `${concept.name} requested; unsupported for historical execution.`,
+      supported: false,
+    }],
+    conceptsUsed: [{
+      name: concept.name,
+      supported: false,
+      explanation,
+    }],
+    riskManagementRules: null,
+    compatibility: {
+      compatible: false,
+      unsupportedConditions: [conditionName, concept.name],
+    },
+  };
+}
+
+const CONCEPT_GUIDE = `
+Trading concept recognition:
+- Market structure: higher high (HH), higher low (HL), lower high (LH), lower low (LL), break of structure (BOS), change of character (CHoCH).
+- Liquidity: buy-side liquidity, sell-side liquidity, liquidity sweep/grab, equal highs/lows, previous high/low liquidity.
+- Support and resistance: support, resistance, break and retest, rejection, previous day/week high and low.
+- Supply and demand: supply zones, demand zones, reactions, zone entry/retest.
+- Fair value gaps: FVG, bullish/bearish FVG, FVG fill/retest, IFVG.
+- Price action: displacement, strong bullish/bearish candles, rejection candles, breakouts, pullbacks, retests.
+- Order blocks: bullish/bearish order blocks, order block retest, breaker block.
+- Premium/discount: premium, discount, equilibrium, range-based premium/discount.
+- Multi-timeframe analysis: higher-timeframe bias, lower-timeframe confirmation, 4H → 1H → 15M → 5M flows, and higher-timeframe levels affecting lower-timeframe entries.
+- ICT/SMC: IRL, ERL, SMT divergence, AMD, Power of 3, and session concepts only when the supplied data supports them.
+- Moving averages: EMA, SMA, price above/below EMA, EMA crossover, EMA rejection, EMA trend confirmation.
+- Risk management: stop loss, take profit, risk/reward, percentage-based SL/TP, position sizing, and maximum risk per trade.
+
+For every strategy draft, identify the concepts used in conceptsUsed as {name, supported, explanation}. The current historical engine can execute only always, bullish, bearish, exact OHLC comparisons, and previous-candle crossings. Treat all other concepts, including EMA/SMA and ICT/SMC concepts, as understood but unsupported unless they are represented by one of those exact rules. Keep unsupported concepts in the draft, mark them unsupported, and explain what engine capability would be needed. Never silently replace an unsupported concept with another rule.
+If the user asks to build or create a strategy, always return a non-null strategyDraft. Never respond with only a refusal because one requested concept is unsupported; preserve that concept as an unsupported condition and explain the limitation in reply.
+`;
 
 async function contextForRequest(context: AssistantContext, message: string) {
   const result: Record<string, unknown> = { page: context.page || "workspace" };
@@ -292,11 +459,13 @@ Return JSON only with this shape:
     "marketSymbol": "string or null",
     "timeframes": ["string"],
     "conditions": [{"name":"string","stage":"entry|confirmation|invalidation|exit","requirement":"required|optional","conceptName":"string","timeframe":"string","triggerRules":"exact supported rule or descriptive unsupported rule"}],
+    "conceptsUsed": [{"name":"string","supported":true,"explanation":"string"}],
     "riskManagementRules": "string or null"
   },
   "backtestSetup": null or {"strategyId": number|null,"versionId":number|null,"instrumentId":number|null,"timeframeId":number|null,"startDate":"ISO string|null","endDate":"ISO string|null"}
 }
 When proposing a strategy, include a draft even if one requested condition is unsupported; explain that limitation in reply. For result explanations, use only actual numbers from context.
+${CONCEPT_GUIDE}
 
 Current workspace context:
 ${JSON.stringify(context)}`;
@@ -384,6 +553,16 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
     const content = typeof payload?.choices?.[0]?.message?.content === "string" ? payload.choices[0].message.content : "";
     const parsed = normalizeModelResponse(parseModelJson(content));
     if (!parsed) throw new Error("OpenRouter returned an invalid assistant response.");
+    if (isStrategyDraftRequest(input.message) && !parsed.strategyDraft) {
+      const fallbackDraft = fallbackDraftForUnsupportedRequest(input.message, parsed.reply);
+      parsed.strategyDraft = fallbackDraft;
+      parsed.intent = "strategy_proposal";
+      parsed.compatibility = fallbackDraft.compatibility;
+    } else if (parsed.strategyDraft) {
+      const enrichedDraft = enrichDraftConcepts(parsed.strategyDraft, input.message);
+      parsed.strategyDraft = enrichedDraft;
+      parsed.compatibility = enrichedDraft.compatibility;
+    }
     const backtestSetup = parsed.backtestSetup ? {
       ...parsed.backtestSetup,
       strategyId: input.context.strategyId ?? parsed.backtestSetup.strategyId,
