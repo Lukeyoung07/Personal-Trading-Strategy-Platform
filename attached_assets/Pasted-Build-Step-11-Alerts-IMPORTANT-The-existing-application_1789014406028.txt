@@ -1,0 +1,488 @@
+Build Step 11: Alerts.
+
+IMPORTANT:
+
+The existing application is already implemented and working.
+
+Do NOT rebuild or redesign existing functionality.
+
+Do NOT change:
+- Strategy Builder
+- Strategy Library
+- Strategy Versioning
+- Trade Journal
+- Strategy Monitoring
+- BiQuote
+- Live market data
+- Live candlestick charts
+- Timeframes
+- Instrument selection
+- News / Economic Calendar
+- FOMC integration
+- ONS integration
+- ECB integration
+- Economic-event impact classification
+- Market-specific economic-event matching
+
+GOAL:
+
+Build a reliable Alerts system using the existing real-time BiQuote market-data infrastructure and existing Strategy Monitoring system.
+
+The alerts system must use genuine live data.
+
+Do NOT use simulated prices.
+Do NOT fabricate market data.
+Do NOT add another market-data provider.
+Do NOT add a paid provider.
+Do NOT add AI.
+
+==================================================
+1. PRICE ALERTS
+==================================================
+
+Allow users to create price alerts for a selected instrument.
+
+Support:
+
+- Price reaches a level
+- Price crosses above a level
+- Price crosses below a level
+
+Example:
+
+XAUUSD
+Crosses above
+4450
+
+When the genuine live price crosses the specified level, trigger the alert.
+
+Do not repeatedly trigger the same alert every tick while price remains beyond the level.
+
+Use proper crossing logic.
+
+Example:
+
+If an alert is:
+
+XAUUSD crosses above 4450
+
+and price moves:
+
+4449 → 4451
+
+trigger the alert.
+
+But:
+
+4451 → 4452 → 4453
+
+must NOT repeatedly trigger it.
+
+==================================================
+2. ONE-TIME VS REPEATING
+==================================================
+
+Allow the user to choose:
+
+- One-time
+- Repeating
+
+One-time:
+
+After triggering, automatically deactivate the alert.
+
+Repeating:
+
+Allow the alert to trigger again when the price crosses back through the required boundary and subsequently crosses it again.
+
+Prevent continuous spam while price remains on the same side of the level.
+
+==================================================
+3. STRATEGY ALERTS
+==================================================
+
+Integrate with the existing Strategy Monitoring Engine.
+
+Allow alerts based on existing strategy-monitoring state changes.
+
+Support:
+
+- WAITING → MET
+- MET → NOT MET
+- Relevant strategy condition/state transition
+
+Do not create a second strategy-evaluation system.
+
+Use the existing Strategy Monitoring Engine as the source of truth.
+
+==================================================
+4. EXACT STRATEGY VERSION
+==================================================
+
+Strategy alerts must be associated with the exact strategy version being monitored.
+
+Example:
+
+Gold Strategy
+v3
+
+The alert must remain associated with v3 even if the user later creates v4.
+
+Do NOT allow a strategy alert for v3 to silently change to v4.
+
+Use the existing immutable strategy-version identity.
+
+==================================================
+5. ALERT MANAGEMENT
+==================================================
+
+Create an Alerts page.
+
+Users should be able to:
+
+- Create an alert
+- View alerts
+- Enable an alert
+- Disable an alert
+- Delete an alert
+- See triggered alerts
+- See alert history
+
+Show useful information such as:
+
+- Alert name
+- Instrument
+- Alert type
+- Trigger condition
+- Current status
+- Created date
+- Last triggered date
+- Strategy and version when applicable
+
+Use clear states:
+
+- ACTIVE
+- DISABLED
+- TRIGGERED
+- ERROR
+
+==================================================
+6. ALERT HISTORY
+==================================================
+
+Store a history of alert triggers.
+
+For each trigger record:
+
+- Alert
+- Instrument
+- Trigger type
+- Trigger value/condition
+- Trigger timestamp
+- Relevant market price when available
+- Strategy/version when applicable
+
+Do not create fake trigger records.
+
+Only record an alert as triggered when the real alert condition was actually detected.
+
+==================================================
+7. REAL-TIME PROCESSING
+==================================================
+
+Use the existing BiQuote live quote infrastructure.
+
+Do NOT poll the market unnecessarily if the existing live stream can be used.
+
+The alert engine should evaluate genuine incoming market updates.
+
+Support the existing live connection states:
+
+- LIVE
+- STALE
+- MARKET CLOSED
+- DISCONNECTED
+
+IMPORTANT:
+
+If live market data is stale or disconnected, do not pretend that an alert has been evaluated successfully.
+
+Do not trigger alerts from stale data unless the existing system explicitly determines that the relevant condition was genuinely reached.
+
+Show the user when alert evaluation is affected by a disconnected/stale data source.
+
+==================================================
+8. DUPLICATE / SPAM PROTECTION
+==================================================
+
+Implement robust trigger protection.
+
+An alert should not fire repeatedly from the same price condition.
+
+For crossing alerts, detect the transition across the threshold.
+
+For example:
+
+Alert:
+Cross above 4500
+
+Price:
+4499
+4501
+
+→ trigger
+
+Then:
+
+4501
+4502
+4503
+4504
+
+→ do not trigger again.
+
+For repeating alerts, the alert must require a genuine new crossing event before triggering again.
+
+==================================================
+9. ALERT RELIABILITY
+==================================================
+
+Design the alert engine so that:
+
+- Duplicate processing of the same market update does not create duplicate trigger records.
+- Concurrent processing cannot trigger the same one-time alert multiple times.
+- Disabled alerts cannot trigger.
+- Deleted alerts cannot trigger.
+- One-time alerts become inactive after triggering.
+- Alert state is persisted reliably.
+
+Use server-side evaluation.
+
+Do not rely on the browser being open for the core alert condition to be evaluated.
+
+==================================================
+10. UI
+==================================================
+
+Create a clean Alerts page that is easy for a beginner to understand.
+
+Do not make the interface overly technical.
+
+Example:
+
+Create Alert
+
+Instrument:
+XAUUSD
+
+Alert type:
+Price crosses above
+
+Price:
+4450
+
+Frequency:
+One-time
+
+[Create Alert]
+
+After creation:
+
+XAUUSD
+Crosses above 4450
+
+ACTIVE
+
+Do not expose unnecessary provider/internal implementation details to normal users.
+
+==================================================
+11. STRATEGY ALERT UI
+==================================================
+
+Allow the user to create a strategy-monitoring alert from the existing monitored strategy.
+
+Example:
+
+Gold Strategy v3
+
+Notify when:
+WAITING → MET
+
+ACTIVE
+
+The strategy version must be clearly visible.
+
+==================================================
+12. NOTIFICATIONS
+==================================================
+
+For this first version, implement the alert engine and in-app alert history.
+
+Do NOT add external notification providers yet.
+
+Do NOT add:
+
+- Email
+- SMS
+- Push notifications
+- Discord
+- Telegram
+
+The system should record the trigger correctly so external notifications can be added later without rebuilding the alert engine.
+
+==================================================
+13. ARCHITECTURE
+==================================================
+
+Keep alerts separate from:
+
+- Market Data Service
+- Strategy Monitoring Engine
+- News / Economic Calendar
+
+But allow the Alerts system to consume their outputs.
+
+Architecture:
+
+BiQuote
+↓
+Market Data Service
+↓
+Alert Engine
+↓
+Alert Trigger
+↓
+Alert History
+
+And:
+
+Strategy Monitoring Engine
+↓
+Alert Engine
+↓
+Alert Trigger
+↓
+Alert History
+
+Do not duplicate market-data or strategy-monitoring logic.
+
+==================================================
+14. SECURITY / DATA INTEGRITY
+==================================================
+
+Validate:
+
+- Instrument IDs
+- Price values
+- Alert types
+- Strategy IDs
+- Strategy version IDs
+- Alert ownership
+
+Users must only be able to access and modify their own alerts.
+
+Do not expose provider credentials.
+
+Do not expose internal API secrets to the frontend.
+
+==================================================
+15. VERIFICATION
+==================================================
+
+Test at minimum:
+
+PRICE ALERTS:
+
+1. Price crosses above a level.
+2. Price crosses below a level.
+3. Price reaches a level.
+4. Price remains beyond the level without repeated triggers.
+5. One-time alert deactivates after triggering.
+6. Repeating alert can trigger again after a genuine new crossing.
+7. Disabled alert does not trigger.
+8. Deleted alert does not trigger.
+9. Duplicate market updates do not create duplicate triggers.
+10. Concurrent evaluation cannot create duplicate one-time triggers.
+
+LIVE DATA:
+
+11. Alert evaluation uses genuine BiQuote data.
+12. Stale data is handled correctly.
+13. Disconnected data is handled correctly.
+14. Closed-market state is handled correctly.
+
+STRATEGY ALERTS:
+
+15. WAITING → MET triggers correctly.
+16. MET → NOT MET triggers correctly.
+17. Strategy alert remains tied to the exact strategy version.
+18. Creating a new strategy version does not change an existing alert's version.
+
+HISTORY:
+
+19. Trigger history is recorded correctly.
+20. Trigger timestamps are correct.
+21. Trigger price is stored when available.
+22. Alert state is persisted correctly.
+
+UI:
+
+23. Alerts can be created.
+24. Alerts can be enabled/disabled.
+25. Alerts can be deleted.
+26. Alert history is displayed.
+27. Strategy/version information is displayed correctly.
+
+==================================================
+16. REGRESSION
+==================================================
+
+After implementation run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+- Existing regression tests
+- Existing BiQuote regression tests
+- Existing Strategy Monitoring tests
+- Desktop verification
+- Mobile verification
+- Browser console verification
+
+Do not break existing functionality.
+
+==================================================
+IMPORTANT SCOPE LIMIT
+==================================================
+
+This is ONLY Step 11: Alerts.
+
+Do NOT add:
+
+- Broker integrations
+- Automatic trading
+- Order execution
+- AI
+- AI-generated alerts
+- Backtesting
+- Trading signals
+- BUY/SELL recommendations
+- External notifications
+- Paid market-data providers
+- New market-data providers
+
+The alert engine should provide reliable infrastructure that can support those future features without implementing them now.
+
+At the end report:
+
+1. Alert types implemented.
+2. How real-time alert evaluation works.
+3. How duplicate/spam protection works.
+4. How stale/disconnected data is handled.
+5. How strategy-version alerts work.
+6. Alert history functionality.
+7. Tests passed.
+8. Any limitations.
+9. Confirm that existing Steps 1–10 functionality remains intact.
