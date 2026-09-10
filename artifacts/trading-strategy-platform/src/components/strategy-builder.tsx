@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Edit3, FileText, Pencil, Plus,
@@ -162,6 +162,15 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
   const update = useUpdateStrategy();
   const queryClient = useQueryClient();
   const [error, setError] = useState("");
+  const draftMarketId = initialDraft?.marketSymbol
+    ? markets.find(market => market.symbol.toLowerCase() === initialDraft.marketSymbol?.toLowerCase())?.id
+    : undefined;
+  const [selectedMarketId, setSelectedMarketId] = useState(() => String(strategy?.marketId || draftMarketId || ""));
+  const marketSelectionTouched = useRef(false);
+  useEffect(() => {
+    if (marketSelectionTouched.current) return;
+    setSelectedMarketId(String(strategy?.marketId || draftMarketId || ""));
+  }, [strategy?.id, strategy?.marketId, draftMarketId]);
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -194,7 +203,6 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
     else create.mutate({ data }, { onSuccess: done, onError });
   };
   const busy = create.isPending || update.isPending;
-  const draftMarketId = initialDraft?.marketSymbol ? markets.find(market => market.symbol.toLowerCase() === initialDraft.marketSymbol?.toLowerCase())?.id : undefined;
   return <form onSubmit={save} className="space-y-6" key={strategy?.id ?? initialDraft?.name ?? "new-strategy"}>
     {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive" role="alert" data-testid="status-builder-strategy-error">{error}</div>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -204,7 +212,16 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
      <Field label="Description"><textarea className="textarea" name="description" defaultValue={strategy?.description || initialDraft?.description || ""} placeholder="What is this strategy trying to explain or capture?" data-testid="input-builder-strategy-description" /></Field>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Field label="Market / instrument" hint="Optional. Add instruments from Market Monitor first, or leave this strategy broad.">
-        <select className="select" name="marketId" defaultValue={strategy?.marketId || draftMarketId || ""} data-testid="select-builder-market">
+        <select
+          className="select"
+          name="marketId"
+          value={selectedMarketId}
+          onChange={event => {
+            marketSelectionTouched.current = true;
+            setSelectedMarketId(event.target.value);
+          }}
+          data-testid="select-builder-market"
+        >
           <option value="">No specific instrument</option>
           {markets.map(market => <option key={market.id} value={market.id}>{market.symbol} · {market.assetClass}</option>)}
         </select>

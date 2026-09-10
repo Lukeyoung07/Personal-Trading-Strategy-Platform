@@ -1,0 +1,68 @@
+The diagnosis is complete and confirms the AI draft handoff is working.
+
+Do NOT change the AI Assistant, OpenRouter, draft store, navigation, Backtesting, or Strategy Builder architecture.
+
+Fix ONLY the confirmed Market / Instrument form-field initialization bug.
+
+Confirmed behaviour:
+
+- AI draft contains market symbol: XAUUSD
+- sessionStorage contains the complete draft
+- Builder receives the draft
+- Builder preview correctly displays XAUUSD
+- Most editable Builder fields populate correctly
+- Only the editable Market / Instrument select remains:
+  "No specific instrument"
+
+Confirmed likely cause:
+
+StrategyForm currently uses:
+
+defaultValue={strategy?.marketId || draftMarketId || ""}
+
+`draftMarketId` depends on the asynchronously loaded markets list.
+
+The form renders before the markets query has finished, so `draftMarketId` is initially empty. Because the select is uncontrolled and uses `defaultValue`, it does not update when the markets become available.
+
+Fix this specific initialization issue so that the AI draft's `marketSymbol` is correctly mapped to the matching market ID once the markets have loaded.
+
+Requirements:
+
+1. Preserve the existing AI draft handoff.
+2. Preserve the existing strategy-based market selection.
+3. Preserve normal Builder behaviour when creating/editing an existing strategy.
+4. Do not hard-code XAUUSD.
+5. Use the actual marketSymbol from the AI draft and match it against the loaded markets.
+6. Make the Market / Instrument select become XAUUSD when the real AI draft contains XAUUSD.
+7. Make sure the value remains correct after the asynchronous markets query completes.
+8. Avoid uncontrolled `defaultValue` behaviour for this draft-driven field; use the appropriate controlled/state initialization approach.
+9. Do not overwrite a user's manual market selection after they have changed it.
+10. Do not modify any other Builder fields.
+
+Test with the real AI request:
+
+"Create me a simple XAUUSD BUY strategy using a bullish candle for entry, a bearish candle for exit, 1% stop loss and 2% take profit."
+
+Then:
+
+1. Click Review Strategy.
+2. Wait for the Builder and market data to finish loading.
+3. Verify the editable Market / Instrument field visibly shows XAUUSD.
+4. Verify the other AI draft fields still populate.
+5. Change the market manually and confirm it does not get overwritten.
+6. Refresh/re-enter the Builder as appropriate and confirm normal Builder behaviour still works.
+
+Also test Save as New Version only to make sure this fix does not regress that existing workflow.
+
+Run the relevant frontend tests, typecheck and production build.
+
+Do NOT consider this task complete merely because the draft preview says XAUUSD.
+
+The editable Market / Instrument control itself must visibly show XAUUSD after the market list has loaded.
+
+At the end report:
+- Exact fix made.
+- Why the async market loading caused the issue.
+- Whether the editable Market / Instrument field now shows XAUUSD in the real browser.
+- Whether manual market selection remains functional.
+- Tests/typecheck/build results.

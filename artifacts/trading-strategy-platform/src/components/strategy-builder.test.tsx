@@ -80,6 +80,7 @@ afterEach(() => {
   window.history.pushState({}, "", "/strategy-builder");
   state.strategies = [];
   state.conditions = [];
+  state.markets = [];
   state.createCondition.mockReset();
   state.updateStrategy.mockReset();
 });
@@ -153,6 +154,34 @@ describe("StrategyBuilder", () => {
     await waitFor(() => expect(screen.getByTestId("input-builder-strategy-name")).toHaveValue("XAUUSD live handoff"));
     expect(screen.getByTestId("select-builder-direction")).toHaveValue("long");
     expect(screen.getByTestId("input-builder-risk-rules")).toHaveValue("Stop loss: 1%; Take profit: 2%");
+  });
+
+  it("updates the draft market after markets load without overwriting a manual choice", async () => {
+    const draft = {
+      name: "XAUUSD market mapping",
+      description: "Draft market mapping.",
+      direction: "long",
+      marketSymbol: "XAUUSD",
+      timeframes: ["1H"],
+      conditions: [],
+      riskManagementRules: null,
+      compatibility: { compatible: true, unsupportedConditions: [] },
+    };
+    window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=review");
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+    const view = render(<StrategyBuilder />);
+
+    expect(screen.getByTestId("select-builder-market")).toHaveValue("");
+    state.markets = [
+      { id: 25, symbol: "XAUUSD", assetClass: "metals" },
+      { id: 26, symbol: "USTEC", assetClass: "index" },
+    ];
+    view.rerender(<StrategyBuilder />);
+    await waitFor(() => expect(screen.getByTestId("select-builder-market")).toHaveValue("25"));
+
+    fireEvent.change(screen.getByTestId("select-builder-market"), { target: { value: "26" } });
+    view.rerender(<StrategyBuilder />);
+    expect(screen.getByTestId("select-builder-market")).toHaveValue("26");
   });
 
   it("loads an existing strategy and keeps the live summary in plain language", () => {
