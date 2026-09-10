@@ -17,7 +17,7 @@ import {
   useDeleteTrade, useGetDashboardSummary, useGetPerformanceSummary, useGetSettings, useGetStrategy, useListAlerts,
   useListConcepts, useListConditions, useListMarkets, useListStrategies, useListStrategyVersions, useListTimeframes, useListTrades,
   useUpdateAlert, useUpdateConcept, useUpdateCondition, useUpdateMarket, useUpdateSettings, useUpdateStrategy,
-  useUpdateTrade, type Alert, type Backtest, type Condition, type Market, type Strategy, type Trade, type TradingConcept
+  useUpdateTrade, type Alert, type AssistantStrategyDraft, type Backtest, type Condition, type Market, type Strategy, type Trade, type TradingConcept
 } from '@workspace/api-client-react';
 import { MarketMonitor } from '@/components/market-monitor';
 import { ErrorBoundary } from '@/components/error-boundary';
