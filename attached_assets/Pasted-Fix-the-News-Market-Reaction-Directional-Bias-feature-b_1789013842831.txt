@@ -1,0 +1,140 @@
+Fix the News Market Reaction / Directional Bias feature because the current UI is showing the Reaction Context selector but is not displaying a reaction result for the selected instrument.
+
+Use the screenshot/current implementation as the reference.
+
+IMPORTANT:
+Do not redesign the News page.
+Do not change the existing economic calendar providers.
+Do not add an API.
+Do not add AI.
+Do not fabricate economic data.
+Do not change BiQuote or Market Monitor.
+
+The reaction system must ALWAYS return an explicit result for an event when it has enough information to evaluate the relationship.
+
+For the currently selected instrument, XAUUSD, an ECB event may not have a reliable direct bullish/bearish relationship.
+
+In that situation, display:
+
+POTENTIAL MARKET REACTION
+
+Neutral / Unclear
+
+Reason:
+"The relationship between this event and XAUUSD is not sufficiently direct or reliable to classify as bullish or bearish."
+
+Do NOT leave the reaction area blank.
+
+However, for events with a legitimate directional relationship, show the conditional scenarios.
+
+For example:
+
+XAUUSD + US CPI
+
+Potential Market Reaction
+
+Higher than expected
+→ Potentially Bearish
+
+Lower than expected
+→ Potentially Bullish
+
+Unclear / in line
+→ Neutral / Unclear
+
+XAUUSD + FOMC
+
+More hawkish
+→ Potentially Bearish
+
+More dovish
+→ Potentially Bullish
+
+Unclear outcome
+→ Neutral / Unclear
+
+EURUSD + ECB
+
+More hawkish
+→ Potentially Bullish
+
+More dovish
+→ Potentially Bearish
+
+Unclear outcome
+→ Neutral / Unclear
+
+GBPUSD + UK monetary-policy event
+
+More hawkish
+→ Potentially Bullish
+
+More dovish
+→ Potentially Bearish
+
+Unclear outcome
+→ Neutral / Unclear
+
+IMPORTANT:
+
+Do not force a bullish/bearish classification when the relationship is genuinely ambiguous.
+
+Instead, explicitly display:
+
+NEUTRAL / UNCLEAR
+
+Never silently omit the reaction.
+
+Also make sure the reaction panel is displayed directly inside each relevant economic-event card, not only in the general Reaction Context section.
+
+The selected instrument should control the reaction shown.
+
+If I change:
+
+XAUUSD → EURUSD
+
+the reaction should be recalculated for EURUSD.
+
+If I change:
+
+EURUSD → GBPUSD
+
+the reaction should be recalculated for GBPUSD.
+
+If there is no supported reaction rule for the event/instrument combination:
+
+show:
+
+INSUFFICIENT DATA
+
+or
+
+NEUTRAL / UNCLEAR
+
+with a short explanation.
+
+Do not invent a directional relationship just to populate the UI.
+
+Keep the existing Previous / Forecast / Actual fields unchanged. They must continue showing "Not provided" when the connected sources don't supply those values.
+
+Run the existing tests and add focused tests confirming:
+
+1. XAUUSD + US CPI returns the correct conditional reaction.
+2. XAUUSD + FOMC returns the correct conditional reaction.
+3. EURUSD + ECB returns the correct conditional reaction.
+4. GBPUSD + UK event returns the correct conditional reaction.
+5. XAUUSD + ECB does NOT disappear or remain blank; it explicitly shows Neutral / Unclear or Insufficient Data.
+6. Unknown event does not produce a fabricated reaction.
+7. Changing the selected instrument recalculates the reaction.
+8. Existing News functionality remains unchanged.
+
+Run:
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+- Desktop verification
+- Mobile verification
+
+Do not just describe the changes. Actually implement them and verify the result.
