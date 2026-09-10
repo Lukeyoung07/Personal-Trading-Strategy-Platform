@@ -517,11 +517,7 @@ export function AddMarketTab({ onAdded }: { onAdded: (result: BiQuoteMarketResul
       : 0;
     return counts;
   }, {} as Record<MarketCategory, number>), [catalog.data]);
-
-  useEffect(() => {
-    const firstAvailable = MARKET_CATEGORIES.find(marketCategory => categoryCounts[marketCategory] > 0);
-    if (firstAvailable && categoryCounts[category] === 0) setCategory(firstAvailable);
-  }, [category, categoryCounts]);
+  const unavailableCategories = MARKET_CATEGORIES.filter(marketCategory => categoryCounts[marketCategory] === 0);
 
   const results = useMemo(() => {
     const assetClass = CATEGORY_ASSET_CLASSES[category];
@@ -582,6 +578,15 @@ export function AddMarketTab({ onAdded }: { onAdded: (result: BiQuoteMarketResul
                 </option>
               ))}
             </select>
+            {unavailableCategories.length > 0 && (
+              <div className="space-y-1 mt-2" role="status">
+                {unavailableCategories.map(item => (
+                  <p key={item} className="text-[11px] text-muted-foreground">
+                    No {item.toLowerCase()} markets are currently available from this data provider.
+                  </p>
+                ))}
+              </div>
+            )}
           </Field>
 
           <Field label="Search markets">

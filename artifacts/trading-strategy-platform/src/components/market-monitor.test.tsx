@@ -176,6 +176,7 @@ describe("Market Monitor live state", () => {
 
     expect(screen.getByRole("option", { name: /Futures.*not currently available/ })).toBeDisabled();
     expect(screen.getByRole("option", { name: /Stocks.*not currently available/ })).toBeDisabled();
+    expect(screen.getByText("No futures markets are currently available from this data provider.")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("select-market-category"), { target: { value: "Commodities" } });
     fireEvent.change(screen.getByTestId("input-search-markets"), { target: { value: "gold" } });
 
@@ -201,7 +202,7 @@ describe("Market Monitor live state", () => {
 
     fireEvent.change(screen.getByTestId("select-market-category"), { target: { value: "Futures" } });
 
-    expect(await screen.findByText("No futures markets are currently available from this data provider.")).toBeInTheDocument();
+    expect(await screen.findAllByText("No futures markets are currently available from this data provider.")).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "Add Market" })).toBeDisabled();
   });
 });

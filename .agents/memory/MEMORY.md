@@ -5,3 +5,4 @@
 - [BiQuote runtime integration](biquote-runtime-integration.md) — server-side SignalR must remain external to the API bundle and use its Node transport dependencies.
 - [BiQuote regression testing](biquote-regression-testing.md) — frontend Vitest uses a standalone jsdom/React config because the app Vite config requires runtime env variables.
 - [Market selection persistence](market-selection-persistence.md) — persisted monitor selections must be cleared when their instrument no longer exists, or stale streams reconnect against deleted records.
+- [Market catalog presentation](market-catalog-presentation.md) — provider descriptions are the only human-facing names; empty provider categories stay visible but unavailable with an explicit explanation.
