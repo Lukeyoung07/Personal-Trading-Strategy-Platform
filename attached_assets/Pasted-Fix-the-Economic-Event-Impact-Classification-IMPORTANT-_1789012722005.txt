@@ -1,0 +1,249 @@
+Fix the Economic Event Impact Classification.
+
+IMPORTANT:
+
+Do NOT rebuild the News / Economic Calendar system.
+
+Do NOT change:
+- BiQuote
+- Live market data
+- Candlestick charts
+- Market Monitor
+- Strategy Builder
+- Strategy Library
+- Strategy Versioning
+- Trade Journal
+- Strategy Monitoring
+- Existing economic-event providers
+- Federal Reserve integration
+- ONS integration
+- ECB integration
+- Step 10 market-specific event context
+
+The issue is specifically that most events currently display:
+
+"Not classified"
+
+because the existing public sources do not provide trader-style impact ratings.
+
+GOAL:
+
+Add a transparent deterministic impact-classification system that can classify economic events based on the event type/name and structured metadata already available.
+
+Do NOT use AI.
+
+Do NOT use a paid API.
+
+Do NOT invent provider data.
+
+Do NOT pretend the source supplied an impact rating when it did not.
+
+IMPORTANT:
+
+The application must clearly distinguish between:
+
+1. PROVIDER-SUPPLIED IMPACT
+2. APPLICATION-CLASSIFIED IMPACT
+3. NOT CLASSIFIED
+
+If the provider supplies an impact rating, preserve it.
+
+If the provider does not supply one, the application may calculate its own classification using the deterministic rules below.
+
+DISPLAY:
+
+Show the source of the classification.
+
+For example:
+
+Impact: HIGH
+Classification: Application rule
+
+or:
+
+Impact: HIGH
+Classification: Provider
+
+or:
+
+Impact: NOT CLASSIFIED
+Classification: Not enough information
+
+RULES:
+
+Create a maintainable event-impact rule registry.
+
+The rules should match event types rather than blindly matching arbitrary words.
+
+Start with the following conservative categories.
+
+HIGH IMPACT:
+
+- Central-bank interest-rate decisions
+- FOMC rate decisions
+- ECB monetary-policy decisions
+- BoE monetary-policy decisions
+- CPI / inflation releases
+- Core CPI
+- Non-Farm Payrolls / NFP
+- Major employment reports
+- GDP major releases
+- PCE inflation
+- Core PCE
+- Major unemployment-rate releases
+- Major central-bank policy statements when clearly identified as monetary-policy decisions
+
+MEDIUM IMPACT:
+
+- Retail Sales
+- PMI
+- Manufacturing PMI
+- Services PMI
+- Industrial Production
+- Durable Goods
+- Housing data
+- Consumer Confidence
+- Producer Price Index / PPI
+- Trade Balance
+- Employment reports that are not major headline releases
+
+LOW IMPACT:
+
+- Minor surveys
+- Secondary economic indicators
+- Small/less influential releases
+- Administrative/statistical releases where appropriate
+
+IMPORTANT:
+
+These rules are only a starting classification system.
+
+Do not claim that HIGH means the market will definitely move.
+
+Impact means the event is potentially important to traders, not that the market will rise or fall.
+
+UNCLASSIFIED:
+
+If the event name/type cannot be confidently matched to a rule:
+
+Impact: NOT CLASSIFIED
+
+Do not guess.
+
+SOURCE:
+
+For every classified event, retain:
+
+- Source
+- Original provider impact if available
+- Application classification
+- Classification reason/rule
+
+Example:
+
+US CPI
+
+Impact: HIGH
+Source: Federal/official source
+Classification: Application rule
+Reason: CPI is classified as a high-importance inflation release.
+
+UI:
+
+Replace the current generic "Not classified" display only when a legitimate classification can be determined.
+
+Make the classification source clear.
+
+Example:
+
+🔴 HIGH IMPACT
+Application classified
+
+or:
+
+🟡 MEDIUM IMPACT
+Application classified
+
+or:
+
+⚪ NOT CLASSIFIED
+Insufficient information
+
+Do not rely on colour alone.
+
+MARKET CONTEXT:
+
+The existing Step 10 market-specific event context must continue working.
+
+Do not change the event relevance matching.
+
+Do not change the existing market mappings.
+
+The impact classification should be available to the existing Market Monitor economic-event panel.
+
+IMPORTANT:
+
+Do NOT add directional bias yet.
+
+Do NOT add:
+
+- Bullish/bearish predictions
+- BUY/SELL signals
+- AI analysis
+- Alerts
+- Notifications
+- Broker integrations
+- Automatic trading
+- Backtesting
+
+This task is ONLY fixing event impact classification.
+
+VERIFICATION:
+
+Test the classification against examples including:
+
+- FOMC
+- ECB monetary policy
+- CPI
+- NFP
+- PCE
+- GDP
+- Retail Sales
+- PMI
+- A minor release
+- An unknown/unrecognised event
+
+Verify:
+
+- Provider impact is preserved when available.
+- Application rules classify eligible events.
+- Unknown events remain NOT CLASSIFIED.
+- No fake provider impact is created.
+- Classification reason is stored/displayed.
+- Existing News filters still work.
+- Market Monitor still works.
+- BiQuote charts and live quotes remain unchanged.
+- Existing Steps 1–10 functionality remains intact.
+
+Run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+- Existing regression tests
+- BiQuote regression tests
+- Desktop verification
+- Mobile verification
+
+At the end report:
+
+1. Which impact rules were implemented.
+2. How provider vs application classification is distinguished.
+3. Which test events were classified.
+4. Which events remain NOT CLASSIFIED.
+5. Tests passed.
+6. Any remaining limitations.
+
+Do not claim an event has a provider-supplied impact rating when it was actually classified by the application.
