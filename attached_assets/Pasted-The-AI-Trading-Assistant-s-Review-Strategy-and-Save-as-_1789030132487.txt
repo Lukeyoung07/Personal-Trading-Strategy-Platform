@@ -1,0 +1,69 @@
+The AI Trading Assistant's "Review Strategy" and "Save as New Version" actions currently only navigate back to the Strategy Builder and do not visibly complete the intended workflow.
+
+Fix this specific workflow.
+
+IMPORTANT:
+- Do NOT rebuild the AI Assistant.
+- Do NOT change OpenRouter.
+- Do NOT change Backtesting calculations.
+- Do NOT change the existing Strategy Builder design unnecessarily.
+- Do NOT silently save anything.
+
+When the AI generates a structured strategy draft:
+
+1. "Review Strategy" should open the existing Strategy Builder with the AI-generated draft correctly populated into the Builder.
+
+2. The user must be able to clearly see the imported strategy:
+   - Strategy name
+   - Direction
+   - Entry conditions
+   - Exit conditions
+   - Stop loss
+   - Take profit
+   - Any compatibility warnings
+
+3. "Review Strategy" must NOT merely navigate to an empty/default Builder.
+
+4. "Save as New Version" should open the Strategy Builder with the AI draft populated and clearly indicate that the user is reviewing an AI-generated draft before saving it as a new version.
+
+5. Do NOT automatically save the strategy when the user clicks these actions.
+
+6. Preserve the existing "Save as New Version" workflow so the user explicitly confirms/saves the version.
+
+7. If the AI draft contains conditions supported by the current Builder, import them correctly.
+
+8. If the draft contains unsupported conditions, preserve the information and show the existing compatibility warning rather than silently removing or replacing the condition.
+
+9. Preserve the exact strategy/version context where applicable.
+
+10. Make sure the Builder's existing save, edit, reorder, validation and versioning functionality continues working.
+
+Test the complete workflow:
+
+AI:
+"Create me a simple XAUUSD BUY strategy that is compatible with my current backtesting system. Use a bullish candle for entry, a bearish candle for exit, with a 1% stop loss and 2% take profit."
+
+Then:
+
+AI draft
+→ Review Strategy
+→ Strategy Builder opens
+→ Draft is populated
+→ User can review/edit it
+→ User clicks Save as New Version
+→ New version is actually saved
+→ Existing strategy versions remain unchanged
+
+Also test the separate "Review Strategy" action.
+
+Do not stop after checking navigation. Verify that the actual draft data is transferred and rendered in the Builder.
+
+Run the relevant frontend/API tests and typechecks.
+
+At the end report:
+- What caused the issue.
+- What was changed.
+- Whether the AI draft now populates the Builder correctly.
+- Whether Save as New Version actually saves a new version after user confirmation.
+- Tests passed.
+- Any remaining limitations.
