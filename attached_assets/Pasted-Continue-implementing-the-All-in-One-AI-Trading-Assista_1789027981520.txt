@@ -1,0 +1,499 @@
+Continue implementing the All-in-One AI Trading Assistant, but use OpenRouter's FREE model routing only.
+
+IMPORTANT:
+
+Do NOT connect xAI.
+
+Do NOT use OpenAI's paid API.
+
+Do NOT use any paid AI model.
+
+The goal is to have the AI assistant operate at £0 AI usage cost using OpenRouter's available free models.
+
+==================================================
+1. OPENROUTER
+==================================================
+
+Use OpenRouter as the AI provider.
+
+Use ONLY the OpenRouter free model route:
+
+openrouter/free
+
+Do not automatically fall back to paid models.
+
+Do not use a model that can incur charges.
+
+Keep the OpenRouter credential securely server-side.
+
+Never expose the credential to the frontend.
+
+==================================================
+2. FREE-ONLY SAFETY
+==================================================
+
+The application must be designed so that the AI assistant cannot accidentally use a paid model.
+
+Do not use:
+
+- paid model routing
+- automatic paid fallbacks
+- premium models
+- xAI
+- OpenAI paid API
+
+If the free model route is unavailable or rate-limited, show:
+
+"AI is temporarily unavailable. Please try again later."
+
+Do NOT automatically switch to a paid model.
+
+==================================================
+3. EXISTING AI ASSISTANT
+==================================================
+
+Continue with the All-in-One AI Assistant functionality already planned.
+
+The assistant should be able to:
+
+- Build strategies
+- Modify strategies
+- Explain strategies
+- Review strategies
+- Check backtest compatibility
+- Help configure backtests
+- Explain completed backtest results
+- Compare strategy versions
+- Explain trading concepts
+
+Use the existing application systems.
+
+Do not create a separate strategy engine.
+
+Do not create a separate backtesting engine.
+
+==================================================
+4. BEGINNER-FRIENDLY HINTS
+==================================================
+
+Make the first AI screen extremely easy for a beginner.
+
+Show:
+
+"Tell me what you want to build, test, or understand."
+
+Then provide clickable examples.
+
+BUILD
+
+"Build me a simple Gold strategy using the 20 EMA."
+
+"Create a BUY strategy for XAUUSD."
+
+"Build a strategy with a 1% stop loss and 2% take profit."
+
+MODIFY
+
+"Add a 20 EMA confirmation."
+
+"Change the stop loss to 1.5%."
+
+"Make this strategy simpler."
+
+ANALYSE
+
+"Explain my strategy."
+
+"Review my strategy."
+
+"Explain my backtest results."
+
+LEARN
+
+"What is an FVG?"
+
+"What does liquidity mean?"
+
+"What does the 20 EMA do?"
+
+These are examples, not limitations.
+
+The user must be able to type their own request.
+
+==================================================
+5. AI STRATEGY CREATION
+==================================================
+
+When a user asks:
+
+"Build me a Gold strategy using the 20 EMA."
+
+The AI should convert the request into the existing structured Strategy Builder format.
+
+Example:
+
+Instrument:
+XAUUSD
+
+Direction:
+BUY
+
+Entry:
+
+Price above EMA 20
+
+AND
+
+Bullish candle
+
+Stop Loss:
+1%
+
+Take Profit:
+2%
+
+The AI must show the generated strategy before saving it.
+
+Do not silently save or overwrite anything.
+
+==================================================
+6. STRUCTURED STRATEGY OUTPUT
+==================================================
+
+The AI should produce structured data that matches the existing Strategy Builder model.
+
+Do NOT create a second AI-specific strategy format.
+
+Only use conditions that the existing application understands.
+
+If the AI cannot represent something using the existing strategy model, clearly tell the user:
+
+"This condition isn't currently supported by the Strategy Builder."
+
+Do not guess.
+
+==================================================
+7. EXISTING STRATEGY MODIFICATION
+==================================================
+
+If the user is viewing an existing strategy, allow requests such as:
+
+"Add a 20 EMA confirmation."
+
+"Change the stop loss to 1.5%."
+
+"Remove the bullish candle condition."
+
+"Make this a SELL strategy."
+
+"Make this strategy simpler."
+
+Show the proposed changes before applying them.
+
+Never overwrite an existing strategy version.
+
+Use the existing "Save as New Version" workflow.
+
+==================================================
+8. BACKTEST INTEGRATION
+==================================================
+
+Use the existing Backtesting system.
+
+The AI should be able to help prepare a backtest.
+
+Example:
+
+"Backtest this strategy on Gold for the last 6 months."
+
+Show:
+
+Strategy
+Version
+Instrument
+Timeframe
+Date range
+
+Then require user confirmation before running it.
+
+Never silently switch strategy versions.
+
+==================================================
+9. BACKTEST RESULTS
+==================================================
+
+When the user asks:
+
+"How did my strategy perform?"
+
+Use ONLY the actual stored backtest results.
+
+Explain:
+
+- Number of trades
+- Win rate
+- Total P/L
+- Average winner
+- Average loser
+- Maximum drawdown
+- Profit factor
+- Equity curve
+
+Never invent statistics.
+
+If information isn't available, say so.
+
+==================================================
+10. STRATEGY REVIEW
+==================================================
+
+Allow:
+
+"Review my strategy."
+
+The AI should explain:
+
+- Entry conditions
+- Exit conditions
+- Risk settings
+- Backtest compatibility
+- Missing information
+- Potentially restrictive conditions
+
+Do not claim the strategy will be profitable.
+
+==================================================
+11. EDUCATION
+==================================================
+
+Allow simple educational questions:
+
+"What is an FVG?"
+
+"What is liquidity?"
+
+"What is BOS?"
+
+"What does an EMA do?"
+
+"Explain support and resistance."
+
+Keep explanations beginner-friendly.
+
+==================================================
+12. AI CONTEXT
+==================================================
+
+Where appropriate, provide the AI with the current application context.
+
+Strategy Builder:
+
+- Current strategy
+- Current version
+- Conditions
+- Risk settings
+
+Backtesting:
+
+- Strategy
+- Exact version
+- Instrument
+- Timeframe
+- Date range
+- Results
+
+Only send information required for the request.
+
+==================================================
+13. RATE LIMIT / FAILURE HANDLING
+==================================================
+
+Because this uses free AI models, rate limits are expected.
+
+Handle them gracefully.
+
+If OpenRouter returns a rate-limit or unavailable response:
+
+"AI is temporarily unavailable because the free AI service has reached its current limit. Please try again later."
+
+Do not expose technical errors to normal users.
+
+Do not retry endlessly.
+
+Do not switch to a paid model.
+
+==================================================
+14. AI PROVIDER SETTINGS
+==================================================
+
+Keep the provider implementation isolated behind the existing server-side AI service.
+
+Do not scatter OpenRouter-specific logic throughout the frontend.
+
+The frontend should communicate with our own server-side AI endpoint.
+
+The server handles the OpenRouter request.
+
+==================================================
+15. SECURITY
+==================================================
+
+Never expose the OpenRouter API key in:
+
+- Frontend code
+- Browser local storage
+- Client-side environment variables
+- API responses
+- Logs
+
+Use a server-side secret.
+
+If the OpenRouter credential is missing, show:
+
+"AI Assistant is currently unavailable."
+
+Do not fabricate responses.
+
+==================================================
+16. DO NOT ADD PAID FALLBACKS
+==================================================
+
+This is critical.
+
+The application must NEVER automatically switch from:
+
+openrouter/free
+
+to:
+
+- OpenAI
+- xAI
+- Claude
+- Gemini
+- Any paid OpenRouter model
+
+The user wants a £0 AI implementation.
+
+==================================================
+17. EXISTING APPLICATION
+==================================================
+
+Preserve all existing functionality:
+
+- Strategy Builder
+- Strategy versions
+- Backtesting
+- Historical candles
+- Backtest trades
+- Backtest results
+- Market Monitor
+- BiQuote
+- News
+- Economic Calendar
+- Alerts
+- Trade Journal
+
+Do not rebuild any of these systems.
+
+==================================================
+18. TESTING
+==================================================
+
+Test:
+
+- AI assistant loads.
+- Example prompts work.
+- Natural-language strategy requests work.
+- Structured strategy output uses the existing strategy model.
+- Unsupported conditions are identified.
+- Existing strategy versions aren't overwritten.
+- Backtest context preserves the exact strategy version.
+- Backtest results are read from real stored results.
+- Missing data isn't fabricated.
+- Free-model rate limits are handled.
+- Missing AI credentials are handled.
+- No paid fallback can occur.
+- API credentials remain server-side.
+
+Run:
+
+- API tests
+- Frontend tests
+- Typechecks
+- Production builds
+- Existing Strategy Builder regression tests
+- Existing Backtesting regression tests
+
+Verify desktop and mobile layouts.
+
+==================================================
+FINAL GOAL
+==================================================
+
+Create ONE simple AI Trading Assistant powered exclusively by OpenRouter's free model route.
+
+The experience should be:
+
+USER:
+"Build me a Gold strategy using the 20 EMA."
+
+↓
+
+AI understands the request.
+
+↓
+
+AI creates a structured strategy draft.
+
+↓
+
+User reviews it.
+
+↓
+
+User saves it as a new strategy version.
+
+↓
+
+AI confirms whether it can be backtested.
+
+↓
+
+User chooses backtest settings.
+
+↓
+
+User runs the backtest.
+
+↓
+
+AI explains the actual results.
+
+↓
+
+User can modify the strategy and create another version.
+
+Most importantly:
+
+Keep the experience simple and beginner-friendly.
+
+Do not add paid AI services.
+
+Do not add automated trading.
+
+Do not fabricate responses, market data, news, or backtest results.
+
+Actually implement and verify the feature rather than only creating placeholder UI.
+
+At the end report:
+
+1. What was implemented.
+2. Which OpenRouter free model route is being used.
+3. Confirmation that no paid fallback exists.
+4. How the strategy builder integration works.
+5. How the hints/examples work.
+6. How backtesting integration works.
+7. How results are explained.
+8. How rate limits are handled.
+9. Tests passed.
+10. Any limitations.
