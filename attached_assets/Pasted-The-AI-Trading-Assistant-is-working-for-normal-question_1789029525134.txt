@@ -1,0 +1,82 @@
+The AI Trading Assistant is working for normal questions and strategy-building requests, but the request:
+
+"Explain my backtest results."
+
+returns:
+
+"AI Assistant is currently unavailable."
+
+Do NOT change the OpenRouter configuration, API key, provider, or free-model route because normal AI requests are already working.
+
+Do NOT rebuild the assistant.
+
+Investigate only the backtest-results context path.
+
+Check how `/api/assistant/chat` handles requests that ask the AI to explain backtest results.
+
+Specifically verify:
+
+1. How the current backtest is identified.
+2. How persisted backtest results are loaded.
+3. Whether the assistant is receiving the correct backtest ID/context.
+4. Whether the API is failing because there is no selected/current backtest.
+5. Whether the result payload is too large or malformed.
+6. Whether any database/API error is being incorrectly converted into the generic "AI unavailable" response.
+7. Whether the assistant prompt/context builder expects fields that don't exist.
+8. Whether the stored results endpoint can successfully return the requested backtest data independently.
+
+IMPORTANT:
+
+The assistant must NEVER invent backtest results.
+
+If there is no selected backtest, respond clearly:
+
+"I need a completed backtest to explain. Open a completed backtest result first, then ask me to explain it."
+
+If a backtest exists, load its REAL persisted results and give those results to the AI.
+
+The AI should be able to explain real stored:
+
+- Trade count
+- Win rate
+- Total P/L
+- Average winner
+- Average loser
+- Largest winner
+- Largest loser
+- Maximum drawdown
+- Profit factor
+- Equity curve
+- Individual trades where available
+
+Preserve the exact existing strategy version and backtest context.
+
+Do NOT modify the Backtesting calculations or stored results.
+
+Do NOT modify the Strategy Builder.
+
+Do NOT add mock data.
+
+Do NOT create fake fallback responses.
+
+After fixing the issue:
+
+1. Test a normal AI question to confirm existing functionality still works.
+2. Test a strategy-building request to confirm it still works.
+3. Test "Explain my backtest results" against a REAL completed backtest.
+4. Confirm the AI receives the actual persisted backtest data.
+5. Confirm it returns an explanation based only on those results.
+6. Test the no-backtest case and make sure it gives a useful message rather than "AI unavailable."
+
+Run the existing API/frontend tests, typechecks and production builds.
+
+At the end report:
+
+- What caused the backtest explanation failure.
+- What was fixed.
+- Whether real persisted backtest results were successfully loaded.
+- Whether the AI successfully explained a real completed backtest.
+- Tests/builds passed.
+- Any remaining limitations.
+
+Do not change anything unrelated to this specific issue.
