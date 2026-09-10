@@ -1,0 +1,381 @@
+Improve the existing Strategy Builder and Backtesting integration as a polished, user-friendly workflow.
+
+IMPORTANT:
+
+The existing Strategy Builder is already working.
+The existing Backtesting Parts 1, 2 and 3 are already working and verified.
+
+Do NOT rebuild them.
+
+Do NOT redesign the entire application.
+
+Do NOT add unnecessary advanced trading features.
+
+The goal of this task is to make creating a strategy and testing it feel like one clear, reliable workflow.
+
+==================================================
+1. STRATEGY COMPATIBILITY
+==================================================
+
+When creating or editing a strategy, clearly indicate whether the strategy can currently be backtested.
+
+Show a simple status such as:
+
+✓ Backtest compatible
+
+or
+
+⚠ Some conditions cannot currently be backtested
+
+Do not use technical implementation language.
+
+If a condition is unsupported, clearly identify which condition is unsupported.
+
+Do NOT pretend an unsupported condition can be backtested.
+
+==================================================
+2. LIVE BACKTEST COMPATIBILITY CHECK
+==================================================
+
+As the user builds a strategy, automatically check its conditions against the capabilities of the existing backtest engine.
+
+Example:
+
+Entry:
+Bullish candle ✓
+
+Entry:
+Price crosses previous high ✓
+
+Stop Loss:
+1% ✓
+
+Take Profit:
+2% ✓
+
+Result:
+
+✓ This strategy can be backtested.
+
+If something is unsupported:
+
+⚠ Backtesting unavailable for:
+RSI condition
+
+Do not prevent the user from saving the strategy unless the existing application already requires this.
+
+The purpose is to clearly explain the limitation.
+
+==================================================
+3. CREATE VERSION
+==================================================
+
+Make strategy versioning easy to understand.
+
+When the user saves changes to an existing strategy, make it clear that they are creating a new version.
+
+Example:
+
+Current version:
+Gold Strategy v2
+
+[Save as New Version]
+
+Then:
+
+Gold Strategy v3
+
+Do not overwrite an existing version.
+
+Existing backtests must continue to reference the exact strategy version they originally used.
+
+==================================================
+4. "BACKTEST THIS STRATEGY" ACTION
+==================================================
+
+After a strategy has been saved successfully, provide an obvious action:
+
+[ Backtest This Strategy ]
+
+This should take the user to the existing Backtesting page with the strategy and exact strategy version preselected where the existing architecture allows this.
+
+Do not automatically start a backtest.
+
+The user should still choose:
+
+- Instrument
+- Timeframe
+- Date range
+
+before running it.
+
+==================================================
+5. PRESERVE USER CONTEXT
+==================================================
+
+When navigating from Strategy Builder to Backtesting:
+
+Preserve the selected:
+
+- Strategy
+- Exact strategy version
+
+Do not silently change to the latest version.
+
+The user should immediately see which strategy/version they are about to test.
+
+==================================================
+6. BACKTEST SETUP CONFIRMATION
+==================================================
+
+Before running the backtest, show a simple confirmation summary:
+
+Strategy:
+Gold Strategy
+
+Version:
+v3
+
+Instrument:
+XAUUSD
+
+Timeframe:
+5m
+
+Period:
+Last 30 days
+
+Then:
+
+[ Run Backtest ]
+
+This should make it difficult for the user to accidentally test the wrong strategy or version.
+
+==================================================
+7. RESULTS → STRATEGY WORKFLOW
+==================================================
+
+On the existing Backtest Results page, provide a simple action:
+
+[ View Strategy ]
+
+This should open the exact strategy version used by that backtest.
+
+Do NOT open the latest version if the backtest used an older version.
+
+Make it clear:
+
+"This backtest used Gold Strategy v3."
+
+==================================================
+8. RESULTS → RUN AGAIN
+==================================================
+
+Add a simple:
+
+[ Run Again ]
+
+action where appropriate.
+
+It should allow the user to use the same strategy/version again while changing:
+
+- Instrument
+- Timeframe
+- Date range
+
+Do not automatically change the strategy version.
+
+==================================================
+9. STRATEGY SUMMARY
+==================================================
+
+Keep the existing plain-English strategy summary.
+
+Improve it where useful so the user can easily understand exactly what will be tested.
+
+Example:
+
+BUY when:
+
+1. Candle is bullish
+2. Price crosses above previous high
+
+Risk:
+
+Stop Loss: 1%
+Take Profit: 2%
+
+Backtesting:
+
+✓ Compatible
+
+==================================================
+10. ERROR HANDLING
+==================================================
+
+Make errors understandable.
+
+Instead of:
+
+"Unsupported condition type"
+
+show:
+
+"This strategy contains a condition that the current backtester cannot evaluate."
+
+Then identify the condition.
+
+Instead of:
+
+"Historical data unavailable"
+
+show:
+
+"Historical data is not available for this market and timeframe during the selected period."
+
+Never fabricate results.
+
+==================================================
+11. KEEP THE WORKFLOW SIMPLE
+==================================================
+
+The ideal workflow should be:
+
+CREATE STRATEGY
+↓
+Save Version
+↓
+✓ Backtest Compatible
+↓
+[ Backtest This Strategy ]
+↓
+Choose Market
+↓
+Choose Timeframe
+↓
+Choose Date Range
+↓
+Review Settings
+↓
+[ Run Backtest ]
+↓
+Results
+↓
+[ View Strategy ] / [ Run Again ]
+
+Do not add unnecessary screens.
+
+==================================================
+12. BEGINNER-FRIENDLY LANGUAGE
+==================================================
+
+Avoid technical wording wherever possible.
+
+For example:
+
+Instead of:
+"Strategy version ID"
+
+Display:
+"Strategy version"
+
+Instead of:
+"Unsupported deterministic expression"
+
+Display:
+"This condition isn't supported by the current backtester."
+
+Keep technical details available only when useful.
+
+==================================================
+13. EXISTING FUNCTIONALITY MUST REMAIN INTACT
+==================================================
+
+Do not break or modify the core behavior of:
+
+- Strategy Builder
+- Strategy conditions
+- Strategy versioning
+- Backtesting engine
+- Historical BiQuote candles
+- Simulated trades
+- Backtest statistics
+- Equity curve
+- Historical chart
+- Trade markers
+- Trade table
+- Market Monitor
+- Live BiQuote data
+- News
+- Economic Calendar
+- Alerts
+- Trade Journal
+
+Do not change the underlying backtest execution logic.
+
+==================================================
+14. TESTING
+==================================================
+
+Add focused tests for:
+
+1. Backtest compatibility is correctly detected.
+2. Supported conditions show as compatible.
+3. Unsupported conditions are clearly identified.
+4. Strategy Builder can navigate to Backtesting.
+5. Exact strategy version is preserved.
+6. Backtesting does not silently switch versions.
+7. Backtest setup displays the correct strategy/version.
+8. Results link to the exact strategy version used.
+9. Run Again preserves the correct strategy/version.
+10. Existing strategies remain unchanged.
+11. Existing backtests remain unchanged.
+
+Run:
+
+- API tests
+- Frontend tests
+- Typechecks
+- Production builds
+- Existing Strategy Builder regression tests
+- Existing Backtesting regression tests
+- Existing BiQuote regression tests
+
+Verify desktop and mobile layouts.
+
+==================================================
+IMPORTANT
+==================================================
+
+This is a workflow/UX improvement only.
+
+Do NOT rebuild the Strategy Builder.
+
+Do NOT rebuild the Backtesting engine.
+
+Do NOT redesign the Backtesting Results Dashboard.
+
+Do NOT add AI.
+
+Do NOT add automated trading.
+
+Do NOT add strategy optimization.
+
+Do NOT add new indicators.
+
+Do NOT add OR condition groups in this task.
+
+Make the existing Strategy Builder and Backtesting system feel connected, polished, reliable, and extremely easy to understand.
+
+Actually implement the changes and verify them in the running application.
+
+At the end report:
+
+1. What was improved.
+2. How Strategy Builder now connects to Backtesting.
+3. How compatibility is shown.
+4. How exact strategy versions are preserved.
+5. How the Backtest This Strategy workflow works.
+6. How Results connects back to the strategy.
+7. Tests passed.
+8. Any limitations.
