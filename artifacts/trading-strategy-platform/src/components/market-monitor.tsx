@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3, Database, Globe, Network, Clock, DatabaseZap, Search, Plus, Check,
@@ -172,6 +172,7 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
   });
   const [quote, setQuote] = useState<LiveQuote | null>(null);
   const [formingCandle, setFormingCandle] = useState<FormingCandle | null>(null);
+  const autoRefreshKey = useRef<string | null>(null);
 
   useEffect(() => {
     if (sourceId === "" && sources.data?.length) {
@@ -232,6 +233,25 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
       },
     },
   );
+
+  useEffect(() => {
+    if (!ready || candles.isLoading || candles.isError || (candles.data?.length ?? 0) > 0) return;
+    const key = `${sourceId}:${instrumentId}:${timeframeId}`;
+    if (autoRefreshKey.current === key) return;
+    autoRefreshKey.current = key;
+    refresh.mutate({
+      data: { sourceId: Number(sourceId), instrumentId: Number(instrumentId), timeframeId: Number(timeframeId), limit: 500 },
+    }, {
+      onSuccess: () => qc.invalidateQueries({
+        queryKey: getListCandlesQueryKey({
+          sourceId: Number(sourceId),
+          instrumentId: Number(instrumentId),
+          timeframeId: Number(timeframeId),
+          limit: 500,
+        }),
+      }),
+    });
+  }, [candles.data, candles.isError, candles.isLoading, instrumentId, qc, ready, refresh, sourceId, timeframeId]);
 
   useEffect(() => {
     setQuote(null);
@@ -392,7 +412,7 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
           <div><h2 className="font-semibold">BiQuote candlestick chart</h2><p className="text-xs text-muted-foreground mt-1">Stored OHLC bars plus a forming bar built only from received provider ticks.</p></div>
           <CandlestickChart size={18} className="text-primary shrink-0" />
         </div>
-        {candles.isError ? <ErrorBlock retry={() => candles.refetch()} /> : !ready ? <div className="p-10 text-center text-sm text-muted-foreground">Select an instrument, source, and timeframe to view genuine market data.</div> : candles.isLoading ? <LoadingBlock /> : !chartBars.length ? <EmptyState icon={CandlestickChart} title="No candle data yet" text="Refresh candles to request OHLC data from BiQuote. If the symbol or timeframe is unsupported, the provider error will be shown instead of substituting data." action={<button className="btn btn-primary" onClick={refreshCandles} disabled={refresh.isPending}>Request BiQuote candles</button>} /> : <CandleSvg bars={chartBars} />}
+        {candles.isError ? <ErrorBlock retry={() => candles.refetch()} /> : !ready ? <div className="p-10 text-center text-sm text-muted-foreground">Select an instrument, source, and timeframe to view genuine market data.</div> : candles.isLoading || refresh.isPending ? <LoadingBlock /> : !chartBars.length ? <EmptyState icon={CandlestickChart} title="No candle data yet" text="BiQuote did not return OHLC data for this instrument and timeframe. No substitute candles are shown." action={<button className="btn btn-primary" onClick={refreshCandles} disabled={refresh.isPending}>Request BiQuote candles</button>} /> : <CandleSvg bars={chartBars} />}
       </div>
     </div>
   );

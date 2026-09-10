@@ -220,6 +220,41 @@ describe("BiQuote adapter", () => {
     expect(connection.invokes).toContainEqual({ method: "Unsubscribe", args: [["EURUSD"]] });
   });
 
+  it("delivers each live tick only to the matching symbol subscriber", async () => {
+    const eurController = new AbortController();
+    const goldController = new AbortController();
+    const eurIterator = biQuoteAdapter.subscribeQuotes({ providerSymbol: "EURUSD", signal: eurController.signal })[Symbol.asyncIterator]();
+    const goldIterator = biQuoteAdapter.subscribeQuotes({ providerSymbol: "XAUUSD", signal: goldController.signal })[Symbol.asyncIterator]();
+    const eurNext = eurIterator.next();
+    const goldNext = goldIterator.next();
+    await Promise.resolve();
+
+    const connection = signalrState.lastConnection!;
+    await vi.waitFor(() => expect(connection.invokes).toEqual(expect.arrayContaining([
+      { method: "Subscribe", args: [["EURUSD"]] },
+      { method: "Subscribe", args: [["XAUUSD"]] },
+    ])));
+    connection.emit("ReceiveTick", {
+      symbol: "XAUUSD",
+      bid: 2400,
+      ask: 2401,
+      mid: 2400.5,
+      timestamp: "2026-09-10T02:00:00.000Z",
+    });
+
+    await expect(goldNext).resolves.toMatchObject({ value: { last: 2400.5 } });
+    const eurResult = await Promise.race([
+      eurNext.then(() => "received"),
+      new Promise(resolve => setTimeout(() => resolve("waiting"), 20)),
+    ]);
+    expect(eurResult).toBe("waiting");
+
+    eurController.abort();
+    goldController.abort();
+    await eurIterator.return?.();
+    await goldIterator.return?.();
+  });
+
   it("marks closed and aged quotes stale, and exposes reconnect/disconnect states", async () => {
     await biQuoteAdapter.connect();
     const connection = signalrState.lastConnection!;

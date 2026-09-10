@@ -102,7 +102,7 @@ class BiQuoteAdapter implements MarketDataProviderAdapter {
   private state: MarketDataConnectionState = "disconnected";
   private statusMessage = "BiQuote is disconnected.";
   private readonly marketStates = new Map<string, { state: string; quoteAgeSeconds: number | null }>();
-  private readonly waiters = new Set<(quote: NormalizedProviderQuote) => void>();
+  private readonly waiters = new Set<{ symbol: string; push: (quote: NormalizedProviderQuote) => void }>();
   private catalogCache: { expiresAt: number; items: BiQuoteCatalogItem[] } | null = null;
 
   async connect() {
@@ -166,7 +166,9 @@ class BiQuoteAdapter implements MarketDataProviderAdapter {
         quoteAgeSeconds,
         lastQuoteAt: parseDate(tick.lastQuoteAt ?? tick.timestamp, timestamp),
       };
-      for (const waiter of this.waiters) waiter(quote);
+      for (const waiter of this.waiters) {
+        if (waiter.symbol === symbol) waiter.push(quote);
+      }
     });
 
     this.connection = connection;
@@ -299,7 +301,8 @@ class BiQuoteAdapter implements MarketDataProviderAdapter {
       queue.push(quote);
       wake?.();
     };
-    this.waiters.add(push);
+    const waiter = { symbol, push };
+    this.waiters.add(waiter);
     const abort = () => wake?.();
     request.signal?.addEventListener("abort", abort, { once: true });
 
@@ -311,7 +314,7 @@ class BiQuoteAdapter implements MarketDataProviderAdapter {
         while (queue.length) yield queue.shift()!;
       }
     } finally {
-      this.waiters.delete(push);
+      this.waiters.delete(waiter);
       request.signal?.removeEventListener("abort", abort);
       if (this.connection.state === "Connected") {
         await this.connection.invoke("Unsubscribe", [symbol]).catch(() => undefined);

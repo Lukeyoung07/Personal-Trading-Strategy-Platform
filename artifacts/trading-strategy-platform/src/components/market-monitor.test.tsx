@@ -6,6 +6,10 @@ import { AddMarketTab, MarketMonitor } from "./market-monitor";
 
 const eventSources = vi.hoisted(() => [] as FakeEventSource[]);
 const addMarketMutate = vi.hoisted(() => vi.fn());
+const refreshCandleMutate = vi.hoisted(() => vi.fn());
+const candleData = vi.hoisted(() => ({
+  current: [{ id: 1, openTime: "2026-09-10T01:00:00.000Z", open: 1.1, high: 1.2, low: 1.05, close: 1.15, isClosed: true }],
+}));
 
 class FakeEventSource {
   static readonly OPEN = 1;
@@ -63,8 +67,8 @@ vi.mock("@workspace/api-client-react", () => ({
     refetch: vi.fn(),
   }),
   useAddBiQuoteMarket: () => ({ isPending: false, isError: false, mutate: addMarketMutate }),
-  useListCandles: () => ({ data: [{ id: 1, openTime: "2026-09-10T01:00:00.000Z", open: 1.1, high: 1.2, low: 1.05, close: 1.15, isClosed: true }], isLoading: false, isError: false, refetch: vi.fn() }),
-  useRefreshMarketDataCandles: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
+  useListCandles: () => ({ data: candleData.current, isLoading: false, isError: false, refetch: vi.fn() }),
+  useRefreshMarketDataCandles: () => ({ isPending: false, isError: false, mutate: refreshCandleMutate }),
   getListCandlesQueryKey: (params: unknown) => ["candles", params],
   getListSourceInstrumentMappingsQueryKey: () => ["mappings"],
 }));
@@ -72,6 +76,8 @@ vi.mock("@workspace/api-client-react", () => ({
 beforeEach(() => {
   eventSources.length = 0;
   addMarketMutate.mockReset();
+  refreshCandleMutate.mockReset();
+  candleData.current = [{ id: 1, openTime: "2026-09-10T01:00:00.000Z", open: 1.1, high: 1.2, low: 1.05, close: 1.15, isClosed: true }];
   addMarketMutate.mockImplementation((_request: unknown, options: { onSuccess?: (result: unknown) => void }) => {
     options.onSuccess?.({
       instrument: { id: 19 },
@@ -168,6 +174,16 @@ describe("Market Monitor live state", () => {
     stream.fail();
     expect(await screen.findByText("DISCONNECTED")).toBeInTheDocument();
     expect(screen.queryByText("LIVE")).not.toBeInTheDocument();
+  });
+
+  it("requests genuine historical candles when a selected timeframe has no stored bars", async () => {
+    candleData.current = [];
+    render(<MarketMonitor />);
+
+    await waitFor(() => expect(refreshCandleMutate).toHaveBeenCalledWith(
+      { data: { sourceId: 5, instrumentId: 18, timeframeId: 20, limit: 500 } },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    ));
   });
 
   it("searches by human name or provider symbol and submits the selected timeframe", async () => {
