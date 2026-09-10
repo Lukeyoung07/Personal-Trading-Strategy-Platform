@@ -1,0 +1,81 @@
+The AI Trading Assistant is currently showing:
+
+"The assistant is currently unavailable. Your workspace is unaffected—try again later."
+
+Please diagnose and fix the actual server-side issue.
+
+IMPORTANT:
+
+- Do NOT rebuild the AI assistant.
+- Do NOT change the Strategy Builder.
+- Do NOT change the Backtesting system.
+- Do NOT create fake/mock AI responses.
+- Do NOT switch to xAI or OpenAI.
+- Do NOT add any paid AI model fallback.
+- Continue using OpenRouter's FREE route only: `openrouter/free`.
+
+I have already created the OpenRouter API key and added it to the Replit Secret:
+
+OPENROUTER_API_KEY
+
+Do NOT ask me to create another key unless you have confirmed the existing secret is genuinely invalid.
+
+Check the complete server-side connection:
+
+1. Verify that `OPENROUTER_API_KEY` is available to the server runtime.
+2. Verify that the server is reading the secret correctly.
+3. Verify that the OpenRouter request is constructed correctly.
+4. Verify that the model/route is exactly `openrouter/free`.
+5. Check the actual OpenRouter response and HTTP status code.
+6. Determine whether the problem is:
+   - missing secret
+   - invalid API key
+   - authentication failure
+   - rate limit
+   - free-model availability
+   - incorrect API request
+   - server configuration
+   - network error
+   - application logic
+7. Fix the issue if it is within the application.
+8. Do NOT expose the API key in logs, frontend code, browser responses, or error messages.
+
+IMPORTANT:
+
+Do not just inspect the code and stop.
+
+Actually test the real server-side `/api/assistant/chat` endpoint after making the fix.
+
+Test it with:
+
+"Hello, can you help me build a trading strategy?"
+
+Then test:
+
+"Build me a simple XAUUSD BUY strategy using the 20 EMA. Buy when price is above the EMA and the candle is bullish. Use a 1% stop loss and 2% take profit."
+
+Confirm that the response is genuinely coming from OpenRouter and that the second request produces a structured strategy draft compatible with the existing Strategy Builder.
+
+If the OpenRouter free route itself is temporarily unavailable or rate-limited, do NOT fabricate a response and do NOT switch to a paid model. Report the exact reason.
+
+Run the existing:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+
+Do not make unrelated changes.
+
+At the end, report clearly:
+
+1. What caused the "assistant unavailable" error.
+2. What you changed to fix it.
+3. Whether `OPENROUTER_API_KEY` was detected successfully.
+4. Whether `openrouter/free` responded successfully.
+5. Whether the real strategy-building request worked.
+6. Tests and builds passed.
+7. Any remaining limitations.
+
+Only report the feature as fixed if the real `/api/assistant/chat` request successfully returns a genuine response.
