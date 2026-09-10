@@ -202,7 +202,12 @@ function Backtesting() {
   const initialRange = presetRange("last_7_days");
   const [startDate, setStartDate] = useState(initialRange.start);
   const [endDate, setEndDate] = useState(initialRange.end);
-  const versions = useListStrategyVersions(strategyId ?? 0);
+  const versions = useListStrategyVersions(strategyId ?? 0, {
+    query: {
+      enabled: strategyId != null,
+      queryKey: getListStrategyVersionsQueryKey(strategyId ?? 0),
+    },
+  });
   const queryClient = useQueryClient();
 
   useEffect(() => {
