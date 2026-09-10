@@ -1,0 +1,92 @@
+Fix the Market Monitor timeframe chart issue.
+
+CURRENT BEHAVIOUR:
+
+The 5-minute chart works correctly.
+
+However, when I select other timeframes, such as:
+
+- 15m
+- 30m
+- 1h
+- 4h
+- 1d
+
+the chart only displays a single orange candle in the middle of the chart that moves up and down.
+
+The other timeframes should display a normal historical candlestick chart with multiple candles, just like the 5-minute chart.
+
+IMPORTANT:
+
+Do NOT redesign the chart.
+
+Do NOT change the instrument-selection UI.
+
+Do NOT change the BiQuote provider.
+
+Do NOT change the Market Data Service architecture.
+
+Do NOT change the Strategy Monitoring Engine.
+
+Do NOT add simulated or fake candles.
+
+Do NOT simply stretch or duplicate the 5-minute candles into other timeframes.
+
+Investigate the existing data flow and determine why the selected timeframe is not returning/rendering the correct historical OHLC candle series.
+
+Check:
+
+- BiQuote timeframe/interval mapping
+- Historical candle retrieval
+- Candle normalization
+- API responses
+- Frontend timeframe selection
+- Chart data transformation
+- Timeframe persistence
+- Live forming-bar handling
+- Timestamp handling
+- Whether the requested timeframe is actually supported by the provider
+- Whether the correct instrument mapping is being used
+
+For every timeframe that BiQuote genuinely supports, the chart should display the correct historical OHLC candles for that timeframe.
+
+For example, selecting 15m should produce actual 15-minute candles, not 5-minute candles and not a single candle.
+
+Selecting 1h should produce actual 1-hour candles.
+
+Selecting 4h should produce actual 4-hour candles.
+
+Selecting 1d should produce actual daily candles.
+
+IMPORTANT:
+
+If a timeframe is not actually supported by BiQuote for the selected instrument, do NOT fabricate or silently substitute data.
+
+Instead, clearly show that the timeframe is unavailable.
+
+Do not assume that because the application has a timeframe registered, BiQuote necessarily provides that timeframe for every instrument.
+
+The existing 5-minute functionality must continue working exactly as it does now.
+
+After fixing:
+
+1. Test 5m.
+2. Test 15m.
+3. Test 30m.
+4. Test 1h.
+5. Test 4h.
+6. Test 1d.
+7. Verify multiple historical candles appear where genuine data is available.
+8. Verify the candles have correct OHLC values and timestamps.
+9. Verify the live/forming candle continues updating correctly.
+10. Verify LIVE/STALE/DISCONNECTED/MARKET CLOSED states still work.
+11. Test desktop and mobile.
+12. Run existing BiQuote regression tests.
+13. Run API/frontend typechecks.
+14. Run production builds.
+
+Fix only the genuine timeframe-data/rendering issue.
+
+Do not add any other features.
+
+At the end, tell me exactly which timeframes were successfully fixed and which, if any, are genuinely unavailable from BiQuote.
