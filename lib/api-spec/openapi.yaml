@@ -45,6 +45,8 @@ paths:
         - { name: currency, in: query, schema: { type: string } }
         - { name: market, in: query, schema: { type: string } }
         - { name: search, in: query, schema: { type: string } }
+        - { name: instrumentId, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: relevance, in: query, schema: { type: string, enum: [relevant, all], default: all } }
       responses:
         "200":
           description: Economic calendar events and provider availability

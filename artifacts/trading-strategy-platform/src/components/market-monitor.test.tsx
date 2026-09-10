@@ -67,6 +67,8 @@ vi.mock("@workspace/api-client-react", () => ({
     refetch: vi.fn(),
   }),
   useAddBiQuoteMarket: () => ({ isPending: false, isError: false, mutate: addMarketMutate }),
+  useListEconomicEvents: () => ({ data: { providerConnected: true, providerName: "Test source", message: "Connected sources: Test source.", events: [] }, isLoading: false, isError: false }),
+  getListEconomicEventsQueryKey: (params: unknown) => ["economic-events", params],
   useListCandles: () => ({ data: candleData.current, isLoading: false, isError: false, refetch: vi.fn() }),
   useRefreshMarketDataCandles: () => ({ isPending: false, isError: false, mutate: refreshCandleMutate }),
   getListCandlesQueryKey: (params: unknown) => ["candles", params],

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ListEconomicEventsImpact } from './listEconomicEventsImpact';
+import type { ListEconomicEventsRelevance } from './listEconomicEventsRelevance';
 import type { ListEconomicEventsView } from './listEconomicEventsView';
 
 export type ListEconomicEventsParams = {
@@ -15,4 +16,9 @@ region?: string;
 currency?: string;
 market?: string;
 search?: string;
+/**
+ * @minimum 1
+ */
+instrumentId?: number;
+relevance?: ListEconomicEventsRelevance;
 };

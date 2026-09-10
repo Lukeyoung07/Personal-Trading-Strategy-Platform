@@ -47,6 +47,7 @@ export * from './instrumentUpdateInstrumentType';
 export * from './listCandlesParams';
 export * from './listEconomicEventsImpact';
 export * from './listEconomicEventsParams';
+export * from './listEconomicEventsRelevance';
 export * from './listEconomicEventsView';
 export * from './market';
 export * from './marketDataConnection';

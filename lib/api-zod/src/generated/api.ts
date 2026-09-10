@@ -12,6 +12,7 @@ import * as zod from 'zod';
  * @summary List economic calendar events
  */
 export const listEconomicEventsQueryViewDefault = `all`;
+export const listEconomicEventsQueryRelevanceDefault = `all`;
 
 export const ListEconomicEventsQueryParams = zod.object({
   "view": zod.enum(['today', 'upcoming', 'recently_released', 'all']).default(listEconomicEventsQueryViewDefault),
@@ -19,7 +20,9 @@ export const ListEconomicEventsQueryParams = zod.object({
   "region": zod.coerce.string().optional(),
   "currency": zod.coerce.string().optional(),
   "market": zod.coerce.string().optional(),
-  "search": zod.coerce.string().optional()
+  "search": zod.coerce.string().optional(),
+  "instrumentId": zod.coerce.number().int().min(1).optional(),
+  "relevance": zod.enum(['relevant', 'all']).default(listEconomicEventsQueryRelevanceDefault)
 })
 
 export const ListEconomicEventsResponse = zod.object({

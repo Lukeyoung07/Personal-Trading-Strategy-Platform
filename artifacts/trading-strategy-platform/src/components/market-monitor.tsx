@@ -16,7 +16,8 @@ import {
   getListMarketsQueryKey,
   useListSourceInstrumentMappings, useCreateSourceInstrumentMapping, useUpdateSourceInstrumentMapping, useDeleteSourceInstrumentMapping, getListSourceInstrumentMappingsQueryKey,
   useGetBiQuoteCatalog, useAddBiQuoteMarket,
-  type Instrument, type MarketDataSource, type Timeframe, type MarketDataConnection, type Candle, type MarketDataSummary, type SourceInstrumentMapping, type BiQuoteCatalogItem, type BiQuoteMarketResult
+  useListEconomicEvents, getListEconomicEventsQueryKey,
+  type Instrument, type MarketDataSource, type Timeframe, type MarketDataConnection, type Candle, type MarketDataSummary, type SourceInstrumentMapping, type BiQuoteCatalogItem, type BiQuoteMarketResult, type EconomicEvent
 } from "@workspace/api-client-react";
 
 type Tab = "live-chart" | "instruments" | "sources" | "mappings" | "timeframes" | "connections" | "candles";
@@ -327,6 +328,7 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
           : "CONNECTED";
   const isLive = connectionLabel === "LIVE";
   const source = sources.data?.find(item => item.id === sourceId);
+  const selectedInstrument = instruments.data?.find(item => item.id === instrumentId);
 
   const refreshCandles = () => {
     if (!ready) return;
@@ -414,7 +416,156 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
         </div>
         {candles.isError ? <ErrorBlock retry={() => candles.refetch()} /> : !ready ? <div className="p-10 text-center text-sm text-muted-foreground">Select an instrument, source, and timeframe to view genuine market data.</div> : candles.isLoading || refresh.isPending ? <LoadingBlock /> : !chartBars.length ? <EmptyState icon={CandlestickChart} title="No candle data yet" text="BiQuote did not return OHLC data for this instrument and timeframe. No substitute candles are shown." action={<button className="btn btn-primary" onClick={refreshCandles} disabled={refresh.isPending}>Request BiQuote candles</button>} /> : <CandleSvg bars={chartBars} />}
       </div>
+
+      {selectedInstrument && <MarketEconomicEvents instrument={selectedInstrument} />}
     </div>
+  );
+}
+
+function marketEventDate(event: EconomicEvent) {
+  const date = new Date(event.scheduledAt);
+  if (event.timePrecision === "date") {
+    return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date);
+  }
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
+}
+
+function marketEventCountdown(event: EconomicEvent) {
+  if (event.timePrecision !== "datetime") return null;
+  const remaining = new Date(event.scheduledAt).getTime() - Date.now();
+  if (remaining <= 0) return null;
+  const minutes = Math.round(remaining / 60_000);
+  if (minutes < 60) return `in ${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `in ${hours}h`;
+  return `in ${Math.round(hours / 24)}d`;
+}
+
+function marketImpactLabel(event: EconomicEvent) {
+  return event.impact ? event.impact.toUpperCase() : "NOT CLASSIFIED";
+}
+
+function marketImpactClass(event: EconomicEvent) {
+  if (event.impact === "high") return "tag tag-danger";
+  if (event.impact === "medium") return "tag tag-warn";
+  if (event.impact === "low") return "tag tag-open";
+  return "tag bg-secondary text-muted-foreground";
+}
+
+function MarketEconomicEvents({ instrument }: { instrument: Instrument }) {
+  const [scope, setScope] = useState<"relevant" | "all">("relevant");
+  const [view, setView] = useState<"upcoming" | "recently_released">("upcoming");
+  const params = {
+    view,
+    instrumentId: instrument.id,
+    relevance: scope,
+  } as const;
+  const query = useListEconomicEvents(params, {
+    query: {
+      enabled: Number.isInteger(instrument.id) && instrument.id > 0,
+      queryKey: getListEconomicEventsQueryKey(params),
+    },
+  });
+  const events = query.data?.events ?? [];
+
+  return (
+    <section className="panel p-4 md:p-5" data-testid="market-economic-events">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="eyebrow mb-2">Economic context</div>
+          <h2 className="font-semibold">Economic events</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Potentially relevant observations for {instrument.symbol}. This is informational context, not a forecast or signal.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <div className="panel p-1 flex gap-1">
+            <button
+              className={`btn text-xs ${scope === "relevant" ? "bg-secondary text-foreground" : "btn-ghost"}`}
+              onClick={() => setScope("relevant")}
+              data-testid="button-economic-scope-relevant"
+            >
+              Relevant to this market
+            </button>
+            <button
+              className={`btn text-xs ${scope === "all" ? "bg-secondary text-foreground" : "btn-ghost"}`}
+              onClick={() => setScope("all")}
+              data-testid="button-economic-scope-all"
+            >
+              All economic events
+            </button>
+          </div>
+          <div className="panel p-1 flex gap-1">
+            <button
+              className={`btn text-xs ${view === "upcoming" ? "bg-secondary text-foreground" : "btn-ghost"}`}
+              onClick={() => setView("upcoming")}
+              data-testid="button-economic-view-upcoming"
+            >
+              Upcoming
+            </button>
+            <button
+              className={`btn text-xs ${view === "recently_released" ? "bg-secondary text-foreground" : "btn-ghost"}`}
+              onClick={() => setView("recently_released")}
+              data-testid="button-economic-view-released"
+            >
+              Recently released
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {query.isLoading && <div className="mt-5 rounded-md bg-secondary/40 p-4 text-sm text-muted-foreground">Loading economic event data…</div>}
+      {query.isError && <div className="mt-5 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Economic event data unavailable</div>}
+      {!query.isLoading && !query.isError && !events.length && (
+        <div className="mt-5 rounded-md bg-secondary/40 p-4 text-sm text-muted-foreground">
+          No economic events are available for this view.
+        </div>
+      )}
+      {!query.isLoading && !query.isError && events.length > 0 && (
+        <div className="mt-5 grid gap-3">
+          {events.slice(0, 8).map(event => {
+            const countdown = marketEventCountdown(event);
+            return (
+              <article key={event.id} className="rounded-md border border-border bg-secondary/20 p-4" data-testid={`market-economic-event-${event.id}`}>
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={marketImpactClass(event)}>{marketImpactLabel(event)}</span>
+                      {event.currency && <span className="tag bg-secondary text-muted-foreground">{event.currency}</span>}
+                      <span className="text-[11px] text-muted-foreground">{event.releaseStatus === "released" ? "Released" : "Upcoming"}</span>
+                    </div>
+                    <h3 className="mt-2 text-sm font-semibold">{event.name}</h3>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>{marketEventDate(event)}</span>
+                      {event.region && <span>{event.region}</span>}
+                      {countdown && <span>{countdown}</span>}
+                      <span>Potentially relevant to {instrument.symbol}</span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-xs text-muted-foreground md:text-right">
+                    {event.sourceUrl ? (
+                      <a className="underline underline-offset-2 hover:text-foreground" href={event.sourceUrl} target="_blank" rel="noreferrer">
+                        {event.sourceName || "Source"}
+                      </a>
+                    ) : (
+                      event.sourceName || "Source unavailable"
+                    )}
+                    <div className="mt-2 space-y-1">
+                      <div>Previous: {event.previous ?? "Not provided"}</div>
+                      <div>Forecast: {event.forecast ?? "Not provided"}</div>
+                      <div>Actual: {event.actual ?? "Not provided"}</div>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+      {query.data?.message && query.data.message.includes("Unavailable sources:") && (
+        <div className="mt-4 text-xs text-destructive">{query.data.message}</div>
+      )}
+    </section>
   );
 }
 

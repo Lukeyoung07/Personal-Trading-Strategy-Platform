@@ -4,8 +4,10 @@ import {
   db,
   economicEventMarketMappingsTable,
   economicEventsTable,
+  marketsTable,
   type EconomicEvent,
   type EconomicEventMarketMapping,
+  type Instrument,
 } from "@workspace/db";
 import type {
   EconomicEventInput,
@@ -72,6 +74,89 @@ function normalizeMapping(mapping: MappingInput) {
     impactDirection: mapping.impactDirection?.trim() || null,
     notes: mapping.notes?.trim() || null,
   };
+}
+
+const CURRENCY_CODES = [
+  "AUD", "CAD", "CHF", "CNY", "EUR", "GBP", "HKD", "JPY", "NOK", "NZD",
+  "SEK", "SGD", "USD", "XAG", "XAU",
+];
+
+function normalizedText(value: string | null | undefined) {
+  return value?.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim() ?? "";
+}
+
+export function instrumentEconomicContext(instrument: Pick<Instrument, "symbol" | "displayName" | "description" | "assetClass" | "instrumentType" | "venue" | "baseCurrency" | "quoteCurrency">) {
+  const raw = [
+    instrument.symbol,
+    instrument.displayName,
+    instrument.description,
+    instrument.assetClass,
+    instrument.instrumentType,
+    instrument.venue,
+    instrument.baseCurrency,
+    instrument.quoteCurrency,
+  ].filter(Boolean).join(" ").toUpperCase();
+  const currencies = new Set<string>();
+  const marketLabels = new Set<string>();
+  const regions = new Set<string>();
+  const addCurrency = (currency: string | null | undefined) => {
+    if (currency) currencies.add(currency.trim().toUpperCase());
+  };
+
+  addCurrency(instrument.baseCurrency);
+  addCurrency(instrument.quoteCurrency);
+  for (const currency of CURRENCY_CODES) {
+    if (raw.includes(currency)) addCurrency(currency);
+  }
+
+  const hasGold = raw.includes("XAU") || raw.includes("GOLD");
+  const hasSilver = raw.includes("XAG") || raw.includes("SILVER");
+  const hasUnitedStates = /\b(US|USA|UNITED STATES|AMERICA|SPX|SP500|S&P|NASDAQ|NAS100|NDX|DOW|DJI|US30|US500|RUSSELL|VIX)\b/.test(raw);
+  const hasUnitedKingdom = /\b(UK|UNITED KINGDOM|BRITAIN|FTSE)\b/.test(raw);
+  const hasEurope = /\b(EUROPE|EURO AREA|ECB|DAX|CAC|STOXX)\b/.test(raw);
+
+  if (hasGold) marketLabels.add("gold");
+  if (hasSilver) marketLabels.add("silver");
+  if (instrument.assetClass.toLowerCase() === "index" || instrument.instrumentType.toLowerCase() === "index") {
+    marketLabels.add("indices");
+  }
+  if (hasUnitedStates) {
+    addCurrency("USD");
+    marketLabels.add("us indices");
+    marketLabels.add("us markets");
+    regions.add("united states");
+  }
+  if (hasUnitedKingdom) {
+    addCurrency("GBP");
+    marketLabels.add("uk markets");
+    regions.add("united kingdom");
+  }
+  if (hasEurope) {
+    addCurrency("EUR");
+    marketLabels.add("european markets");
+    regions.add("euro area");
+  }
+  if (currencies.has("USD")) regions.add("united states");
+  if (currencies.has("GBP")) regions.add("united kingdom");
+  if (currencies.has("EUR")) regions.add("euro area");
+  if (currencies.has("XAU")) marketLabels.add("gold");
+  if (currencies.has("XAG")) marketLabels.add("silver");
+
+  return { currencies, marketLabels, regions };
+}
+
+export function isEconomicEventRelevantToInstrument(
+  event: Pick<EconomicEvent, "currency" | "region"> & { affectedMarkets: Array<Pick<EconomicEventMarketMapping, "marketId" | "marketLabel">> },
+  instrument: Pick<Instrument, "id" | "symbol" | "displayName" | "description" | "assetClass" | "instrumentType" | "venue" | "baseCurrency" | "quoteCurrency">,
+) {
+  const context = instrumentEconomicContext(instrument);
+  if (event.affectedMarkets.some(mapping => mapping.marketId === instrument.id)) return true;
+  if (event.currency && context.currencies.has(event.currency.toUpperCase())) return true;
+  if (event.region && context.regions.has(normalizedText(event.region))) return true;
+  return event.affectedMarkets.some(mapping => {
+    const label = normalizedText(mapping.marketLabel);
+    return label.length > 0 && context.marketLabels.has(label);
+  });
 }
 
 async function withMappings(event: EconomicEvent, query = db) {
@@ -210,6 +295,10 @@ export async function refreshEconomicEvents() {
 export async function listEconomicEvents(params: ListEconomicEventsParams = {}) {
   const rows = await db.select().from(economicEventsTable).orderBy(asc(economicEventsTable.scheduledAt));
   const events = await Promise.all(rows.map(event => withMappings(event)));
+  const instrument = params.instrumentId
+    ? (await db.select().from(marketsTable).where(eq(marketsTable.id, params.instrumentId)))[0]
+    : null;
+  if (params.instrumentId && !instrument) throw new Error("Instrument not found");
   const now = new Date();
   const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const endOfToday = new Date(startOfToday);
@@ -235,6 +324,7 @@ export async function listEconomicEvents(params: ListEconomicEventsParams = {}) 
       (!params.region || event.region?.toLowerCase() === params.region.toLowerCase()) &&
       (!params.currency || event.currency?.toLowerCase() === params.currency.toLowerCase()) &&
       (!params.market || event.affectedMarkets.some(m => m.marketLabel?.toLowerCase().includes(params.market!.toLowerCase()))) &&
+      (params.relevance !== "relevant" || !instrument || isEconomicEventRelevantToInstrument(event, instrument)) &&
       (!search || text.includes(search));
   });
   return {

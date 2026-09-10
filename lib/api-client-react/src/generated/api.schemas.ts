@@ -1639,6 +1639,11 @@ region?: string;
 currency?: string;
 market?: string;
 search?: string;
+/**
+ * @minimum 1
+ */
+instrumentId?: number;
+relevance?: ListEconomicEventsRelevance;
 };
 
 export type ListEconomicEventsView = typeof ListEconomicEventsView[keyof typeof ListEconomicEventsView];
@@ -1658,6 +1663,14 @@ export const ListEconomicEventsImpact = {
   high: 'high',
   medium: 'medium',
   low: 'low',
+} as const;
+
+export type ListEconomicEventsRelevance = typeof ListEconomicEventsRelevance[keyof typeof ListEconomicEventsRelevance];
+
+
+export const ListEconomicEventsRelevance = {
+  relevant: 'relevant',
+  all: 'all',
 } as const;
 
 export type StreamMarketDataQuotesParams = {
