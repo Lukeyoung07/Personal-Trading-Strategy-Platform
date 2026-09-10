@@ -22,6 +22,7 @@ import {
 import { ecbProvider } from "./ecb";
 import { onsProvider } from "./ons";
 import { classifyEconomicEventImpact } from "./economic-event-impact";
+import { calculateMarketReaction } from "./economic-event-reaction";
 
 const providers = new Map<string, EconomicCalendarProvider>([
   [federalReserveProvider.key, federalReserveProvider],
@@ -160,7 +161,7 @@ export function isEconomicEventRelevantToInstrument(
   });
 }
 
-async function withMappings(event: EconomicEvent, query = db) {
+async function withMappings(event: EconomicEvent, query = db, instrument?: Instrument | null) {
   const affectedMarkets = await query
     .select()
     .from(economicEventMarketMappingsTable)
@@ -179,6 +180,7 @@ async function withMappings(event: EconomicEvent, query = db) {
     applicationImpact: applicationClassification?.impact ?? null,
     impactSource: event.impact ? "provider" as const : applicationClassification ? "application" as const : "unclassified" as const,
     impactClassificationReason: applicationClassification?.reason ?? null,
+    marketReaction: instrument ? calculateMarketReaction(event, instrument) : null,
     affectedMarkets,
   };
 }
@@ -318,11 +320,11 @@ export async function refreshEconomicEvents() {
 
 export async function listEconomicEvents(params: ListEconomicEventsParams = {}) {
   const rows = await db.select().from(economicEventsTable).orderBy(asc(economicEventsTable.scheduledAt));
-  const events = await Promise.all(rows.map(event => withMappings(event)));
   const instrument = params.instrumentId
     ? (await db.select().from(marketsTable).where(eq(marketsTable.id, params.instrumentId)))[0]
     : null;
   if (params.instrumentId && !instrument) throw new Error("Instrument not found");
+  const events = await Promise.all(rows.map(event => withMappings(event, db, instrument)));
   const now = new Date();
   const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const endOfToday = new Date(startOfToday);
