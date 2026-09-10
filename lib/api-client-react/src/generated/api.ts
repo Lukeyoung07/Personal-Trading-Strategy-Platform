@@ -43,6 +43,8 @@ import type {
   MarketUpdate,
   NotFoundResponse,
   PerformanceSummary,
+  RefreshCandlesInput,
+  RefreshCandlesResponse,
   SourceInstrumentMapping,
   SourceInstrumentMappingInput,
   SourceInstrumentMappingUpdate,
@@ -60,6 +62,7 @@ import type {
   StrategyVersionCloneInput,
   StrategyVersionCondition,
   StrategyVersionInput,
+  StreamMarketDataQuotesParams,
   Timeframe,
   TimeframeInput,
   TimeframeUpdate,
@@ -3691,6 +3694,161 @@ export function useListMarketDataConnections<TData = Awaited<ReturnType<typeof l
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListMarketDataConnectionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRefreshMarketDataCandlesUrl = () => {
+
+
+
+
+  return `/api/market-data/candles/refresh`
+}
+
+/**
+ * @summary Refresh normalized candles through a registered provider adapter
+ */
+export const refreshMarketDataCandles = async (refreshCandlesInput: RefreshCandlesInput, options?: Parameters<typeof customFetch>[1]): Promise<RefreshCandlesResponse> => {
+
+  return customFetch<RefreshCandlesResponse>(getRefreshMarketDataCandlesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(refreshCandlesInput)
+  }
+);}
+
+
+
+
+
+export const getRefreshMarketDataCandlesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshMarketDataCandles>>, TError,{data: BodyType<RefreshCandlesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof refreshMarketDataCandles>>, TError,{data: BodyType<RefreshCandlesInput>}, TContext> => {
+
+const mutationKey = ['refreshMarketDataCandles'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof refreshMarketDataCandles>>, {data: BodyType<RefreshCandlesInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  refreshMarketDataCandles(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RefreshMarketDataCandlesMutationResult = NonNullable<Awaited<ReturnType<typeof refreshMarketDataCandles>>>
+    export type RefreshMarketDataCandlesMutationBody = BodyType<RefreshCandlesInput>
+    export type RefreshMarketDataCandlesMutationError = ErrorType<void>
+
+    /**
+ * @summary Refresh normalized candles through a registered provider adapter
+ */
+export const useRefreshMarketDataCandles = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshMarketDataCandles>>, TError,{data: BodyType<RefreshCandlesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof refreshMarketDataCandles>>,
+        TError,
+        {data: BodyType<RefreshCandlesInput>},
+        TContext
+      > => {
+      return useMutation(getRefreshMarketDataCandlesMutationOptions(options));
+    }
+
+export const getStreamMarketDataQuotesUrl = (params: StreamMarketDataQuotesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/market-data/quotes/stream?${stringifiedParams}` : `/api/market-data/quotes/stream`
+}
+
+/**
+ * @summary Stream normalized quotes as server-sent events
+ */
+export const streamMarketDataQuotes = async (params: StreamMarketDataQuotesParams, options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getStreamMarketDataQuotesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getStreamMarketDataQuotesQueryKey = (params?: StreamMarketDataQuotesParams,) => {
+    return [
+    `/api/market-data/quotes/stream`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getStreamMarketDataQuotesQueryOptions = <TData = Awaited<ReturnType<typeof streamMarketDataQuotes>>, TError = ErrorType<void>>(params: StreamMarketDataQuotesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamMarketDataQuotes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getStreamMarketDataQuotesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof streamMarketDataQuotes>>> = ({ signal }) => streamMarketDataQuotes(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof streamMarketDataQuotes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type StreamMarketDataQuotesQueryResult = NonNullable<Awaited<ReturnType<typeof streamMarketDataQuotes>>>
+export type StreamMarketDataQuotesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Stream normalized quotes as server-sent events
+ */
+
+export function useStreamMarketDataQuotes<TData = Awaited<ReturnType<typeof streamMarketDataQuotes>>, TError = ErrorType<void>>(
+ params: StreamMarketDataQuotesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamMarketDataQuotes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getStreamMarketDataQuotesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

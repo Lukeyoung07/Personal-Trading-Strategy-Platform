@@ -1,5 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { biQuoteAdapter, ensureBiQuoteCatalog } from "./services/biquote";
+import { marketDataService } from "./services/market-data";
 
 const rawPort = process.env["PORT"];
 
@@ -14,6 +16,9 @@ const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
+
+await ensureBiQuoteCatalog();
+marketDataService.register(biQuoteAdapter);
 
 app.listen(port, (err) => {
   if (err) {

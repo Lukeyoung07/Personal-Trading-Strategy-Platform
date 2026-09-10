@@ -35,6 +35,10 @@ export interface NormalizedProviderQuote {
   askSize: number | null;
   last: number | null;
   lastSize: number | null;
+  marketState?: "open" | "closed" | "unknown" | null;
+  stale?: boolean | null;
+  quoteAgeSeconds?: number | null;
+  lastQuoteAt?: Date | null;
 }
 
 export interface CanonicalQuote extends NormalizedProviderQuote {
@@ -184,6 +188,10 @@ export class MarketDataService {
     if (!adapter.capabilities.includes("realtime") || !adapter.subscribeQuotes) {
       throw new Error("Provider adapter does not support real-time quote subscriptions");
     }
+
+    await adapter.connect();
+    const connection = await adapter.connectionState();
+    await this.recordConnection(request.sourceId, connection.state, connection.message ?? null);
 
     for await (const quote of adapter.subscribeQuotes({ providerSymbol: mapping.providerSymbol, signal: request.signal })) {
       validateQuote(quote);

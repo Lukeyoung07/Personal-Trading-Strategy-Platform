@@ -795,6 +795,49 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/MarketDataConnection"
+  /market-data/candles/refresh:
+    post:
+      operationId: refreshMarketDataCandles
+      tags: [market-data]
+      summary: Refresh normalized candles through a registered provider adapter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshCandlesInput"
+      responses:
+        "200":
+          description: Candle refresh result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshCandlesResponse"
+        "400":
+          description: Provider or request error
+  /market-data/quotes/stream:
+    get:
+      operationId: streamMarketDataQuotes
+      tags: [market-data]
+      summary: Stream normalized quotes as server-sent events
+      parameters:
+        - name: sourceId
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: instrumentId
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Server-sent quote and status events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Invalid source or instrument
   /market-data/candles:
     get:
       operationId: listCandles
@@ -1703,6 +1746,22 @@ components:
         candleCount: { type: integer }
         connectedSourceCount: { type: integer }
         latestDataAt: { type: ["string", "null"], format: date-time }
+    RefreshCandlesInput:
+      type: object
+      required: [sourceId, instrumentId, timeframeId]
+      properties:
+        sourceId: { type: integer, minimum: 1 }
+        instrumentId: { type: integer, minimum: 1 }
+        timeframeId: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+    RefreshCandlesResponse:
+      type: object
+      required: [sourceId, instrumentId, timeframeId, ingested]
+      properties:
+        sourceId: { type: integer }
+        instrumentId: { type: integer }
+        timeframeId: { type: integer }
+        ingested: { type: integer }
     Trade:
       type: object
       required: [id, strategyId, strategyVersionId, strategyName, strategyVersionNumber, marketId, side, status, quantity, entryPrice, exitPrice, openedAt, closedAt, thesis, notes, createdAt]

@@ -1104,6 +1104,27 @@ export interface MarketDataSummary {
   latestDataAt: string | null;
 }
 
+export interface RefreshCandlesInput {
+  /** @minimum 1 */
+  sourceId: number;
+  /** @minimum 1 */
+  instrumentId: number;
+  /** @minimum 1 */
+  timeframeId: number;
+  /**
+     * @minimum 1
+     * @maximum 1000
+     */
+  limit?: number;
+}
+
+export interface RefreshCandlesResponse {
+  sourceId: number;
+  instrumentId: number;
+  timeframeId: number;
+  ingested: number;
+}
+
 export type TradeSide = typeof TradeSide[keyof typeof TradeSide];
 
 
@@ -1357,6 +1378,17 @@ export interface UserSettingsUpdate {
  * Resource not found
  */
 export type NotFoundResponse = Error;
+
+export type StreamMarketDataQuotesParams = {
+/**
+ * @minimum 1
+ */
+sourceId: number;
+/**
+ * @minimum 1
+ */
+instrumentId: number;
+};
 
 export type ListCandlesParams = {
 /**

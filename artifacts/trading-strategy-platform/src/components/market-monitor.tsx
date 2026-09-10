@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3, Database, Globe, Network, Clock, DatabaseZap, Search, Plus,
-  Pencil, Trash2, X, Info, Activity, AlertTriangle, FileText, Settings2, ShieldAlert, Link2
+  Pencil, Trash2, X, Info, Activity, AlertTriangle, FileText, Settings2, ShieldAlert, Link2,
+  Radio, RefreshCw, WifiOff, CandlestickChart
 } from "lucide-react";
 import {
   useListInstruments, useCreateInstrument, useUpdateInstrument, useDeleteInstrument, getListInstrumentsQueryKey,
@@ -10,16 +11,17 @@ import {
   useListTimeframes, useCreateTimeframe, useUpdateTimeframe, useDeleteTimeframe, getListTimeframesQueryKey,
   useListMarketDataConnections, getListMarketDataConnectionsQueryKey,
   useListCandles, getListCandlesQueryKey,
+  useRefreshMarketDataCandles,
   useGetMarketDataSummary, getGetMarketDataSummaryQueryKey,
   getListMarketsQueryKey,
   useListSourceInstrumentMappings, useCreateSourceInstrumentMapping, useUpdateSourceInstrumentMapping, useDeleteSourceInstrumentMapping, getListSourceInstrumentMappingsQueryKey,
   type Instrument, type MarketDataSource, type Timeframe, type MarketDataConnection, type Candle, type MarketDataSummary, type SourceInstrumentMapping
 } from "@workspace/api-client-react";
 
-type Tab = "instruments" | "sources" | "mappings" | "timeframes" | "connections" | "candles";
+type Tab = "live-chart" | "instruments" | "sources" | "mappings" | "timeframes" | "connections" | "candles";
 
 export function MarketMonitor() {
-  const [tab, setTab] = useState<Tab>("instruments");
+  const [tab, setTab] = useState<Tab>("live-chart");
   const summary = useGetMarketDataSummary();
   const sumData = summary.data;
 
@@ -30,8 +32,8 @@ export function MarketMonitor() {
           <div className="eyebrow mb-3">Coverage</div>
           <h1 className="display text-3xl md:text-4xl font-bold">Market Monitor</h1>
           <p className="text-muted-foreground text-sm mt-3 max-w-2xl leading-relaxed">
-            Manage your provider-neutral instrument catalog, future data connections, and candle data.
-            Quotes do not enter this workspace without your explicit structure.
+            Watch genuine BiQuote market data through the provider-neutral market-data service.
+            Closed, stale, and unavailable data remain visibly distinct.
           </p>
         </div>
       </div>
@@ -45,16 +47,17 @@ export function MarketMonitor() {
       <div className="panel p-4 md:p-5 mb-5">
         <div className="eyebrow mb-3">Provider-neutral data path</div>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-          {["External market data", "Market data service", "Price / candle data", "Strategy engine"].map((step, index) => (
+          {["BiQuote adapter", "Market data service", "Normalized data", "Strategy engine"].map((step, index) => (
             <div key={step} className="rounded-md bg-secondary/55 px-3 py-3 text-xs font-semibold flex items-center justify-between gap-2">
               <span>{step}</span>{index < 3 && <span className="text-primary hidden sm:inline">→</span>}
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-muted-foreground mt-3">No provider adapter or live strategy monitoring is connected in this step.</p>
+        <p className="text-[11px] text-muted-foreground mt-3">BiQuote is enabled for this personal development workspace only. No trades are placed and no recommendations are generated.</p>
       </div>
 
       <div className="panel p-1 flex overflow-x-auto gap-1 mb-5">
+        <TabButton current={tab} id="live-chart" icon={CandlestickChart} label="Live Chart" onClick={setTab} />
         <TabButton current={tab} id="instruments" icon={BarChart3} label="Instruments" onClick={setTab} />
         <TabButton current={tab} id="sources" icon={Database} label="Sources" onClick={setTab} />
         <TabButton current={tab} id="mappings" icon={Link2} label="Mappings" onClick={setTab} />
@@ -63,6 +66,7 @@ export function MarketMonitor() {
         <TabButton current={tab} id="candles" icon={DatabaseZap} label="Candles" onClick={setTab} />
       </div>
 
+      {tab === "live-chart" && <LiveChartTab />}
       {tab === "instruments" && <InstrumentsTab />}
       {tab === "sources" && <SourcesTab />}
       {tab === "mappings" && <MappingsTab />}
@@ -95,6 +99,276 @@ function TabButton({ current, id, icon: Icon, label, onClick }: { current: strin
     >
       <Icon size={14} /> {label}
     </button>
+  );
+}
+
+type StreamStatus = {
+  state: "disconnected" | "connecting" | "connected" | "degraded" | "error";
+  message: string;
+  lastDataAt: string | null;
+};
+
+type LiveQuote = {
+  last: number | null;
+  bid: number | null;
+  ask: number | null;
+  eventTime: string;
+  receivedAt: string;
+  lastQuoteAt: string | null;
+  marketState: "open" | "closed" | "unknown" | null;
+  stale: boolean | null;
+  quoteAgeSeconds: number | null;
+  isLive: boolean;
+};
+
+type FormingCandle = {
+  openTime: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  isClosed: false;
+};
+
+function LiveChartTab() {
+  const instruments = useListInstruments();
+  const sources = useListMarketDataSources();
+  const timeframes = useListTimeframes();
+  const refresh = useRefreshMarketDataCandles();
+  const qc = useQueryClient();
+  const [sourceId, setSourceId] = useState<number | "">("");
+  const [instrumentId, setInstrumentId] = useState<number | "">("");
+  const [timeframeId, setTimeframeId] = useState<number | "">("");
+  const [streamStatus, setStreamStatus] = useState<StreamStatus>({
+    state: "disconnected",
+    message: "Select an instrument to connect.",
+    lastDataAt: null,
+  });
+  const [quote, setQuote] = useState<LiveQuote | null>(null);
+  const [formingCandle, setFormingCandle] = useState<FormingCandle | null>(null);
+
+  useEffect(() => {
+    if (sourceId === "" && sources.data?.length) {
+      const biquote = sources.data.find(source => source.providerKey === "biquote") ?? sources.data[0];
+      setSourceId(biquote.id);
+    }
+  }, [sourceId, sources.data]);
+  useEffect(() => {
+    if (instrumentId === "" && instruments.data?.length) setInstrumentId(instruments.data[0].id);
+  }, [instrumentId, instruments.data]);
+  useEffect(() => {
+    if (timeframeId === "" && timeframes.data?.length) {
+      const hourly = timeframes.data.find(timeframe => timeframe.code === "1h") ?? timeframes.data[0];
+      setTimeframeId(hourly.id);
+    }
+  }, [timeframeId, timeframes.data]);
+
+  const ready = sourceId !== "" && instrumentId !== "" && timeframeId !== "";
+  const selectedTimeframe = timeframes.data?.find(timeframe => timeframe.id === timeframeId);
+  const candles = useListCandles(
+    {
+      sourceId: Number(sourceId),
+      instrumentId: Number(instrumentId),
+      timeframeId: Number(timeframeId),
+      limit: 500,
+    },
+    {
+      query: {
+        enabled: ready,
+        queryKey: getListCandlesQueryKey({
+          sourceId: Number(sourceId),
+          instrumentId: Number(instrumentId),
+          timeframeId: Number(timeframeId),
+          limit: 500,
+        }),
+      },
+    },
+  );
+
+  useEffect(() => {
+    setQuote(null);
+    setFormingCandle(null);
+    if (!ready) {
+      setStreamStatus({ state: "disconnected", message: "Select an instrument to connect.", lastDataAt: null });
+      return;
+    }
+
+    const stream = new EventSource(`/api/market-data/quotes/stream?sourceId=${sourceId}&instrumentId=${instrumentId}`);
+    const onStatus = (event: MessageEvent<string>) => {
+      try {
+        setStreamStatus(JSON.parse(event.data) as StreamStatus);
+      } catch {
+        setStreamStatus({ state: "error", message: "The provider status could not be read.", lastDataAt: null });
+      }
+    };
+    const onQuote = (event: MessageEvent<string>) => {
+      try {
+        const next = JSON.parse(event.data) as LiveQuote;
+        setQuote(next);
+        const price = next.last ?? (next.bid != null && next.ask != null ? (next.bid + next.ask) / 2 : next.bid ?? next.ask);
+        const durationMs = (selectedTimeframe?.durationSeconds ?? 3600) * 1000;
+        if (price == null || !Number.isFinite(price)) return;
+        const eventTime = new Date(next.eventTime);
+        if (Number.isNaN(eventTime.getTime())) return;
+        const bucket = new Date(Math.floor(eventTime.getTime() / durationMs) * durationMs).toISOString();
+        setFormingCandle(previous => previous?.openTime === bucket
+          ? { ...previous, high: Math.max(previous.high, price), low: Math.min(previous.low, price), close: price }
+          : { openTime: bucket, open: price, high: price, low: price, close: price, isClosed: false });
+      } catch {
+        setStreamStatus({ state: "error", message: "The provider quote could not be read.", lastDataAt: null });
+      }
+    };
+    stream.addEventListener("status", onStatus);
+    stream.addEventListener("quote", onQuote);
+    stream.onerror = () => setStreamStatus(previous => ({
+      ...previous,
+      state: "disconnected",
+      message: "The live data connection was lost. No stale quote is marked LIVE.",
+    }));
+    return () => {
+      stream.removeEventListener("status", onStatus);
+      stream.removeEventListener("quote", onQuote);
+      stream.close();
+    };
+  }, [instrumentId, ready, selectedTimeframe?.durationSeconds, sourceId]);
+
+  const chartBars = useMemo(() => {
+    const stored = (candles.data ?? []).map(candle => ({
+      openTime: String(candle.openTime),
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      isClosed: candle.isClosed,
+    }));
+    if (!formingCandle) return stored.sort((a, b) => new Date(a.openTime).getTime() - new Date(b.openTime).getTime()).slice(-80);
+    const existing = stored.findIndex(candle => candle.openTime === formingCandle.openTime);
+    if (existing >= 0) stored[existing] = { ...stored[existing], ...formingCandle };
+    else stored.push(formingCandle);
+    return stored.sort((a, b) => new Date(a.openTime).getTime() - new Date(b.openTime).getTime()).slice(-80);
+  }, [candles.data, formingCandle]);
+
+  const connectionLabel = streamStatus.state === "connected" && quote?.isLive
+    ? "LIVE"
+    : quote?.marketState === "closed" || quote?.stale
+      ? "MARKET CLOSED"
+      : streamStatus.state.toUpperCase();
+  const isLive = connectionLabel === "LIVE";
+  const source = sources.data?.find(item => item.id === sourceId);
+
+  const refreshCandles = () => {
+    if (!ready) return;
+    refresh.mutate({
+      data: { sourceId: Number(sourceId), instrumentId: Number(instrumentId), timeframeId: Number(timeframeId), limit: 500 },
+    }, {
+      onSuccess: () => qc.invalidateQueries({
+        queryKey: getListCandlesQueryKey({
+          sourceId: Number(sourceId),
+          instrumentId: Number(instrumentId),
+          timeframeId: Number(timeframeId),
+          limit: 500,
+        }),
+      }),
+    });
+  };
+
+  if (instruments.isLoading || sources.isLoading || timeframes.isLoading) return <LoadingBlock />;
+  if (instruments.isError || sources.isError || timeframes.isError) return <ErrorBlock retry={() => { instruments.refetch(); sources.refetch(); timeframes.refetch(); }} />;
+
+  return (
+    <div className="space-y-5">
+      <div className="panel p-4 md:p-5">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+          <div className="flex-1 min-w-[180px]">
+            <span className="label">Instrument</span>
+            <select className="select" value={instrumentId} onChange={event => setInstrumentId(event.target.value ? Number(event.target.value) : "")}>
+              <option value="">Select instrument…</option>
+              {(instruments.data ?? []).map(instrument => <option key={instrument.id} value={instrument.id}>{instrument.symbol} — {instrument.displayName || instrument.assetClass}</option>)}
+            </select>
+          </div>
+          <div className="w-full lg:w-56">
+            <span className="label">Data source</span>
+            <select className="select" value={sourceId} onChange={event => setSourceId(event.target.value ? Number(event.target.value) : "")}>
+              <option value="">Select source…</option>
+              {(sources.data ?? []).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </div>
+          <div className="w-full lg:w-44">
+            <span className="label">Timeframe</span>
+            <select className="select" value={timeframeId} onChange={event => setTimeframeId(event.target.value ? Number(event.target.value) : "")}>
+              <option value="">Select timeframe…</option>
+              {(timeframes.data ?? []).map(timeframe => <option key={timeframe.id} value={timeframe.id}>{timeframe.code}</option>)}
+            </select>
+          </div>
+          <button className="btn btn-secondary" onClick={refreshCandles} disabled={!ready || refresh.isPending}>
+            <RefreshCw size={14} className={refresh.isPending ? "animate-spin" : ""} />
+            {refresh.isPending ? "Refreshing…" : "Refresh candles"}
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-5 pt-4 border-t border-border text-xs text-muted-foreground">
+          <span className={`tag ${isLive ? "tag-open" : connectionLabel === "MARKET CLOSED" ? "tag-draft" : "tag-archived"}`}>
+            {isLive ? <Radio size={11} className="mr-1" /> : <WifiOff size={11} className="mr-1" />}
+            {connectionLabel}
+          </span>
+          <span>{source?.name ?? "No source selected"}</span>
+          <span>{selectedTimeframe?.code ?? "—"}</span>
+          <span>{streamStatus.message}</span>
+        </div>
+      </div>
+
+      {refresh.isError && <div className="panel p-4 text-sm text-destructive">Candles could not be refreshed: {refresh.error instanceof Error ? refresh.error.message : "provider error"}</div>}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="panel p-4"><div className="eyebrow">Current price</div><div className="metric-value mt-3 mono">{quote?.last?.toFixed(5) ?? "—"}</div><div className="text-[11px] text-muted-foreground mt-2">{isLive ? "Genuine live mid price" : quote ? "Last provider price" : "No quote received"}</div></div>
+        <div className="panel p-4"><div className="eyebrow">Bid / ask</div><div className="mt-3 mono text-sm">{quote?.bid?.toFixed(5) ?? "—"} <span className="text-muted-foreground">/</span> {quote?.ask?.toFixed(5) ?? "—"}</div><div className="text-[11px] text-muted-foreground mt-2">Provider quote</div></div>
+        <div className="panel p-4"><div className="eyebrow">Last update</div><div className="mt-3 mono text-sm">{quote?.receivedAt ? new Date(quote.receivedAt).toLocaleTimeString() : "—"}</div><div className="text-[11px] text-muted-foreground mt-2">{quote?.quoteAgeSeconds != null ? `${quote.quoteAgeSeconds}s quote age` : "No timestamp yet"}</div></div>
+        <div className="panel p-4"><div className="eyebrow">Candles</div><div className="metric-value mt-3">{chartBars.length}</div><div className="text-[11px] text-muted-foreground mt-2">{formingCandle ? "Includes live forming bar" : "Stored provider bars"}</div></div>
+      </div>
+
+      <div className="panel p-4 md:p-6">
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div><h2 className="font-semibold">BiQuote candlestick chart</h2><p className="text-xs text-muted-foreground mt-1">Stored OHLC bars plus a forming bar built only from received provider ticks.</p></div>
+          <CandlestickChart size={18} className="text-primary shrink-0" />
+        </div>
+        {candles.isError ? <ErrorBlock retry={() => candles.refetch()} /> : !ready ? <div className="p-10 text-center text-sm text-muted-foreground">Select an instrument, source, and timeframe to view genuine market data.</div> : candles.isLoading ? <LoadingBlock /> : !chartBars.length ? <EmptyState icon={CandlestickChart} title="No candle data yet" text="Refresh candles to request OHLC data from BiQuote. If the symbol or timeframe is unsupported, the provider error will be shown instead of substituting data." action={<button className="btn btn-primary" onClick={refreshCandles} disabled={refresh.isPending}>Request BiQuote candles</button>} /> : <CandleSvg bars={chartBars} />}
+      </div>
+    </div>
+  );
+}
+
+function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; high: number; low: number; close: number; isClosed: boolean }> }) {
+  const width = 900;
+  const height = 360;
+  const pad = { top: 20, right: 20, bottom: 30, left: 20 };
+  const highs = bars.map(bar => bar.high);
+  const lows = bars.map(bar => bar.low);
+  const high = Math.max(...highs);
+  const low = Math.min(...lows);
+  const range = high - low || Math.max(Math.abs(high) * 0.01, 1);
+  const chartHeight = height - pad.top - pad.bottom;
+  const chartWidth = width - pad.left - pad.right;
+  const xStep = chartWidth / Math.max(bars.length, 1);
+  const y = (value: number) => pad.top + ((high - value) / range) * chartHeight;
+  return (
+    <div className="overflow-x-auto">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[680px] h-[300px] md:h-[360px]" role="img" aria-label="BiQuote candlestick chart">
+        <line x1={pad.left} x2={width - pad.right} y1={height - pad.bottom} y2={height - pad.bottom} stroke="hsl(var(--border))" />
+        {bars.map((bar, index) => {
+          const x = pad.left + xStep * index + xStep / 2;
+          const candleWidth = Math.max(3, Math.min(12, xStep * 0.55));
+          const rising = bar.close >= bar.open;
+          const color = bar.isClosed ? (rising ? "hsl(var(--primary))" : "hsl(var(--destructive))") : "hsl(var(--accent))";
+          const bodyTop = y(Math.max(bar.open, bar.close));
+          const bodyHeight = Math.max(2, Math.abs(y(bar.open) - y(bar.close)));
+          return <g key={`${bar.openTime}-${index}`}><line x1={x} x2={x} y1={y(bar.high)} y2={y(bar.low)} stroke={color} strokeWidth="1.5" /><rect x={x - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={color} rx="1" /></g>;
+        })}
+        <text x={pad.left} y={height - 8} fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(bars[0].openTime).toLocaleString()}</text>
+        <text x={width - pad.right} y={height - 8} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(bars[bars.length - 1].openTime).toLocaleString()}</text>
+        <text x={width - pad.right} y={pad.top + 10} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{high.toFixed(5)}</text>
+        <text x={width - pad.right} y={height - pad.bottom - 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{low.toFixed(5)}</text>
+      </svg>
+      <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground mt-2"><span><i className="inline-block w-2 h-2 rounded-sm bg-primary mr-1" />up</span><span><i className="inline-block w-2 h-2 rounded-sm bg-destructive mr-1" />down</span><span><i className="inline-block w-2 h-2 rounded-sm bg-accent mr-1" />forming from genuine ticks</span></div>
+    </div>
   );
 }
 

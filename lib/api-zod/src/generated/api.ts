@@ -1484,6 +1484,47 @@ export const ListMarketDataConnectionsResponse = zod.array(ListMarketDataConnect
 
 
 /**
+ * @summary Refresh normalized candles through a registered provider adapter
+ */
+
+
+
+export const refreshMarketDataCandlesBodyLimitDefault = 200;
+export const refreshMarketDataCandlesBodyLimitMax = 1000;
+
+
+
+export const RefreshMarketDataCandlesBody = zod.object({
+  "sourceId": zod.number().int().min(1),
+  "instrumentId": zod.number().int().min(1),
+  "timeframeId": zod.number().int().min(1),
+  "limit": zod.number().int().min(1).max(refreshMarketDataCandlesBodyLimitMax).default(refreshMarketDataCandlesBodyLimitDefault)
+})
+
+export const RefreshMarketDataCandlesResponse = zod.object({
+  "sourceId": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "timeframeId": zod.number().int(),
+  "ingested": zod.number().int()
+})
+
+
+/**
+ * @summary Stream normalized quotes as server-sent events
+ */
+
+
+
+
+export const StreamMarketDataQuotesQueryParams = zod.object({
+  "sourceId": zod.coerce.number().int().min(1),
+  "instrumentId": zod.coerce.number().int().min(1)
+})
+
+export const StreamMarketDataQuotesResponse = zod.unknown()
+
+
+/**
  * @summary Query stored provider candle data
  */
 

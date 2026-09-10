@@ -45,6 +45,8 @@ import {
   UpdateTimeframeParams,
   UpdateTimeframeResponse,
 } from "@workspace/api-zod";
+import { marketDataService } from "../services/market-data";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -297,6 +299,23 @@ router.delete("/market-data/timeframes/:timeframeId", async (req, res): Promise<
   res.sendStatus(204);
 });
 
+router.post("/market-data/candles/refresh", async (req, res): Promise<void> => {
+  const sourceId = Number(req.body?.sourceId);
+  const instrumentId = Number(req.body?.instrumentId);
+  const timeframeId = Number(req.body?.timeframeId);
+  const limit = req.body?.limit == null ? undefined : Number(req.body.limit);
+  if (![sourceId, instrumentId, timeframeId].every(Number.isInteger) || [sourceId, instrumentId, timeframeId].some(value => value < 1) || (limit != null && (!Number.isInteger(limit) || limit < 1 || limit > 1000))) {
+    res.status(400).json({ error: "sourceId, instrumentId, and timeframeId must be positive integers; limit must be between 1 and 1000." });
+    return;
+  }
+  try {
+    const ingested = await marketDataService.refreshCandles({ sourceId, instrumentId, timeframeId, limit });
+    res.json({ sourceId, instrumentId, timeframeId, ingested });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Could not refresh candles." });
+  }
+});
+
 router.get("/market-data/connections", async (_req, res): Promise<void> => {
   const rows = await db.select({
     connection: marketDataConnectionsTable,
@@ -305,6 +324,62 @@ router.get("/market-data/connections", async (_req, res): Promise<void> => {
     .innerJoin(marketDataSourcesTable, eq(marketDataConnectionsTable.sourceId, marketDataSourcesTable.id))
     .orderBy(asc(marketDataSourcesTable.name));
   res.json(ListMarketDataConnectionsResponse.parse(rows.map(row => ({ ...row.connection, sourceName: row.sourceName }))));
+});
+
+router.get("/market-data/quotes/stream", async (req, res): Promise<void> => {
+  const sourceId = Number(req.query.sourceId);
+  const instrumentId = Number(req.query.instrumentId);
+  if (![sourceId, instrumentId].every(Number.isInteger) || [sourceId, instrumentId].some(value => value < 1)) {
+    res.status(400).json({ error: "sourceId and instrumentId must be positive integers." });
+    return;
+  }
+
+  res.status(200);
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const controller = new AbortController();
+  const send = (event: string, payload: unknown) => {
+    if (res.writableEnded) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+  };
+  const statusTimer = setInterval(async () => {
+    try {
+      const [connection] = await db.select().from(marketDataConnectionsTable).where(eq(marketDataConnectionsTable.sourceId, sourceId));
+      send("status", {
+        state: connection?.status ?? "disconnected",
+        message: connection?.statusMessage ?? "No connection status is available.",
+        lastDataAt: connection?.lastDataAt ?? null,
+      });
+    } catch {
+      // The stream will report provider errors through its error event.
+    }
+  }, 5000);
+  req.on("close", () => controller.abort());
+  send("status", { state: "connecting", message: "Connecting to the provider.", lastDataAt: null });
+
+  try {
+    for await (const quote of marketDataService.streamQuotes({ sourceId, instrumentId, signal: controller.signal })) {
+      const isLive = quote.marketState === "open" && quote.stale !== true;
+      send("quote", {
+        ...quote,
+        eventTime: quote.eventTime.toISOString(),
+        receivedAt: quote.receivedAt.toISOString(),
+        lastQuoteAt: quote.lastQuoteAt?.toISOString() ?? null,
+        isLive,
+      });
+    }
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      logger.warn({ err: error, sourceId, instrumentId }, "Market-data quote stream failed");
+      send("error", { message: error instanceof Error ? error.message : "The provider stream failed." });
+    }
+  } finally {
+    clearInterval(statusTimer);
+    if (!res.writableEnded) res.end();
+  }
 });
 
 router.get("/market-data/candles", async (req, res): Promise<void> => {
