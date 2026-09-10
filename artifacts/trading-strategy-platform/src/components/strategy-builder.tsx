@@ -59,6 +59,22 @@ function friendlyMutationError(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message.replace(/^Error:\s*/i, "") : fallback;
 }
 
+function isBacktestCompatibleRule(rule: string | null | undefined) {
+  if (!rule?.trim()) return false;
+  const normalized = rule.trim().toLowerCase().replace(/[()[\],]/g, " ").replace(/\s+/g, " ");
+  if (normalized === "always" || normalized === "bullish" || normalized === "bullish candle" || normalized === "bearish" || normalized === "bearish candle") return true;
+  if (/^(open|high|low|close) crosses (above|below) previous[_ ](open|high|low|close)$/.test(normalized)) return true;
+  return /^(open|high|low|close|previous[_ ](?:open|high|low|close))\s*(>=|<=|>|<|=|==)\s*(open|high|low|close|previous[_ ](?:open|high|low|close)|\d+(?:\.\d+)?)$/.test(normalized);
+}
+
+function isBacktestCompatibleRiskRules(riskRules: string | null | undefined) {
+  if (!riskRules?.trim()) return true;
+  const mentionsRisk = /(?:stop[- ]loss|sl|take[- ]profit|tp)/i.test(riskRules);
+  if (!mentionsRisk) return true;
+  return /(?:stop[- ]loss|sl)\s*[:=]?\s*\d+(?:\.\d+)?\s*%/i.test(riskRules)
+    || /(?:take[- ]profit|tp)\s*[:=]?\s*\d+(?:\.\d+)?\s*%/i.test(riskRules);
+}
+
 function BuilderPage({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return <div className="page-wrap">
     <div className="flex items-start justify-between gap-5 mb-8">
@@ -426,6 +442,9 @@ function StrategyControls({ strategy, conditions }: { strategy: Strategy; condit
 
   const entryConditions = conditions.filter(condition => condition.stage === "entry" || condition.stage === "confirmation");
   const exitConditions = conditions.filter(condition => condition.stage === "exit" || condition.stage === "invalidation");
+  const unsupportedConditions = conditions.filter(condition => !isBacktestCompatibleRule(condition.triggerRules)).map(condition => condition.name || "Unnamed condition");
+  const missingEntryCondition = entryConditions.length === 0;
+  const compatible = !missingEntryCondition && unsupportedConditions.length === 0 && isBacktestCompatibleRiskRules(strategy.riskManagementRules);
   const riskRules = [
     riskNarrative(strategy.riskManagementRules),
     stopLossEnabled && stopLoss ? `stop-loss: ${stopLoss}%` : "",
@@ -477,7 +496,7 @@ function StrategyControls({ strategy, conditions }: { strategy: Strategy; condit
       <label className="block mt-4"><span className="label">Optional exit condition</span><select className="select" defaultValue="" data-testid="select-builder-exit-condition"><option value="">No condition selected</option>{exitConditions.map(condition => <option key={condition.id} value={condition.id}>{condition.name}</option>)}</select><span className="block text-[11px] text-muted-foreground mt-1.5">Add an exit-stage condition from the Entry Conditions area when you need one. Exit conditions are stored separately from risk percentages.</span></label>
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive mt-4" role="alert" data-testid="status-builder-settings-error">{error}</div>}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-5 pt-5 border-t border-border">
-        <span className="text-[11px] text-muted-foreground">No fees, slippage, or execution signals are added here.</span>
+        <span className="text-[11px] text-muted-foreground">Save these editable settings first, then use “Save as New Version” below to create an immutable snapshot for Backtesting.</span>
         <button type="button" className="btn btn-primary" onClick={save} disabled={update.isPending} data-testid="button-save-builder-strategy-settings"><Save size={14} />{update.isPending ? "Saving…" : "Save Strategy"}</button>
       </div>
     </section>
@@ -495,6 +514,16 @@ function StrategyControls({ strategy, conditions }: { strategy: Strategy; condit
         {exitConditions.length > 0 && <p className="text-xs text-muted-foreground mt-4">Exit conditions: {exitConditions.map(condition => condition.name).join(", ")}.</p>}
       </div>
       <p className="text-[11px] text-muted-foreground mt-4">This is a plain-English view of saved conditions. It describes your process; it does not recommend trades or create signals.</p>
+    </section>
+    <section className={`panel p-5 md:p-6 ${compatible ? "border-primary/30 bg-primary/5" : "border-amber-500/40 bg-amber-500/5"}`} data-testid="section-backtest-compatibility">
+      <div className="flex items-start gap-3">
+        <ShieldCheck size={18} className={compatible ? "text-primary shrink-0 mt-0.5" : "text-amber-300 shrink-0 mt-0.5"} />
+        <div className="min-w-0">
+          <div className="eyebrow">Backtesting compatibility</div>
+          <h2 className="font-semibold mt-2">{compatible ? "This strategy can be backtested." : missingEntryCondition ? "Add an entry condition before backtesting." : "Some conditions cannot currently be backtested."}</h2>
+          {compatible ? <p className="text-xs text-muted-foreground mt-2 leading-relaxed">The saved conditions and percentage exit rules use capabilities available in the current historical backtester.</p> : <><p className="text-xs text-muted-foreground mt-2 leading-relaxed">You can still save this strategy, but the current backtester cannot evaluate:</p><ul className="mt-3 space-y-1.5 text-xs text-amber-100">{missingEntryCondition && <li>• No entry condition has been added</li>}{unsupportedConditions.map(condition => <li key={condition}>• {condition}</li>)}{!isBacktestCompatibleRiskRules(strategy.riskManagementRules) && <li>• The current risk rules</li>}</ul><p className="text-[11px] text-muted-foreground mt-3">This limitation is shown before you try to run a backtest.</p></>}
+        </div>
+      </div>
     </section>
   </div>;
 }
@@ -524,6 +553,7 @@ export function StrategyBuilder() {
   const concepts = useListConcepts();
   const queryClient = useQueryClient();
   const requestedStrategyId = Number(new URLSearchParams(window.location.search).get("strategyId")) || null;
+  const requestedVersionId = Number(new URLSearchParams(window.location.search).get("versionId")) || null;
   const [selectedStrategyId, setSelectedStrategyId] = useState<number | null>(requestedStrategyId);
   const [strategyModal, setStrategyModal] = useState<"new" | "edit" | false>(false);
   const [conditionModal, setConditionModal] = useState<StrategyCondition | "new" | false>(false);
@@ -583,7 +613,7 @@ export function StrategyBuilder() {
            <StrategyControls strategy={activeStrategy} conditions={strategyConditions.data || []} />
         </div>
         <div className="space-y-5">
-          <StrategyVersionManager strategy={activeStrategy} compact />
+           <StrategyVersionManager strategy={activeStrategy} compact initialVersionId={requestedVersionId} />
           <ConceptsCard concepts={concepts.data || []} />
           <Panel title="Builder boundaries" eyebrow="What this page does not do">
             <ul className="mt-4 space-y-3 text-xs text-muted-foreground leading-relaxed">

@@ -102,9 +102,16 @@ describe("BacktestResultsPanel", () => {
       },
     };
 
-    render(<BacktestResultsPanel backtestId={8} onBack={vi.fn()} />);
+    const onViewStrategy = vi.fn();
+    const onRunAgain = vi.fn();
+    render(<BacktestResultsPanel backtestId={8} onBack={vi.fn()} onViewStrategy={onViewStrategy} onRunAgain={onRunAgain} />);
 
     expect(screen.getByText("Bullish review")).toBeInTheDocument();
+    expect(screen.getByText(/This backtest used/)).toHaveTextContent("Bullish review v4");
+    fireEvent.click(screen.getByTestId("button-view-strategy-from-backtest"));
+    expect(onViewStrategy).toHaveBeenCalledWith(3, 12);
+    fireEvent.click(screen.getByTestId("button-run-again-backtest"));
+    expect(onRunAgain).toHaveBeenCalledWith(baseBacktest);
     expect(screen.getByTestId("stat-win-rate")).toHaveTextContent("100.0%");
     expect(screen.getByTestId("stat-net-p/l")).toHaveTextContent("$5.00");
     expect(screen.getByTestId("chart-equity-curve")).toBeInTheDocument();

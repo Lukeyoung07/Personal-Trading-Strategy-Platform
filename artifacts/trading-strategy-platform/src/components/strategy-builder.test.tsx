@@ -152,4 +152,13 @@ describe("StrategyBuilder", () => {
 
     expect(screen.getByText("Not currently supported by Backtesting.")).toBeInTheDocument();
   });
+
+  it("shows which saved condition prevents backtesting", () => {
+    state.strategies = [strategy];
+    state.conditions = [{ ...condition, name: "RSI filter", triggerRules: "RSI above 70" }];
+    render(<StrategyBuilder />);
+
+    expect(screen.getByTestId("section-backtest-compatibility")).toHaveTextContent("Some conditions cannot currently be backtested.");
+    expect(screen.getByTestId("section-backtest-compatibility")).toHaveTextContent("RSI filter");
+  });
 });

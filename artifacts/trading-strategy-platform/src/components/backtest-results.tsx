@@ -10,8 +10,10 @@ import {
   Clock3,
   Crosshair,
   Database,
+  ExternalLink,
   Info,
   LineChart,
+  RotateCcw,
   Target,
 } from "lucide-react";
 import {
@@ -26,6 +28,8 @@ import {
 type BacktestResultsPanelProps = {
   backtestId: number;
   onBack: () => void;
+  onViewStrategy?: (strategyId: number, strategyVersionId: number) => void;
+  onRunAgain?: (backtest: BacktestResults["backtest"]) => void;
 };
 
 const money = (value: number | null | undefined) => {
@@ -393,7 +397,7 @@ function Assumptions({ backtest }: { backtest: BacktestResults["backtest"] }) {
   );
 }
 
-export function BacktestResultsPanel({ backtestId, onBack }: BacktestResultsPanelProps) {
+export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRunAgain }: BacktestResultsPanelProps) {
   const query = useGetBacktestResults(backtestId, {
     query: { enabled: Number.isFinite(backtestId), queryKey: getGetBacktestResultsQueryKey(backtestId) },
   });
@@ -448,9 +452,13 @@ export function BacktestResultsPanel({ backtestId, onBack }: BacktestResultsPane
           <button className="btn btn-ghost -ml-2 mb-4" onClick={onBack} data-testid="button-back-to-backtesting"><ArrowLeft size={15} /> Back to backtesting</button>
           <div className="eyebrow flex items-center gap-2"><Clock3 size={13} /> Recorded review · Backtest {backtest.id}</div>
           <h1 className="display text-3xl md:text-4xl font-bold mt-3">{backtest.strategyName} <span className="text-muted-foreground">/ v{backtest.versionNumber}</span></h1>
-          <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">A read-only result from the stored strategy version and historical candle series. Nothing here is a signal or an order.</p>
+          <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">This backtest used {backtest.strategyName} v{backtest.versionNumber}. It is a read-only result from the stored strategy version and historical candle series. Nothing here is a signal or an order.</p>
         </div>
-        <div className={`tag ${isFailed ? "tag-archived" : isCompleted ? "tag-active" : "tag-draft"} mt-1`} data-testid="status-backtest-result">{backtest.status}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          {onViewStrategy && <button className="btn btn-secondary" onClick={() => onViewStrategy(backtest.strategyId, backtest.strategyVersionId)} data-testid="button-view-strategy-from-backtest"><ExternalLink size={14} /> View Strategy</button>}
+          {onRunAgain && <button className="btn btn-primary" onClick={() => onRunAgain(backtest)} data-testid="button-run-again-backtest"><RotateCcw size={14} /> Run Again</button>}
+          <div className={`tag ${isFailed ? "tag-archived" : isCompleted ? "tag-active" : "tag-draft"} mt-1`} data-testid="status-backtest-result">{backtest.status}</div>
+        </div>
       </div>
 
       {isFailed && (

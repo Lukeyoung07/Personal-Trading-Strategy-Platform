@@ -1,4 +1,5 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Link } from "wouter";
 import {
   ArrowRight, Check, Copy, GitCompareArrows, History, Plus, RotateCcw, X,
 } from "lucide-react";
@@ -148,6 +149,7 @@ function SaveVersionForm({ strategyId, onClose }: { strategyId: number; onClose:
   };
   return <form onSubmit={save} className="space-y-4">
     {error && <div className="rounded-md bg-destructive/10 border border-destructive/40 p-3 text-xs text-destructive">{error}</div>}
+    <div className="rounded-md border border-primary/25 bg-primary/5 p-3 text-xs text-muted-foreground leading-relaxed">This creates a new immutable version from the current Builder state. Earlier versions and their backtests stay unchanged.</div>
     <Field label="Version label"><input className="input" name="label" placeholder="What changed?" data-testid="input-new-version-label" /></Field>
     <Field label="Thesis"><textarea className="textarea" name="thesis" placeholder="What must be true for this version?" /></Field>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -161,7 +163,7 @@ function SaveVersionForm({ strategyId, onClose }: { strategyId: number; onClose:
   </form>;
 }
 
-export function StrategyVersionManager({ strategy, compact = false }: { strategy: Strategy; compact?: boolean }) {
+export function StrategyVersionManager({ strategy, compact = false, initialVersionId }: { strategy: Strategy; compact?: boolean; initialVersionId?: number | null }) {
   const versionsQuery = useListStrategyVersions(strategy.id, { query: { queryKey: getListStrategyVersionsQueryKey(strategy.id) } });
   const activate = useActivateStrategyVersion();
   const clone = useCloneStrategyVersion();
@@ -173,6 +175,9 @@ export function StrategyVersionManager({ strategy, compact = false }: { strategy
   const [error, setError] = useState("");
   const versions = versionsQuery.data || [];
   const selected = useMemo(() => versions.find(version => version.id === selectedId) || versions.find(version => version.isActive) || versions[0] || null, [selectedId, versions]);
+  useEffect(() => {
+    if (initialVersionId && versions.some(version => version.id === initialVersionId)) setSelectedId(initialVersionId);
+  }, [initialVersionId, versions]);
   const conditions = useListStrategyVersionConditions(strategy.id, selected?.id || 0, { query: { enabled: !!selected?.id, queryKey: getListStrategyVersionConditionsQueryKey(strategy.id, selected?.id || 0) } });
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: getListStrategyVersionsQueryKey(strategy.id) });
@@ -196,8 +201,8 @@ export function StrategyVersionManager({ strategy, compact = false }: { strategy
   };
   return <section className={compact ? "panel p-5" : ""} data-testid="strategy-version-manager">
     <div className={`flex flex-col ${compact ? "" : "sm:flex-row sm:items-center"} justify-between gap-3`}>
-      <div><div className="eyebrow">Version history</div><h2 className="font-semibold mt-2">{strategy.name}</h2><p className="text-xs text-muted-foreground mt-1">Saved versions are immutable. Activating one loads its snapshot into the Builder.</p></div>
-      <div className={`grid ${compact ? "grid-cols-2" : "grid-cols-2"} gap-2`}><button className="btn btn-secondary" disabled={versions.length < 2} onClick={() => setShowCompare(value => !value)} data-testid="button-compare-versions"><GitCompareArrows size={14} /> Compare</button><button className="btn btn-primary" onClick={() => setSaveOpen(true)} data-testid="button-save-new-version"><Plus size={14} /> Save new version</button></div>
+      <div><div className="eyebrow">Version history</div><h2 className="font-semibold mt-2">{strategy.name}</h2><p className="text-xs text-muted-foreground mt-1">Saved versions are immutable. Current Builder edits become a new version when you choose to save one.</p></div>
+      <div className={`grid ${compact ? "grid-cols-2" : "grid-cols-2"} gap-2`}><button className="btn btn-secondary" disabled={versions.length < 2} onClick={() => setShowCompare(value => !value)} data-testid="button-compare-versions"><GitCompareArrows size={14} /> Compare</button><button className="btn btn-primary" onClick={() => setSaveOpen(true)} data-testid="button-save-new-version"><Plus size={14} /> Save as New Version</button></div>
     </div>
     {error && <div className="rounded-md bg-destructive/10 border border-destructive/40 p-3 text-xs text-destructive mt-4">{error}</div>}
     {versionsQuery.isLoading ? <div className="rounded-md bg-secondary/50 p-5 text-xs text-muted-foreground mt-5">Loading versions…</div> : versionsQuery.isError ? <div className="rounded-md bg-destructive/10 p-5 text-xs text-destructive mt-5">Couldn’t load version history.</div> : versions.length ? <>
@@ -206,9 +211,9 @@ export function StrategyVersionManager({ strategy, compact = false }: { strategy
         <div className="text-[10px] text-muted-foreground mt-1 max-w-36 truncate">{version.label || "Saved snapshot"}</div>
       </button>)}</div>
       {selected && <div className="mt-4 rounded-lg border border-border p-4 md:p-5">
-        <div className={`flex flex-col ${compact ? "" : "sm:flex-row sm:items-start"} justify-between gap-3 mb-5`}>
+          <div className={`flex flex-col ${compact ? "" : "sm:flex-row sm:items-start"} justify-between gap-3 mb-5`}>
           <div><div className="flex items-center gap-2"><History size={15} className="text-primary" /><h3 className="font-semibold">{versionTitle(selected)}</h3>{selected.isActive && <Check size={14} className="text-primary" />}</div><div className="text-[11px] text-muted-foreground mt-2">{new Date(selected.createdAt).toLocaleString()}</div></div>
-          <div className="grid grid-cols-2 gap-2"><button className="btn btn-secondary" disabled={selected.isActive || activate.isPending} onClick={() => activateVersion(selected)} data-testid={`button-activate-version-${selected.id}`}><RotateCcw size={13} /> {selected.isActive ? "Active" : "Activate"}</button><button className="btn btn-secondary" onClick={() => setCloneSource(selected)} data-testid={`button-clone-version-${selected.id}`}><Copy size={13} /> Create from</button></div>
+          <div className="flex flex-wrap gap-2"><Link className="btn btn-primary" href={`/backtesting?strategyId=${strategy.id}&strategyVersionId=${selected.id}`} data-testid={`link-backtest-version-${selected.id}`}><ArrowRight size={13} /> Backtest This Version</Link><button className="btn btn-secondary" disabled={selected.isActive || activate.isPending} onClick={() => activateVersion(selected)} data-testid={`button-activate-version-${selected.id}`}><RotateCcw size={13} /> {selected.isActive ? "Active" : "Activate"}</button><button className="btn btn-secondary" onClick={() => setCloneSource(selected)} data-testid={`button-clone-version-${selected.id}`}><Copy size={13} /> Create from</button></div>
         </div>
         <SnapshotSummary version={selected} compact={compact} />
         <div className="mt-5"><div className="eyebrow mb-3">Saved conditions</div>{conditions.isLoading ? <div className="text-xs text-muted-foreground">Loading conditions…</div> : <ConditionsSnapshot conditions={conditions.data || []} />}</div>

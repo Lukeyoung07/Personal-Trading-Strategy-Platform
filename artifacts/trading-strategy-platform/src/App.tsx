@@ -180,6 +180,12 @@ function SettingsPage() { const q=useGetSettings();const u=useUpdateSettings();c
 function formatDateInput(value: Date) {
   return value.toISOString().slice(0, 10);
 }
+function backtestErrorCopy(value: unknown) {
+  const message = typeof value === "string" ? value : value instanceof Error ? value.message : "";
+  if (/historical|insufficient|candle|provider data/i.test(message)) return "Historical data is not available for this market and timeframe during the selected period.";
+  if (/unsupported|condition|entry rule|risk rule/i.test(message)) return "This strategy contains a condition that the current backtester cannot evaluate.";
+  return "This backtest could not run. Check the selected setup and try again.";
+}
 
 function presetRange(preset: string) {
   const end = new Date();
@@ -195,14 +201,22 @@ function Backtesting() {
   const timeframes = useListTimeframes();
   const saved = useListBacktests();
   const create = useCreateBacktest();
-  const [strategyId, setStrategyId] = useState<number | null>(null);
-  const [versionId, setVersionId] = useState<number | null>(null);
-  const [instrumentId, setInstrumentId] = useState<number | null>(null);
-  const [timeframeId, setTimeframeId] = useState<number | null>(null);
-  const [preset, setPreset] = useState("last_7_days");
+  const params = new URLSearchParams(window.location.search);
+  const requestedStrategyId = Number(params.get("strategyId")) || null;
+  const requestedVersionId = Number(params.get("strategyVersionId")) || null;
+  const requestedInstrumentId = Number(params.get("instrumentId")) || null;
+  const requestedTimeframeId = Number(params.get("timeframeId")) || null;
   const initialRange = presetRange("last_7_days");
-  const [startDate, setStartDate] = useState(initialRange.start);
-  const [endDate, setEndDate] = useState(initialRange.end);
+  const requestedStartDate = params.get("startDate") || "";
+  const requestedEndDate = params.get("endDate") || "";
+  const initialPreset = requestedStartDate && requestedEndDate ? "custom" : "last_7_days";
+  const [strategyId, setStrategyId] = useState<number | null>(requestedStrategyId);
+  const [versionId, setVersionId] = useState<number | null>(requestedVersionId);
+  const [instrumentId, setInstrumentId] = useState<number | null>(requestedInstrumentId);
+  const [timeframeId, setTimeframeId] = useState<number | null>(requestedTimeframeId);
+  const [preset, setPreset] = useState(initialPreset);
+  const [startDate, setStartDate] = useState(requestedStartDate || initialRange.start);
+  const [endDate, setEndDate] = useState(requestedEndDate || initialRange.end);
   const versions = useListStrategyVersions(strategyId ?? 0, {
     query: {
       enabled: strategyId != null,
@@ -245,7 +259,11 @@ function Backtesting() {
       },
     });
   };
+  const chosenStrategy = strategies.data?.find(strategy => strategy.id === strategyId);
   const chosenVersion = versions.data?.find(version => version.id === versionId);
+  const chosenInstrument = markets.data?.find(market => market.id === instrumentId);
+  const chosenTimeframe = timeframes.data?.find(timeframe => timeframe.id === timeframeId);
+  const periodLabel = preset === "custom" ? `${startDate || "Start"} – ${endDate || "End"}` : preset === "last_30_days" ? "Last 30 days" : preset === "last_90_days" ? "Last 90 days" : "Last 7 days";
 
   return <Page eyebrow="Utilities" title="Backtesting" description="Run a historical review from your saved strategy versions using genuine provider candles.">
     <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5">
@@ -253,7 +271,7 @@ function Backtesting() {
         <div>
           <div className="eyebrow">Setup</div>
           <h2 className="display text-2xl font-bold mt-2">Choose what to review</h2>
-          <p className="text-sm text-muted-foreground mt-2">Select an exact strategy version and the normalized market data series it should use.</p>
+            <p className="text-sm text-muted-foreground mt-2">Select an exact strategy version and the normalized market data series it should use.</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Strategy">
@@ -267,7 +285,7 @@ function Backtesting() {
               <option value="">{versions.isLoading ? "Loading versions…" : "Select a version"}</option>
               {(versions.data || []).map(version => <option key={version.id} value={version.id}>v{version.versionNumber}{version.label ? ` · ${version.label}` : ""}</option>)}
             </select>
-            {chosenVersion && <p className="text-xs text-muted-foreground mt-2">This run stays tied to v{chosenVersion.versionNumber}; newer versions will not replace it.</p>}
+             {chosenVersion && <p className="text-xs text-muted-foreground mt-2">This run stays tied to v{chosenVersion.versionNumber}; newer versions will not replace it.</p>}
           </Field>
           <Field label="Instrument">
             <select className="select" value={instrumentId ?? ""} onChange={event => setInstrumentId(event.target.value ? Number(event.target.value) : null)} required data-testid="select-backtest-instrument">
@@ -292,13 +310,21 @@ function Backtesting() {
           <Field label="Start date"><input className="input" type="date" value={startDate} onChange={event => setStartDate(event.target.value)} required data-testid="input-backtest-start-date" /></Field>
           <Field label="End date"><input className="input" type="date" value={endDate} onChange={event => setEndDate(event.target.value)} required data-testid="input-backtest-end-date" /></Field>
         </div>}
+         <section className="rounded-lg border border-primary/25 bg-primary/5 p-4 md:p-5" data-testid="backtest-setup-confirmation">
+           <div className="eyebrow text-primary">Review before running</div>
+           <h3 className="font-semibold mt-2">Confirm this backtest setup</h3>
+           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
+             {[["Strategy", chosenStrategy?.name || "Not selected"], ["Version", chosenVersion ? `v${chosenVersion.versionNumber}` : "Not selected"], ["Instrument", chosenInstrument?.symbol || "Not selected"], ["Timeframe", chosenTimeframe?.label || "Not selected"], ["Period", periodLabel]].map(([label, value]) => <div key={label}><div className="eyebrow">{label}</div><div className="text-xs font-semibold mt-2 break-words">{value}</div></div>)}
+           </div>
+           <p className="text-[11px] text-muted-foreground mt-4">Nothing runs until you choose Run Backtest. The selected strategy version will remain fixed for this run.</p>
+         </section>
         <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
           <p className="text-xs text-muted-foreground">The server evaluates completed candles chronologically and saves simulated trades separately from the journal.</p>
           <button className="btn btn-primary whitespace-nowrap" type="submit" disabled={create.isPending || strategies.isLoading || markets.isLoading || timeframes.isLoading}>{create.isPending ? "Saving…" : "Run Backtest"}</button>
         </div>
         {create.isSuccess && create.data?.status === "completed" && <p className="text-sm text-primary">Backtest completed: {create.data.candlesProcessed} candles processed and {create.data.tradeCount} simulated trades saved. {create.data.resultMessage}</p>}
-        {create.isSuccess && create.data?.status === "failed" && <p className="text-sm text-destructive">Backtest failed: {create.data.errorMessage || "Historical data or strategy rules were not available."}</p>}
-        {create.isError && <p className="text-sm text-destructive">Could not start this backtest. Check the selected dates and try again.</p>}
+        {create.isSuccess && create.data?.status === "failed" && <p className="text-sm text-destructive">Backtest failed: {backtestErrorCopy(create.data.errorMessage)}</p>}
+         {create.isError && <p className="text-sm text-destructive">{backtestErrorCopy(create.error)}</p>}
       </form>
       <div className="space-y-5">
         <div className="panel p-6">
@@ -319,7 +345,12 @@ function BacktestResultsRoute() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const backtestId = Number(params.id);
-  return <div className="page-wrap"><BacktestResultsPanel backtestId={backtestId} onBack={() => setLocation("/backtesting")} /></div>;
+  return <div className="page-wrap"><BacktestResultsPanel
+    backtestId={backtestId}
+    onBack={() => setLocation("/backtesting")}
+    onViewStrategy={(strategyId, strategyVersionId) => setLocation(`/strategy-builder?strategyId=${strategyId}&versionId=${strategyVersionId}`)}
+    onRunAgain={backtest => setLocation(`/backtesting?strategyId=${backtest.strategyId}&strategyVersionId=${backtest.strategyVersionId}&instrumentId=${backtest.instrumentId}&timeframeId=${backtest.timeframeId}&startDate=${formatDateInput(new Date(backtest.startDate))}&endDate=${formatDateInput(new Date(backtest.endDate))}`)}
+  /></div>;
 }
 function Router() { return <ErrorBoundary><Shell><Switch><Route path="/" component={Dashboard}/><Route path="/strategy-builder" component={StrategyBuilderRoute}/><Route path="/strategy-library" component={StrategyLibrary}/><Route path="/market-monitor" component={MarketMonitor}/><Route path="/trade-journal" component={Journal}/><Route path="/performance" component={Performance}/><Route path="/strategy-monitoring" component={StrategyMonitoringPage}/><Route path="/alerts" component={Alerts}/><Route path="/news" component={EconomicCalendar}/><Route path="/settings" component={SettingsPage}/><Route path="/backtesting/:id" component={BacktestResultsRoute}/><Route path="/backtesting" component={Backtesting}/><Route component={NotFound}/></Switch></Shell></ErrorBoundary>; }
 export default function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><Router/><Toaster/></TooltipProvider></QueryClientProvider>; }
