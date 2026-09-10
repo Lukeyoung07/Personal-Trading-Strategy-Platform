@@ -8,7 +8,6 @@
 import type { EconomicEventImpact } from './economicEventImpact';
 import type { EconomicEventImpactSource } from './economicEventImpactSource';
 import type { EconomicEventMarketMapping } from './economicEventMarketMapping';
-import type { EconomicEventMarketReaction } from './economicEventMarketReaction';
 import type { EconomicEventReleaseStatus } from './economicEventReleaseStatus';
 import type { EconomicEventTimePrecision } from './economicEventTimePrecision';
 
@@ -33,7 +32,6 @@ export interface EconomicEvent {
      * @nullable
      */
   impactClassificationReason: string | null;
-  marketReaction: EconomicEventMarketReaction | null;
   /** @nullable */
   region: string | null;
   /** @nullable */

@@ -1256,7 +1256,7 @@ components:
         notes: { type: ["string", "null"] }
     EconomicEvent:
       type: object
-      required: [id, providerKey, providerEventId, dedupeKey, name, scheduledAt, timePrecision, impact, providerImpact, applicationImpact, impactSource, impactClassificationReason, region, currency, previous, forecast, actual, releaseStatus, sourceName, sourceUrl, sourceUpdatedAt, createdAt, updatedAt, affectedMarkets, marketReaction]
+      required: [id, providerKey, providerEventId, dedupeKey, name, scheduledAt, timePrecision, impact, providerImpact, applicationImpact, impactSource, impactClassificationReason, region, currency, previous, forecast, actual, releaseStatus, sourceName, sourceUrl, sourceUpdatedAt, createdAt, updatedAt, affectedMarkets]
       properties:
         id: { type: integer }
         providerKey: { type: string }
@@ -1286,10 +1286,6 @@ components:
         impactClassificationReason:
           type: ["string", "null"]
           description: Rule or explanation for the application classification.
-        marketReaction:
-          anyOf:
-            - $ref: "#/components/schemas/EconomicEventMarketReaction"
-            - type: "null"
         region: { type: ["string", "null"] }
         currency: { type: ["string", "null"] }
         previous: { type: ["string", "null"] }
@@ -1343,37 +1339,6 @@ components:
     EconomicEventImpact:
       type: string
       enum: [high, medium, low]
-    EconomicEventMarketReaction:
-      type: object
-      required: [instrumentId, instrumentSymbol, state, direction, summary, reason, ruleId, scenarios]
-      properties:
-        instrumentId: { type: integer }
-        instrumentSymbol: { type: string }
-        state:
-          type: string
-          enum: [waiting_for_actual, potentially_bullish, potentially_bearish, neutral_unclear, insufficient_data]
-        direction:
-          type: ["string", "null"]
-          enum: [bullish, bearish, neutral, null]
-        summary: { type: string }
-        reason: { type: string }
-        ruleId: { type: ["string", "null"] }
-        scenarios:
-          type: array
-          items:
-            $ref: "#/components/schemas/EconomicEventReactionScenario"
-    EconomicEventReactionScenario:
-      type: object
-      required: [condition, label, state, reason]
-      properties:
-        condition:
-          type: string
-          enum: [higher_than_forecast, lower_than_forecast, in_line]
-        label: { type: string }
-        state:
-          type: string
-          enum: [potentially_bullish, potentially_bearish, neutral_unclear]
-        reason: { type: string }
     EconomicEventUpdate:
       type: object
       properties:

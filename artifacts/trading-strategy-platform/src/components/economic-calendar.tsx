@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CalendarDays,
@@ -14,12 +14,10 @@ import {
 import {
   getListEconomicEventsQueryKey,
   useListEconomicEvents,
-  useListInstruments,
   type EconomicEvent,
   type ListEconomicEventsParams,
 } from '@workspace/api-client-react';
 import { EmptyState, ErrorState, LoadingBlock, Page } from '../App';
-import { EconomicEventReactionPanel } from './economic-event-reaction';
 
 type CalendarView = NonNullable<ListEconomicEventsParams['view']>;
 type SelectFilter = 'impact' | 'region' | 'currency' | 'market';
@@ -210,7 +208,6 @@ function EventCard({ event }: { event: EconomicEvent }) {
           <EventValue label="Actual" value={event.actual} testId={`text-event-actual-${event.id}`} />
         </div>
       </div>
-      {event.marketReaction && <EconomicEventReactionPanel reaction={event.marketReaction} />}
       {isHighImpact && (
         <div
           className="flex items-center gap-2 border-t border-accent/20 bg-accent/[0.06] px-5 py-2.5 text-[11px] font-semibold text-accent"
@@ -243,16 +240,6 @@ export function EconomicCalendar() {
   const [market, setMarket] = useState('');
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [reactionInstrumentId, setReactionInstrumentId] = useState<number>();
-  const instruments = useListInstruments();
-
-  useEffect(() => {
-    if (reactionInstrumentId !== undefined || !instruments.data?.length) return;
-    const preferred = instruments.data.find(instrument => instrument.symbol.toUpperCase() === 'XAUUSD')
-      ?? instruments.data.find(instrument => instrument.isActive !== false)
-      ?? instruments.data[0];
-    if (preferred) setReactionInstrumentId(preferred.id);
-  }, [instruments.data, reactionInstrumentId]);
 
   const params = useMemo<ListEconomicEventsParams>(() => {
     const next: ListEconomicEventsParams = { view };
@@ -261,18 +248,11 @@ export function EconomicCalendar() {
     if (currency) next.currency = currency;
     if (market) next.market = market;
     if (search.trim()) next.search = search.trim();
-    if (reactionInstrumentId !== undefined) {
-      next.instrumentId = reactionInstrumentId;
-      next.relevance = 'all';
-    }
     return next;
-  }, [currency, impact, market, reactionInstrumentId, region, search, view]);
+  }, [currency, impact, market, region, search, view]);
 
   const query = useListEconomicEvents(params, {
-    query: {
-      enabled: reactionInstrumentId !== undefined,
-      queryKey: getListEconomicEventsQueryKey(params),
-    },
+    query: { queryKey: getListEconomicEventsQueryKey(params) },
   });
   const events = query.data?.events ?? [];
   const hasFilters = Boolean(impact || region || currency || market || search.trim());
@@ -339,27 +319,6 @@ export function EconomicCalendar() {
         </div>
 
         <div className="panel p-4">
-          <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="eyebrow">Reaction context</div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Choose an instrument to see conditional, informational market reactions.
-              </div>
-            </div>
-            <select
-              className="select md:max-w-xs"
-              value={reactionInstrumentId ?? ''}
-              onChange={(event) => setReactionInstrumentId(event.target.value ? Number(event.target.value) : undefined)}
-              data-testid="select-reaction-market"
-            >
-              <option value="">Choose reaction market</option>
-              {(instruments.data ?? []).map(instrument => (
-                <option key={instrument.id} value={instrument.id}>
-                  {instrument.symbol} — {instrument.displayName || instrument.symbol}
-                </option>
-              ))}
-            </select>
-          </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative min-w-0 flex-1">
               <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />

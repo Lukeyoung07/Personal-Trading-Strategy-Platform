@@ -64,67 +64,6 @@ export const EconomicEventImpact = {
   low: 'low',
 } as const;
 
-export type EconomicEventMarketReactionState = typeof EconomicEventMarketReactionState[keyof typeof EconomicEventMarketReactionState];
-
-
-export const EconomicEventMarketReactionState = {
-  waiting_for_actual: 'waiting_for_actual',
-  potentially_bullish: 'potentially_bullish',
-  potentially_bearish: 'potentially_bearish',
-  neutral_unclear: 'neutral_unclear',
-  insufficient_data: 'insufficient_data',
-} as const;
-
-/**
- * @nullable
- */
-export type EconomicEventMarketReactionDirection = typeof EconomicEventMarketReactionDirection[keyof typeof EconomicEventMarketReactionDirection] | null;
-
-
-export const EconomicEventMarketReactionDirection = {
-  bullish: 'bullish',
-  bearish: 'bearish',
-  neutral: 'neutral',
-} as const;
-
-export type EconomicEventReactionScenarioCondition = typeof EconomicEventReactionScenarioCondition[keyof typeof EconomicEventReactionScenarioCondition];
-
-
-export const EconomicEventReactionScenarioCondition = {
-  higher_than_forecast: 'higher_than_forecast',
-  lower_than_forecast: 'lower_than_forecast',
-  in_line: 'in_line',
-} as const;
-
-export type EconomicEventReactionScenarioState = typeof EconomicEventReactionScenarioState[keyof typeof EconomicEventReactionScenarioState];
-
-
-export const EconomicEventReactionScenarioState = {
-  potentially_bullish: 'potentially_bullish',
-  potentially_bearish: 'potentially_bearish',
-  neutral_unclear: 'neutral_unclear',
-} as const;
-
-export interface EconomicEventReactionScenario {
-  condition: EconomicEventReactionScenarioCondition;
-  label: string;
-  state: EconomicEventReactionScenarioState;
-  reason: string;
-}
-
-export interface EconomicEventMarketReaction {
-  instrumentId: number;
-  instrumentSymbol: string;
-  state: EconomicEventMarketReactionState;
-  /** @nullable */
-  direction: EconomicEventMarketReactionDirection;
-  summary: string;
-  reason: string;
-  /** @nullable */
-  ruleId: string | null;
-  scenarios: EconomicEventReactionScenario[];
-}
-
 export interface EconomicEvent {
   id: number;
   providerKey: string;
@@ -146,7 +85,6 @@ export interface EconomicEvent {
      * @nullable
      */
   impactClassificationReason: string | null;
-  marketReaction: EconomicEventMarketReaction | null;
   /** @nullable */
   region: string | null;
   /** @nullable */

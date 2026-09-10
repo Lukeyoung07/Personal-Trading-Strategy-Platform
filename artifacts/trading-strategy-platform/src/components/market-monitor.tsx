@@ -19,7 +19,6 @@ import {
   useListEconomicEvents, getListEconomicEventsQueryKey,
   type Instrument, type MarketDataSource, type Timeframe, type MarketDataConnection, type Candle, type MarketDataSummary, type SourceInstrumentMapping, type BiQuoteCatalogItem, type BiQuoteMarketResult, type EconomicEvent
 } from "@workspace/api-client-react";
-import { EconomicEventReactionPanel } from "./economic-event-reaction";
 
 type Tab = "live-chart" | "instruments" | "sources" | "mappings" | "timeframes" | "connections" | "candles";
 const MARKET_SELECTION_STORAGE_KEY = "market-monitor-selection";
@@ -546,7 +545,6 @@ function MarketEconomicEvents({ instrument }: { instrument: Instrument }) {
                       Classification: {marketImpactSourceLabel(event)}
                       {event.impactClassificationReason ? ` · ${event.impactClassificationReason}` : ""}
                     </div>
-                    {event.marketReaction && <EconomicEventReactionPanel reaction={event.marketReaction} compact />}
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span>{marketEventDate(event)}</span>
                       {event.region && <span>{event.region}</span>}
