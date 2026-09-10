@@ -1,0 +1,171 @@
+Integrate BiQuote as the initial live market-data provider for my personal development/testing environment.
+
+IMPORTANT:
+
+Steps 1–6 are already complete. Do not rebuild, remove, or replace the existing Market Data Architecture or Strategy Monitoring Engine.
+
+The existing provider-neutral architecture must remain intact.
+
+The integration should be:
+
+BiQuote
+↓
+BiQuote Adapter
+↓
+Existing Market Data Service
+↓
+Normalized Market Data
+↓
+Existing Strategy Monitoring Engine
+
+Use BiQuote only as the initial development/testing provider.
+
+Do not hard-code BiQuote throughout the application.
+
+Create a dedicated BiQuote adapter that implements the existing provider-neutral market-data interfaces from Step 5.
+
+Use BiQuote's documented WebSocket/live-data functionality where available for real-time price updates.
+
+The integration should support:
+
+- Real-time quotes
+- OHLC/candlestick data where supported
+- Instrument/symbol mapping
+- Timeframes supported by the provider
+- Connection status
+- Reconnection handling
+- Data timestamps
+- Graceful handling of missing or invalid data
+
+LIVE CHART:
+
+Add the ability for the existing Market Monitor to display genuine incoming BiQuote market data as a candlestick chart.
+
+The chart must clearly show:
+
+- Instrument
+- Timeframe
+- Current price
+- Candlesticks
+- Live connection status
+- Last data update time
+
+Display a clear status such as:
+
+LIVE ●
+
+when genuine live data is being received.
+
+If the connection is lost, clearly show:
+
+DISCONNECTED
+
+Do NOT silently display stale or fabricated data.
+
+Do NOT generate fake candles.
+
+Do NOT interpolate or invent missing market prices.
+
+Do NOT use TradingView data.
+
+Do NOT use screen capture.
+
+Do NOT create simulated market data.
+
+IMPORTANT MARKET-DATA BEHAVIOUR:
+
+The application must distinguish between:
+
+- Live data
+- Delayed data
+- Historical data
+- No data
+
+Never label delayed, historical, demo, or cached data as LIVE.
+
+If BiQuote does not provide a requested instrument or timeframe, clearly tell the user that the requested data is unavailable rather than substituting fake data.
+
+STRATEGY MONITORING:
+
+Connect genuine incoming market data to the existing Step 6 Strategy Monitoring Engine.
+
+Do not rebuild the Strategy Monitoring Engine.
+
+The existing strategy conditions should receive normalized market data through the existing architecture.
+
+Do not create BUY or SELL recommendations.
+
+Do not automatically place trades.
+
+Do not create fake strategy-condition results.
+
+Only evaluate conditions when the required genuine market data is available.
+
+PERSONAL DEVELOPMENT MODE:
+
+This BiQuote integration is initially for my personal development/testing environment.
+
+Do not build public data redistribution functionality.
+
+Do not build user-specific commercial subscriptions.
+
+Do not assume that the current BiQuote access permits commercial redistribution.
+
+Keep the provider adapter replaceable so it can later be replaced with a commercially licensed provider such as dxFeed without rebuilding the rest of the application.
+
+SECURITY:
+
+Do not expose provider credentials or secrets in frontend code.
+
+Use environment variables/server-side configuration where credentials are required.
+
+Do not commit secrets to the repository.
+
+ERROR HANDLING:
+
+Handle:
+
+- WebSocket disconnections
+- Reconnection attempts
+- Invalid messages
+- Missing data
+- Unsupported symbols
+- Unsupported timeframes
+- Provider errors
+- Stale data
+
+The UI should clearly communicate the current connection/data state.
+
+VERIFICATION:
+
+After implementation:
+
+- Run API and frontend type checks
+- Run production builds
+- Test the BiQuote adapter
+- Test connection and disconnection handling
+- Test real incoming market data
+- Test candlestick rendering
+- Test multiple supported timeframes
+- Test instrument mapping
+- Test that live data reaches the existing Strategy Monitoring Engine
+- Verify that no fake data is being generated
+- Verify that delayed/historical data is never labelled LIVE
+- Test desktop and mobile layouts
+- Run regression tests for Steps 1–6
+
+Do not begin new features.
+
+Do not add AI.
+
+Do not add backtesting.
+
+Do not add automatic trading.
+
+Do not add broker integrations.
+
+Do not add new trading concepts.
+
+Do not redesign the application.
+
+Only implement the BiQuote live-data integration and live candlestick display.
