@@ -1,0 +1,360 @@
+Build the News Market Reaction / Directional Bias feature on top of the existing Economic Calendar, Impact Classification, and Market-Specific Economic Event Context.
+
+IMPORTANT:
+
+Do NOT rebuild the existing News / Economic Calendar system.
+
+Do NOT change or replace:
+- BiQuote
+- Live market data
+- Candlestick charts
+- Market Monitor
+- Strategy Builder
+- Strategy Library
+- Strategy Versioning
+- Trade Journal
+- Strategy Monitoring
+- Federal Reserve integration
+- ONS integration
+- ECB integration
+- Existing impact classification
+- Existing market relevance matching
+
+GOAL:
+
+Add an informational "Potential Market Reaction" section to economic events.
+
+The feature should explain how an economic event could potentially affect the selected market.
+
+It must NOT claim that the market will definitely move in a particular direction.
+
+It must NOT create automatic BUY or SELL signals.
+
+It must NOT use AI.
+
+It must NOT use machine learning.
+
+It must NOT use fabricated historical statistics or probabilities.
+
+BEFORE AN EVENT:
+
+When an event has not happened yet, show conditional scenarios rather than predicting the actual result.
+
+Example:
+
+US CPI
+
+Potential XAUUSD reaction:
+
+Higher than forecast
+→ Potentially Bearish
+
+Lower than forecast
+→ Potentially Bullish
+
+In line with forecast
+→ Neutral / Unclear
+
+Use cautious language such as:
+- Potentially
+- May
+- Could
+- Can
+
+Never say:
+"Gold will go down."
+
+Say:
+"Potentially bearish for Gold if CPI is higher than expected."
+
+AFTER AN EVENT:
+
+If genuine forecast and actual values are available, compare them.
+
+Example:
+
+Forecast: 3.0%
+Actual: 3.3%
+
+XAUUSD:
+
+Potential reaction:
+POTENTIALLY BEARISH
+
+Reason:
+"Actual CPI was higher than forecast, which can potentially support USD strength and put pressure on Gold."
+
+If:
+
+Forecast: 3.0%
+Actual: 2.7%
+
+Then:
+
+Potential reaction:
+POTENTIALLY BULLISH
+
+Reason:
+"Actual CPI was lower than forecast, which can potentially weaken USD strength and support Gold."
+
+If actual is approximately in line with forecast:
+
+NEUTRAL / UNCLEAR
+
+If the required information is unavailable:
+
+INSUFFICIENT DATA
+
+Do not guess.
+
+STATES:
+
+Use these states:
+
+- WAITING FOR ACTUAL
+- POTENTIALLY BULLISH
+- POTENTIALLY BEARISH
+- NEUTRAL / UNCLEAR
+- INSUFFICIENT DATA
+
+IMPORTANT:
+
+Do not show a directional reaction when there isn't enough genuine information to support one.
+
+MARKET-SPECIFIC RULES:
+
+The reaction must be calculated relative to the selected instrument.
+
+For XAUUSD:
+
+US inflation:
+Higher than expected → potentially bearish
+Lower than expected → potentially bullish
+
+US monetary policy:
+More hawkish than expected → potentially bearish
+More dovish than expected → potentially bullish
+
+For EURUSD:
+
+EUR-positive economic surprise → potentially bullish EURUSD
+EUR-negative economic surprise → potentially bearish EURUSD
+
+USD-positive economic surprise → potentially bearish EURUSD
+USD-negative economic surprise → potentially bullish EURUSD
+
+For GBPUSD:
+
+UK-positive economic surprise → potentially bullish GBPUSD
+UK-negative economic surprise → potentially bearish GBPUSD
+
+USD-positive economic surprise → potentially bearish GBPUSD
+USD-negative economic surprise → potentially bullish GBPUSD
+
+For major US indices:
+
+Strong or weak economic data can have different effects depending on the event.
+
+Do NOT force a bullish/bearish result when the relationship is ambiguous.
+
+For example, strong economic data can sometimes support equities but can also increase expectations for tighter monetary policy.
+
+In ambiguous cases:
+
+NEUTRAL / UNCLEAR
+
+IMPORTANT:
+
+These are deterministic informational rules, not guaranteed predictions.
+
+Create a maintainable reaction-rule registry so additional event types and instruments can be added later without rewriting the system.
+
+IMPACT VS REACTION:
+
+Keep the existing impact classification completely separate from directional reaction.
+
+Example:
+
+Impact:
+HIGH
+
+Classification:
+Application rule
+
+Potential XAUUSD reaction:
+POTENTIALLY BEARISH
+
+These are different things.
+
+HIGH impact does NOT mean bearish.
+
+HIGH impact only means the event may be important to traders.
+
+REACTION REASON:
+
+Every directional classification must have a short explanation.
+
+Example:
+
+"Actual CPI was higher than forecast."
+
+Then explain the potential market relationship cautiously.
+
+SOURCE DATA:
+
+Only use genuine economic-event information already available from the connected sources.
+
+Do NOT add:
+
+- Trading Economics
+- Any paid API
+- API keys
+- AI
+- External prediction services
+- Fabricated forecast values
+- Fabricated actual values
+- Fabricated probabilities
+- Fabricated historical win rates
+
+IMPORTANT CURRENT LIMITATION:
+
+The current Federal Reserve, ONS and ECB sources often do not provide forecast, previous, or actual values.
+
+That is okay.
+
+When those fields are unavailable, the UI must clearly say:
+
+"Insufficient data to determine potential reaction."
+
+Do not invent values just to make the feature appear populated.
+
+NEWS PAGE:
+
+Add the reaction information to the existing event card/details.
+
+Example:
+
+US CPI
+🔴 HIGH IMPACT
+
+Forecast: 3.0%
+Previous: 3.1%
+
+Potential XAUUSD Reaction
+
+Higher than forecast
+Potentially Bearish
+
+Lower than forecast
+Potentially Bullish
+
+In line with forecast
+Neutral / Unclear
+
+After release:
+
+Actual: 3.3%
+
+XAUUSD
+POTENTIALLY BEARISH
+
+Actual was higher than forecast.
+
+MARKET MONITOR:
+
+When viewing an instrument in Market Monitor, the existing Economic Events panel should also display the potential reaction for that instrument.
+
+Do not redesign the chart.
+
+Do not change:
+
+- Live candles
+- Live quotes
+- Timeframes
+- BiQuote
+- Candle loading
+- Market data refresh
+
+ARCHITECTURE:
+
+Keep this provider-neutral.
+
+Do not put provider-specific reaction logic into the frontend.
+
+Create the reaction classification on the server side and expose the result through the existing economic-event contracts.
+
+Keep the existing provider data untouched.
+
+Do not overwrite provider values.
+
+VERIFICATION:
+
+Test at minimum:
+
+1. US CPI + XAUUSD
+2. US CPI + EURUSD
+3. US monetary-policy event + XAUUSD
+4. ECB event + EURUSD
+5. UK event + GBPUSD
+6. Event with forecast and actual
+7. Event with forecast but no actual
+8. Event with no forecast
+9. Actual higher than forecast
+10. Actual lower than forecast
+11. Actual approximately equal to forecast
+12. Unknown/unrecognised event
+13. Unrelated event/instrument combination
+14. Ambiguous event where no reliable directional relationship exists
+
+Verify:
+
+- Before-release scenarios work correctly.
+- After-release actual-vs-forecast comparison works correctly.
+- Instrument-specific interpretation works correctly.
+- Insufficient data is handled honestly.
+- No fabricated values are created.
+- No fabricated probabilities are created.
+- No guaranteed predictions are created.
+- Existing impact classification remains unchanged.
+- Existing market relevance matching remains unchanged.
+- Existing News filters remain unchanged.
+- Existing Market Monitor remains functional.
+- BiQuote live charts remain functional.
+- All existing timeframes remain functional.
+
+Run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+- Existing regression tests
+- Existing BiQuote regression tests
+- Desktop verification
+- Mobile verification
+
+At the end report:
+
+1. Reaction rules implemented.
+2. Supported event types.
+3. Supported instruments.
+4. Example reactions tested.
+5. How before-release scenarios work.
+6. How post-release actual-vs-forecast comparison works.
+7. How missing data is handled.
+8. Tests passed.
+9. Remaining limitations.
+
+Confirm explicitly that:
+
+- No AI was used.
+- No BUY/SELL signals were created.
+- No guaranteed predictions were created.
+- No fabricated economic data was created.
+- No paid API was added.
+- No API key was added.
+- Existing News functionality remains intact.
+- Existing Market Monitor functionality remains intact.
+- Existing BiQuote functionality remains intact.
+- Existing Steps 1–10 functionality remains intact.

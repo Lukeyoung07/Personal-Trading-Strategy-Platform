@@ -42,6 +42,21 @@ export const ListEconomicEventsResponse = zod.object({
   "applicationImpact": zod.union([zod.enum(['high', 'medium', 'low']),zod.null()]).describe('Deterministic application classification when providerImpact is absent.'),
   "impactSource": zod.enum(['provider', 'application', 'unclassified']),
   "impactClassificationReason": zod.string().nullable().describe('Rule or explanation for the application classification.'),
+  "marketReaction": zod.union([zod.object({
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "state": zod.enum(['waiting_for_actual', 'potentially_bullish', 'potentially_bearish', 'neutral_unclear', 'insufficient_data']),
+  "direction": zod.union([zod.literal('bullish'),zod.literal('bearish'),zod.literal('neutral'),zod.literal(null)]).nullable(),
+  "summary": zod.string(),
+  "reason": zod.string(),
+  "ruleId": zod.string().nullable(),
+  "scenarios": zod.array(zod.object({
+  "condition": zod.enum(['higher_than_forecast', 'lower_than_forecast', 'in_line']),
+  "label": zod.string(),
+  "state": zod.enum(['potentially_bullish', 'potentially_bearish', 'neutral_unclear']),
+  "reason": zod.string()
+}))
+}),zod.null()]),
   "region": zod.string().nullable(),
   "currency": zod.string().nullable(),
   "previous": zod.string().nullable(),
@@ -110,6 +125,21 @@ export const UpsertEconomicEventResponse = zod.object({
   "applicationImpact": zod.union([zod.enum(['high', 'medium', 'low']),zod.null()]).describe('Deterministic application classification when providerImpact is absent.'),
   "impactSource": zod.enum(['provider', 'application', 'unclassified']),
   "impactClassificationReason": zod.string().nullable().describe('Rule or explanation for the application classification.'),
+  "marketReaction": zod.union([zod.object({
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "state": zod.enum(['waiting_for_actual', 'potentially_bullish', 'potentially_bearish', 'neutral_unclear', 'insufficient_data']),
+  "direction": zod.union([zod.literal('bullish'),zod.literal('bearish'),zod.literal('neutral'),zod.literal(null)]).nullable(),
+  "summary": zod.string(),
+  "reason": zod.string(),
+  "ruleId": zod.string().nullable(),
+  "scenarios": zod.array(zod.object({
+  "condition": zod.enum(['higher_than_forecast', 'lower_than_forecast', 'in_line']),
+  "label": zod.string(),
+  "state": zod.enum(['potentially_bullish', 'potentially_bearish', 'neutral_unclear']),
+  "reason": zod.string()
+}))
+}),zod.null()]),
   "region": zod.string().nullable(),
   "currency": zod.string().nullable(),
   "previous": zod.string().nullable(),
@@ -181,6 +211,21 @@ export const UpdateEconomicEventResponse = zod.object({
   "applicationImpact": zod.union([zod.enum(['high', 'medium', 'low']),zod.null()]).describe('Deterministic application classification when providerImpact is absent.'),
   "impactSource": zod.enum(['provider', 'application', 'unclassified']),
   "impactClassificationReason": zod.string().nullable().describe('Rule or explanation for the application classification.'),
+  "marketReaction": zod.union([zod.object({
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "state": zod.enum(['waiting_for_actual', 'potentially_bullish', 'potentially_bearish', 'neutral_unclear', 'insufficient_data']),
+  "direction": zod.union([zod.literal('bullish'),zod.literal('bearish'),zod.literal('neutral'),zod.literal(null)]).nullable(),
+  "summary": zod.string(),
+  "reason": zod.string(),
+  "ruleId": zod.string().nullable(),
+  "scenarios": zod.array(zod.object({
+  "condition": zod.enum(['higher_than_forecast', 'lower_than_forecast', 'in_line']),
+  "label": zod.string(),
+  "state": zod.enum(['potentially_bullish', 'potentially_bearish', 'neutral_unclear']),
+  "reason": zod.string()
+}))
+}),zod.null()]),
   "region": zod.string().nullable(),
   "currency": zod.string().nullable(),
   "previous": zod.string().nullable(),
