@@ -1,0 +1,83 @@
+The AI Strategy Builder handoff has a reproducible state bug.
+
+IMPORTANT: Do NOT change OpenRouter, AI generation, Backtesting, Strategy Builder architecture, market mapping, or the working first-click Review flow.
+
+I have now reproduced this exact behaviour:
+
+1. Open AI Assistant.
+2. Ask:
+   "Create me a simple XAUUSD strategy."
+3. AI generates the structured strategy draft.
+4. Click "Review Strategy".
+5. The Builder opens correctly with the draft populated.
+6. Navigate to another tab/page.
+7. Return to the AI Assistant.
+8. The Assistant is opened again and the same strategy draft is available/displayed.
+9. Click "Review Strategy" again OR "Save as New Version".
+10. The app navigates to the Strategy Builder, but the Builder is completely empty/default.
+
+So the first handoff works, but a subsequent handoff after leaving and reopening the Assistant fails.
+
+This is now a state-lifecycle regression.
+
+DO NOT assume the previous draft-store fix is sufficient.
+
+Diagnose ONLY this specific repeated-handoff problem.
+
+Trace the exact second-click path:
+
+AI Assistant reopened
+→ existing/generated strategy draft
+→ Review Strategy OR Save as New Version
+→ draft handoff storage
+→ navigation
+→ Strategy Builder initialization
+→ draft loading
+
+Check specifically:
+
+1. Is the reopened Assistant holding the same structured draft?
+2. When the SECOND Review Strategy button is clicked, is the draft actually written to the pending-draft store/sessionStorage?
+3. Is the second click generating a different/empty draft object?
+4. Is the first handoff clearing or consuming state that the reopened Assistant later relies on?
+5. Does the Assistant use stale React state when it is reopened?
+6. Does the second action use the same callback and draft reference as the first?
+7. Is sessionStorage being overwritten with an empty/stale draft?
+8. Does the Builder receive `assistantDraft=1` on the second navigation?
+9. Does the Builder read the second draft correctly?
+10. Is an existing/default Builder state overriding the second draft?
+
+MOST IMPORTANT:
+
+Use the REAL running browser and reproduce the sequence twice.
+
+Do NOT just test the first Review click.
+
+Test:
+
+A. First Review Strategy
+B. Leave the page
+C. Return to Assistant
+D. Click Review Strategy again
+E. Confirm whether the second draft exists before navigation
+F. Confirm the exact URL
+G. Confirm sessionStorage contents
+H. Confirm what the Builder receives after navigation
+
+Then repeat the same test for:
+
+Save as New Version
+
+Do not edit files while diagnosing.
+
+Do not implement a fix until the exact second-handoff failure is identified.
+
+After diagnosis, report:
+- Whether the draft exists when the Assistant is reopened.
+- What is stored immediately before the second click.
+- What URL is produced.
+- What the Builder receives.
+- Exactly where the second handoff differs from the first.
+- The minimal fix required.
+
+STOP after diagnosis and wait for approval before changing code.
