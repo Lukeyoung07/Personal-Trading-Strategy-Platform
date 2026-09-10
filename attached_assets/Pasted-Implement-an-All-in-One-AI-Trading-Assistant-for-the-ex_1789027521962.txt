@@ -1,0 +1,676 @@
+Implement an All-in-One AI Trading Assistant for the existing application.
+
+IMPORTANT:
+
+The existing Strategy Builder, Backtesting Parts 1–3, Market Monitor, News/Economic Calendar, and Alerts already exist and are working.
+
+Do NOT rebuild those systems.
+
+Do NOT redesign the entire application.
+
+The AI should work WITH the existing systems rather than creating separate replacements.
+
+The goal is to create ONE simple AI assistant that can help users:
+
+- Build strategies
+- Modify strategies
+- Explain strategies
+- Review strategies
+- Check backtest compatibility
+- Help configure and run backtests
+- Explain backtest results
+- Compare strategy versions
+- Explain trading concepts
+
+The AI must NOT place trades, execute real orders, connect to a broker, or guarantee trading outcomes.
+
+==================================================
+1. AI ASSISTANT
+==================================================
+
+Add one central:
+
+"AI Trading Assistant"
+
+It should be accessible from the main application without creating multiple separate AI tools.
+
+Use a clean, modern chat interface.
+
+The user should be able to type naturally.
+
+Example:
+
+"Build me a simple Gold strategy using the 20 EMA."
+
+The AI should understand the request and help create the strategy using the existing Strategy Builder.
+
+==================================================
+2. BEGINNER-FRIENDLY HINTS
+==================================================
+
+THIS IS VERY IMPORTANT.
+
+Do not leave the user looking at an empty chat box wondering what they can type.
+
+Show helpful suggestions/prompts around the input box.
+
+For example:
+
+"Try asking..."
+
+BUILD A STRATEGY
+"Build me a simple Gold strategy using the 20 EMA."
+
+"Create a BUY strategy for XAUUSD."
+
+"Build a strategy with a 1% stop loss and 2% take profit."
+
+"Create a strategy using bullish candles and the previous high."
+
+MODIFY
+"Add a 20 EMA confirmation."
+
+"Change the stop loss to 1.5%."
+
+"Make this strategy simpler."
+
+"Remove the candle confirmation."
+
+ANALYSE
+"Explain my strategy."
+
+"Review my strategy."
+
+"Explain my backtest results."
+
+"Why did this strategy lose money?"
+
+LEARN
+"What is an FVG?"
+
+"What does liquidity mean?"
+
+"What does the 20 EMA do?"
+
+These should be examples and shortcuts, NOT hard-coded limitations.
+
+The user must still be able to type any natural-language request.
+
+Make the examples clickable so they can populate/start the relevant request.
+
+==================================================
+3. STRATEGY CREATION WITH AI
+==================================================
+
+When the user asks the AI to build a strategy, convert the natural-language request into the EXISTING structured Strategy Builder format.
+
+Example user request:
+
+"Build me a simple Gold strategy. Buy when price is above the 20 EMA and the candle is bullish. Use a 1% stop loss and 2% take profit."
+
+The AI should create/prepare structured strategy data containing:
+
+Instrument:
+XAUUSD
+
+Direction:
+BUY
+
+Conditions:
+
+Price above EMA 20
+
+AND
+
+Candle is bullish
+
+Risk:
+
+Stop Loss:
+1%
+
+Take Profit:
+2%
+
+Do NOT simply respond with a text description.
+
+The AI should use the existing Strategy Builder's data/model where possible.
+
+Do NOT create a separate AI-only strategy format.
+
+==================================================
+4. USER CONFIRMATION
+==================================================
+
+IMPORTANT:
+
+The AI must NOT silently save, overwrite, publish, or activate a strategy.
+
+After generating a strategy, show a clear preview:
+
+"Here's the strategy I created:"
+
+Strategy name:
+Gold EMA Strategy
+
+BUY when:
+- Price is above EMA 20
+- Candle is bullish
+
+Stop Loss:
+1%
+
+Take Profit:
+2%
+
+Then provide clear actions:
+
+[ Review Strategy ]
+
+[ Edit ]
+
+[ Save as New Version ]
+
+The user remains in control.
+
+==================================================
+5. AI HINTS FOR STRATEGY BUILDING
+==================================================
+
+When the user asks to build a strategy but gives very little information, help them understand what they can provide.
+
+For example:
+
+"Sure. You can tell me things like:
+
+• What market? Gold, EURUSD, US indices, etc.
+• BUY, SELL, or both?
+• What should trigger the entry?
+• Any indicators such as EMA?
+• Stop loss?
+• Take profit?
+• Timeframe?
+
+Example:
+'Build a Gold BUY strategy using the 20 EMA with a 1% SL and 2% TP.'"
+
+Do NOT force the user through a long questionnaire.
+
+If enough information has already been provided, build the strategy immediately.
+
+==================================================
+6. MODIFY EXISTING STRATEGIES
+==================================================
+
+The AI should understand the currently selected strategy where appropriate.
+
+Examples:
+
+"Add a 20 EMA confirmation."
+
+"Change the stop loss to 1.5%."
+
+"Make this a SELL strategy."
+
+"Remove the bullish candle condition."
+
+"Make the strategy simpler."
+
+"Change the take profit to 3%."
+
+The AI should propose the change and show the updated strategy before saving it as a NEW version.
+
+Never silently overwrite an existing version.
+
+==================================================
+7. EXPLAIN STRATEGIES
+==================================================
+
+Allow the user to ask:
+
+"Explain this strategy."
+
+The AI should translate the structured rules into simple language.
+
+Example:
+
+"This strategy looks for price to be above the 20 EMA and for the current candle to be bullish. When both conditions are true, it enters a BUY trade."
+
+Keep explanations beginner-friendly.
+
+==================================================
+8. BACKTEST COMPATIBILITY
+==================================================
+
+Before suggesting that a strategy be backtested, check its conditions against the capabilities of the existing Backtesting engine.
+
+Show:
+
+✓ Backtest compatible
+
+or:
+
+⚠ This strategy contains a condition that the current backtester cannot evaluate.
+
+Clearly identify unsupported conditions.
+
+Never pretend unsupported conditions can be backtested.
+
+Do NOT modify the Backtesting engine to support new AI-generated conditions in this task.
+
+==================================================
+9. BACKTESTING
+==================================================
+
+The AI should be able to help the user configure a backtest.
+
+Example:
+
+User:
+
+"Backtest this strategy on Gold over the last 6 months."
+
+The AI should use the existing Backtesting workflow.
+
+Do NOT automatically start a backtest without appropriate user confirmation.
+
+Before starting, show:
+
+Strategy:
+Gold EMA Strategy
+
+Version:
+v3
+
+Instrument:
+XAUUSD
+
+Timeframe:
+5m
+
+Period:
+[date range]
+
+Then:
+
+[ Run Backtest ]
+
+The exact strategy version must be preserved.
+
+Never silently substitute the latest version.
+
+==================================================
+10. EXPLAIN BACKTEST RESULTS
+==================================================
+
+After a backtest has completed, the AI should be able to explain the actual results.
+
+Use the existing stored backtest results.
+
+Example:
+
+"How did my strategy perform?"
+
+The AI can explain:
+
+- Total trades
+- Win rate
+- Total P/L
+- Average win
+- Average loss
+- Maximum drawdown
+- Profit factor
+- Equity curve
+- Winning/losing periods
+
+Do NOT invent statistics.
+
+Every number must come from the actual backtest data.
+
+If data is unavailable, clearly say it is unavailable.
+
+==================================================
+11. STRATEGY REVIEW
+==================================================
+
+Allow the user to ask:
+
+"Review my strategy."
+
+The AI should explain:
+
+- What the strategy is doing
+- Entry conditions
+- Exit conditions
+- Risk settings
+- Whether it is backtest compatible
+- Potentially restrictive conditions
+- Missing information
+
+Do NOT claim that the strategy is profitable or guaranteed to work.
+
+Use language such as:
+
+"This strategy performed X during the tested period."
+
+Never:
+
+"This strategy will make money."
+
+==================================================
+12. COMPARE STRATEGIES
+==================================================
+
+If multiple completed backtests exist, allow the user to ask:
+
+"Compare my Gold strategies."
+
+The AI should compare actual stored results.
+
+For example:
+
+Strategy v1:
+Win rate: X
+P/L: X
+Trades: X
+
+Strategy v2:
+Win rate: X
+P/L: X
+Trades: X
+
+Clearly state that historical backtest performance does not guarantee future results.
+
+==================================================
+13. TRADING CONCEPT EXPLANATIONS
+==================================================
+
+The AI can explain trading concepts in simple language.
+
+Examples:
+
+"What is an FVG?"
+
+"What does liquidity mean?"
+
+"What is a BOS?"
+
+"What does EMA 20 mean?"
+
+"Explain support and resistance."
+
+Keep explanations educational and beginner-friendly.
+
+Do not turn educational explanations into guaranteed trading advice.
+
+==================================================
+14. CONTEXT AWARENESS
+==================================================
+
+Where appropriate, the AI should understand the context of the current page.
+
+On Strategy Builder:
+
+- Current strategy
+- Current version
+- Current conditions
+- Risk settings
+
+On Backtesting:
+
+- Selected strategy
+- Exact version
+- Instrument
+- Timeframe
+- Date range
+- Backtest status
+- Results
+
+On Market Monitor:
+
+- Current instrument
+- Available market information
+
+Do not send unnecessary private data to external AI services.
+
+==================================================
+15. SECURITY
+==================================================
+
+Use a secure server-side AI integration.
+
+Never expose AI API keys in the frontend.
+
+Never expose secrets to the browser.
+
+Do not hard-code API keys.
+
+If an AI provider is not configured, show an honest message:
+
+"AI Assistant is currently unavailable."
+
+Do NOT fabricate AI responses.
+
+==================================================
+16. SAFETY / TRADING BOUNDARIES
+==================================================
+
+The AI must NOT:
+
+- Place real trades
+- Execute orders
+- Connect to a broker
+- Manage a live account
+- Guarantee profits
+- Claim a strategy will definitely work
+- Fabricate market data
+- Fabricate backtest results
+- Fabricate news
+- Pretend unsupported strategy conditions are supported
+
+The AI can assist with:
+
+- Strategy creation
+- Strategy editing
+- Education
+- Strategy analysis
+- Backtest configuration
+- Backtest result analysis
+
+==================================================
+17. USER EXPERIENCE
+==================================================
+
+Make the assistant extremely easy to use.
+
+The first screen should clearly communicate:
+
+"Tell me what you want to build, test, or understand."
+
+Then show example prompts.
+
+Example sections:
+
+BUILD
+
+"Build me a Gold strategy using the 20 EMA."
+
+MODIFY
+
+"Add a bullish candle confirmation."
+
+ANALYSE
+
+"Explain my backtest results."
+
+LEARN
+
+"What is an FVG?"
+
+The examples should be clickable.
+
+Keep the interface clean and beginner-friendly.
+
+==================================================
+18. DO NOT OVERCOMPLICATE THE UI
+==================================================
+
+Do NOT create separate AI pages for every function.
+
+Use ONE assistant.
+
+Do NOT create a complicated prompt-building form.
+
+Natural language should be the primary interface.
+
+The hints teach users what they can ask.
+
+==================================================
+19. EXISTING APPLICATION
+==================================================
+
+Preserve:
+
+- Strategy Builder
+- Strategy versions
+- Backtesting configuration
+- Historical backtest engine
+- Backtest results
+- Market Monitor
+- BiQuote live data
+- News
+- Economic Calendar
+- Alerts
+- Trade Journal
+
+Do not replace these systems.
+
+The AI is an additional layer that interacts with them.
+
+==================================================
+20. DO NOT BREAK EXISTING FUNCTIONALITY
+==================================================
+
+Do not modify existing backtest calculations.
+
+Do not modify historical candle handling.
+
+Do not modify BiQuote live quote handling.
+
+Do not modify the economic calendar providers.
+
+Do not modify the alert engine.
+
+Do not modify the Trade Journal.
+
+Do not remove existing Strategy Builder functionality.
+
+Do not remove existing Backtesting functionality.
+
+If integration requires a small API/client addition, keep it isolated and backward compatible.
+
+==================================================
+21. TESTING
+==================================================
+
+Add focused tests for:
+
+1. AI assistant loads.
+2. Example prompts work.
+3. Strategy creation requests produce structured strategy data.
+4. Generated conditions use the existing strategy model.
+5. Backtest compatibility is correctly detected.
+6. Unsupported conditions are clearly identified.
+7. Existing strategy versions are never overwritten.
+8. Exact strategy version is preserved when starting a backtest.
+9. Backtest results are read from actual stored results.
+10. AI does not fabricate missing backtest data.
+11. Strategy review uses the current strategy.
+12. Strategy modification creates a proposed new version rather than silently overwriting.
+13. AI unavailable state works correctly.
+14. AI credentials remain server-side.
+15. Existing Strategy Builder tests still pass.
+16. Existing Backtesting tests still pass.
+
+Run:
+
+- API tests
+- Frontend tests
+- Typechecks
+- Production builds
+- Existing Strategy Builder regression tests
+- Existing Backtesting regression tests
+- Existing Market Monitor regression tests
+
+Verify desktop and mobile layouts.
+
+==================================================
+22. IMPLEMENTATION APPROACH
+==================================================
+
+IMPORTANT:
+
+Before making changes, inspect the existing Strategy Builder and Backtesting architecture.
+
+Reuse existing APIs, models, generated clients, validation, and data structures wherever possible.
+
+Do not duplicate existing functionality.
+
+Do not create a second strategy system.
+
+Do not create a second backtesting system.
+
+The AI should act as an intelligent interface on top of what already exists.
+
+If an AI-generated request cannot safely be converted into an existing supported strategy condition, tell the user exactly what cannot be represented rather than guessing.
+
+==================================================
+FINAL GOAL
+==================================================
+
+The finished experience should feel like:
+
+USER
+↓
+"Build me a Gold strategy using the 20 EMA..."
+↓
+AI understands the request
+↓
+AI creates a structured strategy
+↓
+User reviews it
+↓
+User saves it as a version
+↓
+AI confirms backtest compatibility
+↓
+User chooses market/timeframe/date range
+↓
+User runs the backtest
+↓
+AI can explain the actual results
+↓
+User can modify the strategy and create another version
+
+Most importantly:
+
+MAKE THE AI EASY FOR A BEGINNER TO USE.
+
+The user should open the assistant and immediately understand:
+
+"I can ask this AI to build me a strategy."
+
+Actually implement the feature and verify it in the running application.
+
+At the end report:
+
+1. What was implemented.
+2. How the all-in-one assistant works.
+3. What strategy-building requests it supports.
+4. How the hints/examples work.
+5. How strategies are transferred into the existing Strategy Builder.
+6. How Backtesting integration works.
+7. How results are explained.
+8. How exact strategy versions are protected.
+9. Tests passed.
+10. Any limitations.
