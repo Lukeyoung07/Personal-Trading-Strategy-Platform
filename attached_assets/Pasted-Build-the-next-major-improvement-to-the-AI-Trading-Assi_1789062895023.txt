@@ -1,0 +1,266 @@
+Build the next major improvement to the AI Trading Assistant: an AI Trading Concept & Strategy Builder layer.
+
+IMPORTANT:
+The existing AI → Strategy Builder Review workflow is currently working.
+Do NOT break or rewrite it.
+
+Do NOT change:
+- OpenRouter configuration
+- API key
+- AI provider/model
+- Backtesting calculations
+- Historical data engine
+- Existing Strategy Builder architecture
+- Existing Review Strategy handoff
+- Existing strategy/version saving architecture
+
+The goal of this task is to make the AI much better at understanding trading concepts and helping users create strategy drafts.
+
+SUPPORTED TRADING CONCEPTS
+
+Teach the AI how to recognise and explain these concepts when users mention them:
+
+1. Market Structure
+- Higher High (HH)
+- Higher Low (HL)
+- Lower High (LH)
+- Lower Low (LL)
+- Break of Structure (BOS)
+- Change of Character (CHoCH)
+
+2. Liquidity
+- Buy-side liquidity
+- Sell-side liquidity
+- Liquidity sweep
+- Liquidity grab
+- Equal highs
+- Equal lows
+- Previous high/low liquidity
+
+3. Support & Resistance
+- Support
+- Resistance
+- Break and retest
+- Rejection
+- Previous day/week high and low
+
+4. Supply & Demand
+- Supply zones
+- Demand zones
+- Supply/demand reactions
+- Zone entry/retest
+
+5. Fair Value Gaps
+- FVG
+- Bullish FVG
+- Bearish FVG
+- FVG fill
+- FVG retest
+- IFVG / Inverse Fair Value Gap
+
+6. Order Flow / Price Action Concepts
+- Displacement
+- Strong bullish/bearish candles
+- Rejection candles
+- Breakouts
+- Pullbacks
+- Retests
+
+7. Order Blocks
+- Bullish order block
+- Bearish order block
+- Order block retest
+- Breaker block
+
+8. Premium / Discount
+- Premium
+- Discount
+- Equilibrium
+- Range-based premium/discount
+
+9. Multi-Timeframe Analysis
+- Higher-timeframe bias
+- Lower-timeframe confirmation
+- 4H → 1H → 15M → 5M style analysis
+- Higher-timeframe levels affecting lower-timeframe entries
+
+10. ICT / SMC Concepts
+- IRL
+- ERL
+- SMT divergence
+- AMD
+- Power of 3
+- Session concepts where the available data supports them
+
+11. Moving Averages
+- EMA
+- SMA
+- Price above/below EMA
+- EMA crossover
+- EMA rejection
+- EMA trend confirmation
+
+12. Risk Management
+- Stop loss
+- Take profit
+- Risk/reward
+- Percentage-based SL/TP
+- Position sizing concepts
+- Maximum risk per trade
+
+IMPORTANT:
+Do NOT pretend that every concept is currently executable by the historical Backtesting engine.
+
+The AI must distinguish between:
+
+A. Concepts the current Strategy Builder/Backtesting engine can represent and execute.
+
+B. Concepts the AI understands but the current Backtesting engine cannot yet execute.
+
+For unsupported concepts:
+- Keep them in the strategy draft.
+- Clearly mark them as unsupported for historical execution.
+- Explain what would need to be added before they can be backtested.
+- NEVER silently convert them into a different rule.
+- NEVER claim a backtest can execute something it cannot.
+
+NATURAL-LANGUAGE STRATEGY BUILDING
+
+Users should be able to type requests such as:
+
+"Build me a simple XAUUSD strategy using the 20 EMA."
+
+"Create a strategy where price sweeps the previous high and then reverses."
+
+"Build me a bullish FVG strategy."
+
+"Create an SMC strategy using liquidity sweeps and market structure."
+
+"Use a 4H bullish bias and look for entries on the 15 minute chart."
+
+The AI should identify the concepts being requested and turn them into a structured strategy draft.
+
+BEGINNER-FRIENDLY HINTS
+
+Improve the AI Assistant UI so beginners can easily understand what they can type.
+
+Add a helpful section such as:
+
+"What can I ask the AI?"
+
+Provide clickable example prompts grouped into categories:
+
+BUILD
+- "Build me a simple XAUUSD strategy"
+- "Create a BUY strategy using the 20 EMA"
+- "Build a strategy using support and resistance"
+
+ICT / SMC
+- "Build a liquidity sweep strategy"
+- "Create an FVG strategy"
+- "Use market structure and BOS"
+
+PRICE ACTION
+- "Build a breakout and retest strategy"
+- "Create a bullish candle confirmation strategy"
+
+MULTI-TIMEFRAME
+- "Use the 4H trend and find entries on the 15M"
+- "Create a higher-timeframe bias strategy"
+
+RISK
+- "Use a 1% stop loss and 2% take profit"
+
+These should be examples/hints, not hardcoded strategy logic.
+
+AI EXPLANATIONS
+
+When the user mentions a trading concept they may not understand, the AI should be able to explain it simply.
+
+For example:
+
+User:
+"What is a liquidity sweep?"
+
+AI:
+Give a beginner-friendly explanation and optionally offer:
+"Would you like me to add a liquidity-sweep condition to your strategy?"
+
+Do not force the user to know technical terminology.
+
+STRATEGY DRAFT QUALITY
+
+When creating a strategy draft, the AI should identify:
+
+- Strategy name
+- Direction
+- Market/instrument
+- Timeframe(s)
+- Entry conditions
+- Exit conditions
+- Stop loss
+- Take profit
+- Concepts used
+- Compatibility status
+- Unsupported concepts
+- Plain-English explanation of the strategy
+
+The existing structured strategy draft format must remain compatible with the current Strategy Builder.
+
+IMPORTANT:
+Do not automatically save strategies.
+The user must still explicitly review/create/save them.
+
+PRESERVE THE EXISTING WORKING FLOW
+
+The final flow must remain:
+
+AI Assistant
+→ Generate strategy draft
+→ Review Strategy
+→ Existing Strategy Builder
+→ User reviews/edits
+→ User explicitly saves
+
+Do not alter this flow.
+
+TESTING
+
+Before finishing:
+
+1. Test:
+   "Create me a simple XAUUSD strategy."
+
+2. Test:
+   "Build me a strategy using the 20 EMA."
+
+3. Test:
+   "Build me a liquidity sweep strategy."
+
+4. Test:
+   "Create an FVG strategy using a 4H bias and 15M entry."
+
+5. Confirm the AI correctly identifies the requested concepts.
+
+6. Confirm unsupported concepts are clearly marked rather than fabricated.
+
+7. Confirm Review Strategy still transfers the generated draft into the existing Builder.
+
+8. Confirm normal AI questions still work.
+
+9. Confirm Backtesting has not been changed.
+
+10. Run frontend/API tests, typechecks and production builds.
+
+Do NOT add fake market data.
+Do NOT claim any strategy is profitable.
+Do NOT claim a concept is supported by the Backtester unless it actually is.
+
+At the end report:
+- Which concepts are now recognised.
+- Which concepts are currently executable by the Backtester.
+- Which concepts are understood but still unsupported for historical execution.
+- What beginner hints were added.
+- Example structured drafts generated during testing.
+- Whether Review Strategy still works.
+- Tests/typechecks/build results.
