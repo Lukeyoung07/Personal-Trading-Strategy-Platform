@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, asc, desc, eq } from "drizzle-orm";
 import {
+  backtestCandlesTable,
   backtestConfigurationsTable,
   backtestTradesTable,
   db,
@@ -18,6 +19,7 @@ import {
 } from "@workspace/api-zod";
 import { marketDataService } from "../services/market-data";
 import { runHistoricalBacktest } from "../services/backtest-engine";
+import { calculateBacktestStatistics } from "../services/backtest-results";
 
 const router: IRouter = Router();
 
@@ -27,14 +29,36 @@ function backtestView(row: {
   versionNumber: number;
   instrumentSymbol: string;
   timeframeLabel: string;
+  statistics?: ReturnType<typeof calculateBacktestStatistics>;
 }) {
+  const statistics = row.statistics;
   return {
     ...row.configuration,
     strategyName: row.strategyName,
     versionNumber: row.versionNumber,
     instrumentSymbol: row.instrumentSymbol,
     timeframeLabel: row.timeframeLabel,
+    winningTrades: statistics?.winningTrades ?? 0,
+    losingTrades: statistics?.losingTrades ?? 0,
+    winRate: statistics?.winRate ?? null,
+    totalPnl: statistics?.totalPnl ?? null,
   };
+}
+
+async function statisticsForBacktest(id: number) {
+  const trades = await db.select({
+    id: backtestTradesTable.id,
+    entryTime: backtestTradesTable.entryTime,
+    exitTime: backtestTradesTable.exitTime,
+    pnl: backtestTradesTable.pnl,
+  }).from(backtestTradesTable).where(eq(backtestTradesTable.backtestId, id));
+  const [configuration] = await db.select({ startDate: backtestConfigurationsTable.startDate })
+    .from(backtestConfigurationsTable)
+    .where(eq(backtestConfigurationsTable.id, id));
+  return calculateBacktestStatistics(trades.map(trade => ({
+    ...trade,
+    pnl: Number(trade.pnl),
+  })), configuration?.startDate ?? new Date(0));
 }
 
 async function findBacktest(id: number) {
@@ -52,7 +76,7 @@ async function findBacktest(id: number) {
     .innerJoin(marketsTable, eq(backtestConfigurationsTable.instrumentId, marketsTable.id))
     .innerJoin(timeframesTable, eq(backtestConfigurationsTable.timeframeId, timeframesTable.id))
     .where(eq(backtestConfigurationsTable.id, id));
-  return row ? backtestView(row) : null;
+  return row ? backtestView({ ...row, statistics: await statisticsForBacktest(id) }) : null;
 }
 
 async function executeBacktest(backtestId: number) {
@@ -72,6 +96,7 @@ async function executeBacktest(backtestId: number) {
     tradeCount: 0,
   }).where(eq(backtestConfigurationsTable.id, backtestId));
   await db.delete(backtestTradesTable).where(eq(backtestTradesTable.backtestId, backtestId));
+  await db.delete(backtestCandlesTable).where(eq(backtestCandlesTable.backtestId, backtestId));
 
   try {
     const [[version], conditions, [source]] = await Promise.all([
@@ -117,6 +142,22 @@ async function executeBacktest(backtestId: number) {
     const completedAt = new Date();
 
     await db.transaction(async tx => {
+      if (candles.length) {
+        await tx.insert(backtestCandlesTable).values(candles.map(candle => ({
+          backtestId,
+          sourceId: source.id,
+          instrumentId: configuration.instrumentId,
+          timeframeId: configuration.timeframeId,
+          openTime: candle.openTime,
+          closeTime: candle.closeTime,
+          open: candle.open.toString(),
+          high: candle.high.toString(),
+          low: candle.low.toString(),
+          close: candle.close.toString(),
+          volume: candle.volume?.toString() ?? null,
+          isClosed: candle.isClosed,
+        })));
+      }
       if (result.trades.length) {
         await tx.insert(backtestTradesTable).values(result.trades.map(trade => ({
           backtestId,
@@ -172,7 +213,10 @@ router.get("/backtests", async (_req, res): Promise<void> => {
     .innerJoin(marketsTable, eq(backtestConfigurationsTable.instrumentId, marketsTable.id))
     .innerJoin(timeframesTable, eq(backtestConfigurationsTable.timeframeId, timeframesTable.id))
     .orderBy(desc(backtestConfigurationsTable.createdAt));
-  res.json(ListBacktestsResponse.parse(rows.map(backtestView)));
+  res.json(ListBacktestsResponse.parse(await Promise.all(rows.map(async row => backtestView({
+    ...row,
+    statistics: await statisticsForBacktest(row.configuration.id),
+  })))));
 });
 
 router.post("/backtests", async (req, res): Promise<void> => {
@@ -267,6 +311,50 @@ router.get("/backtests/:backtestId/trades", async (req, res): Promise<void> => {
     exitPrice: Number(trade.exitPrice),
     pnl: Number(trade.pnl),
   })));
+});
+
+router.get("/backtests/:backtestId/results", async (req, res): Promise<void> => {
+  const id = Number(req.params.backtestId);
+  if (!Number.isInteger(id) || id < 1) {
+    res.status(400).json({ error: "backtestId must be a positive integer" });
+    return;
+  }
+  const backtest = await findBacktest(id);
+  if (!backtest) {
+    res.status(404).json({ error: "Backtest not found" });
+    return;
+  }
+  const [tradeRows, candleRows] = await Promise.all([
+    db.select().from(backtestTradesTable).where(eq(backtestTradesTable.backtestId, id)).orderBy(asc(backtestTradesTable.entryTime)),
+    db.select().from(backtestCandlesTable).where(eq(backtestCandlesTable.backtestId, id)).orderBy(asc(backtestCandlesTable.openTime)),
+  ]);
+  const trades = tradeRows.map(trade => ({
+    ...trade,
+    entryPrice: Number(trade.entryPrice),
+    stopLoss: trade.stopLoss == null ? null : Number(trade.stopLoss),
+    takeProfit: trade.takeProfit == null ? null : Number(trade.takeProfit),
+    exitPrice: Number(trade.exitPrice),
+    pnl: Number(trade.pnl),
+  }));
+  const candles = candleRows.map(candle => ({
+    ...candle,
+    open: Number(candle.open),
+    high: Number(candle.high),
+    low: Number(candle.low),
+    close: Number(candle.close),
+    volume: candle.volume == null ? null : Number(candle.volume),
+  }));
+  res.json({
+    backtest,
+    trades,
+    candles,
+    statistics: calculateBacktestStatistics(trades.map(trade => ({
+      id: trade.id,
+      entryTime: trade.entryTime,
+      exitTime: trade.exitTime,
+      pnl: trade.pnl,
+    })), new Date(backtest.startDate)),
+  });
 });
 
 export default router;

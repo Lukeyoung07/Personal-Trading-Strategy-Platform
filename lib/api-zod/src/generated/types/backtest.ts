@@ -24,6 +24,12 @@ export interface Backtest {
   status: BacktestStatus;
   candlesProcessed: number;
   tradeCount: number;
+  winningTrades: number;
+  losingTrades: number;
+  /** @nullable */
+  winRate: number | null;
+  /** @nullable */
+  totalPnl: number | null;
   /** @nullable */
   resultMessage: string | null;
   /** @nullable */

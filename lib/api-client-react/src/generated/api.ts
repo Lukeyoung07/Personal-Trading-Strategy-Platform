@@ -26,6 +26,7 @@ import type {
   AlertUpdate,
   Backtest,
   BacktestInput,
+  BacktestResults,
   BacktestTrade,
   BiQuoteCatalogItem,
   BiQuoteMarketResult,
@@ -5331,7 +5332,7 @@ export const getListBacktestTradesQueryKey = (backtestId: number,) => {
     }
 
 
-export const getListBacktestTradesQueryOptions = <TData = Awaited<ReturnType<typeof listBacktestTrades>>, TError = ErrorType<NotFoundResponse>>(backtestId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBacktestTrades>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListBacktestTradesQueryOptions = <TData = Awaited<ReturnType<typeof listBacktestTrades>>, TError = ErrorType<unknown>>(backtestId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBacktestTrades>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -5350,19 +5351,96 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListBacktestTradesQueryResult = NonNullable<Awaited<ReturnType<typeof listBacktestTrades>>>
-export type ListBacktestTradesQueryError = ErrorType<NotFoundResponse>
+export type ListBacktestTradesQueryError = ErrorType<unknown>
 
 
 /**
  * @summary Retrieve simulated trades for a backtest
  */
 
-export function useListBacktestTrades<TData = Awaited<ReturnType<typeof listBacktestTrades>>, TError = ErrorType<NotFoundResponse>>(
+export function useListBacktestTrades<TData = Awaited<ReturnType<typeof listBacktestTrades>>, TError = ErrorType<unknown>>(
  backtestId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBacktestTrades>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListBacktestTradesQueryOptions(backtestId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetBacktestResultsUrl = (backtestId: number,) => {
+
+
+
+
+  return `/api/backtests/${backtestId}/results`
+}
+
+/**
+ * @summary Retrieve completed backtest results
+ */
+export const getBacktestResults = async (backtestId: number, options?: Parameters<typeof customFetch>[1]): Promise<BacktestResults> => {
+
+  return customFetch<BacktestResults>(getGetBacktestResultsUrl(backtestId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBacktestResultsQueryKey = (backtestId: number,) => {
+    return [
+    `/api/backtests/${backtestId}/results`
+    ] as const;
+    }
+
+
+export const getGetBacktestResultsQueryOptions = <TData = Awaited<ReturnType<typeof getBacktestResults>>, TError = ErrorType<NotFoundResponse>>(backtestId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBacktestResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBacktestResultsQueryKey(backtestId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBacktestResults>>> = ({ signal }) => getBacktestResults(backtestId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: backtestId !== null && backtestId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBacktestResults>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBacktestResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getBacktestResults>>>
+export type GetBacktestResultsQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary Retrieve completed backtest results
+ */
+
+export function useGetBacktestResults<TData = Awaited<ReturnType<typeof getBacktestResults>>, TError = ErrorType<NotFoundResponse>>(
+ backtestId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBacktestResults>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBacktestResultsQueryOptions(backtestId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

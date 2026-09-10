@@ -2059,6 +2059,10 @@ export const ListBacktestsResponseItem = zod.object({
   "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
   "candlesProcessed": zod.number().int(),
   "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "winRate": zod.number().nullable(),
+  "totalPnl": zod.number().nullable(),
   "resultMessage": zod.string().nullable(),
   "executionAssumptions": zod.string().nullable(),
   "errorMessage": zod.string().nullable(),
@@ -2104,6 +2108,10 @@ export const CreateBacktestResponse = zod.object({
   "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
   "candlesProcessed": zod.number().int(),
   "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "winRate": zod.number().nullable(),
+  "totalPnl": zod.number().nullable(),
   "resultMessage": zod.string().nullable(),
   "executionAssumptions": zod.string().nullable(),
   "errorMessage": zod.string().nullable(),
@@ -2139,6 +2147,10 @@ export const GetBacktestResponse = zod.object({
   "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
   "candlesProcessed": zod.number().int(),
   "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "winRate": zod.number().nullable(),
+  "totalPnl": zod.number().nullable(),
   "resultMessage": zod.string().nullable(),
   "executionAssumptions": zod.string().nullable(),
   "errorMessage": zod.string().nullable(),
@@ -2174,6 +2186,10 @@ export const RunBacktestResponse = zod.object({
   "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
   "candlesProcessed": zod.number().int(),
   "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "winRate": zod.number().nullable(),
+  "totalPnl": zod.number().nullable(),
   "resultMessage": zod.string().nullable(),
   "executionAssumptions": zod.string().nullable(),
   "errorMessage": zod.string().nullable(),
@@ -2213,6 +2229,99 @@ export const ListBacktestTradesResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const ListBacktestTradesResponse = zod.array(ListBacktestTradesResponseItem)
+
+
+/**
+ * @summary Retrieve completed backtest results
+ */
+
+
+
+export const GetBacktestResultsParams = zod.object({
+  "backtestId": zod.coerce.number().int().min(1)
+})
+
+export const GetBacktestResultsResponse = zod.object({
+  "backtest": zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "strategyName": zod.string(),
+  "strategyVersionId": zod.number().int(),
+  "versionNumber": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "timeframeId": zod.number().int(),
+  "timeframeLabel": zod.string(),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date(),
+  "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "winRate": zod.number().nullable(),
+  "totalPnl": zod.number().nullable(),
+  "resultMessage": zod.string().nullable(),
+  "executionAssumptions": zod.string().nullable(),
+  "errorMessage": zod.string().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}),
+  "trades": zod.array(zod.object({
+  "id": zod.number().int(),
+  "backtestId": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "strategyVersionId": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "timeframeId": zod.number().int(),
+  "side": zod.enum(['long', 'short']),
+  "entryTime": zod.coerce.date(),
+  "entryPrice": zod.number(),
+  "stopLoss": zod.number().nullable(),
+  "takeProfit": zod.number().nullable(),
+  "exitTime": zod.coerce.date(),
+  "exitPrice": zod.number(),
+  "pnl": zod.number(),
+  "entryReason": zod.string(),
+  "exitReason": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "candles": zod.array(zod.object({
+  "id": zod.number().int(),
+  "backtestId": zod.number().int(),
+  "sourceId": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "timeframeId": zod.number().int(),
+  "openTime": zod.coerce.date(),
+  "closeTime": zod.coerce.date().nullable(),
+  "open": zod.number(),
+  "high": zod.number(),
+  "low": zod.number(),
+  "close": zod.number(),
+  "volume": zod.number().nullable(),
+  "isClosed": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})),
+  "statistics": zod.object({
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "winRate": zod.number().nullable(),
+  "totalPnl": zod.number().nullable(),
+  "averageWinningTrade": zod.number().nullable(),
+  "averageLosingTrade": zod.number().nullable(),
+  "largestWinningTrade": zod.number().nullable(),
+  "largestLosingTrade": zod.number().nullable(),
+  "maximumDrawdown": zod.number().nullable(),
+  "profitFactor": zod.number().nullable(),
+  "equityCurve": zod.array(zod.object({
+  "timestamp": zod.coerce.date(),
+  "equity": zod.number(),
+  "tradeId": zod.number().int().nullable()
+}))
+})
+})
 
 
 /**

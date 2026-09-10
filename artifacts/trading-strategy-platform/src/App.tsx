@@ -29,6 +29,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { StrategyMonitoringPage } from '@/components/strategy-monitoring';
 import { EconomicCalendar } from '@/components/economic-calendar';
+import { BacktestResultsPanel } from '@/components/backtest-results';
 import '@/index.css';
 
 const queryClient = new QueryClient();
@@ -75,7 +76,7 @@ function Shell({ children }: { children: ReactNode }) {
     </main>
   </div>;
 }
-function pageName(path:string) { return nav.find(n=>n.href===path)?.label || (path==='/backtesting'?'Backtesting':path==='/settings'?'Settings':'Workspace'); }
+function pageName(path:string) { return nav.find(n=>n.href===path)?.label || (path.startsWith('/backtesting')?'Backtesting':path==='/settings'?'Settings':'Workspace'); }
 export function Page({ eyebrow, title, description, action, children }: { eyebrow:string; title:string; description?:string; action?:ReactNode; children:ReactNode }) {
   return <div className="page-wrap"><div className="flex items-start justify-between gap-5 mb-8"><div><div className="eyebrow mb-3">{eyebrow}</div><h1 className="display text-3xl md:text-4xl font-bold">{title}</h1>{description&&<p className="text-muted-foreground text-sm mt-3 max-w-2xl leading-relaxed">{description}</p>}</div>{action}</div>{children}</div>;
 }
@@ -302,7 +303,7 @@ function Backtesting() {
       <div className="space-y-5">
         <div className="panel p-6">
           <div className="eyebrow">Saved setups</div>
-          {saved.isLoading ? <LoadingBlock /> : saved.data?.length ? <div className="mt-4 space-y-3">{saved.data.slice(0, 5).map((backtest: Backtest) => <div className="rounded-md bg-secondary/60 p-3" key={backtest.id} data-testid={`row-backtest-${backtest.id}`}><div className="flex items-center justify-between gap-3"><span className="font-semibold text-sm">{backtest.strategyName} · v{backtest.versionNumber}</span><span className="tag tag-active">{backtest.status}</span></div><div className="text-xs text-muted-foreground mt-2">{backtest.instrumentSymbol} · {backtest.timeframeLabel}</div><div className="text-xs text-muted-foreground mt-1">{formatDate(backtest.startDate)} – {formatDate(backtest.endDate)}</div><div className="text-xs text-muted-foreground mt-1">{backtest.candlesProcessed} candles · {backtest.tradeCount} simulated trades</div>{backtest.status === "failed" && backtest.errorMessage && <div className="text-xs text-destructive mt-2">{backtest.errorMessage}</div>}{backtest.status === "completed" && backtest.resultMessage && <div className="text-xs text-muted-foreground mt-2">{backtest.resultMessage}</div>}</div>)}</div> : <p className="text-sm text-muted-foreground mt-4">No backtests run yet.</p>}
+          {saved.isLoading ? <LoadingBlock /> : saved.data?.length ? <div className="mt-4 space-y-3">{saved.data.slice(0, 5).map((backtest: Backtest) => <div className="rounded-md bg-secondary/60 p-3" key={backtest.id} data-testid={`row-backtest-${backtest.id}`}><div className="flex items-center justify-between gap-3"><span className="font-semibold text-sm">{backtest.strategyName} · v{backtest.versionNumber}</span><span className={`tag ${backtest.status === "completed" ? "tag-active" : backtest.status === "failed" ? "tag-archived" : "tag-draft"}`}>{backtest.status}</span></div><div className="text-xs text-muted-foreground mt-2">{backtest.instrumentSymbol} · {backtest.timeframeLabel}</div><div className="text-xs text-muted-foreground mt-1">{formatDate(backtest.startDate)} – {formatDate(backtest.endDate)}</div><div className="text-xs text-muted-foreground mt-1">{backtest.candlesProcessed} candles · {backtest.tradeCount} simulated trades</div>{backtest.status === "completed" && backtest.tradeCount > 0 && <div className="text-xs text-muted-foreground mt-1">{backtest.winRate === null ? "—" : `${backtest.winRate.toFixed(1)}%`} win rate · {formatMoney(backtest.totalPnl)} total P/L</div>}{backtest.status === "failed" && backtest.errorMessage && <div className="text-xs text-destructive mt-2">{backtest.errorMessage}</div>}{backtest.status === "completed" && backtest.resultMessage && <div className="text-xs text-muted-foreground mt-2">{backtest.resultMessage}</div>}<Link href={`/backtesting/${backtest.id}`} className="text-xs text-primary inline-flex items-center gap-1 mt-3 hover:underline" data-testid={`link-view-backtest-${backtest.id}`}>Review result <ChevronRight size={13}/></Link></div>)}</div> : <p className="text-sm text-muted-foreground mt-4">No backtests run yet.</p>}
         </div>
         <div className="panel p-6">
           <div className="eyebrow">What happens next</div>
@@ -314,5 +315,11 @@ function Backtesting() {
 }
 
 function StrategyBuilderRoute() { return <StrategyBuilder/>; }
-function Router() { return <ErrorBoundary><Shell><Switch><Route path="/" component={Dashboard}/><Route path="/strategy-builder" component={StrategyBuilderRoute}/><Route path="/strategy-library" component={StrategyLibrary}/><Route path="/market-monitor" component={MarketMonitor}/><Route path="/trade-journal" component={Journal}/><Route path="/performance" component={Performance}/><Route path="/strategy-monitoring" component={StrategyMonitoringPage}/><Route path="/alerts" component={Alerts}/><Route path="/news" component={EconomicCalendar}/><Route path="/settings" component={SettingsPage}/><Route path="/backtesting" component={Backtesting}/><Route component={NotFound}/></Switch></Shell></ErrorBoundary>; }
+function BacktestResultsRoute() {
+  const params = useParams<{ id: string }>();
+  const [, setLocation] = useLocation();
+  const backtestId = Number(params.id);
+  return <div className="page-wrap"><BacktestResultsPanel backtestId={backtestId} onBack={() => setLocation("/backtesting")} /></div>;
+}
+function Router() { return <ErrorBoundary><Shell><Switch><Route path="/" component={Dashboard}/><Route path="/strategy-builder" component={StrategyBuilderRoute}/><Route path="/strategy-library" component={StrategyLibrary}/><Route path="/market-monitor" component={MarketMonitor}/><Route path="/trade-journal" component={Journal}/><Route path="/performance" component={Performance}/><Route path="/strategy-monitoring" component={StrategyMonitoringPage}/><Route path="/alerts" component={Alerts}/><Route path="/news" component={EconomicCalendar}/><Route path="/settings" component={SettingsPage}/><Route path="/backtesting/:id" component={BacktestResultsRoute}/><Route path="/backtesting" component={Backtesting}/><Route component={NotFound}/></Switch></Shell></ErrorBoundary>; }
 export default function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><Router/><Toaster/></TooltipProvider></QueryClientProvider>; }

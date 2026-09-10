@@ -1650,6 +1650,12 @@ export interface Backtest {
   status: BacktestStatus;
   candlesProcessed: number;
   tradeCount: number;
+  winningTrades: number;
+  losingTrades: number;
+  /** @nullable */
+  winRate: number | null;
+  /** @nullable */
+  totalPnl: number | null;
   /** @nullable */
   resultMessage: string | null;
   /** @nullable */
@@ -1691,6 +1697,61 @@ export interface BacktestTrade {
   entryReason: string;
   exitReason: string;
   createdAt: string;
+}
+
+export interface BacktestCandle {
+  id: number;
+  backtestId: number;
+  sourceId: number;
+  instrumentId: number;
+  timeframeId: number;
+  openTime: string;
+  /** @nullable */
+  closeTime: string | null;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  /** @nullable */
+  volume: number | null;
+  isClosed: boolean;
+  createdAt: string;
+}
+
+export type BacktestStatisticsEquityCurveItem = {
+  timestamp: string;
+  equity: number;
+  /** @nullable */
+  tradeId: number | null;
+};
+
+export interface BacktestStatistics {
+  winningTrades: number;
+  losingTrades: number;
+  /** @nullable */
+  winRate: number | null;
+  /** @nullable */
+  totalPnl: number | null;
+  /** @nullable */
+  averageWinningTrade: number | null;
+  /** @nullable */
+  averageLosingTrade: number | null;
+  /** @nullable */
+  largestWinningTrade: number | null;
+  /** @nullable */
+  largestLosingTrade: number | null;
+  /** @nullable */
+  maximumDrawdown: number | null;
+  /** @nullable */
+  profitFactor: number | null;
+  equityCurve: BacktestStatisticsEquityCurveItem[];
+}
+
+export interface BacktestResults {
+  backtest: Backtest;
+  trades: BacktestTrade[];
+  candles: BacktestCandle[];
+  statistics: BacktestStatistics;
 }
 
 export type BacktestInputPreset = typeof BacktestInputPreset[keyof typeof BacktestInputPreset];

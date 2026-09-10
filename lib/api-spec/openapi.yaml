@@ -1183,6 +1183,20 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/BacktestTrade"
+  /backtests/{backtestId}/results:
+    get:
+      operationId: getBacktestResults
+      tags: [backtesting]
+      summary: Retrieve completed backtest results
+      parameters:
+        - $ref: "#/components/parameters/BacktestId"
+      responses:
+        "200":
+          description: Backtest results, stored trades, and historical candles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestResults"
         "404":
           $ref: "#/components/responses/NotFound"
   /alerts/{alertId}:
@@ -2251,7 +2265,7 @@ components:
           enum: [active, paused]
     Backtest:
       type: object
-      required: [id, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, timeframeId, timeframeLabel, preset, startDate, endDate, status, candlesProcessed, tradeCount, resultMessage, executionAssumptions, errorMessage, startedAt, completedAt, createdAt]
+      required: [id, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, timeframeId, timeframeLabel, preset, startDate, endDate, status, candlesProcessed, tradeCount, winningTrades, losingTrades, winRate, totalPnl, resultMessage, executionAssumptions, errorMessage, startedAt, completedAt, createdAt]
       properties:
         id: { type: integer }
         strategyId: { type: integer }
@@ -2272,6 +2286,10 @@ components:
           enum: [configured, pending, running, completed, failed]
         candlesProcessed: { type: integer }
         tradeCount: { type: integer }
+        winningTrades: { type: integer }
+        losingTrades: { type: integer }
+        winRate: { type: ["number", "null"] }
+        totalPnl: { type: ["number", "null"] }
         resultMessage: { type: ["string", "null"] }
         executionAssumptions: { type: ["string", "null"] }
         errorMessage: { type: ["string", "null"] }
@@ -2301,6 +2319,63 @@ components:
         entryReason: { type: string }
         exitReason: { type: string }
         createdAt: { type: string, format: date-time }
+    BacktestCandle:
+      type: object
+      required: [id, backtestId, sourceId, instrumentId, timeframeId, openTime, closeTime, open, high, low, close, volume, isClosed, createdAt]
+      properties:
+        id: { type: integer }
+        backtestId: { type: integer }
+        sourceId: { type: integer }
+        instrumentId: { type: integer }
+        timeframeId: { type: integer }
+        openTime: { type: string, format: date-time }
+        closeTime: { type: ["string", "null"], format: date-time }
+        open: { type: number }
+        high: { type: number }
+        low: { type: number }
+        close: { type: number }
+        volume: { type: ["number", "null"] }
+        isClosed: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    BacktestStatistics:
+      type: object
+      required: [winningTrades, losingTrades, winRate, totalPnl, averageWinningTrade, averageLosingTrade, largestWinningTrade, largestLosingTrade, maximumDrawdown, profitFactor, equityCurve]
+      properties:
+        winningTrades: { type: integer }
+        losingTrades: { type: integer }
+        winRate: { type: ["number", "null"] }
+        totalPnl: { type: ["number", "null"] }
+        averageWinningTrade: { type: ["number", "null"] }
+        averageLosingTrade: { type: ["number", "null"] }
+        largestWinningTrade: { type: ["number", "null"] }
+        largestLosingTrade: { type: ["number", "null"] }
+        maximumDrawdown: { type: ["number", "null"] }
+        profitFactor: { type: ["number", "null"] }
+        equityCurve:
+          type: array
+          items:
+            type: object
+            required: [timestamp, equity, tradeId]
+            properties:
+              timestamp: { type: string, format: date-time }
+              equity: { type: number }
+              tradeId: { type: ["integer", "null"] }
+    BacktestResults:
+      type: object
+      required: [backtest, trades, candles, statistics]
+      properties:
+        backtest:
+          $ref: "#/components/schemas/Backtest"
+        trades:
+          type: array
+          items:
+            $ref: "#/components/schemas/BacktestTrade"
+        candles:
+          type: array
+          items:
+            $ref: "#/components/schemas/BacktestCandle"
+        statistics:
+          $ref: "#/components/schemas/BacktestStatistics"
     BacktestInput:
       type: object
       required: [strategyId, strategyVersionId, instrumentId, timeframeId, preset, startDate, endDate]
