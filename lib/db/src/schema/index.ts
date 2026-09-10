@@ -309,6 +309,19 @@ export const alertsTable = pgTable("alerts", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
+export const backtestConfigurationsTable = pgTable("backtest_configurations", {
+  id: serial("id").primaryKey(),
+  strategyId: integer("strategy_id").notNull().references(() => strategiesTable.id, { onDelete: "cascade" }),
+  strategyVersionId: integer("strategy_version_id").notNull().references(() => strategyVersionsTable.id, { onDelete: "cascade" }),
+  instrumentId: integer("instrument_id").notNull().references(() => marketsTable.id, { onDelete: "restrict" }),
+  timeframeId: integer("timeframe_id").notNull().references(() => timeframesTable.id, { onDelete: "restrict" }),
+  preset: text("preset").notNull(),
+  startDate: timestamp("start_date", { withTimezone: true }).notNull(),
+  endDate: timestamp("end_date", { withTimezone: true }).notNull(),
+  status: text("status").notNull().default("configured"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const economicEventsTable = pgTable("economic_events", {
   id: serial("id").primaryKey(),
   providerKey: text("provider_key").notNull(),
@@ -375,6 +388,7 @@ export const insertStrategyMonitorTransitionEventSchema = createInsertSchema(str
 export const insertTradeSchema = createInsertSchema(tradesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPerformanceRecordSchema = createInsertSchema(performanceRecordsTable).omit({ id: true, createdAt: true });
 export const insertAlertSchema = createInsertSchema(alertsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBacktestConfigurationSchema = createInsertSchema(backtestConfigurationsTable).omit({ id: true, createdAt: true });
 export const insertEconomicEventSchema = createInsertSchema(economicEventsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEconomicEventMarketMappingSchema = createInsertSchema(economicEventMarketMappingsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertUserSettingsSchema = createInsertSchema(userSettingsTable).omit({ id: true, updatedAt: true });
@@ -398,6 +412,7 @@ export type StrategyMonitorTransitionEvent = typeof strategyMonitorTransitionEve
 export type Trade = typeof tradesTable.$inferSelect;
 export type PerformanceRecord = typeof performanceRecordsTable.$inferSelect;
 export type Alert = typeof alertsTable.$inferSelect;
+export type BacktestConfiguration = typeof backtestConfigurationsTable.$inferSelect;
 export type EconomicEvent = typeof economicEventsTable.$inferSelect;
 export type EconomicEventMarketMapping = typeof economicEventMarketMappingsTable.$inferSelect;
 export type UserSettings = typeof userSettingsTable.$inferSelect;
@@ -418,6 +433,7 @@ export type InsertStrategyMonitorSession = z.infer<typeof insertStrategyMonitorS
 export type InsertStrategyMonitorConditionState = z.infer<typeof insertStrategyMonitorConditionStateSchema>;
 export type InsertStrategyMonitorTransitionEvent = z.infer<typeof insertStrategyMonitorTransitionEventSchema>;
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
+export type InsertBacktestConfiguration = z.infer<typeof insertBacktestConfigurationSchema>;
 export type InsertPerformanceRecord = z.infer<typeof insertPerformanceRecordSchema>;
 export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type InsertEconomicEvent = z.infer<typeof insertEconomicEventSchema>;

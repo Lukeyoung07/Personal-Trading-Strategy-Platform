@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Link, Route, Switch, useLocation, useParams } from 'wouter';
 import {
@@ -9,14 +9,15 @@ import {
 } from 'lucide-react';
 import {
   AlertStatus, getGetDashboardSummaryQueryKey, getGetPerformanceSummaryQueryKey, getGetSettingsQueryKey,
+  getListBacktestsQueryKey, useCreateBacktest, useListBacktests,
   getGetStrategyQueryKey, getListAlertsQueryKey, getListConceptsQueryKey, getListConditionsQueryKey,
   getListMarketsQueryKey, getListStrategiesQueryKey, getListStrategyVersionsQueryKey, getListTradesQueryKey,
   useCreateAlert, useCreateConcept, useCreateCondition, useCreateMarket, useCreateStrategy, useCreateStrategyVersion,
   useCreateTrade, useDeleteAlert, useDeleteConcept, useDeleteCondition, useDeleteMarket, useDeleteStrategy,
   useDeleteTrade, useGetDashboardSummary, useGetPerformanceSummary, useGetSettings, useGetStrategy, useListAlerts,
-  useListConcepts, useListConditions, useListMarkets, useListStrategies, useListStrategyVersions, useListTrades,
+  useListConcepts, useListConditions, useListMarkets, useListStrategies, useListStrategyVersions, useListTimeframes, useListTrades,
   useUpdateAlert, useUpdateConcept, useUpdateCondition, useUpdateMarket, useUpdateSettings, useUpdateStrategy,
-  useUpdateTrade, type Alert, type Condition, type Market, type Strategy, type Trade, type TradingConcept
+  useUpdateTrade, type Alert, type Backtest, type Condition, type Market, type Strategy, type Trade, type TradingConcept
 } from '@workspace/api-client-react';
 import { MarketMonitor } from '@/components/market-monitor';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -175,7 +176,136 @@ function Alerts() { const q=useListAlerts();const markets=useListMarkets();const
 
 function SettingsPage() { const q=useGetSettings();const u=useUpdateSettings();const qc=useQueryClient();const [saved,setSaved]=useState(false);if(q.isLoading)return <Page eyebrow="Workspace" title="Settings"><LoadingBlock/></Page>;if(q.isError)return <Page eyebrow="Workspace" title="Settings"><ErrorState retry={()=>q.refetch()}/></Page>;const s=q.data;const save=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const f=new FormData(e.currentTarget);u.mutate({data:{timezone:String(f.get('timezone')),baseCurrency:String(f.get('baseCurrency')),defaultRiskUnit:String(f.get('defaultRiskUnit')) as 'percent'|'amount'|'r',compactMode:f.get('compactMode')==='on'}},{onSuccess:()=>{setSaved(true);qc.invalidateQueries({queryKey:getGetSettingsQueryKey()});setTimeout(()=>setSaved(false),2600)}})};return <Page eyebrow="Workspace" title="Settings" description="Small preferences that make the daily record feel like yours."><div className="max-w-2xl panel p-6 md:p-8"><form onSubmit={save} className="space-y-6"><div><div className="eyebrow">Locale</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5"><Field label="Timezone"><select className="select" name="timezone" defaultValue={s?.timezone||'UTC'} data-testid="select-settings-timezone"><option value="UTC">UTC</option><option value="America/New_York">America / New York</option><option value="America/Los_Angeles">America / Los Angeles</option><option value="Europe/London">Europe / London</option><option value="Asia/Tokyo">Asia / Tokyo</option></select></Field><Field label="Base currency"><select className="select" name="baseCurrency" defaultValue={s?.baseCurrency||'USD'} data-testid="select-settings-currency"><option value="USD">USD — US Dollar</option><option value="EUR">EUR — Euro</option><option value="GBP">GBP — Pound</option><option value="JPY">JPY — Yen</option></select></Field></div></div><div className="border-t border-border pt-6"><div className="eyebrow">Risk language</div><Field label="Default risk unit"><select className="select mt-5" name="defaultRiskUnit" defaultValue={s?.defaultRiskUnit||'percent'} data-testid="select-settings-risk"><option value="percent">Percent</option><option value="amount">Amount</option><option value="r">R multiple</option></select></Field></div><div className="border-t border-border pt-6 flex items-center justify-between gap-4"><div><div className="text-sm font-semibold">Compact mode</div><div className="text-xs text-muted-foreground mt-1">Tighten row spacing in dense records.</div></div><input type="checkbox" name="compactMode" defaultChecked={s?.compactMode} className="accent-[hsl(var(--primary))] w-4 h-4" data-testid="input-settings-compact"/></div><div className="flex items-center justify-end gap-4 pt-2"><span className="text-xs text-primary">{saved?'Preferences saved.':''}</span><button className="btn btn-primary" disabled={u.isPending} data-testid="button-save-settings">{u.isPending?'Saving…':'Save preferences'}</button></div></form></div></Page>; }
 
-function Backtesting() { return <Page eyebrow="Utilities" title="Backtesting" description="A deliberate boundary, for now."><div className="panel empty-grid p-10 md:p-16 text-center max-w-2xl mx-auto"><div className="w-12 h-12 mx-auto rounded-xl border border-accent/30 bg-accent/10 text-accent flex items-center justify-center mb-5"><Clock3 size={21}/></div><span className="tag tag-draft">Not built yet</span><h2 className="display text-2xl font-bold mt-5">No simulated certainty here.</h2><p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto mt-3">Backtesting is intentionally a placeholder. This workspace is for building and reviewing your own records, not manufacturing a performance history.</p><Link href="/strategy-builder" className="btn btn-secondary mt-7" data-testid="link-backtesting-builder">Return to builder <ChevronRight size={14}/></Link></div></Page>; }
+function formatDateInput(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function presetRange(preset: string) {
+  const end = new Date();
+  const days = preset === "last_30_days" ? 30 : preset === "last_90_days" ? 90 : 7;
+  const start = new Date(end);
+  start.setDate(start.getDate() - days);
+  return { start: formatDateInput(start), end: formatDateInput(end) };
+}
+
+function Backtesting() {
+  const strategies = useListStrategies();
+  const markets = useListMarkets();
+  const timeframes = useListTimeframes();
+  const saved = useListBacktests();
+  const create = useCreateBacktest();
+  const [strategyId, setStrategyId] = useState<number | null>(null);
+  const [versionId, setVersionId] = useState<number | null>(null);
+  const [instrumentId, setInstrumentId] = useState<number | null>(null);
+  const [timeframeId, setTimeframeId] = useState<number | null>(null);
+  const [preset, setPreset] = useState("last_7_days");
+  const initialRange = presetRange("last_7_days");
+  const [startDate, setStartDate] = useState(initialRange.start);
+  const [endDate, setEndDate] = useState(initialRange.end);
+  const versions = useListStrategyVersions(strategyId ?? 0);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (strategyId == null && strategies.data?.[0]) setStrategyId(strategies.data[0].id);
+  }, [strategyId, strategies.data]);
+  useEffect(() => {
+    if (versionId == null && versions.data?.[0]) setVersionId(versions.data[0].id);
+  }, [versionId, versions.data]);
+
+  const selectPreset = (value: string) => {
+    setPreset(value);
+    if (value !== "custom") {
+      const range = presetRange(value);
+      setStartDate(range.start);
+      setEndDate(range.end);
+    }
+  };
+  const save = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!strategyId || !versionId || !instrumentId || !timeframeId || !startDate || !endDate) return;
+    create.mutate({
+      data: {
+        strategyId,
+        strategyVersionId: versionId,
+        instrumentId,
+        timeframeId,
+        preset: preset as "last_7_days" | "last_30_days" | "last_90_days" | "custom",
+        startDate: new Date(`${startDate}T00:00:00.000Z`).toISOString(),
+        endDate: new Date(`${endDate}T23:59:59.999Z`).toISOString(),
+      },
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListBacktestsQueryKey() });
+      },
+    });
+  };
+  const chosenVersion = versions.data?.find(version => version.id === versionId);
+
+  return <Page eyebrow="Utilities" title="Backtesting" description="Configure a historical review from your saved strategy versions. Results are not calculated yet.">
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5">
+      <form className="panel p-6 md:p-8 space-y-6" onSubmit={save}>
+        <div>
+          <div className="eyebrow">Setup</div>
+          <h2 className="display text-2xl font-bold mt-2">Choose what to review</h2>
+          <p className="text-sm text-muted-foreground mt-2">Select an exact strategy version and the normalized market data series it should use.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Strategy">
+            <select className="select" value={strategyId ?? ""} onChange={event => { setStrategyId(event.target.value ? Number(event.target.value) : null); setVersionId(null); }} required data-testid="select-backtest-strategy">
+              <option value="">Select a strategy</option>
+              {(strategies.data || []).map(strategy => <option key={strategy.id} value={strategy.id}>{strategy.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Exact strategy version">
+            <select className="select" value={versionId ?? ""} onChange={event => setVersionId(event.target.value ? Number(event.target.value) : null)} disabled={!strategyId || versions.isLoading} required data-testid="select-backtest-version">
+              <option value="">{versions.isLoading ? "Loading versions…" : "Select a version"}</option>
+              {(versions.data || []).map(version => <option key={version.id} value={version.id}>v{version.versionNumber}{version.label ? ` · ${version.label}` : ""}</option>)}
+            </select>
+            {chosenVersion && <p className="text-xs text-muted-foreground mt-2">This run stays tied to v{chosenVersion.versionNumber}; newer versions will not replace it.</p>}
+          </Field>
+          <Field label="Instrument">
+            <select className="select" value={instrumentId ?? ""} onChange={event => setInstrumentId(event.target.value ? Number(event.target.value) : null)} required data-testid="select-backtest-instrument">
+              <option value="">Select an instrument</option>
+              {(markets.data || []).filter(market => market.isActive).map(market => <option key={market.id} value={market.id}>{market.symbol}{market.displayName ? ` · ${market.displayName}` : ""}</option>)}
+            </select>
+          </Field>
+          <Field label="Timeframe">
+            <select className="select" value={timeframeId ?? ""} onChange={event => setTimeframeId(event.target.value ? Number(event.target.value) : null)} required data-testid="select-backtest-timeframe">
+              <option value="">Select a timeframe</option>
+              {(timeframes.data || []).filter(timeframe => timeframe.isActive).map(timeframe => <option key={timeframe.id} value={timeframe.id}>{timeframe.label}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div>
+          <div className="label">Date range</div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {[["last_7_days", "Last 7 Days"], ["last_30_days", "Last 30 Days"], ["last_90_days", "Last 90 Days"], ["custom", "Custom"]].map(([value, label]) => <button type="button" key={value} className={`btn ${preset === value ? "btn-primary" : "btn-secondary"}`} onClick={() => selectPreset(value)} data-testid={`button-backtest-preset-${value}`}>{label}</button>)}
+          </div>
+        </div>
+        {preset === "custom" && <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Start date"><input className="input" type="date" value={startDate} onChange={event => setStartDate(event.target.value)} required data-testid="input-backtest-start-date" /></Field>
+          <Field label="End date"><input className="input" type="date" value={endDate} onChange={event => setEndDate(event.target.value)} required data-testid="input-backtest-end-date" /></Field>
+        </div>}
+        <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
+          <p className="text-xs text-muted-foreground">Part 1 saves the setup only. No trades or performance are generated.</p>
+          <button className="btn btn-primary whitespace-nowrap" type="submit" disabled={create.isPending || strategies.isLoading || markets.isLoading || timeframes.isLoading}>{create.isPending ? "Saving…" : "Run Backtest"}</button>
+        </div>
+        {create.isSuccess && <p className="text-sm text-primary">Backtest configuration saved. The engine is not active yet.</p>}
+        {create.isError && <p className="text-sm text-destructive">Could not save this configuration. Check the selected dates and try again.</p>}
+      </form>
+      <div className="space-y-5">
+        <div className="panel p-6">
+          <div className="eyebrow">Saved setups</div>
+          {saved.isLoading ? <LoadingBlock /> : saved.data?.length ? <div className="mt-4 space-y-3">{saved.data.slice(0, 5).map((backtest: Backtest) => <div className="rounded-md bg-secondary/60 p-3" key={backtest.id} data-testid={`row-backtest-${backtest.id}`}><div className="flex items-center justify-between gap-3"><span className="font-semibold text-sm">{backtest.strategyName} · v{backtest.versionNumber}</span><span className="tag tag-draft">{backtest.status}</span></div><div className="text-xs text-muted-foreground mt-2">{backtest.instrumentSymbol} · {backtest.timeframeLabel}</div><div className="text-xs text-muted-foreground mt-1">{formatDate(backtest.startDate)} – {formatDate(backtest.endDate)}</div></div>)}</div> : <p className="text-sm text-muted-foreground mt-4">No configurations saved yet.</p>}
+        </div>
+        <div className="panel p-6">
+          <div className="eyebrow">What happens next</div>
+          <p className="text-sm text-muted-foreground leading-relaxed mt-4">This setup is saved against your immutable strategy version and selected instrument. Historical candles, simulated trades, and performance calculations will be added in a later part.</p>
+        </div>
+      </div>
+    </div>
+  </Page>;
+}
 
 function StrategyBuilderRoute() { return <StrategyBuilder/>; }
 function Router() { return <ErrorBoundary><Shell><Switch><Route path="/" component={Dashboard}/><Route path="/strategy-builder" component={StrategyBuilderRoute}/><Route path="/strategy-library" component={StrategyLibrary}/><Route path="/market-monitor" component={MarketMonitor}/><Route path="/trade-journal" component={Journal}/><Route path="/performance" component={Performance}/><Route path="/strategy-monitoring" component={StrategyMonitoringPage}/><Route path="/alerts" component={Alerts}/><Route path="/news" component={EconomicCalendar}/><Route path="/settings" component={SettingsPage}/><Route path="/backtesting" component={Backtesting}/><Route component={NotFound}/></Switch></Shell></ErrorBoundary>; }

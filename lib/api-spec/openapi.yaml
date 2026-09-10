@@ -1104,6 +1104,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Alert"
+  /backtests:
+    get:
+      operationId: listBacktests
+      tags: [backtesting]
+      summary: List saved backtest configurations
+      responses:
+        "200":
+          description: Saved backtest configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Backtest"
+    post:
+      operationId: createBacktest
+      tags: [backtesting]
+      summary: Save a backtest configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BacktestInput"
+      responses:
+        "201":
+          description: Saved backtest configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Backtest"
   /alerts/{alertId}:
     patch:
       operationId: updateAlert
@@ -2163,6 +2194,41 @@ components:
         status:
           type: string
           enum: [active, paused]
+    Backtest:
+      type: object
+      required: [id, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, timeframeId, timeframeLabel, preset, startDate, endDate, status, createdAt]
+      properties:
+        id: { type: integer }
+        strategyId: { type: integer }
+        strategyName: { type: string }
+        strategyVersionId: { type: integer }
+        versionNumber: { type: integer }
+        instrumentId: { type: integer }
+        instrumentSymbol: { type: string }
+        timeframeId: { type: integer }
+        timeframeLabel: { type: string }
+        preset:
+          type: string
+          enum: [last_7_days, last_30_days, last_90_days, custom]
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [configured]
+        createdAt: { type: string, format: date-time }
+    BacktestInput:
+      type: object
+      required: [strategyId, strategyVersionId, instrumentId, timeframeId, preset, startDate, endDate]
+      properties:
+        strategyId: { type: integer, minimum: 1 }
+        strategyVersionId: { type: integer, minimum: 1 }
+        instrumentId: { type: integer, minimum: 1 }
+        timeframeId: { type: integer, minimum: 1 }
+        preset:
+          type: string
+          enum: [last_7_days, last_30_days, last_90_days, custom]
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
     UserSettings:
       type: object
       required: [id, timezone, baseCurrency, defaultRiskUnit, compactMode, updatedAt]
