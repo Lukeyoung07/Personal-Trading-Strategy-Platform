@@ -26,6 +26,14 @@ export interface EconomicEventMarketMapping {
   notes: string | null;
 }
 
+export type EconomicEventTimePrecision = typeof EconomicEventTimePrecision[keyof typeof EconomicEventTimePrecision];
+
+
+export const EconomicEventTimePrecision = {
+  date: 'date',
+  datetime: 'datetime',
+} as const;
+
 export type EconomicEventReleaseStatus = typeof EconomicEventReleaseStatus[keyof typeof EconomicEventReleaseStatus];
 
 
@@ -55,6 +63,7 @@ export interface EconomicEvent {
   dedupeKey: string;
   name: string;
   scheduledAt: string;
+  timePrecision: EconomicEventTimePrecision;
   impact: EconomicEventImpact | null;
   /** @nullable */
   region: string | null;
@@ -68,11 +77,23 @@ export interface EconomicEvent {
   actual: string | null;
   releaseStatus: EconomicEventReleaseStatus;
   /** @nullable */
+  sourceName: string | null;
+  /** @nullable */
+  sourceUrl: string | null;
+  /** @nullable */
   sourceUpdatedAt: string | null;
   createdAt: string;
   updatedAt: string;
   affectedMarkets: EconomicEventMarketMapping[];
 }
+
+export type EconomicEventInputTimePrecision = typeof EconomicEventInputTimePrecision[keyof typeof EconomicEventInputTimePrecision];
+
+
+export const EconomicEventInputTimePrecision = {
+  date: 'date',
+  datetime: 'datetime',
+} as const;
 
 export type EconomicEventInputReleaseStatus = typeof EconomicEventInputReleaseStatus[keyof typeof EconomicEventInputReleaseStatus];
 
@@ -107,6 +128,7 @@ export interface EconomicEventInput {
   /** @minLength 1 */
   name: string;
   scheduledAt: string;
+  timePrecision?: EconomicEventInputTimePrecision;
   impact?: EconomicEventImpact | null;
   /** @nullable */
   region?: string | null;
@@ -120,9 +142,21 @@ export interface EconomicEventInput {
   actual?: string | null;
   releaseStatus?: EconomicEventInputReleaseStatus;
   /** @nullable */
+  sourceName?: string | null;
+  /** @nullable */
+  sourceUrl?: string | null;
+  /** @nullable */
   sourceUpdatedAt?: string | null;
   affectedMarkets?: EconomicEventMarketMappingInput[];
 }
+
+export type EconomicEventUpdateTimePrecision = typeof EconomicEventUpdateTimePrecision[keyof typeof EconomicEventUpdateTimePrecision];
+
+
+export const EconomicEventUpdateTimePrecision = {
+  date: 'date',
+  datetime: 'datetime',
+} as const;
 
 export type EconomicEventUpdateReleaseStatus = typeof EconomicEventUpdateReleaseStatus[keyof typeof EconomicEventUpdateReleaseStatus];
 
@@ -142,6 +176,7 @@ export interface EconomicEventUpdate {
   /** @minLength 1 */
   name?: string;
   scheduledAt?: string;
+  timePrecision?: EconomicEventUpdateTimePrecision;
   impact?: EconomicEventImpact | null;
   /** @nullable */
   region?: string | null;
@@ -154,6 +189,10 @@ export interface EconomicEventUpdate {
   /** @nullable */
   actual?: string | null;
   releaseStatus?: EconomicEventUpdateReleaseStatus;
+  /** @nullable */
+  sourceName?: string | null;
+  /** @nullable */
+  sourceUrl?: string | null;
   /** @nullable */
   sourceUpdatedAt?: string | null;
   affectedMarkets?: EconomicEventMarketMappingInput[];

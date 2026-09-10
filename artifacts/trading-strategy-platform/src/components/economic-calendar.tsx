@@ -40,9 +40,16 @@ function displayValue(value: string | null | undefined) {
   return value?.trim() || 'Not provided';
 }
 
-function formatDateTime(value: string) {
+function formatDateTime(value: string, precision: EconomicEvent['timePrecision']) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Time unavailable';
+  if (precision === 'date') {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(date);
+  }
   return new Intl.DateTimeFormat(undefined, {
     month: 'short',
     day: 'numeric',
@@ -110,7 +117,7 @@ function EventCard({ event }: { event: EconomicEvent }) {
             dateTime={event.scheduledAt}
             data-testid={`text-event-date-${event.id}`}
           >
-            {formatDateTime(event.scheduledAt)}
+            {formatDateTime(event.scheduledAt, event.timePrecision)}
           </time>
           {relativeTime && (
             <div
@@ -134,7 +141,7 @@ function EventCard({ event }: { event: EconomicEvent }) {
               data-testid={`status-event-impact-${event.id}`}
             >
               {isHighImpact && <AlertTriangle size={11} aria-hidden="true" />}
-              {event.impact ? `${event.impact} impact` : 'Impact not provided'}
+              {event.impact ? `${event.impact} impact` : 'Not classified'}
             </span>
             <span
               className={`tag ${
@@ -160,6 +167,9 @@ function EventCard({ event }: { event: EconomicEvent }) {
                 Affects {event.affectedMarkets.map((market) => market.marketLabel || `Market ${market.marketId ?? '—'}`).join(', ')}
               </span>
             )}
+            <span data-testid={`text-event-source-${event.id}`}>
+              Source: {displayValue(event.sourceName)}
+            </span>
           </div>
         </div>
 
@@ -375,7 +385,7 @@ export function EconomicCalendar() {
             </span>
             <span className="flex items-center gap-1.5">
               <RefreshCw size={12} />
-              Times are shown in your local timezone
+              Dates and times reflect the precision provided by the source
             </span>
           </div>
         )}

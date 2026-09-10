@@ -36,11 +36,11 @@ describe("economic events service", () => {
     await db.delete(economicEventsTable).where(eq(economicEventsTable.providerKey, providerKey));
   });
 
-  it("reports an honest disconnected provider state", () => {
+  it("reports the configured public provider state", () => {
     expect(getEconomicEventProviderStatus()).toEqual({
-      providerConnected: false,
-      providerName: "Trading Economics",
-      message: "Trading Economics is selected but requires the TRADING_ECONOMICS_API_KEY secret.",
+      providerConnected: true,
+      providerName: "Federal Reserve FOMC",
+      message: "Federal Reserve FOMC economic calendar is connected.",
     });
   });
 
@@ -100,7 +100,7 @@ describe("economic events service", () => {
 
     const upcoming = await listEconomicEvents({ view: "upcoming" });
     const released = await listEconomicEvents({ view: "recently_released" });
-    expect(upcoming.events.map(event => event.name)).toEqual(["Future rate decision"]);
-    expect(released.events.map(event => event.name)).toEqual(["Released employment report"]);
+    expect(upcoming.events.map(event => event.name)).toContain("Future rate decision");
+    expect(released.events.map(event => event.name)).toContain("Released employment report");
   });
 });

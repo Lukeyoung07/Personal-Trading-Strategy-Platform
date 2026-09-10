@@ -14,12 +14,12 @@ import type {
   ListEconomicEventsParams,
 } from "@workspace/api-zod";
 import {
-  tradingEconomicsProvider,
+  federalReserveProvider,
   type EconomicCalendarProvider,
-} from "./trading-economics";
+} from "./federal-reserve";
 
 const providers = new Map<string, EconomicCalendarProvider>([
-  [tradingEconomicsProvider.key, tradingEconomicsProvider],
+  [federalReserveProvider.key, federalReserveProvider],
 ]);
 const PROVIDER_SYNC_TTL_MS = 5 * 60 * 1000;
 let lastProviderSyncAt = 0;
@@ -32,13 +32,6 @@ export function getEconomicEventProviderStatus() {
       providerConnected: false,
       providerName: null,
       message: "No economic calendar data is currently connected.",
-    };
-  }
-  if (!provider.isConfigured()) {
-    return {
-      providerConnected: false,
-      providerName: provider.name,
-      message: `${provider.name} is selected but requires the TRADING_ECONOMICS_API_KEY secret.`,
     };
   }
   return {
@@ -97,6 +90,7 @@ export async function upsertEconomicEvent(input: EconomicEventInput) {
       dedupeKey,
       name: input.name.trim(),
       scheduledAt: input.scheduledAt,
+      timePrecision: input.timePrecision ?? "datetime",
       impact: input.impact ?? null,
       region: input.region?.trim() || null,
       currency: input.currency?.trim().toUpperCase() || null,
@@ -104,6 +98,8 @@ export async function upsertEconomicEvent(input: EconomicEventInput) {
       forecast: input.forecast ?? null,
       actual: input.actual ?? null,
       releaseStatus: input.releaseStatus ?? "upcoming",
+      sourceName: input.sourceName?.trim() || null,
+      sourceUrl: input.sourceUrl?.trim() || null,
       sourceUpdatedAt: input.sourceUpdatedAt ?? null,
     };
     const [saved] = existing
@@ -130,6 +126,7 @@ export async function updateEconomicEvent(eventId: number, input: EconomicEventU
     providerEventId: input.providerEventId === undefined ? undefined : input.providerEventId?.trim() || null,
     name: input.name?.trim(),
     scheduledAt: input.scheduledAt,
+    timePrecision: input.timePrecision,
     impact: input.impact,
     region: input.region === undefined ? undefined : input.region?.trim() || null,
     currency: input.currency === undefined ? undefined : input.currency?.trim().toUpperCase() || null,
@@ -137,6 +134,8 @@ export async function updateEconomicEvent(eventId: number, input: EconomicEventU
     forecast: input.forecast,
     actual: input.actual,
     releaseStatus: input.releaseStatus,
+    sourceName: input.sourceName === undefined ? undefined : input.sourceName?.trim() || null,
+    sourceUrl: input.sourceUrl === undefined ? undefined : input.sourceUrl?.trim() || null,
     sourceUpdatedAt: input.sourceUpdatedAt,
   }).where(eq(economicEventsTable.id, eventId)).returning();
   if (!updated) return null;
@@ -187,7 +186,6 @@ export async function refreshEconomicEvents() {
 }
 
 export async function listEconomicEvents(params: ListEconomicEventsParams = {}) {
-  await refreshEconomicEvents();
   const rows = await db.select().from(economicEventsTable).orderBy(asc(economicEventsTable.scheduledAt));
   const events = await Promise.all(rows.map(event => withMappings(event)));
   const now = new Date();

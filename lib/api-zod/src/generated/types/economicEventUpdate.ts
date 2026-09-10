@@ -8,6 +8,7 @@
 import type { EconomicEventImpact } from './economicEventImpact';
 import type { EconomicEventMarketMappingInput } from './economicEventMarketMappingInput';
 import type { EconomicEventUpdateReleaseStatus } from './economicEventUpdateReleaseStatus';
+import type { EconomicEventUpdateTimePrecision } from './economicEventUpdateTimePrecision';
 
 export interface EconomicEventUpdate {
   /** @nullable */
@@ -15,6 +16,7 @@ export interface EconomicEventUpdate {
   /** @minLength 1 */
   name?: string;
   scheduledAt?: Date;
+  timePrecision?: EconomicEventUpdateTimePrecision;
   impact?: EconomicEventImpact | null;
   /** @nullable */
   region?: string | null;
@@ -27,6 +29,10 @@ export interface EconomicEventUpdate {
   /** @nullable */
   actual?: string | null;
   releaseStatus?: EconomicEventUpdateReleaseStatus;
+  /** @nullable */
+  sourceName?: string | null;
+  /** @nullable */
+  sourceUrl?: string | null;
   /** @nullable */
   sourceUpdatedAt?: Date | null;
   affectedMarkets?: EconomicEventMarketMappingInput[];

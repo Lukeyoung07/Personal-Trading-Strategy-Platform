@@ -12,6 +12,7 @@ import {
 import {
   getEconomicEventProviderStatus,
   listEconomicEvents,
+  refreshEconomicEvents,
   updateEconomicEvent,
   upsertEconomicEvent,
 } from "../services/economic-events";
@@ -25,6 +26,7 @@ router.get("/economic-events", async (req, res): Promise<void> => {
     return;
   }
   try {
+    await refreshEconomicEvents();
     res.json(ListEconomicEventsResponse.parse(await listEconomicEvents(parsed.data)));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Economic calendar provider unavailable.";
