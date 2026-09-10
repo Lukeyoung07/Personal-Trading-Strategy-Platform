@@ -1,0 +1,229 @@
+Build the News & Economic Events foundation for my trading platform.
+
+IMPORTANT:
+
+Steps 1–6 and the existing BiQuote live market-data system are already implemented and working.
+
+Do not rebuild, replace, or modify the existing:
+
+- Strategy Builder
+- Strategy Library
+- Strategy Versioning
+- Trade Journal
+- Market Data Service
+- BiQuote integration
+- Live candlestick charts
+- Strategy Monitoring Engine
+- Instrument selection system
+
+This task is ONLY for the News & Economic Events foundation.
+
+GOAL:
+
+Create a dedicated News & Economic Events section that allows the application to show upcoming and recently released economic events that could affect financial markets.
+
+The system should classify events as:
+
+- HIGH IMPACT
+- MEDIUM IMPACT
+- LOW IMPACT
+
+Each event should contain, where available:
+
+- Event name
+- Date
+- Time
+- Impact level
+- Country/region
+- Currency
+- Affected markets
+- Previous value
+- Forecast/consensus
+- Actual value
+- Release status
+
+MARKET IMPACT:
+
+The system should associate events with the markets they are relevant to.
+
+Examples:
+
+US CPI
+→ USD
+→ Gold
+→ US indices
+→ Forex
+
+FOMC interest-rate decision
+→ USD
+→ Gold
+→ US indices
+→ Treasury-related markets
+
+UK CPI
+→ GBP
+→ UK indices
+→ GBP forex pairs
+
+Do not hard-code incorrect market relationships.
+
+Use a structured impact mapping that can be expanded later.
+
+NEWS PAGE:
+
+Create a dedicated News / Economic Calendar page.
+
+It should allow users to:
+
+- View today's events
+- View upcoming events
+- View recently released events
+- Filter by impact
+- Filter by country/region
+- Filter by currency
+- Filter by affected market
+- Search events
+
+Make HIGH IMPACT events visually obvious.
+
+For example:
+
+🔴 HIGH IMPACT
+US CPI
+USD
+14:30
+
+🟡 MEDIUM IMPACT
+UK Retail Sales
+GBP
+07:00
+
+🟢 LOW IMPACT
+... 
+
+Do not rely on colour alone; include the text label as well.
+
+EVENT TIMING:
+
+Clearly distinguish:
+
+- Upcoming
+- Released
+- Live/releasing, if the data source provides this state
+
+Show a countdown to upcoming events where reliable timing data is available.
+
+Do not create fake countdowns or fake release times.
+
+DATA SOURCE:
+
+Create a provider-neutral news/economic-calendar service architecture.
+
+Do NOT hard-code the system to a single provider.
+
+Do NOT assume a specific news provider unless an existing configured provider is already available.
+
+The architecture should allow a real economic-calendar/news provider to be connected later.
+
+If no real news provider is currently connected, show an honest empty/unavailable state.
+
+Do NOT generate fake events or fabricated economic data.
+
+IMPORTANT:
+
+This is a foundation only.
+
+Do NOT build:
+
+- AI analysis
+- Trade recommendations
+- BUY/SELL signals
+- Automatic trading
+- Broker integrations
+- Trading alerts
+- Push notifications
+- Backtesting
+- Strategy execution
+
+Do not make the system automatically tell the user to buy or sell.
+
+TRADE CONTEXT:
+
+Prepare the architecture so that a future version can determine whether an upcoming news event is relevant to a specific instrument or strategy.
+
+For example, a future trade on XAUUSD could identify that a high-impact USD event is approaching.
+
+However, do NOT build the future trade-warning functionality yet.
+
+Keep the news system separate from the existing Strategy Monitoring Engine.
+
+DATABASE:
+
+Create the necessary structured data model for economic events.
+
+Avoid duplicate events.
+
+Store provider/source identifiers where appropriate so events can be updated safely.
+
+Support updates to:
+
+- Forecast
+- Actual
+- Status
+- Impact
+- Timing
+
+Do not overwrite historical event records incorrectly.
+
+UI:
+
+Make the page beginner-friendly and clean.
+
+The user should immediately understand:
+
+"What important economic events are happening today and what markets could they affect?"
+
+Add a clear empty state if no real data source is connected.
+
+For example:
+
+"No economic calendar data is currently connected."
+
+Do not populate the page with fake sample events.
+
+MOBILE:
+
+The page must work properly on mobile as well as desktop.
+
+VERIFICATION:
+
+After implementation:
+
+- Run API type checks.
+- Run frontend type checks.
+- Run production builds.
+- Test event creation/update logic.
+- Test duplicate prevention.
+- Test impact classification.
+- Test market-impact mappings.
+- Test filtering.
+- Test searching.
+- Test upcoming/released states.
+- Test empty/no-provider state.
+- Test mobile layout.
+- Test desktop layout.
+- Run existing Steps 1–6 regression tests.
+- Run existing BiQuote regression tests.
+
+Do not change existing trading functionality.
+
+Fix only genuine bugs directly related to this News & Economic Events foundation.
+
+At the end, report:
+
+1. What was implemented.
+2. What tests passed.
+3. Whether a real news/economic-calendar provider is currently connected.
+4. How the system handles the absence of a provider.
+5. Any remaining issues.
+6. Confirm that no AI, alerts, trading signals, broker integrations, or backtesting were added.
