@@ -3,3 +3,4 @@
 - [Market data boundaries](market-data-boundaries.md) — provider mappings feed service-owned connection, candle, and quote normalization; clients cannot assert connection truth.
 - [Strategy monitoring semantics](strategy-monitoring-semantics.md) — exact-version monitoring uses typed evaluators, honest waiting states, activation epochs, and durable sparse transitions.
 - [BiQuote runtime integration](biquote-runtime-integration.md) — server-side SignalR must remain external to the API bundle and use its Node transport dependencies.
+- [BiQuote regression testing](biquote-regression-testing.md) — frontend Vitest uses a standalone jsdom/React config because the app Vite config requires runtime env variables.

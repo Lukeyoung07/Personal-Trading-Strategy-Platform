@@ -248,11 +248,15 @@ function LiveChartTab() {
     return stored.sort((a, b) => new Date(a.openTime).getTime() - new Date(b.openTime).getTime()).slice(-80);
   }, [candles.data, formingCandle]);
 
-  const connectionLabel = streamStatus.state === "connected" && quote?.isLive
-    ? "LIVE"
-    : quote?.marketState === "closed" || quote?.stale
+  const connectionLabel = streamStatus.state !== "connected"
+    ? streamStatus.state.toUpperCase()
+    : quote?.marketState === "closed"
       ? "MARKET CLOSED"
-      : streamStatus.state.toUpperCase();
+      : quote?.stale
+        ? "STALE"
+        : quote?.isLive
+          ? "LIVE"
+          : "CONNECTED";
   const isLive = connectionLabel === "LIVE";
   const source = sources.data?.find(item => item.id === sourceId);
 
@@ -306,7 +310,7 @@ function LiveChartTab() {
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-5 pt-4 border-t border-border text-xs text-muted-foreground">
-          <span className={`tag ${isLive ? "tag-open" : connectionLabel === "MARKET CLOSED" ? "tag-draft" : "tag-archived"}`}>
+           <span className={`tag ${isLive ? "tag-open" : connectionLabel === "MARKET CLOSED" || connectionLabel === "STALE" ? "tag-draft" : "tag-archived"}`}>
             {isLive ? <Radio size={11} className="mr-1" /> : <WifiOff size={11} className="mr-1" />}
             {connectionLabel}
           </span>
