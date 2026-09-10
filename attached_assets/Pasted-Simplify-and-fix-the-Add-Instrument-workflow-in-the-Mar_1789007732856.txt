@@ -1,0 +1,133 @@
+Simplify and fix the Add Instrument workflow in the Market Monitor.
+
+IMPORTANT:
+Do not change, rebuild, or remove the existing BiQuote live-data integration.
+Do not change the provider-neutral Market Data Service.
+Do not change the Strategy Monitoring Engine.
+Do not change the existing live chart functionality.
+Do not add fake or simulated market data.
+
+The current Add Instrument page is too technical and requires users to manually enter fields such as:
+
+- Symbol
+- Asset class
+- Venue
+- Timezone
+- Base currency
+- Quote currency
+- Tick size
+- Multiplier
+- Contract expiry
+
+Replace the current user-facing workflow with a simple market selection system.
+
+The user should be able to:
+
+1. Choose a market category from a dropdown:
+   - Futures
+   - Forex
+   - Stocks
+   - Indices
+   - Commodities
+   - Crypto
+
+2. Choose an instrument from a searchable dropdown.
+
+3. Choose a timeframe from a dropdown.
+
+4. Click "Add Market".
+
+The technical provider-specific information should be handled automatically in the background.
+
+IMPORTANT:
+Only show instruments that are actually supported by the currently configured BiQuote integration.
+
+Do not invent instruments or provider mappings.
+
+Use the existing provider/instrument catalog and BiQuote symbol mappings wherever possible.
+
+If an instrument is not currently supported by BiQuote, do not show it as available.
+
+The UI should be simple enough for a beginner to understand.
+
+For example:
+
+ADD MARKET
+
+Market Type:
+[Futures ▼]
+
+Instrument:
+[MGC — Micro Gold ▼]
+
+Timeframe:
+[5 Minutes ▼]
+
+[ Add Market ]
+
+Also include search functionality.
+
+For example:
+
+Search: gold
+
+Possible results should only include genuinely supported instruments.
+
+After the user adds an instrument:
+
+- Create/use the correct existing provider mapping automatically.
+- Use the existing BiQuote connection.
+- Retrieve genuine market data.
+- Display the live candlestick chart in the existing Market Monitor.
+- Show the correct LIVE/STALE/DISCONNECTED/MARKET CLOSED state.
+- Do not display LIVE unless genuine live data is being received.
+
+Do NOT remove the existing EUR/USD test functionality from the underlying integration if it is needed for verification, but do not leave temporary test records as permanent user data.
+
+The instrument selection must persist correctly so that refreshing the page does not unexpectedly remove the user's selected market.
+
+If there are currently zero instruments, the Market Monitor should have a clear empty state explaining that the user needs to add a market.
+
+Do not expose technical fields to normal users.
+
+Keep the technical instrument fields in the database/backend where they are required by the existing architecture.
+
+Do not rebuild the Market Data Service.
+
+Do not rebuild BiQuote integration.
+
+Do not rebuild the Strategy Monitoring Engine.
+
+Do not add AI.
+Do not add alerts.
+Do not add news.
+Do not add backtesting.
+Do not add broker integrations.
+Do not add trading execution.
+
+Only fix the Add Instrument user experience and connect it correctly to the existing instrument catalog and BiQuote data flow.
+
+After implementation:
+
+- Run API type checks.
+- Run frontend type checks.
+- Run production builds.
+- Test adding a supported instrument.
+- Test searching for an instrument.
+- Test timeframe selection.
+- Test unsupported instruments.
+- Test that the selected instrument creates/uses the correct mapping.
+- Test that genuine BiQuote data appears in the existing live chart.
+- Test LIVE/STALE/DISCONNECTED/MARKET CLOSED states.
+- Test page refresh/persistence.
+- Test desktop and mobile layouts.
+- Run the existing BiQuote regression tests.
+
+Fix only genuine bugs related to this change.
+
+At the end, report exactly:
+1. What was changed.
+2. What tests passed.
+3. Which supported instruments are currently available through BiQuote.
+4. Whether a newly added instrument successfully displayed genuine live data.
+5. Whether anything remains to be fixed.
