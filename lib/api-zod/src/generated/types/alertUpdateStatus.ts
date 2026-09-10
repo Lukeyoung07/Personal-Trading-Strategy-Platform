@@ -12,4 +12,6 @@ export type AlertUpdateStatus = typeof AlertUpdateStatus[keyof typeof AlertUpdat
 export const AlertUpdateStatus = {
   active: 'active',
   paused: 'paused',
+  triggered: 'triggered',
+  acknowledged: 'acknowledged',
 } as const;

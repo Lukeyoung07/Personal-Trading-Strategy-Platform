@@ -10,3 +10,4 @@
 - [Assistant provider boundary](assistant-provider-boundary.md) — the assistant uses only server-side OpenRouter free routing with no paid fallback or fabricated data.
 - [Assistant backtest context](assistant-backtest-context.md) — result explanations require an explicit completed persisted backtest and honest no-data handling.
 - [Strategy builder assistant handoff](strategy-builder-assistant-handoff.md) — AI drafts enter a forced review state; saving remains explicit and versioned.
+- [Monitoring alert history](monitoring-alert-history.md) — monitoring alerts are in-app transition history with acknowledgement, not external delivery or trade execution.

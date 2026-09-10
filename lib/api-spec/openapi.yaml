@@ -2171,7 +2171,7 @@ components:
         ingested: { type: integer }
     Trade:
       type: object
-      required: [id, strategyId, strategyVersionId, strategyName, strategyVersionNumber, marketId, side, status, quantity, entryPrice, exitPrice, openedAt, closedAt, thesis, notes, createdAt]
+      required: [id, strategyId, strategyVersionId, strategyName, strategyVersionNumber, marketId, side, status, quantity, entryPrice, exitPrice, stopLoss, takeProfit, riskUnit, riskAmount, openedAt, closedAt, thesis, notes, createdAt]
       properties:
         id: { type: integer }
         strategyId: { type: integer }
@@ -2189,6 +2189,12 @@ components:
         quantity: { type: ["number", "null"] }
         entryPrice: { type: ["number", "null"] }
         exitPrice: { type: ["number", "null"] }
+        stopLoss: { type: ["number", "null"] }
+        takeProfit: { type: ["number", "null"] }
+        riskUnit:
+          type: ["string", "null"]
+          enum: [percent, amount, r, null]
+        riskAmount: { type: ["number", "null"] }
         pnl: { type: ["number", "null"] }
         openedAt: { type: ["string", "null"], format: date-time }
         closedAt: { type: ["string", "null"], format: date-time }
@@ -2210,6 +2216,12 @@ components:
         quantity: { type: ["number", "null"] }
         entryPrice: { type: ["number", "null"] }
         exitPrice: { type: ["number", "null"] }
+        stopLoss: { type: ["number", "null"] }
+        takeProfit: { type: ["number", "null"] }
+        riskUnit:
+          type: ["string", "null"]
+          enum: [percent, amount, r, null]
+        riskAmount: { type: ["number", "null"] }
         pnl: { type: ["number", "null"] }
         openedAt: { type: ["string", "null"], format: date-time }
         closedAt: { type: ["string", "null"], format: date-time }
@@ -2228,6 +2240,12 @@ components:
         quantity: { type: ["number", "null"] }
         entryPrice: { type: ["number", "null"] }
         exitPrice: { type: ["number", "null"] }
+        stopLoss: { type: ["number", "null"] }
+        takeProfit: { type: ["number", "null"] }
+        riskUnit:
+          type: ["string", "null"]
+          enum: [percent, amount, r, null]
+        riskAmount: { type: ["number", "null"] }
         pnl: { type: ["number", "null"] }
         openedAt: { type: ["string", "null"], format: date-time }
         closedAt: { type: ["string", "null"], format: date-time }
@@ -2235,28 +2253,69 @@ components:
         notes: { type: ["string", "null"] }
     PerformanceSummary:
       type: object
-      required: [hasData, tradeCount, netPnl, winRate, averagePnl, largestWin, largestLoss]
+      required: [hasData, tradeCount, winningTrades, losingTrades, netPnl, winRate, averagePnl, averageWinner, averageLoser, largestWin, largestLoss, maxDrawdown, profitFactor, equityCurve, byStrategyVersion]
       properties:
         hasData: { type: boolean }
         tradeCount: { type: integer }
+        winningTrades: { type: integer }
+        losingTrades: { type: integer }
         netPnl: { type: ["number", "null"] }
         winRate: { type: ["number", "null"] }
         averagePnl: { type: ["number", "null"] }
+        averageWinner: { type: ["number", "null"] }
+        averageLoser: { type: ["number", "null"] }
         largestWin: { type: ["number", "null"] }
         largestLoss: { type: ["number", "null"] }
+        maxDrawdown: { type: ["number", "null"] }
+        profitFactor: { type: ["number", "null"] }
+        equityCurve:
+          type: array
+          items:
+            $ref: "#/components/schemas/PerformancePoint"
+        byStrategyVersion:
+          type: array
+          items:
+            $ref: "#/components/schemas/PerformanceVersion"
+    PerformancePoint:
+      type: object
+      required: [timestamp, equity]
+      properties:
+        timestamp: { type: string, format: date-time }
+        equity: { type: number }
+    PerformanceVersion:
+      type: object
+      required: [strategyId, strategyVersionId, strategyName, versionNumber, tradeCount, winningTrades, losingTrades, netPnl, winRate]
+      properties:
+        strategyId: { type: integer }
+        strategyVersionId: { type: integer }
+        strategyName: { type: string }
+        versionNumber: { type: integer }
+        tradeCount: { type: integer }
+        winningTrades: { type: integer }
+        losingTrades: { type: integer }
+        netPnl: { type: ["number", "null"] }
+        winRate: { type: ["number", "null"] }
     Alert:
       type: object
-      required: [id, name, marketId, marketSymbol, condition, threshold, status, createdAt, updatedAt]
+      required: [id, name, marketId, marketSymbol, monitorSessionId, strategyVersionId, sourceType, condition, threshold, status, message, triggeredAt, acknowledgedAt, createdAt, updatedAt]
       properties:
         id: { type: integer }
         name: { type: string }
         marketId: { type: ["integer", "null"] }
         marketSymbol: { type: ["string", "null"] }
+        monitorSessionId: { type: ["integer", "null"] }
+        strategyVersionId: { type: ["integer", "null"] }
+        sourceType:
+          type: string
+          enum: [manual, monitoring]
         condition: { type: string }
         threshold: { type: ["string", "null"] }
         status:
           type: string
-          enum: [active, paused]
+          enum: [active, paused, triggered, acknowledged]
+        message: { type: ["string", "null"] }
+        triggeredAt: { type: ["string", "null"], format: date-time }
+        acknowledgedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     AlertInput:
@@ -2280,7 +2339,7 @@ components:
         threshold: { type: ["string", "null"] }
         status:
           type: string
-          enum: [active, paused]
+          enum: [active, paused, triggered, acknowledged]
     Backtest:
       type: object
       required: [id, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, timeframeId, timeframeLabel, preset, startDate, endDate, status, candlesProcessed, tradeCount, winningTrades, losingTrades, winRate, totalPnl, resultMessage, executionAssumptions, errorMessage, startedAt, completedAt, createdAt]

@@ -9,6 +9,7 @@ import {
   strategyMonitorConditionStatesTable,
   strategyMonitorSessionsTable,
   strategyMonitorTransitionEventsTable,
+  alertsTable,
   strategyVersionConditionsTable,
   strategyVersionsTable,
   timeframesTable,
@@ -622,6 +623,23 @@ export class StrategyMonitoringEngine {
           changedConditionIds,
           occurredAt: evaluatedAt,
         });
+        if (!currentSession || currentSession.overallStatus !== summary.overallStatus) {
+          const meaningfulTransition = summary.overallStatus === "met" || summary.overallStatus === "invalid";
+          if (meaningfulTransition) {
+            await tx.insert(alertsTable).values({
+              name: `${item.strategy.name} monitoring`,
+              marketId: item.version.marketId,
+              monitorSessionId: session.id,
+              strategyVersionId: item.version.id,
+              sourceType: "monitoring",
+              condition: `strategy_monitor_${summary.overallStatus}`,
+              threshold: summary.overallStatus,
+              status: "triggered",
+              message: summary.statusReason,
+              triggeredAt: evaluatedAt,
+            });
+          }
+        }
       }
       return true;
     });

@@ -120,6 +120,52 @@ function evaluateRule(rule: string, candle: HistoricalCandle, previous: Historic
   return normalized.split("||").some(group => group.split("&&").every(clause => evaluateClause(group === clause ? clause : clause, candle, previous)));
 }
 
+export function validateHistoricalRule(rule: string) {
+  const normalized = normalizedRule(rule)
+    .replace(/\s+and\s+/g, "&&")
+    .replace(/\s+or\s+/g, "||");
+  for (const group of normalized.split("||")) {
+    for (const clause of group.split("&&")) {
+      const compact = clause.trim();
+      if (compact === "always" || compact === "bullish" || compact === "bullish candle" || compact === "bearish" || compact === "bearish candle") continue;
+      if (/^(open|high|low|close) crosses (above|below) previous[_ ](open|high|low|close)$/.test(compact)) continue;
+      if (/^(open|high|low|close|previous[_ ](?:open|high|low|close))\s*(>=|<=|>|<|=|==)\s*(open|high|low|close|previous[_ ](?:open|high|low|close)|\d+(?:\.\d+)?)$/.test(compact)) continue;
+      return `Condition rule '${rule}' is not supported by the historical engine. Use always, bullish/bearish, OHLC comparisons, or previous-candle crossings.`;
+    }
+  }
+  return null;
+}
+
+export function validateHistoricalBacktestStrategy(strategy: BacktestStrategy) {
+  const errors: string[] = [];
+  const entryConditions = strategy.conditions.filter(condition => condition.stage === "entry" || condition.stage === "confirmation");
+  const exitConditions = strategy.conditions.filter(condition => condition.stage === "exit" || condition.stage === "invalidation");
+  if (!entryConditions.length && !strategy.entryRules?.trim()) {
+    errors.push("This strategy version has no executable entry rule.");
+  }
+  for (const condition of [...entryConditions, ...exitConditions]) {
+    try {
+      const rule = ruleForCondition(condition);
+      const error = validateHistoricalRule(rule);
+      if (error) errors.push(`${condition.name}: ${error}`);
+    } catch (error) {
+      errors.push(error instanceof Error ? `${condition.name}: ${error.message}` : `${condition.name}: no executable historical rule.`);
+    }
+  }
+  if (strategy.exitRules?.trim()) {
+    const error = validateHistoricalRule(strategy.exitRules);
+    if (error) errors.push(`Exit rules: ${error}`);
+  }
+  if (strategy.riskRules?.trim()) {
+    try {
+      parseRiskRules(strategy.riskRules);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : "Risk rules are not supported by the historical engine.");
+    }
+  }
+  return [...new Set(errors)];
+}
+
 function ruleForCondition(condition: BacktestCondition) {
   const rule = condition.triggerRules?.trim() || condition.conceptDetectionRules?.trim();
   if (!rule) throw new BacktestEngineError(`Condition '${condition.name}' has no executable historical rule.`);

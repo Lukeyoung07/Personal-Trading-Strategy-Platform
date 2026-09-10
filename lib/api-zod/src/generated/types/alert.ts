@@ -5,6 +5,7 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { AlertSourceType } from './alertSourceType';
 import type { AlertStatus } from './alertStatus';
 
 export interface Alert {
@@ -14,10 +15,21 @@ export interface Alert {
   marketId: number | null;
   /** @nullable */
   marketSymbol: string | null;
+  /** @nullable */
+  monitorSessionId: number | null;
+  /** @nullable */
+  strategyVersionId: number | null;
+  sourceType: AlertSourceType;
   condition: string;
   /** @nullable */
   threshold: string | null;
   status: AlertStatus;
+  /** @nullable */
+  message: string | null;
+  /** @nullable */
+  triggeredAt: Date | null;
+  /** @nullable */
+  acknowledgedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

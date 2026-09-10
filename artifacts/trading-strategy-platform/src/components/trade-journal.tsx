@@ -18,6 +18,7 @@ import {
   type Strategy,
   type StrategyVersion,
   type Trade,
+  type TradeInputRiskUnit,
 } from "@workspace/api-client-react";
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -39,6 +40,10 @@ function money(value?: number | null) {
 
 function date(value?: string | null) {
   return value ? new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
+}
+
+function dateTimeInput(value?: string | null) {
+  return value ? new Date(value).toISOString().slice(0, 16) : "";
 }
 
 function TradeRow({ trade, onEdit, onDelete }: { trade: Trade; onEdit: () => void; onDelete: () => void }) {
@@ -85,9 +90,13 @@ function TradeEditor({
       quantity: numberOrNull("quantity"),
       entryPrice: numberOrNull("entryPrice"),
       exitPrice: numberOrNull("exitPrice"),
+      stopLoss: numberOrNull("stopLoss"),
+      takeProfit: numberOrNull("takeProfit"),
+      riskUnit: (String(form.get("riskUnit") || "") || null) as TradeInputRiskUnit,
+      riskAmount: numberOrNull("riskAmount"),
       pnl: numberOrNull("pnl"),
-      openedAt: String(form.get("openedAt") || "") || null,
-      closedAt: String(form.get("closedAt") || "") || null,
+      openedAt: String(form.get("openedAt") || "") ? new Date(String(form.get("openedAt"))).toISOString() : null,
+      closedAt: String(form.get("closedAt") || "") ? new Date(String(form.get("closedAt"))).toISOString() : null,
       thesis: String(form.get("thesis") || "") || null,
       notes: String(form.get("notes") || "") || null,
     };
@@ -138,7 +147,21 @@ function TradeEditor({
       <Field label="Quantity"><input className="input" type="number" step="any" name="quantity" defaultValue={trade?.quantity ?? ""} /></Field>
       <Field label="Entry price"><input className="input" type="number" step="any" name="entryPrice" defaultValue={trade?.entryPrice ?? ""} /></Field>
       <Field label="Exit price"><input className="input" type="number" step="any" name="exitPrice" defaultValue={trade?.exitPrice ?? ""} /></Field>
+      <Field label="Stop loss"><input className="input" type="number" step="any" name="stopLoss" defaultValue={trade?.stopLoss ?? ""} /></Field>
+      <Field label="Take profit"><input className="input" type="number" step="any" name="takeProfit" defaultValue={trade?.takeProfit ?? ""} /></Field>
       <Field label="P&L"><input className="input" type="number" step="any" name="pnl" defaultValue={trade?.pnl ?? ""} /></Field>
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <Field label="Risk unit" hint="Optional position-risk context for later review.">
+        <select className="select" name="riskUnit" defaultValue={trade?.riskUnit ?? ""}>
+          <option value="">Not specified</option><option value="percent">Percent</option><option value="amount">Amount</option><option value="r">R multiple</option>
+        </select>
+      </Field>
+      <Field label="Risk amount"><input className="input" type="number" step="any" name="riskAmount" defaultValue={trade?.riskAmount ?? ""} /></Field>
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <Field label="Opened at"><input className="input" type="datetime-local" name="openedAt" defaultValue={dateTimeInput(trade?.openedAt)} /></Field>
+      <Field label="Closed at"><input className="input" type="datetime-local" name="closedAt" defaultValue={dateTimeInput(trade?.closedAt)} /></Field>
     </div>
     <Field label="Thesis"><textarea className="textarea" name="thesis" defaultValue={trade?.thesis || ""} placeholder="Why did this trade make sense?" /></Field>
     <Field label="Notes"><textarea className="textarea" name="notes" defaultValue={trade?.notes || ""} /></Field>
@@ -173,7 +196,7 @@ export function TradeJournalPage() {
       <button className="btn btn-primary" onClick={() => setModal("new")} disabled={!strategies.data?.length} data-testid="button-create-trade"><Plus size={15} /> Record trade</button>
     </div>
     <div className="flex gap-2 mb-5 overflow-x-auto">{["all", "planned", "open", "closed", "cancelled"].map(status => <button key={status} className={`btn whitespace-nowrap ${filter === status ? "btn-primary" : "btn-secondary"}`} onClick={() => setFilter(status)}>{status === "all" ? "All" : status}</button>)}</div>
-    {trades.isLoading ? <div className="panel p-10 text-center text-sm text-muted-foreground">Loading journal…</div> : rows.length ? <div className="panel divide-y divide-border">{rows.map(trade => <TradeRow key={trade.id} trade={trade} onEdit={() => setModal(trade)} onDelete={() => setConfirm(trade)} />)}</div> : <div className="panel empty-grid p-10 md:p-14 text-center"><BookOpen size={22} className="text-primary mx-auto" /><h2 className="font-semibold text-lg mt-5">{filter === "all" ? "No recorded trades yet" : "Nothing in this view"}</h2><p className="text-sm text-muted-foreground mt-2">{strategies.data?.length ? "Record a trade and select the exact strategy version used." : "Create a strategy before recording a trade."}</p></div>}
+     {trades.isError || markets.isError || strategies.isError ? <div className="panel p-10 text-center"><p className="text-sm text-muted-foreground">The journal could not be loaded.</p><button className="btn btn-secondary mt-4" onClick={() => { trades.refetch(); markets.refetch(); strategies.refetch(); }}>Try again</button></div> : trades.isLoading || markets.isLoading || strategies.isLoading ? <div className="panel p-10 text-center text-sm text-muted-foreground">Loading journal…</div> : rows.length ? <div className="panel divide-y divide-border">{rows.map(trade => <TradeRow key={trade.id} trade={trade} onEdit={() => setModal(trade)} onDelete={() => setConfirm(trade)} />)}</div> : <div className="panel empty-grid p-10 md:p-14 text-center"><BookOpen size={22} className="text-primary mx-auto" /><h2 className="font-semibold text-lg mt-5">{filter === "all" ? "No recorded trades yet" : "Nothing in this view"}</h2><p className="text-sm text-muted-foreground mt-2">{strategies.data?.length ? "Record a trade and select the exact strategy version used." : "Create a strategy before recording a trade."}</p></div>}
     {modal && <Modal title={modal === "new" ? "Record trade" : "Edit trade"} onClose={() => setModal(null)}><TradeEditor trade={modal === "new" ? null : modal} markets={markets.data || []} strategies={strategies.data || []} onClose={() => setModal(null)} /></Modal>}
     {confirm && <Modal title="Delete trade?" onClose={() => setConfirm(null)}><p className="text-sm text-muted-foreground">This removes the journal entry and its contribution to version performance.</p><div className="flex justify-end gap-3 mt-6"><button className="btn btn-secondary" onClick={() => setConfirm(null)}>Cancel</button><button className="btn bg-destructive text-destructive-foreground" onClick={deleteTrade} disabled={remove.isPending}>Delete trade</button></div></Modal>}
   </div>;

@@ -1951,6 +1951,10 @@ export const ListTradesResponseItem = zod.object({
   "quantity": zod.number().nullable(),
   "entryPrice": zod.number().nullable(),
   "exitPrice": zod.number().nullable(),
+  "stopLoss": zod.number().nullable(),
+  "takeProfit": zod.number().nullable(),
+  "riskUnit": zod.union([zod.literal('percent'),zod.literal('amount'),zod.literal('r'),zod.literal(null)]).nullable(),
+  "riskAmount": zod.number().nullable(),
   "pnl": zod.number().nullish(),
   "openedAt": zod.coerce.date().nullable(),
   "closedAt": zod.coerce.date().nullable(),
@@ -1975,6 +1979,10 @@ export const CreateTradeBody = zod.object({
   "quantity": zod.number().nullish(),
   "entryPrice": zod.number().nullish(),
   "exitPrice": zod.number().nullish(),
+  "stopLoss": zod.number().nullish(),
+  "takeProfit": zod.number().nullish(),
+  "riskUnit": zod.union([zod.literal('percent'),zod.literal('amount'),zod.literal('r'),zod.literal(null)]).nullish(),
+  "riskAmount": zod.number().nullish(),
   "pnl": zod.number().nullish(),
   "openedAt": zod.coerce.date().nullish(),
   "closedAt": zod.coerce.date().nullish(),
@@ -1995,6 +2003,10 @@ export const CreateTradeResponse = zod.object({
   "quantity": zod.number().nullable(),
   "entryPrice": zod.number().nullable(),
   "exitPrice": zod.number().nullable(),
+  "stopLoss": zod.number().nullable(),
+  "takeProfit": zod.number().nullable(),
+  "riskUnit": zod.union([zod.literal('percent'),zod.literal('amount'),zod.literal('r'),zod.literal(null)]).nullable(),
+  "riskAmount": zod.number().nullable(),
   "pnl": zod.number().nullish(),
   "openedAt": zod.coerce.date().nullable(),
   "closedAt": zod.coerce.date().nullable(),
@@ -2021,6 +2033,10 @@ export const UpdateTradeBody = zod.object({
   "quantity": zod.number().nullish(),
   "entryPrice": zod.number().nullish(),
   "exitPrice": zod.number().nullish(),
+  "stopLoss": zod.number().nullish(),
+  "takeProfit": zod.number().nullish(),
+  "riskUnit": zod.union([zod.literal('percent'),zod.literal('amount'),zod.literal('r'),zod.literal(null)]).nullish(),
+  "riskAmount": zod.number().nullish(),
   "pnl": zod.number().nullish(),
   "openedAt": zod.coerce.date().nullish(),
   "closedAt": zod.coerce.date().nullish(),
@@ -2041,6 +2057,10 @@ export const UpdateTradeResponse = zod.object({
   "quantity": zod.number().nullable(),
   "entryPrice": zod.number().nullable(),
   "exitPrice": zod.number().nullable(),
+  "stopLoss": zod.number().nullable(),
+  "takeProfit": zod.number().nullable(),
+  "riskUnit": zod.union([zod.literal('percent'),zod.literal('amount'),zod.literal('r'),zod.literal(null)]).nullable(),
+  "riskAmount": zod.number().nullable(),
   "pnl": zod.number().nullish(),
   "openedAt": zod.coerce.date().nullable(),
   "closedAt": zod.coerce.date().nullable(),
@@ -2069,11 +2089,32 @@ export const DeleteTradeResponse = zod.void()
 export const GetPerformanceSummaryResponse = zod.object({
   "hasData": zod.boolean(),
   "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
   "netPnl": zod.number().nullable(),
   "winRate": zod.number().nullable(),
   "averagePnl": zod.number().nullable(),
+  "averageWinner": zod.number().nullable(),
+  "averageLoser": zod.number().nullable(),
   "largestWin": zod.number().nullable(),
-  "largestLoss": zod.number().nullable()
+  "largestLoss": zod.number().nullable(),
+  "maxDrawdown": zod.number().nullable(),
+  "profitFactor": zod.number().nullable(),
+  "equityCurve": zod.array(zod.object({
+  "timestamp": zod.coerce.date(),
+  "equity": zod.number()
+})),
+  "byStrategyVersion": zod.array(zod.object({
+  "strategyId": zod.number().int(),
+  "strategyVersionId": zod.number().int(),
+  "strategyName": zod.string(),
+  "versionNumber": zod.number().int(),
+  "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "netPnl": zod.number().nullable(),
+  "winRate": zod.number().nullable()
+}))
 })
 
 
@@ -2085,9 +2126,15 @@ export const ListAlertsResponseItem = zod.object({
   "name": zod.string(),
   "marketId": zod.number().int().nullable(),
   "marketSymbol": zod.string().nullable(),
+  "monitorSessionId": zod.number().int().nullable(),
+  "strategyVersionId": zod.number().int().nullable(),
+  "sourceType": zod.enum(['manual', 'monitoring']),
   "condition": zod.string(),
   "threshold": zod.string().nullable(),
-  "status": zod.enum(['active', 'paused']),
+  "status": zod.enum(['active', 'paused', 'triggered', 'acknowledged']),
+  "message": zod.string().nullable(),
+  "triggeredAt": zod.coerce.date().nullable(),
+  "acknowledgedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -2114,9 +2161,15 @@ export const CreateAlertResponse = zod.object({
   "name": zod.string(),
   "marketId": zod.number().int().nullable(),
   "marketSymbol": zod.string().nullable(),
+  "monitorSessionId": zod.number().int().nullable(),
+  "strategyVersionId": zod.number().int().nullable(),
+  "sourceType": zod.enum(['manual', 'monitoring']),
   "condition": zod.string(),
   "threshold": zod.string().nullable(),
-  "status": zod.enum(['active', 'paused']),
+  "status": zod.enum(['active', 'paused', 'triggered', 'acknowledged']),
+  "message": zod.string().nullable(),
+  "triggeredAt": zod.coerce.date().nullable(),
+  "acknowledgedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -2425,7 +2478,7 @@ export const UpdateAlertBody = zod.object({
   "marketId": zod.number().int().nullish(),
   "condition": zod.string().min(1).optional(),
   "threshold": zod.string().nullish(),
-  "status": zod.enum(['active', 'paused']).optional()
+  "status": zod.enum(['active', 'paused', 'triggered', 'acknowledged']).optional()
 })
 
 export const UpdateAlertResponse = zod.object({
@@ -2433,9 +2486,15 @@ export const UpdateAlertResponse = zod.object({
   "name": zod.string(),
   "marketId": zod.number().int().nullable(),
   "marketSymbol": zod.string().nullable(),
+  "monitorSessionId": zod.number().int().nullable(),
+  "strategyVersionId": zod.number().int().nullable(),
+  "sourceType": zod.enum(['manual', 'monitoring']),
   "condition": zod.string(),
   "threshold": zod.string().nullable(),
-  "status": zod.enum(['active', 'paused']),
+  "status": zod.enum(['active', 'paused', 'triggered', 'acknowledged']),
+  "message": zod.string().nullable(),
+  "triggeredAt": zod.coerce.date().nullable(),
+  "acknowledgedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })

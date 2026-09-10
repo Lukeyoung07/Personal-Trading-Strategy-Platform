@@ -5,10 +5,14 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { PerformancePoint } from './performancePoint';
+import type { PerformanceVersion } from './performanceVersion';
 
 export interface PerformanceSummary {
   hasData: boolean;
   tradeCount: number;
+  winningTrades: number;
+  losingTrades: number;
   /** @nullable */
   netPnl: number | null;
   /** @nullable */
@@ -16,7 +20,17 @@ export interface PerformanceSummary {
   /** @nullable */
   averagePnl: number | null;
   /** @nullable */
+  averageWinner: number | null;
+  /** @nullable */
+  averageLoser: number | null;
+  /** @nullable */
   largestWin: number | null;
   /** @nullable */
   largestLoss: number | null;
+  /** @nullable */
+  maxDrawdown: number | null;
+  /** @nullable */
+  profitFactor: number | null;
+  equityCurve: PerformancePoint[];
+  byStrategyVersion: PerformanceVersion[];
 }

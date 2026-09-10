@@ -5,6 +5,7 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { TradeRiskUnit } from './tradeRiskUnit';
 import type { TradeSide } from './tradeSide';
 import type { TradeStatus } from './tradeStatus';
 
@@ -28,6 +29,14 @@ export interface Trade {
   entryPrice: number | null;
   /** @nullable */
   exitPrice: number | null;
+  /** @nullable */
+  stopLoss: number | null;
+  /** @nullable */
+  takeProfit: number | null;
+  /** @nullable */
+  riskUnit: TradeRiskUnit;
+  /** @nullable */
+  riskAmount: number | null;
   /** @nullable */
   pnl?: number | null;
   /** @nullable */

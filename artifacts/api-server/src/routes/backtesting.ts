@@ -18,7 +18,7 @@ import {
   ListBacktestsResponse,
 } from "@workspace/api-zod";
 import { marketDataService } from "../services/market-data";
-import { runHistoricalBacktest } from "../services/backtest-engine";
+import { runHistoricalBacktest, validateHistoricalBacktestStrategy } from "../services/backtest-engine";
 import { calculateBacktestStatistics } from "../services/backtest-results";
 
 const router: IRouter = Router();
@@ -111,6 +111,22 @@ async function executeBacktest(backtestId: number) {
         .where(eq(marketDataSourcesTable.providerKey, "biquote")),
     ]);
     if (!version) throw new Error("The exact strategy version for this backtest no longer exists.");
+    const compatibilityErrors = validateHistoricalBacktestStrategy({
+      direction: version.direction as "long" | "short" | "both",
+      entryRules: version.entryRules,
+      exitRules: version.exitRules,
+      riskRules: version.riskRules ?? version.riskManagementRules,
+      conditions: conditions.map(condition => ({
+        name: condition.name,
+        stage: condition.stage as "entry" | "confirmation" | "invalidation" | "exit",
+        direction: condition.direction as "long" | "short" | "both",
+        requirement: condition.requirement as "required" | "optional",
+        triggerRules: condition.triggerRules,
+        invalidationRules: condition.invalidationRules,
+        conceptDetectionRules: condition.conceptDetectionRules,
+      })),
+    });
+    if (compatibilityErrors.length) throw new Error(`This strategy version is not compatible with the historical engine: ${compatibilityErrors.join(" ")}`);
     if (!source) throw new Error("BiQuote is not configured as a historical market-data source.");
 
     const candles = await marketDataService.historicalCandles({
@@ -232,7 +248,14 @@ router.post("/backtests", async (req, res): Promise<void> => {
   }
 
   const [[version], [instrument], [timeframe]] = await Promise.all([
-    db.select({ id: strategyVersionsTable.id })
+    db.select({
+      id: strategyVersionsTable.id,
+      direction: strategyVersionsTable.direction,
+      entryRules: strategyVersionsTable.entryRules,
+      exitRules: strategyVersionsTable.exitRules,
+      riskRules: strategyVersionsTable.riskRules,
+      riskManagementRules: strategyVersionsTable.riskManagementRules,
+    })
       .from(strategyVersionsTable)
       .where(and(eq(strategyVersionsTable.id, strategyVersionId), eq(strategyVersionsTable.strategyId, strategyId))),
     db.select({ id: marketsTable.id }).from(marketsTable).where(eq(marketsTable.id, instrumentId)),
@@ -244,6 +267,28 @@ router.post("/backtests", async (req, res): Promise<void> => {
   }
   if (!instrument || !timeframe) {
     res.status(400).json({ error: "The selected instrument or timeframe was not found." });
+    return;
+  }
+  const conditions = await db.select().from(strategyVersionConditionsTable)
+    .where(eq(strategyVersionConditionsTable.strategyVersionId, strategyVersionId))
+    .orderBy(asc(strategyVersionConditionsTable.conditionOrder));
+  const compatibilityErrors = validateHistoricalBacktestStrategy({
+    direction: version.direction as "long" | "short" | "both",
+    entryRules: version.entryRules,
+    exitRules: version.exitRules,
+    riskRules: version.riskRules ?? version.riskManagementRules,
+    conditions: conditions.map(condition => ({
+      name: condition.name,
+      stage: condition.stage as "entry" | "confirmation" | "invalidation" | "exit",
+      direction: condition.direction as "long" | "short" | "both",
+      requirement: condition.requirement as "required" | "optional",
+      triggerRules: condition.triggerRules,
+      invalidationRules: condition.invalidationRules,
+      conceptDetectionRules: condition.conceptDetectionRules,
+    })),
+  });
+  if (compatibilityErrors.length) {
+    res.status(400).json({ error: `This strategy version is not compatible with the historical engine: ${compatibilityErrors.join(" ")}` });
     return;
   }
 

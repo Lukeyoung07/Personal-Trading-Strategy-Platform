@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BacktestEngineError, runHistoricalBacktest, type HistoricalCandle } from "./backtest-engine";
+import { BacktestEngineError, runHistoricalBacktest, validateHistoricalBacktestStrategy, type HistoricalCandle } from "./backtest-engine";
 
 function candle(index: number, values: Partial<Pick<HistoricalCandle, "open" | "high" | "low" | "close">> = {}): HistoricalCandle {
   const open = values.open ?? 100;
@@ -145,5 +145,46 @@ describe("historical backtest engine", () => {
       riskRules: null,
       conditions: [],
     }, [candle(0), candle(1)])).toThrow(BacktestEngineError);
+  });
+
+  it("preflights unsupported rules without touching historical candles", () => {
+    const errors = validateHistoricalBacktestStrategy({
+      direction: "long",
+      entryRules: null,
+      exitRules: null,
+      riskRules: "stop loss is discretionary",
+      conditions: [{
+        name: "EMA crossover",
+        stage: "entry",
+        direction: "long",
+        requirement: "required",
+        triggerRules: "ema20 crosses above ema50",
+        invalidationRules: null,
+        conceptDetectionRules: null,
+      }],
+    });
+
+    expect(errors).toEqual(expect.arrayContaining([
+      expect.stringContaining("EMA crossover"),
+      expect.stringContaining("Risk rules mention stop-loss or take-profit"),
+    ]));
+  });
+
+  it("accepts a zero-trade-compatible strategy during preflight", () => {
+    expect(validateHistoricalBacktestStrategy({
+      direction: "long",
+      entryRules: null,
+      exitRules: null,
+      riskRules: null,
+      conditions: [{
+        name: "Never met",
+        stage: "entry",
+        direction: "long",
+        requirement: "required",
+        triggerRules: "close > 1000",
+        invalidationRules: null,
+        conceptDetectionRules: null,
+      }],
+    })).toEqual([]);
   });
 });

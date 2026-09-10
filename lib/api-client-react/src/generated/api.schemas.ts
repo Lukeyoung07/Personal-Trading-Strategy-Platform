@@ -1418,6 +1418,18 @@ export const TradeStatus = {
   cancelled: 'cancelled',
 } as const;
 
+/**
+ * @nullable
+ */
+export type TradeRiskUnit = typeof TradeRiskUnit[keyof typeof TradeRiskUnit] | null;
+
+
+export const TradeRiskUnit = {
+  percent: 'percent',
+  amount: 'amount',
+  r: 'r',
+} as const;
+
 export interface Trade {
   id: number;
   strategyId: number;
@@ -1438,6 +1450,14 @@ export interface Trade {
   entryPrice: number | null;
   /** @nullable */
   exitPrice: number | null;
+  /** @nullable */
+  stopLoss: number | null;
+  /** @nullable */
+  takeProfit: number | null;
+  /** @nullable */
+  riskUnit: TradeRiskUnit;
+  /** @nullable */
+  riskAmount: number | null;
   /** @nullable */
   pnl?: number | null;
   /** @nullable */
@@ -1469,6 +1489,18 @@ export const TradeInputStatus = {
   cancelled: 'cancelled',
 } as const;
 
+/**
+ * @nullable
+ */
+export type TradeInputRiskUnit = typeof TradeInputRiskUnit[keyof typeof TradeInputRiskUnit] | null;
+
+
+export const TradeInputRiskUnit = {
+  percent: 'percent',
+  amount: 'amount',
+  r: 'r',
+} as const;
+
 export interface TradeInput {
   /** @minimum 1 */
   strategyVersionId: number;
@@ -1482,6 +1514,14 @@ export interface TradeInput {
   entryPrice?: number | null;
   /** @nullable */
   exitPrice?: number | null;
+  /** @nullable */
+  stopLoss?: number | null;
+  /** @nullable */
+  takeProfit?: number | null;
+  /** @nullable */
+  riskUnit?: TradeInputRiskUnit;
+  /** @nullable */
+  riskAmount?: number | null;
   /** @nullable */
   pnl?: number | null;
   /** @nullable */
@@ -1512,6 +1552,18 @@ export const TradeUpdateStatus = {
   cancelled: 'cancelled',
 } as const;
 
+/**
+ * @nullable
+ */
+export type TradeUpdateRiskUnit = typeof TradeUpdateRiskUnit[keyof typeof TradeUpdateRiskUnit] | null;
+
+
+export const TradeUpdateRiskUnit = {
+  percent: 'percent',
+  amount: 'amount',
+  r: 'r',
+} as const;
+
 export interface TradeUpdate {
   /** @nullable */
   marketId?: number | null;
@@ -1524,6 +1576,14 @@ export interface TradeUpdate {
   /** @nullable */
   exitPrice?: number | null;
   /** @nullable */
+  stopLoss?: number | null;
+  /** @nullable */
+  takeProfit?: number | null;
+  /** @nullable */
+  riskUnit?: TradeUpdateRiskUnit;
+  /** @nullable */
+  riskAmount?: number | null;
+  /** @nullable */
   pnl?: number | null;
   /** @nullable */
   openedAt?: string | null;
@@ -1535,9 +1595,30 @@ export interface TradeUpdate {
   notes?: string | null;
 }
 
+export interface PerformancePoint {
+  timestamp: string;
+  equity: number;
+}
+
+export interface PerformanceVersion {
+  strategyId: number;
+  strategyVersionId: number;
+  strategyName: string;
+  versionNumber: number;
+  tradeCount: number;
+  winningTrades: number;
+  losingTrades: number;
+  /** @nullable */
+  netPnl: number | null;
+  /** @nullable */
+  winRate: number | null;
+}
+
 export interface PerformanceSummary {
   hasData: boolean;
   tradeCount: number;
+  winningTrades: number;
+  losingTrades: number;
   /** @nullable */
   netPnl: number | null;
   /** @nullable */
@@ -1545,10 +1626,28 @@ export interface PerformanceSummary {
   /** @nullable */
   averagePnl: number | null;
   /** @nullable */
+  averageWinner: number | null;
+  /** @nullable */
+  averageLoser: number | null;
+  /** @nullable */
   largestWin: number | null;
   /** @nullable */
   largestLoss: number | null;
+  /** @nullable */
+  maxDrawdown: number | null;
+  /** @nullable */
+  profitFactor: number | null;
+  equityCurve: PerformancePoint[];
+  byStrategyVersion: PerformanceVersion[];
 }
+
+export type AlertSourceType = typeof AlertSourceType[keyof typeof AlertSourceType];
+
+
+export const AlertSourceType = {
+  manual: 'manual',
+  monitoring: 'monitoring',
+} as const;
 
 export type AlertStatus = typeof AlertStatus[keyof typeof AlertStatus];
 
@@ -1556,6 +1655,8 @@ export type AlertStatus = typeof AlertStatus[keyof typeof AlertStatus];
 export const AlertStatus = {
   active: 'active',
   paused: 'paused',
+  triggered: 'triggered',
+  acknowledged: 'acknowledged',
 } as const;
 
 export interface Alert {
@@ -1565,10 +1666,21 @@ export interface Alert {
   marketId: number | null;
   /** @nullable */
   marketSymbol: string | null;
+  /** @nullable */
+  monitorSessionId: number | null;
+  /** @nullable */
+  strategyVersionId: number | null;
+  sourceType: AlertSourceType;
   condition: string;
   /** @nullable */
   threshold: string | null;
   status: AlertStatus;
+  /** @nullable */
+  message: string | null;
+  /** @nullable */
+  triggeredAt: string | null;
+  /** @nullable */
+  acknowledgedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1599,6 +1711,8 @@ export type AlertUpdateStatus = typeof AlertUpdateStatus[keyof typeof AlertUpdat
 export const AlertUpdateStatus = {
   active: 'active',
   paused: 'paused',
+  triggered: 'triggered',
+  acknowledged: 'acknowledged',
 } as const;
 
 export interface AlertUpdate {

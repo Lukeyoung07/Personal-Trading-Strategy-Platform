@@ -219,10 +219,98 @@ function LegacyJournal() { const q=useListTrades();const markets=useListMarkets(
     {modal!==false&&<TradeModal trade={modal&&typeof modal==='object'?modal:null} markets={markets.data||[]} onClose={()=>setModal(false)} onSave={save} busy={c.isPending||u.isPending}/>} {confirm&&<Confirm title={`Remove this ${confirm.marketSymbol||'trade'} entry?`} onCancel={()=>setConfirm(null)} onConfirm={()=>del.mutate({tradeId:confirm.id},{onSuccess:()=>{setConfirm(null);qc.invalidateQueries({queryKey:getListTradesQueryKey()});qc.invalidateQueries({queryKey:getGetDashboardSummaryQueryKey()});qc.invalidateQueries({queryKey:getGetPerformanceSummaryQueryKey()})}})} busy={del.isPending}/>}</Page>; }
 function TradeModal({trade,markets,onClose,onSave,busy}:{trade:Trade|null;markets:Market[];onClose:()=>void;onSave:(e:FormEvent<HTMLFormElement>)=>void;busy:boolean}) { return <Modal title={trade?'Edit trade':'Record trade'} onClose={onClose}><form onSubmit={onSave} className="space-y-4"><div className="grid grid-cols-2 gap-3"><Field label="Market"><select className="select" name="marketId" defaultValue={trade?.marketId||''} data-testid="select-trade-market"><option value="">Unassigned</option>{markets.map(m=><option key={m.id} value={m.id}>{m.symbol}</option>)}</select></Field><Field label="Side"><select className="select" name="side" defaultValue={trade?.side||'long'} data-testid="select-trade-side"><option value="long">Long</option><option value="short">Short</option></select></Field></div><Field label="Status"><select className="select" name="status" defaultValue={trade?.status||'planned'} data-testid="select-trade-status"><option value="planned">Planned</option><option value="open">Open</option><option value="closed">Closed</option><option value="cancelled">Cancelled</option></select></Field><div className="grid grid-cols-2 gap-3"><Field label="Quantity"><input className="input" type="number" step="any" name="quantity" defaultValue={trade?.quantity??''} data-testid="input-trade-quantity"/></Field><Field label="Entry price"><input className="input" type="number" step="any" name="entryPrice" defaultValue={trade?.entryPrice??''} data-testid="input-trade-entry"/></Field><Field label="Exit price"><input className="input" type="number" step="any" name="exitPrice" defaultValue={trade?.exitPrice??''} data-testid="input-trade-exit"/></Field><Field label="P&L"><input className="input" type="number" step="any" name="pnl" defaultValue={trade?.pnl??''} data-testid="input-trade-pnl"/></Field></div><Field label="Thesis"><textarea className="textarea" name="thesis" defaultValue={trade?.thesis||''} placeholder="Why did this trade make sense?" data-testid="input-trade-thesis"/></Field><Field label="Notes"><textarea className="textarea" name="notes" defaultValue={trade?.notes||''} data-testid="input-trade-notes"/></Field><button className="btn btn-primary w-full" disabled={busy} data-testid="button-submit-trade">{busy?'Saving…':'Save trade'}</button></form></Modal>; }
 
-function Performance() { const q=useGetPerformanceSummary();if(q.isLoading)return <Page eyebrow="Review" title="Performance" description="Only what your journal can support."><LoadingBlock/></Page>;if(q.isError)return <Page eyebrow="Review" title="Performance"><ErrorState retry={()=>q.refetch()}/></Page>;const p=q.data;return <Page eyebrow="Review" title="Performance" description="A measured read of closed records. No quotes, no assumptions, no invented curve.">{p?.hasData?<><div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4"><Stat label="Net P&L" value={formatMoney(p.netPnl)} icon={TrendingUp}/><Stat label="Win rate" value={`${p.winRate??0}%`} icon={Target}/><Stat label="Trades" value={p.tradeCount} icon={BookOpen}/><Stat label="Average P&L" value={formatMoney(p.averagePnl)} icon={Activity}/><Stat label="Range" value={<span className="text-lg">{formatMoney(p.largestLoss)} / {formatMoney(p.largestWin)}</span>} icon={BarChart3}/></div><div className="panel p-6 mt-5"><div className="eyebrow">What this means</div><p className="text-sm text-muted-foreground leading-relaxed mt-4 max-w-2xl">These figures are calculated from the trades you have recorded as closed. They are a mirror of your journal, not a forecast.</p></div></>:<EmptyState icon={TrendingUp} title="Performance begins with a closed record" text="There is nothing to summarize yet. Once you close and record trades, this page will stay grounded in those entries." action={<Link href="/trade-journal" className="btn btn-primary" data-testid="link-performance-journal">Open trade journal <ChevronRight size={14}/></Link>}/>}</Page>; }
+function Performance() {
+  const q = useGetPerformanceSummary();
+  if (q.isLoading) return <Page eyebrow="Review" title="Performance" description="Only what your journal can support."><LoadingBlock /></Page>;
+  if (q.isError) return <Page eyebrow="Review" title="Performance"><ErrorState retry={() => q.refetch()} /></Page>;
+  const p = q.data;
+  if (!p?.hasData) return <Page eyebrow="Review" title="Performance" description="A measured read of closed records. No quotes, no assumptions, no invented curve."><EmptyState icon={TrendingUp} title="Performance begins with a closed record" text="There is nothing to summarize yet. Once you close and record trades, this page will stay grounded in those entries." action={<Link href="/trade-journal" className="btn btn-primary" data-testid="link-performance-journal">Open trade journal <ChevronRight size={14} /></Link>} /></Page>;
+  const curve = p.equityCurve ?? [];
+  const curveRange = Math.max(1, ...curve.map(point => Math.abs(point.equity)));
+  return <Page eyebrow="Review" title="Performance" description="A measured read of closed records. No quotes, no assumptions, no invented curve.">
+    <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3 md:gap-4">
+      <Stat label="Net P&L" value={formatMoney(p.netPnl)} icon={TrendingUp} />
+      <Stat label="Win rate" value={`${p.winRate ?? 0}%`} icon={Target} />
+      <Stat label="Trades" value={p.tradeCount} icon={BookOpen} />
+      <Stat label="Winners" value={p.winningTrades} icon={ArrowUpRight} />
+      <Stat label="Losers" value={p.losingTrades} icon={ArrowDownRight} />
+      <Stat label="Profit factor" value={p.profitFactor == null ? "—" : p.profitFactor.toFixed(2)} icon={BarChart3} />
+      <Stat label="Drawdown" value={formatMoney(p.maxDrawdown)} icon={Activity} />
+      <Stat label="Average P&L" value={formatMoney(p.averagePnl)} icon={Gauge} />
+    </div>
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 mt-5">
+      <div className="panel p-6">
+        <div className="eyebrow">Winner / loser profile</div>
+        <div className="grid grid-cols-2 gap-4 mt-5">
+          <div><div className="text-xs text-muted-foreground">Average winner</div><div className="mono text-xl font-semibold text-primary mt-2">{formatMoney(p.averageWinner)}</div></div>
+          <div><div className="text-xs text-muted-foreground">Average loser</div><div className="mono text-xl font-semibold text-destructive mt-2">{formatMoney(p.averageLoser)}</div></div>
+          <div><div className="text-xs text-muted-foreground">Largest winner</div><div className="mono text-sm font-semibold mt-2">{formatMoney(p.largestWin)}</div></div>
+          <div><div className="text-xs text-muted-foreground">Largest loser</div><div className="mono text-sm font-semibold mt-2">{formatMoney(p.largestLoss)}</div></div>
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed mt-6">Calculated only from closed journal trades with a recorded P&L. Simulated backtest trades stay separate.</p>
+      </div>
+      <div className="panel p-6">
+        <div className="eyebrow">Equity over time</div>
+        <div className="mt-5 space-y-3" data-testid="performance-equity-curve">
+          {curve.map((point, index) => <div key={`${point.timestamp}-${index}`} className="grid grid-cols-[88px_minmax(0,1fr)_auto] items-center gap-3 text-xs">
+            <span className="text-muted-foreground">{new Date(point.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+            <div className="h-2 rounded-full bg-secondary overflow-hidden"><div className={`h-full rounded-full ${point.equity >= 0 ? "bg-primary" : "bg-destructive"}`} style={{ width: `${Math.max(4, Math.min(100, Math.abs(point.equity) / curveRange * 100))}%` }} /></div>
+            <span className={`mono ${point.equity >= 0 ? "text-primary" : "text-destructive"}`}>{formatMoney(point.equity)}</span>
+          </div>)}
+        </div>
+      </div>
+    </div>
+    <div className="panel table-wrap mt-5">
+      <div className="p-6 pb-3"><div className="eyebrow">By strategy version</div><p className="text-xs text-muted-foreground mt-2">Closed journal performance remains tied to the exact version used.</p></div>
+      <table><thead><tr><th>Strategy</th><th>Version</th><th>Trades</th><th>Win rate</th><th>Net P&L</th></tr></thead><tbody>
+        {p.byStrategyVersion.map(version => <tr key={version.strategyVersionId}><td className="font-semibold">{version.strategyName}</td><td>v{version.versionNumber}</td><td>{version.tradeCount}</td><td>{version.winRate == null ? "—" : `${version.winRate}%`}</td><td className="mono">{formatMoney(version.netPnl)}</td></tr>)}
+      </tbody></table>
+    </div>
+  </Page>;
+}
 
-function Alerts() { const q=useListAlerts();const markets=useListMarkets();const c=useCreateAlert();const u=useUpdateAlert();const del=useDeleteAlert();const qc=useQueryClient();const [modal,setModal]=useState<Alert|null|false>(false);const [confirm,setConfirm]=useState<Alert|null>(null);const save=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const f=new FormData(e.currentTarget);const data:any={name:String(f.get('name')),marketId:f.get('marketId')?Number(f.get('marketId')):null,condition:String(f.get('condition')),threshold:String(f.get('threshold')||'')||null,status:String(f.get('status')||'active') as 'active'|'paused'};const done=()=>{qc.invalidateQueries({queryKey:getListAlertsQueryKey()});qc.invalidateQueries({queryKey:getGetDashboardSummaryQueryKey()});setModal(false)};modal&&typeof modal==='object'?u.mutate({alertId:modal.id,data},{onSuccess:done}):c.mutate({data},{onSuccess:done})};return <Page eyebrow="Reminders" title="Alerts" description="Personal prompts for your own review. These alerts do not listen to a feed or execute anything." action={<button className="btn btn-primary" onClick={()=>setModal(null)} data-testid="button-create-alert"><Plus size={15}/> New alert</button>}>{q.isLoading?<LoadingBlock/>:q.isError?<ErrorState retry={()=>q.refetch()}/>:q.data?.length?<div className="panel table-wrap"><table><thead><tr><th>Alert</th><th>Market</th><th>Rule</th><th>Status</th><th></th></tr></thead><tbody>{q.data.map((a:Alert)=><tr key={a.id} data-testid={`row-alert-${a.id}`}><td className="font-semibold">{a.name}</td><td className="mono">{a.marketSymbol||'—'}</td><td className="text-muted-foreground">{a.condition} {a.threshold&&`· ${a.threshold}`}</td><td><button className={`tag tag-${a.status}`} onClick={()=>u.mutate({alertId:a.id,data:{status:a.status==='active'?'paused':'active'}},{onSuccess:()=>qc.invalidateQueries({queryKey:getListAlertsQueryKey()})})} data-testid={`button-toggle-alert-${a.id}`}>{a.status}</button></td><td><div className="flex justify-end"><button className="btn btn-ghost" onClick={()=>setModal(a)} data-testid={`button-edit-alert-${a.id}`}><Pencil size={13}/></button><button className="btn btn-ghost text-destructive" onClick={()=>setConfirm(a)} data-testid={`button-delete-alert-${a.id}`}><Trash2 size={13}/></button></div></td></tr>)}</tbody></table></div>:<EmptyState icon={Bell} title="No personal reminders" text="Use an alert to mark a review condition you want to remember. It will stay here until you act on it." action={<button className="btn btn-primary" onClick={()=>setModal(null)} data-testid="button-empty-create-alert"><Plus size={14}/> Create alert</button>}/>}
-    {modal!==false&&<Modal title={modal&&typeof modal==='object'?'Edit alert':'New alert'} onClose={()=>setModal(false)}><form onSubmit={save} className="space-y-4"><Field label="Name"><input className="input" name="name" required defaultValue={modal&&typeof modal==='object'?modal.name:''} placeholder="Give the reminder a name" data-testid="input-alert-name"/></Field><Field label="Market"><select className="select" name="marketId" defaultValue={modal&&typeof modal==='object'?modal.marketId||'':''} data-testid="select-alert-market"><option value="">No market</option>{(markets.data||[]).map((m:Market)=><option key={m.id} value={m.id}>{m.symbol}</option>)}</select></Field><div className="grid grid-cols-2 gap-3"><Field label="Condition"><input className="input" name="condition" required defaultValue={modal&&typeof modal==='object'?modal.condition:''} placeholder="Review when…" data-testid="input-alert-condition"/></Field><Field label="Threshold"><input className="input" name="threshold" defaultValue={modal&&typeof modal==='object'?modal.threshold||'':''} placeholder="Optional" data-testid="input-alert-threshold"/></Field></div><Field label="Status"><select className="select" name="status" defaultValue={modal&&typeof modal==='object'?modal.status:'active'} data-testid="select-alert-status"><option value="active">Active</option><option value="paused">Paused</option></select></Field><button className="btn btn-primary w-full" disabled={c.isPending||u.isPending} data-testid="button-submit-alert">Save alert</button></form></Modal>}{confirm&&<Confirm title={`Remove “${confirm.name}”?`} onCancel={()=>setConfirm(null)} onConfirm={()=>del.mutate({alertId:confirm.id},{onSuccess:()=>{setConfirm(null);qc.invalidateQueries({queryKey:getListAlertsQueryKey()});qc.invalidateQueries({queryKey:getGetDashboardSummaryQueryKey()})}})} busy={del.isPending}/>}</Page>; }
+function Alerts() {
+  const q = useListAlerts();
+  const markets = useListMarkets();
+  const c = useCreateAlert();
+  const u = useUpdateAlert();
+  const del = useDeleteAlert();
+  const qc = useQueryClient();
+  const [modal, setModal] = useState<Alert | null | false>(false);
+  const [confirm, setConfirm] = useState<Alert | null>(null);
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: getListAlertsQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+  };
+  const save = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const data: any = {
+      name: String(form.get("name")),
+      marketId: form.get("marketId") ? Number(form.get("marketId")) : null,
+      condition: String(form.get("condition")),
+      threshold: String(form.get("threshold") || "") || null,
+      status: String(form.get("status") || "active") as "active" | "paused",
+    };
+    const done = () => { invalidate(); setModal(false); };
+    modal && typeof modal === "object"
+      ? u.mutate({ alertId: modal.id, data }, { onSuccess: done })
+      : c.mutate({ data }, { onSuccess: done });
+  };
+  return <Page eyebrow="Review" title="Alerts" description="Manual reminders and durable monitoring events. No external delivery or trade execution is performed." action={<button className="btn btn-primary" onClick={() => setModal(null)} data-testid="button-create-alert"><Plus size={15} /> New alert</button>}>
+    {q.isLoading ? <LoadingBlock /> : q.isError ? <ErrorState retry={() => q.refetch()} /> : q.data?.length ? <div className="panel table-wrap"><table><thead><tr><th>Alert</th><th>Market</th><th>Rule</th><th>Status</th><th /></tr></thead><tbody>
+      {q.data.map((alert: Alert) => <tr key={alert.id} data-testid={`row-alert-${alert.id}`}>
+        <td><div className="font-semibold">{alert.name}</div><div className="text-[11px] text-muted-foreground">{alert.sourceType === "monitoring" ? "Monitoring event" : "Manual reminder"}{alert.triggeredAt ? ` · ${new Date(alert.triggeredAt).toLocaleString()}` : ""}</div></td>
+        <td className="mono">{alert.marketSymbol || "—"}</td>
+        <td className="text-muted-foreground">{alert.message || alert.condition}{alert.threshold && ` · ${alert.threshold}`}</td>
+        <td>{alert.sourceType === "monitoring" ? <button className={`tag tag-${alert.status}`} onClick={() => alert.status === "triggered" && u.mutate({ alertId: alert.id, data: { status: "acknowledged" } }, { onSuccess: invalidate })} disabled={alert.status === "acknowledged"} data-testid={`button-ack-alert-${alert.id}`}>{alert.status === "triggered" ? "Acknowledge" : alert.status}</button> : <button className={`tag tag-${alert.status}`} onClick={() => u.mutate({ alertId: alert.id, data: { status: alert.status === "active" ? "paused" : "active" } }, { onSuccess: invalidate })} data-testid={`button-toggle-alert-${alert.id}`}>{alert.status}</button>}</td>
+        <td><div className="flex justify-end">{alert.sourceType === "manual" && <button className="btn btn-ghost" onClick={() => setModal(alert)} data-testid={`button-edit-alert-${alert.id}`}><Pencil size={13} /></button>}<button className="btn btn-ghost text-destructive" onClick={() => setConfirm(alert)} data-testid={`button-delete-alert-${alert.id}`}><Trash2 size={13} /></button></div></td>
+      </tr>)}
+    </tbody></table></div> : <EmptyState icon={Bell} title="No alerts yet" text="Create a manual reminder or start monitoring a strategy version to record meaningful monitoring events." action={<button className="btn btn-primary" onClick={() => setModal(null)} data-testid="button-empty-create-alert"><Plus size={14} /> Create alert</button>} />}
+    {modal !== false && <Modal title={modal && typeof modal === "object" ? "Edit alert" : "New alert"} onClose={() => setModal(false)}><form onSubmit={save} className="space-y-4"><Field label="Name"><input className="input" name="name" required defaultValue={modal && typeof modal === "object" ? modal.name : ""} placeholder="Give the reminder a name" data-testid="input-alert-name" /></Field><Field label="Market"><select className="select" name="marketId" defaultValue={modal && typeof modal === "object" ? modal.marketId || "" : ""} data-testid="select-alert-market"><option value="">No market</option>{(markets.data || []).map((market: Market) => <option key={market.id} value={market.id}>{market.symbol}</option>)}</select></Field><div className="grid grid-cols-2 gap-3"><Field label="Condition"><input className="input" name="condition" required defaultValue={modal && typeof modal === "object" ? modal.condition : ""} placeholder="Review when…" data-testid="input-alert-condition" /></Field><Field label="Threshold"><input className="input" name="threshold" defaultValue={modal && typeof modal === "object" ? modal.threshold || "" : ""} placeholder="Optional" data-testid="input-alert-threshold" /></Field></div><Field label="Status"><select className="select" name="status" defaultValue={modal && typeof modal === "object" ? modal.status : "active"} data-testid="select-alert-status"><option value="active">Active</option><option value="paused">Paused</option></select></Field><button className="btn btn-primary w-full" disabled={c.isPending || u.isPending} data-testid="button-submit-alert">Save alert</button></form></Modal>}
+    {confirm && <Confirm title={`Remove “${confirm.name}”?`} onCancel={() => setConfirm(null)} onConfirm={() => del.mutate({ alertId: confirm.id }, { onSuccess: () => { setConfirm(null); invalidate(); } })} busy={del.isPending} />}
+  </Page>;
+}
 
 function SettingsPage() { const q=useGetSettings();const u=useUpdateSettings();const qc=useQueryClient();const [saved,setSaved]=useState(false);if(q.isLoading)return <Page eyebrow="Workspace" title="Settings"><LoadingBlock/></Page>;if(q.isError)return <Page eyebrow="Workspace" title="Settings"><ErrorState retry={()=>q.refetch()}/></Page>;const s=q.data;const save=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const f=new FormData(e.currentTarget);u.mutate({data:{timezone:String(f.get('timezone')),baseCurrency:String(f.get('baseCurrency')),defaultRiskUnit:String(f.get('defaultRiskUnit')) as 'percent'|'amount'|'r',compactMode:f.get('compactMode')==='on'}},{onSuccess:()=>{setSaved(true);qc.invalidateQueries({queryKey:getGetSettingsQueryKey()});setTimeout(()=>setSaved(false),2600)}})};return <Page eyebrow="Workspace" title="Settings" description="Small preferences that make the daily record feel like yours."><div className="max-w-2xl panel p-6 md:p-8"><form onSubmit={save} className="space-y-6"><div><div className="eyebrow">Locale</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5"><Field label="Timezone"><select className="select" name="timezone" defaultValue={s?.timezone||'UTC'} data-testid="select-settings-timezone"><option value="UTC">UTC</option><option value="America/New_York">America / New York</option><option value="America/Los_Angeles">America / Los Angeles</option><option value="Europe/London">Europe / London</option><option value="Asia/Tokyo">Asia / Tokyo</option></select></Field><Field label="Base currency"><select className="select" name="baseCurrency" defaultValue={s?.baseCurrency||'USD'} data-testid="select-settings-currency"><option value="USD">USD — US Dollar</option><option value="EUR">EUR — Euro</option><option value="GBP">GBP — Pound</option><option value="JPY">JPY — Yen</option></select></Field></div></div><div className="border-t border-border pt-6"><div className="eyebrow">Risk language</div><Field label="Default risk unit"><select className="select mt-5" name="defaultRiskUnit" defaultValue={s?.defaultRiskUnit||'percent'} data-testid="select-settings-risk"><option value="percent">Percent</option><option value="amount">Amount</option><option value="r">R multiple</option></select></Field></div><div className="border-t border-border pt-6 flex items-center justify-between gap-4"><div><div className="text-sm font-semibold">Compact mode</div><div className="text-xs text-muted-foreground mt-1">Tighten row spacing in dense records.</div></div><input type="checkbox" name="compactMode" defaultChecked={s?.compactMode} className="accent-[hsl(var(--primary))] w-4 h-4" data-testid="input-settings-compact"/></div><div className="flex items-center justify-end gap-4 pt-2"><span className="text-xs text-primary">{saved?'Preferences saved.':''}</span><button className="btn btn-primary" disabled={u.isPending} data-testid="button-save-settings">{u.isPending?'Saving…':'Save preferences'}</button></div></form></div></Page>; }
 
@@ -266,6 +354,7 @@ function Backtesting() {
   const [preset, setPreset] = useState(initialPreset);
   const [startDate, setStartDate] = useState(requestedStartDate || initialRange.start);
   const [endDate, setEndDate] = useState(requestedEndDate || initialRange.end);
+  const [setupError, setSetupError] = useState("");
   const versions = useListStrategyVersions(strategyId ?? 0, {
     query: {
       enabled: strategyId != null,
@@ -291,7 +380,15 @@ function Backtesting() {
   };
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!strategyId || !versionId || !instrumentId || !timeframeId || !startDate || !endDate) return;
+    if (!strategyId || !versionId || !instrumentId || !timeframeId || !startDate || !endDate) {
+      setSetupError("Select a strategy version, instrument, timeframe, and date range before running.");
+      return;
+    }
+    if (startDate >= endDate) {
+      setSetupError("Start date must be before end date.");
+      return;
+    }
+    setSetupError("");
     create.mutate({
       data: {
         strategyId,
@@ -355,10 +452,11 @@ function Backtesting() {
             {[["last_7_days", "Last 7 Days"], ["last_30_days", "Last 30 Days"], ["last_90_days", "Last 90 Days"], ["custom", "Custom"]].map(([value, label]) => <button type="button" key={value} className={`btn ${preset === value ? "btn-primary" : "btn-secondary"}`} onClick={() => selectPreset(value)} data-testid={`button-backtest-preset-${value}`}>{label}</button>)}
           </div>
         </div>
-        {preset === "custom" && <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Start date"><input className="input" type="date" value={startDate} onChange={event => setStartDate(event.target.value)} required data-testid="input-backtest-start-date" /></Field>
-          <Field label="End date"><input className="input" type="date" value={endDate} onChange={event => setEndDate(event.target.value)} required data-testid="input-backtest-end-date" /></Field>
+         {preset === "custom" && <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+           <Field label="Start date"><input className="input" type="date" value={startDate} onChange={event => { setStartDate(event.target.value); setSetupError(""); }} required data-testid="input-backtest-start-date" /></Field>
+           <Field label="End date"><input className="input" type="date" value={endDate} onChange={event => { setEndDate(event.target.value); setSetupError(""); }} required data-testid="input-backtest-end-date" /></Field>
         </div>}
+         {setupError && <p className="text-sm text-destructive" data-testid="backtest-setup-error">{setupError}</p>}
          <section className="rounded-lg border border-primary/25 bg-primary/5 p-4 md:p-5" data-testid="backtest-setup-confirmation">
            <div className="eyebrow text-primary">Review before running</div>
            <h3 className="font-semibold mt-2">Confirm this backtest setup</h3>
@@ -380,9 +478,9 @@ function Backtesting() {
           <div className="eyebrow">Saved setups</div>
           {saved.isLoading ? <LoadingBlock /> : saved.data?.length ? <div className="mt-4 space-y-3">{saved.data.slice(0, 5).map((backtest: Backtest) => <div className="rounded-md bg-secondary/60 p-3" key={backtest.id} data-testid={`row-backtest-${backtest.id}`}><div className="flex items-center justify-between gap-3"><span className="font-semibold text-sm">{backtest.strategyName} · v{backtest.versionNumber}</span><span className={`tag ${backtest.status === "completed" ? "tag-active" : backtest.status === "failed" ? "tag-archived" : "tag-draft"}`}>{backtest.status}</span></div><div className="text-xs text-muted-foreground mt-2">{backtest.instrumentSymbol} · {backtest.timeframeLabel}</div><div className="text-xs text-muted-foreground mt-1">{formatDate(backtest.startDate)} – {formatDate(backtest.endDate)}</div><div className="text-xs text-muted-foreground mt-1">{backtest.candlesProcessed} candles · {backtest.tradeCount} simulated trades</div>{backtest.status === "completed" && backtest.tradeCount > 0 && <div className="text-xs text-muted-foreground mt-1">{backtest.winRate === null ? "—" : `${backtest.winRate.toFixed(1)}%`} win rate · {formatMoney(backtest.totalPnl)} total P/L</div>}{backtest.status === "failed" && backtest.errorMessage && <div className="text-xs text-destructive mt-2">{backtest.errorMessage}</div>}{backtest.status === "completed" && backtest.resultMessage && <div className="text-xs text-muted-foreground mt-2">{backtest.resultMessage}</div>}<Link href={`/backtesting/${backtest.id}`} className="text-xs text-primary inline-flex items-center gap-1 mt-3 hover:underline" data-testid={`link-view-backtest-${backtest.id}`}>Review result <ChevronRight size={13}/></Link></div>)}</div> : <p className="text-sm text-muted-foreground mt-4">No backtests run yet.</p>}
         </div>
-        <div className="panel p-6">
+         <div className="panel p-6">
           <div className="eyebrow">What happens next</div>
-          <p className="text-sm text-muted-foreground leading-relaxed mt-4">This run stays tied to your immutable strategy version and selected instrument. Historical candles and simulated trades are saved here; performance analysis will be added later.</p>
+           <p className="text-sm text-muted-foreground leading-relaxed mt-4">This run stays tied to your immutable strategy version and selected instrument. Historical candles and simulated trades are saved separately from the journal; completed runs can be reviewed in Results and Performance.</p>
         </div>
       </div>
     </div>

@@ -168,6 +168,93 @@ function calculateTradeMetrics(rows: Array<{ status: string; pnl: string | numbe
   };
 }
 
+function roundMetric(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function calculateJournalPerformance(rows: Array<{
+  trade: typeof tradesTable.$inferSelect;
+  strategyId: number;
+  strategyVersionId: number;
+  strategyName: string;
+  versionNumber: number;
+}>) {
+  const closed = rows
+    .filter(({ trade }) => trade.status === "closed")
+    .map(({ trade, ...context }) => ({
+      ...context,
+      trade,
+      pnl: nullableNumber(trade.pnl),
+      timestamp: trade.closedAt ?? trade.createdAt,
+    }))
+    .filter((row): row is typeof row & { pnl: number } => row.pnl != null)
+    .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  const pnlValues = closed.map(row => row.pnl);
+  const winners = pnlValues.filter(value => value > 0);
+  const losers = pnlValues.filter(value => value < 0);
+  const netPnl = pnlValues.reduce((total, value) => total + value, 0);
+  let equity = 0;
+  let peak = 0;
+  let maxDrawdown = 0;
+  const equityCurve = closed.map(row => {
+    equity += row.pnl;
+    peak = Math.max(peak, equity);
+    maxDrawdown = Math.max(maxDrawdown, peak - equity);
+    return { timestamp: row.timestamp.toISOString(), equity: roundMetric(equity) };
+  });
+  const byVersion = new Map<number, {
+    strategyId: number;
+    strategyVersionId: number;
+    strategyName: string;
+    versionNumber: number;
+    values: number[];
+  }>();
+  for (const row of closed) {
+    const existing = byVersion.get(row.strategyVersionId) ?? {
+      strategyId: row.strategyId,
+      strategyVersionId: row.strategyVersionId,
+      strategyName: row.strategyName,
+      versionNumber: row.versionNumber,
+      values: [],
+    };
+    existing.values.push(row.pnl);
+    byVersion.set(row.strategyVersionId, existing);
+  }
+  const breakdown = [...byVersion.values()].map(version => {
+    const versionWins = version.values.filter(value => value > 0).length;
+    return {
+      strategyId: version.strategyId,
+      strategyVersionId: version.strategyVersionId,
+      strategyName: version.strategyName,
+      versionNumber: version.versionNumber,
+      tradeCount: version.values.length,
+      winningTrades: versionWins,
+      losingTrades: version.values.filter(value => value < 0).length,
+      netPnl: roundMetric(version.values.reduce((total, value) => total + value, 0)),
+      winRate: version.values.length ? roundMetric((versionWins / version.values.length) * 100) : null,
+    };
+  });
+  const grossProfit = winners.reduce((total, value) => total + value, 0);
+  const grossLoss = Math.abs(losers.reduce((total, value) => total + value, 0));
+  return {
+    hasData: pnlValues.length > 0,
+    tradeCount: pnlValues.length,
+    winningTrades: winners.length,
+    losingTrades: losers.length,
+    netPnl: pnlValues.length ? roundMetric(netPnl) : null,
+    winRate: pnlValues.length ? roundMetric((winners.length / pnlValues.length) * 100) : null,
+    averagePnl: pnlValues.length ? roundMetric(netPnl / pnlValues.length) : null,
+    averageWinner: winners.length ? roundMetric(grossProfit / winners.length) : null,
+    averageLoser: losers.length ? roundMetric(losers.reduce((total, value) => total + value, 0) / losers.length) : null,
+    largestWin: winners.length ? roundMetric(Math.max(...winners)) : null,
+    largestLoss: losers.length ? roundMetric(Math.min(...losers)) : null,
+    maxDrawdown: pnlValues.length ? roundMetric(maxDrawdown) : null,
+    profitFactor: grossLoss > 0 ? roundMetric(grossProfit / grossLoss) : null,
+    equityCurve,
+    byStrategyVersion: breakdown,
+  };
+}
+
 async function strategyTradeMetrics(strategyId: number) {
   const rows = await db
     .select({ status: tradesTable.status, pnl: tradesTable.pnl })
@@ -998,6 +1085,9 @@ router.get("/trades", async (_req, res): Promise<void> => {
         entryPrice: nullableNumber(trade.entryPrice),
         exitPrice: nullableNumber(trade.exitPrice),
         pnl: nullableNumber(trade.pnl),
+        stopLoss: nullableNumber(trade.stopLoss),
+        takeProfit: nullableNumber(trade.takeProfit),
+        riskAmount: nullableNumber(trade.riskAmount),
       })),
     ),
   );
@@ -1024,6 +1114,9 @@ router.post("/trades", async (req, res): Promise<void> => {
       quantity: parsed.data.quantity?.toString(),
       entryPrice: parsed.data.entryPrice?.toString(),
       exitPrice: parsed.data.exitPrice?.toString(),
+      stopLoss: parsed.data.stopLoss?.toString(),
+      takeProfit: parsed.data.takeProfit?.toString(),
+      riskAmount: parsed.data.riskAmount?.toString(),
       pnl: parsed.data.pnl?.toString(),
     })
     .returning();
@@ -1042,6 +1135,9 @@ router.post("/trades", async (req, res): Promise<void> => {
       quantity: nullableNumber(created.quantity),
       entryPrice: nullableNumber(created.entryPrice),
       exitPrice: nullableNumber(created.exitPrice),
+        stopLoss: nullableNumber(created.stopLoss),
+        takeProfit: nullableNumber(created.takeProfit),
+        riskAmount: nullableNumber(created.riskAmount),
       pnl: nullableNumber(created.pnl),
     }),
   );
@@ -1061,6 +1157,9 @@ router.patch("/trades/:tradeId", async (req, res): Promise<void> => {
       quantity: body.data.quantity?.toString(),
       entryPrice: body.data.entryPrice?.toString(),
       exitPrice: body.data.exitPrice?.toString(),
+      stopLoss: body.data.stopLoss?.toString(),
+      takeProfit: body.data.takeProfit?.toString(),
+      riskAmount: body.data.riskAmount?.toString(),
       pnl: body.data.pnl?.toString(),
       updatedAt: new Date(),
     })
@@ -1085,6 +1184,9 @@ router.patch("/trades/:tradeId", async (req, res): Promise<void> => {
       quantity: nullableNumber(updated.quantity),
       entryPrice: nullableNumber(updated.entryPrice),
       exitPrice: nullableNumber(updated.exitPrice),
+        stopLoss: nullableNumber(updated.stopLoss),
+        takeProfit: nullableNumber(updated.takeProfit),
+        riskAmount: nullableNumber(updated.riskAmount),
       pnl: nullableNumber(updated.pnl),
     }),
   );
@@ -1105,31 +1207,21 @@ router.delete("/trades/:tradeId", async (req, res): Promise<void> => {
 });
 
 router.get("/performance/summary", async (_req, res): Promise<void> => {
-  const [aggregate] = await db
+  const rows = await db
     .select({
-      tradeCount: count(),
-      netPnl: sum(tradesTable.pnl),
-      averagePnl: avg(tradesTable.pnl),
-      largestWin: max(tradesTable.pnl),
-      largestLoss: min(tradesTable.pnl),
+      trade: tradesTable,
+      strategyId: strategiesTable.id,
+      strategyVersionId: strategyVersionsTable.id,
+      strategyName: strategiesTable.name,
+      versionNumber: strategyVersionsTable.versionNumber,
     })
     .from(tradesTable)
-    .where(and(eq(tradesTable.status, "closed"), isNotNull(tradesTable.pnl)));
-  const tradeCount = Number(aggregate?.tradeCount ?? 0);
-  const [wins] = await db
-    .select({ value: count() })
-    .from(tradesTable)
-    .where(and(eq(tradesTable.status, "closed"), sql`${tradesTable.pnl} > 0`));
+    .innerJoin(strategyVersionsTable, eq(tradesTable.strategyVersionId, strategyVersionsTable.id))
+    .innerJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
+    .where(eq(tradesTable.status, "closed"))
+    .orderBy(asc(tradesTable.closedAt), asc(tradesTable.createdAt));
   res.json(
-    GetPerformanceSummaryResponse.parse({
-      hasData: tradeCount > 0,
-      tradeCount,
-      netPnl: nullableNumber(aggregate?.netPnl),
-      winRate: tradeCount > 0 ? Number(wins?.value ?? 0) / tradeCount : null,
-      averagePnl: nullableNumber(aggregate?.averagePnl),
-      largestWin: nullableNumber(aggregate?.largestWin),
-      largestLoss: nullableNumber(aggregate?.largestLoss),
-    }),
+    GetPerformanceSummaryResponse.parse(calculateJournalPerformance(rows)),
   );
 });
 
@@ -1148,7 +1240,7 @@ router.post("/alerts", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [created] = await db.insert(alertsTable).values(parsed.data).returning();
+  const [created] = await db.insert(alertsTable).values({ ...parsed.data, sourceType: "manual" }).returning();
   res.status(201).json(CreateAlertResponse.parse({ ...created, marketSymbol: await marketSymbol(created.marketId) }));
 });
 
@@ -1161,7 +1253,11 @@ router.patch("/alerts/:alertId", async (req, res): Promise<void> => {
   }
   const [updated] = await db
     .update(alertsTable)
-    .set({ ...body.data, updatedAt: new Date() })
+    .set({
+      ...body.data,
+      acknowledgedAt: body.data.status === "acknowledged" ? new Date() : body.data.status === "triggered" ? null : undefined,
+      updatedAt: new Date(),
+    })
     .where(eq(alertsTable.id, params.data.alertId))
     .returning();
   if (!updated) {
