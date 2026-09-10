@@ -24,7 +24,12 @@ router.get("/economic-events", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  res.json(ListEconomicEventsResponse.parse(await listEconomicEvents(parsed.data)));
+  try {
+    res.json(ListEconomicEventsResponse.parse(await listEconomicEvents(parsed.data)));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Economic calendar provider unavailable.";
+    res.status(502).json({ error: message });
+  }
 });
 
 router.post("/economic-events", async (req, res): Promise<void> => {

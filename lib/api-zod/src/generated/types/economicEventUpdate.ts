@@ -5,8 +5,8 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { EconomicEventImpact } from './economicEventImpact';
 import type { EconomicEventMarketMappingInput } from './economicEventMarketMappingInput';
-import type { EconomicEventUpdateImpact } from './economicEventUpdateImpact';
 import type { EconomicEventUpdateReleaseStatus } from './economicEventUpdateReleaseStatus';
 
 export interface EconomicEventUpdate {
@@ -15,7 +15,7 @@ export interface EconomicEventUpdate {
   /** @minLength 1 */
   name?: string;
   scheduledAt?: Date;
-  impact?: EconomicEventUpdateImpact;
+  impact?: EconomicEventImpact | null;
   /** @nullable */
   region?: string | null;
   /** @nullable */

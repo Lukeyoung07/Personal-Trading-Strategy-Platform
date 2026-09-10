@@ -1262,13 +1262,16 @@ components:
         dedupeKey: { type: string }
         name: { type: string }
         scheduledAt: { type: string, format: date-time }
-        impact: { type: string, enum: [high, medium, low] }
+        impact:
+          anyOf:
+            - $ref: "#/components/schemas/EconomicEventImpact"
+            - type: "null"
         region: { type: ["string", "null"] }
         currency: { type: ["string", "null"] }
         previous: { type: ["string", "null"] }
         forecast: { type: ["string", "null"] }
         actual: { type: ["string", "null"] }
-        releaseStatus: { type: string, enum: [upcoming, live, released, delayed, cancelled] }
+        releaseStatus: { type: string, enum: [upcoming, live, released, delayed, cancelled, unknown] }
         sourceUpdatedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -1285,13 +1288,16 @@ components:
         dedupeKey: { type: ["string", "null"] }
         name: { type: string, minLength: 1 }
         scheduledAt: { type: string, format: date-time }
-        impact: { type: string, enum: [high, medium, low] }
+        impact:
+          anyOf:
+            - $ref: "#/components/schemas/EconomicEventImpact"
+            - type: "null"
         region: { type: ["string", "null"] }
         currency: { type: ["string", "null"] }
         previous: { type: ["string", "null"] }
         forecast: { type: ["string", "null"] }
         actual: { type: ["string", "null"] }
-        releaseStatus: { type: string, enum: [upcoming, live, released, delayed, cancelled] }
+        releaseStatus: { type: string, enum: [upcoming, live, released, delayed, cancelled, unknown] }
         sourceUpdatedAt: { type: ["string", "null"], format: date-time }
         affectedMarkets:
           type: array
@@ -1304,19 +1310,25 @@ components:
         marketLabel: { type: ["string", "null"] }
         impactDirection: { type: ["string", "null"] }
         notes: { type: ["string", "null"] }
+    EconomicEventImpact:
+      type: string
+      enum: [high, medium, low]
     EconomicEventUpdate:
       type: object
       properties:
         providerEventId: { type: ["string", "null"] }
         name: { type: string, minLength: 1 }
         scheduledAt: { type: string, format: date-time }
-        impact: { type: string, enum: [high, medium, low] }
+        impact:
+          anyOf:
+            - $ref: "#/components/schemas/EconomicEventImpact"
+            - type: "null"
         region: { type: ["string", "null"] }
         currency: { type: ["string", "null"] }
         previous: { type: ["string", "null"] }
         forecast: { type: ["string", "null"] }
         actual: { type: ["string", "null"] }
-        releaseStatus: { type: string, enum: [upcoming, live, released, delayed, cancelled] }
+        releaseStatus: { type: string, enum: [upcoming, live, released, delayed, cancelled, unknown] }
         sourceUpdatedAt: { type: ["string", "null"], format: date-time }
         affectedMarkets:
           type: array

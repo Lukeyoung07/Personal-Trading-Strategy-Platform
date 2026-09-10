@@ -134,7 +134,7 @@ function EventCard({ event }: { event: EconomicEvent }) {
               data-testid={`status-event-impact-${event.id}`}
             >
               {isHighImpact && <AlertTriangle size={11} aria-hidden="true" />}
-              {event.impact} impact
+              {event.impact ? `${event.impact} impact` : 'Impact not provided'}
             </span>
             <span
               className={`tag ${
@@ -328,7 +328,10 @@ export function EconomicCalendar() {
           </div>
         ) : query.isError ? (
           <div data-testid="error-economic-calendar">
-            <ErrorState retry={() => query.refetch()} />
+            <ErrorState
+              retry={() => query.refetch()}
+              message="The economic-calendar provider is unavailable or returned invalid data. No stale records are shown as current."
+            />
           </div>
         ) : !query.data?.providerConnected ? (
           <EmptyState

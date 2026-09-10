@@ -13,29 +13,39 @@ import type {
   EconomicEventUpdate,
   ListEconomicEventsParams,
 } from "@workspace/api-zod";
+import {
+  tradingEconomicsProvider,
+  type EconomicCalendarProvider,
+} from "./trading-economics";
 
-export type EconomicCalendarProvider = {
-  key: string;
-  name: string;
-};
-
-// Provider adapters register here when a real calendar integration is connected.
-// Keeping this registry empty is intentional until a provider is authorized.
-const providers = new Map<string, EconomicCalendarProvider>();
+const providers = new Map<string, EconomicCalendarProvider>([
+  [tradingEconomicsProvider.key, tradingEconomicsProvider],
+]);
+const PROVIDER_SYNC_TTL_MS = 5 * 60 * 1000;
+let lastProviderSyncAt = 0;
+let providerSyncPromise: Promise<number> | null = null;
 
 export function getEconomicEventProviderStatus() {
   const provider = providers.values().next().value as EconomicCalendarProvider | undefined;
-  return provider
-    ? {
-        providerConnected: true,
-        providerName: provider.name,
-        message: `${provider.name} economic calendar is connected.`,
-      }
-    : {
-        providerConnected: false,
-        providerName: null,
-        message: "No economic calendar data is currently connected.",
-      };
+  if (!provider) {
+    return {
+      providerConnected: false,
+      providerName: null,
+      message: "No economic calendar data is currently connected.",
+    };
+  }
+  if (!provider.isConfigured()) {
+    return {
+      providerConnected: false,
+      providerName: provider.name,
+      message: `${provider.name} is selected but requires the TRADING_ECONOMICS_API_KEY secret.`,
+    };
+  }
+  return {
+    providerConnected: true,
+    providerName: provider.name,
+    message: `${provider.name} economic calendar is connected.`,
+  };
 }
 
 function stableDedupeKey(input: Pick<EconomicEventInput, "providerKey" | "providerEventId" | "name" | "scheduledAt" | "region" | "currency">) {
@@ -87,7 +97,7 @@ export async function upsertEconomicEvent(input: EconomicEventInput) {
       dedupeKey,
       name: input.name.trim(),
       scheduledAt: input.scheduledAt,
-      impact: input.impact ?? "low",
+      impact: input.impact ?? null,
       region: input.region?.trim() || null,
       currency: input.currency?.trim().toUpperCase() || null,
       previous: input.previous ?? null,
@@ -148,7 +158,36 @@ export async function updateEconomicEvent(eventId: number, input: EconomicEventU
   return withMappings(updated);
 }
 
+function configuredProvider() {
+  return [...providers.values()].find(provider => provider.isConfigured());
+}
+
+export async function refreshEconomicEvents() {
+  const provider = configuredProvider();
+  if (!provider) return 0;
+  if (Date.now() - lastProviderSyncAt < PROVIDER_SYNC_TTL_MS) return 0;
+  if (providerSyncPromise) return providerSyncPromise;
+
+  providerSyncPromise = (async () => {
+    const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const to = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const events = await provider.fetchEvents(from, to);
+    for (const event of events) {
+      await upsertEconomicEvent(event);
+    }
+    lastProviderSyncAt = Date.now();
+    return events.length;
+  })();
+
+  try {
+    return await providerSyncPromise;
+  } finally {
+    providerSyncPromise = null;
+  }
+}
+
 export async function listEconomicEvents(params: ListEconomicEventsParams = {}) {
+  await refreshEconomicEvents();
   const rows = await db.select().from(economicEventsTable).orderBy(asc(economicEventsTable.scheduledAt));
   const events = await Promise.all(rows.map(event => withMappings(event)));
   const now = new Date();

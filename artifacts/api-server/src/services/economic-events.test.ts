@@ -39,8 +39,8 @@ describe("economic events service", () => {
   it("reports an honest disconnected provider state", () => {
     expect(getEconomicEventProviderStatus()).toEqual({
       providerConnected: false,
-      providerName: null,
-      message: "No economic calendar data is currently connected.",
+      providerName: "Trading Economics",
+      message: "Trading Economics is selected but requires the TRADING_ECONOMICS_API_KEY secret.",
     });
   });
 

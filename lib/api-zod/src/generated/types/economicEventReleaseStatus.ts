@@ -15,4 +15,5 @@ export const EconomicEventReleaseStatus = {
   released: 'released',
   delayed: 'delayed',
   cancelled: 'cancelled',
+  unknown: 'unknown',
 } as const;

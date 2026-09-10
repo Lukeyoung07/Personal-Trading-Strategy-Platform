@@ -26,15 +26,6 @@ export interface EconomicEventMarketMapping {
   notes: string | null;
 }
 
-export type EconomicEventImpact = typeof EconomicEventImpact[keyof typeof EconomicEventImpact];
-
-
-export const EconomicEventImpact = {
-  high: 'high',
-  medium: 'medium',
-  low: 'low',
-} as const;
-
 export type EconomicEventReleaseStatus = typeof EconomicEventReleaseStatus[keyof typeof EconomicEventReleaseStatus];
 
 
@@ -44,6 +35,16 @@ export const EconomicEventReleaseStatus = {
   released: 'released',
   delayed: 'delayed',
   cancelled: 'cancelled',
+  unknown: 'unknown',
+} as const;
+
+export type EconomicEventImpact = typeof EconomicEventImpact[keyof typeof EconomicEventImpact];
+
+
+export const EconomicEventImpact = {
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
 } as const;
 
 export interface EconomicEvent {
@@ -54,7 +55,7 @@ export interface EconomicEvent {
   dedupeKey: string;
   name: string;
   scheduledAt: string;
-  impact: EconomicEventImpact;
+  impact: EconomicEventImpact | null;
   /** @nullable */
   region: string | null;
   /** @nullable */
@@ -73,15 +74,6 @@ export interface EconomicEvent {
   affectedMarkets: EconomicEventMarketMapping[];
 }
 
-export type EconomicEventInputImpact = typeof EconomicEventInputImpact[keyof typeof EconomicEventInputImpact];
-
-
-export const EconomicEventInputImpact = {
-  high: 'high',
-  medium: 'medium',
-  low: 'low',
-} as const;
-
 export type EconomicEventInputReleaseStatus = typeof EconomicEventInputReleaseStatus[keyof typeof EconomicEventInputReleaseStatus];
 
 
@@ -91,6 +83,7 @@ export const EconomicEventInputReleaseStatus = {
   released: 'released',
   delayed: 'delayed',
   cancelled: 'cancelled',
+  unknown: 'unknown',
 } as const;
 
 export interface EconomicEventMarketMappingInput {
@@ -114,7 +107,7 @@ export interface EconomicEventInput {
   /** @minLength 1 */
   name: string;
   scheduledAt: string;
-  impact?: EconomicEventInputImpact;
+  impact?: EconomicEventImpact | null;
   /** @nullable */
   region?: string | null;
   /** @nullable */
@@ -131,15 +124,6 @@ export interface EconomicEventInput {
   affectedMarkets?: EconomicEventMarketMappingInput[];
 }
 
-export type EconomicEventUpdateImpact = typeof EconomicEventUpdateImpact[keyof typeof EconomicEventUpdateImpact];
-
-
-export const EconomicEventUpdateImpact = {
-  high: 'high',
-  medium: 'medium',
-  low: 'low',
-} as const;
-
 export type EconomicEventUpdateReleaseStatus = typeof EconomicEventUpdateReleaseStatus[keyof typeof EconomicEventUpdateReleaseStatus];
 
 
@@ -149,6 +133,7 @@ export const EconomicEventUpdateReleaseStatus = {
   released: 'released',
   delayed: 'delayed',
   cancelled: 'cancelled',
+  unknown: 'unknown',
 } as const;
 
 export interface EconomicEventUpdate {
@@ -157,7 +142,7 @@ export interface EconomicEventUpdate {
   /** @minLength 1 */
   name?: string;
   scheduledAt?: string;
-  impact?: EconomicEventUpdateImpact;
+  impact?: EconomicEventImpact | null;
   /** @nullable */
   region?: string | null;
   /** @nullable */

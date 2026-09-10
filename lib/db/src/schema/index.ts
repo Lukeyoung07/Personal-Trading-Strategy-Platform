@@ -316,7 +316,7 @@ export const economicEventsTable = pgTable("economic_events", {
   dedupeKey: text("dedupe_key").notNull(),
   name: text("name").notNull(),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
-  impact: text("impact").notNull().default("low"),
+  impact: text("impact"),
   region: text("region"),
   currency: text("currency"),
   previous: text("previous"),

@@ -17,7 +17,7 @@ export interface EconomicEvent {
   dedupeKey: string;
   name: string;
   scheduledAt: Date;
-  impact: EconomicEventImpact;
+  impact: EconomicEventImpact | null;
   /** @nullable */
   region: string | null;
   /** @nullable */
