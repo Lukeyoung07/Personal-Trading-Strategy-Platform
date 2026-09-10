@@ -1,0 +1,124 @@
+The previous fix did NOT resolve the issue in the actual app.
+
+I have tested it myself and the behavior is still:
+
+AI generates strategy
+→ I click "Review Strategy" or "Save as New Version"
+→ Strategy Builder opens
+→ Builder is empty/default
+→ AI draft is NOT populated
+
+Do not tell me the handoff is fixed based only on unit/component tests.
+
+I need you to debug the ACTUAL running browser workflow.
+
+IMPORTANT:
+Do not change:
+- OpenRouter
+- AI generation
+- Backtesting
+- Strategy Builder design
+- trading concepts
+- existing save/version architecture
+
+Fix only the AI draft handoff.
+
+FIRST, reproduce the issue yourself in the running browser using a real AI-generated strategy draft.
+
+Use this exact AI request:
+
+"Create me a simple XAUUSD BUY strategy that is compatible with my current Backtesting system. Use a bullish candle for entry, a bearish candle for exit, with a 1% stop loss and 2% take profit."
+
+Then inspect the draft immediately before clicking "Review Strategy".
+
+Confirm that the structured draft actually contains the expected data.
+
+Then click "Review Strategy" and trace the data through EVERY step:
+
+1. AI response
+2. Structured draft object
+3. Assistant state
+4. Draft store
+5. Navigation
+6. `/strategy-builder?assistantDraft=1`
+7. Builder component mount
+8. Builder draft-loading logic
+9. Builder form state
+10. Rendered Builder fields
+
+Find the exact point where the draft is lost.
+
+Do not assume the shared draft store is working just because a test says it is.
+
+Add temporary diagnostic logging if necessary to identify:
+- whether the draft exists
+- what its exact contents are
+- whether the store contains it
+- whether the Builder can read it
+- whether the Builder clears/overwrites it
+- whether the query parameters are present
+- whether an existing strategy is replacing the incoming draft
+- whether the draft is being consumed too early
+
+Then fix the actual root cause.
+
+The Builder MUST display the real AI-generated values:
+
+- XAUUSD
+- BUY / Long
+- Bullish candle entry
+- Bearish candle exit
+- 1% stop loss
+- 2% take profit
+
+Do not hard-code these values into the Builder. They must come from the actual AI draft.
+
+Test BOTH:
+
+"Review Strategy"
+
+and
+
+"Save as New Version"
+
+For "Save as New Version":
+
+- The draft must populate the Builder.
+- Nothing should automatically save.
+- The user must explicitly confirm the save.
+- The new version must then be created successfully.
+
+CRITICAL:
+
+Do not consider this fixed if:
+- only unit tests pass
+- only component tests pass
+- the route changes successfully
+- the Builder page opens
+- the draft exists somewhere in code
+
+It is only fixed when the actual running browser shows the AI-generated strategy inside the Builder.
+
+After fixing it, physically verify the workflow in the running browser if the available browser tool supports interaction.
+
+If the available browser tool cannot physically click the controls, state that limitation clearly and provide a deterministic automated end-to-end test that reproduces the exact click/navigation/state-transfer path.
+
+Run:
+- frontend tests
+- API tests where relevant
+- frontend typecheck
+- API typecheck
+- production builds
+
+At the end report:
+1. Exact root cause.
+2. Exact file/component/state responsible.
+3. Exact fix.
+4. Whether the real AI draft was traced through the full workflow.
+5. Whether the Builder actually displayed the draft.
+6. Whether both buttons work.
+7. Whether Save as New Version actually saves after confirmation.
+8. Tests/builds passed.
+9. Any remaining limitation.
+
+Do not make unrelated changes.
