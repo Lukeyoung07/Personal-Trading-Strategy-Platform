@@ -1,0 +1,469 @@
+Implement Backtesting Part 3: Results Dashboard.
+
+IMPORTANT:
+
+Backtesting Parts 1 and 2 are already complete and verified.
+
+Part 1:
+- Backtesting configuration
+- Strategy/version selection
+- Instrument selection
+- Timeframe selection
+- Date range selection
+
+Part 2:
+- Genuine BiQuote historical candles
+- Exact strategy version execution
+- Chronological evaluation
+- No-look-ahead protection
+- Simulated trades
+- SL/TP handling
+- Backtest storage
+- Backtest lifecycle
+
+Do NOT rebuild or redesign Parts 1 or 2.
+
+Do NOT change the existing backtest engine.
+
+The goal of this task is to build the simple results experience AFTER a backtest has completed.
+
+==================================================
+1. RESULTS SUMMARY
+==================================================
+
+When a backtest completes successfully, show a clear results page/section.
+
+Display:
+
+- Strategy name
+- Exact strategy version
+- Instrument
+- Timeframe
+- Date range
+- Candles processed
+- Total trades
+
+Main performance statistics:
+
+- Winning trades
+- Losing trades
+- Win rate
+- Total P/L
+- Average winning trade
+- Average losing trade
+- Largest winning trade
+- Largest losing trade
+- Maximum drawdown
+- Profit factor
+
+If there are zero trades:
+
+Show:
+
+"No trades found for this strategy and period."
+
+Do not display misleading performance statistics.
+
+==================================================
+2. PROFIT / LOSS
+==================================================
+
+Calculate all statistics from the actual stored backtest trades.
+
+Do NOT create separate calculations using different trade data.
+
+The dashboard must agree with the stored backtest trades.
+
+For example:
+
+Total P/L must equal the sum of all simulated trade P/L values.
+
+Win rate must equal:
+
+winning trades / total completed trades
+
+Do not include incomplete trades in completed-trade statistics unless explicitly documented.
+
+==================================================
+3. EQUITY CURVE
+==================================================
+
+Add a simple equity curve.
+
+The curve must be generated from the actual simulated backtest trades.
+
+It should show how the simulated account balance changed throughout the historical period.
+
+Use the existing backtest starting-balance configuration if one already exists.
+
+If no starting balance exists in the current system, use the simplest appropriate implementation and clearly label the assumption.
+
+Do NOT invent broker fees or slippage.
+
+If fees/slippage are not included, state:
+
+"Fees and slippage are not included."
+
+==================================================
+4. DRAWDOWN
+==================================================
+
+Calculate maximum drawdown from the actual equity curve.
+
+Make the calculation deterministic.
+
+Display the result clearly.
+
+Do not use fabricated data.
+
+==================================================
+5. TRADE LIST
+==================================================
+
+Add a simple trade-history table.
+
+Columns:
+
+- #
+- Direction
+- Entry
+- Exit
+- P/L
+- Result
+- Entry time
+- Exit time
+
+Example:
+
+#1 | BUY | 4412.50 | 4418.20 | +£5.70 | WIN
+
+#2 | SELL | 4419.10 | 4421.00 | -£1.90 | LOSS
+
+Keep the table simple and readable.
+
+==================================================
+6. TRADE DETAILS
+==================================================
+
+Allow the user to select a trade.
+
+Show:
+
+Trade #X
+
+Direction:
+BUY / SELL
+
+Entry:
+Price
+
+Entry time:
+Date/time
+
+Exit:
+Price
+
+Exit time:
+Date/time
+
+P/L:
++£X / -£X
+
+Entry reason:
+[stored reason]
+
+Exit reason:
+[stored reason]
+
+Stop-loss:
+[price or Not used]
+
+Take-profit:
+[price or Not used]
+
+Use the actual stored trade data.
+
+==================================================
+7. HISTORICAL CHART
+==================================================
+
+Add a historical candlestick chart showing the actual candles used by the backtest.
+
+Overlay the actual simulated trades.
+
+Show:
+
+- BUY entries
+- SELL entries
+- Exits
+- Stop-loss when applicable
+- Take-profit when applicable
+
+The chart must use the genuine historical OHLC candles used by the backtest.
+
+Do NOT generate replacement candles.
+
+Do NOT modify the existing live BiQuote chart.
+
+This is a separate historical backtest chart.
+
+==================================================
+8. TRADE SELECTION
+==================================================
+
+When the user selects a trade from the trade table:
+
+- Highlight that trade on the chart.
+- Show its entry marker.
+- Show its exit marker.
+- Show its trade details.
+
+Keep this interaction simple.
+
+==================================================
+9. BACKTEST HISTORY
+==================================================
+
+Add a simple list of previous completed backtests.
+
+Show:
+
+- Strategy
+- Version
+- Instrument
+- Timeframe
+- Date range
+- Number of trades
+- Win rate
+- Total P/L
+
+Allow the user to open a previous backtest and view its results.
+
+Previous backtests must continue using the exact strategy version that was originally selected.
+
+==================================================
+10. FAILED BACKTESTS
+==================================================
+
+If a backtest failed:
+
+Show:
+
+"Backtest failed"
+
+and the stored error message.
+
+Do not display fake performance results.
+
+==================================================
+11. ZERO-TRADE BACKTESTS
+==================================================
+
+For a completed backtest with zero trades:
+
+Show:
+
+- Strategy
+- Version
+- Instrument
+- Timeframe
+- Date range
+- Candles processed
+- 0 trades
+
+Then:
+
+"No trades were generated during this period."
+
+Do not show misleading win rate, profit factor or drawdown values.
+
+==================================================
+12. SIMPLE USER EXPERIENCE
+==================================================
+
+Keep everything beginner-friendly.
+
+The normal workflow should remain:
+
+Select strategy
+↓
+Select version
+↓
+Select instrument
+↓
+Select timeframe
+↓
+Select date range
+↓
+Run Backtest
+↓
+View Results
+
+Do not introduce a complicated settings page.
+
+Do not require the user to understand technical backtesting terminology.
+
+Put advanced information such as execution assumptions inside a small expandable section:
+
+"Backtest assumptions"
+
+==================================================
+13. BACKTEST ASSUMPTIONS
+==================================================
+
+Display the actual assumptions saved by the backtest engine.
+
+Include information such as:
+
+- Signal execution convention
+- Candle-based execution limitations
+- Same-candle SL/TP handling
+- Whether fees are included
+- Whether slippage is included
+
+Do not invent additional assumptions.
+
+==================================================
+14. PERFORMANCE ACCURACY
+==================================================
+
+All displayed statistics must be calculated from the stored simulated trades.
+
+The following must remain consistent:
+
+Trade count
+=
+number of stored completed trades
+
+Winning trades
+=
+number of profitable trades
+
+Losing trades
+=
+number of losing trades
+
+Win rate
+=
+winning trades / completed trades
+
+Total P/L
+=
+sum of trade P/L
+
+Maximum drawdown
+=
+maximum peak-to-trough decline in the calculated equity curve
+
+Do not round intermediate calculations in a way that changes the final result.
+
+==================================================
+15. DATA AND SECURITY
+==================================================
+
+Use the existing server-side APIs.
+
+Do not expose provider credentials.
+
+A user must only be able to access their own backtests and trades once authentication exists.
+
+Do not bypass existing validation.
+
+==================================================
+16. TESTING
+==================================================
+
+Add focused tests for:
+
+1. Results load from a completed backtest.
+2. Trade count matches stored trades.
+3. Winning trade count is correct.
+4. Losing trade count is correct.
+5. Win rate is correct.
+6. Total P/L is correct.
+7. Average winning trade is correct.
+8. Average losing trade is correct.
+9. Largest winner is correct.
+10. Largest loser is correct.
+11. Maximum drawdown is correct.
+12. Profit factor is correct.
+13. Equity curve is generated from actual trades.
+14. Trade table matches stored trades.
+15. Trade details show the correct trade.
+16. Historical chart uses genuine candles.
+17. Chart trade markers correspond to actual trades.
+18. Zero-trade backtests display correctly.
+19. Failed backtests display correctly.
+20. Previous backtests can be opened.
+21. Exact strategy version remains associated with the backtest.
+
+==================================================
+17. REGRESSION
+==================================================
+
+After implementation run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+- Existing BiQuote tests
+- Existing Strategy Builder tests
+- Existing Strategy Monitoring tests
+- Existing Backtesting Part 1 tests
+- Existing Backtesting Part 2 tests
+- Existing News/Economic Calendar tests
+
+Verify that:
+
+- Live BiQuote charts still work.
+- All existing timeframes still work.
+- Market Monitor still works.
+- News still works.
+- Economic Calendar still works.
+- Alerts remain unchanged.
+- Strategy Builder remains unchanged.
+- Backtest engine remains unchanged.
+
+Do not modify unrelated functionality.
+
+==================================================
+IMPORTANT SCOPE
+==================================================
+
+This task is Backtesting Part 3 only.
+
+Do NOT add:
+
+- AI
+- Strategy optimization
+- Parameter optimization
+- Monte Carlo
+- Automatic trading
+- Broker integration
+- Real trading
+- Live trading
+- Trading signals
+- New market-data providers
+- Paid data providers
+- Notifications
+
+Do not rebuild Parts 1 or 2.
+
+Actually implement the Results Dashboard.
+
+Do not stop after planning.
+
+At the end report:
+
+1. What was implemented.
+2. Which statistics were added.
+3. How the equity curve is calculated.
+4. How maximum drawdown is calculated.
+5. How trades are displayed.
+6. How the historical chart works.
+7. How previous backtests are displayed.
+8. Tests passed.
+9. Any limitations.
+10. Confirm Parts 1 and 2 remain intact.
