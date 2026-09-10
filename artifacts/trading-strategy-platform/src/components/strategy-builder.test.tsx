@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StrategyBuilder } from "./strategy-builder";
 
@@ -40,6 +40,7 @@ vi.mock("./strategy-versioning", () => ({
 
 vi.mock("wouter", () => ({
   Link: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
+  useLocation: () => [window.location.pathname + window.location.search],
 }));
 
 const strategy = {
@@ -128,6 +129,30 @@ describe("StrategyBuilder", () => {
     expect(screen.getByTestId("assistant-draft-builder-preview")).toHaveTextContent("Stop loss: 1%; Take profit: 2%");
     expect(screen.getByTestId("input-builder-strategy-name")).toHaveValue("XAUUSD candle review");
     expect(screen.getByTestId("select-builder-direction")).toHaveValue("long");
+  });
+
+  it("reloads the pending draft when assistant query state arrives after the Builder mounted", async () => {
+    const draft = {
+      name: "XAUUSD live handoff",
+      description: "Draft loaded after route state changed.",
+      direction: "long",
+      marketSymbol: "XAUUSD",
+      timeframes: ["1H"],
+      conditions: [],
+      riskManagementRules: "Stop loss: 1%; Take profit: 2%",
+      compatibility: { compatible: true, unsupportedConditions: [] },
+    };
+    state.markets = [{ id: 25, symbol: "XAUUSD", assetClass: "metals" }];
+    const view = render(<StrategyBuilder />);
+
+    expect(screen.getByTestId("input-builder-strategy-name")).toHaveValue("");
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+    window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=review");
+    view.rerender(<StrategyBuilder />);
+
+    await waitFor(() => expect(screen.getByTestId("input-builder-strategy-name")).toHaveValue("XAUUSD live handoff"));
+    expect(screen.getByTestId("select-builder-direction")).toHaveValue("long");
+    expect(screen.getByTestId("input-builder-risk-rules")).toHaveValue("Stop loss: 1%; Take profit: 2%");
   });
 
   it("loads an existing strategy and keeps the live summary in plain language", () => {

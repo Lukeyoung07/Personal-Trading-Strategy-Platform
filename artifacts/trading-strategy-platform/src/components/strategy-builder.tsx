@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Edit3, FileText, Pencil, Plus,
   Save, Search, ShieldCheck, SlidersHorizontal, Trash2, X, Zap,
@@ -609,11 +609,12 @@ function DraftCondition({ condition }: { condition: AssistantStrategyDraft["cond
 }
 
 export function StrategyBuilder() {
+  const [routeLocation] = useLocation();
   const strategies = useListStrategies();
   const markets = useListMarkets();
   const concepts = useListConcepts();
   const queryClient = useQueryClient();
-  const searchParams = new URLSearchParams(window.location.search);
+  const searchParams = useMemo(() => new URLSearchParams(window.location.search), [routeLocation]);
   const requestedStrategyId = Number(searchParams.get("strategyId")) || null;
   const requestedVersionId = Number(searchParams.get("versionId")) || null;
   const requestedAssistantDraft = searchParams.get("assistantDraft") === "1";
@@ -625,6 +626,13 @@ export function StrategyBuilder() {
     if (!requestedAssistantDraft) return null;
     return getPendingAssistantDraft();
   });
+  useEffect(() => {
+    if (!requestedAssistantDraft) {
+      setAssistantDraft(null);
+      return;
+    }
+    setAssistantDraft(getPendingAssistantDraft());
+  }, [requestedAssistantDraft, routeLocation]);
   const [draftImportMessage, setDraftImportMessage] = useState("");
   const [unmatchedDraftConditions, setUnmatchedDraftConditions] = useState<AssistantStrategyDraft["conditions"]>([]);
   const createDraftCondition = useCreateStrategyCondition();

@@ -14,12 +14,15 @@ export function setPendingAssistantDraft(draft: AssistantStrategyDraft) {
 }
 
 export function getPendingAssistantDraft(): AssistantStrategyDraft | null {
-  if (pendingDraft) return pendingDraft;
   try {
     const stored = sessionStorage.getItem(STORAGE_KEY);
-    pendingDraft = stored ? JSON.parse(stored) as AssistantStrategyDraft : null;
-  } catch {
+    if (stored) {
+      pendingDraft = JSON.parse(stored) as AssistantStrategyDraft;
+      return pendingDraft;
+    }
     pendingDraft = null;
+  } catch {
+    // Fall back to the same-tab value when browser storage is unavailable.
   }
   return pendingDraft;
 }
