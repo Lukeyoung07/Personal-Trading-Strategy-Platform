@@ -12,9 +12,11 @@ import {
 } from "@workspace/db";
 import { ChatAssistantResponse, type ChatAssistantBody } from "@workspace/api-zod";
 import { calculateBacktestStatistics } from "./backtest-results";
+import { logger } from "../lib/logger";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODEL = "openrouter/free";
+const OPENROUTER_TIMEOUT_MS = 60000;
 const UNAVAILABLE_MESSAGE = "AI Assistant is currently unavailable.";
 const RATE_LIMIT_MESSAGE = "AI is temporarily unavailable because the free AI service has reached its current limit. Please try again later.";
 
@@ -257,7 +259,7 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
   }
   const context = await contextForRequest(input.context, input.message);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
   try {
     const upstream = await fetch(OPENROUTER_URL, {
       method: "POST",
@@ -275,13 +277,22 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
           ...input.messages.slice(-10),
           { role: "user", content: input.message },
         ],
-        max_tokens: 1600,
+        max_tokens: 1200,
+        reasoning: { effort: "none" },
+        response_format: { type: "json_object" },
       }),
     });
-    if (upstream.status === 429 || upstream.status === 503 || upstream.status === 502) {
-      return ChatAssistantResponse.parse({ status: "rate_limited", reply: RATE_LIMIT_MESSAGE, provider: OPENROUTER_MODEL, intent: null, strategyDraft: null, compatibility: null, backtestSetup: null });
+    if (!upstream.ok) {
+      const errorBody = await upstream.text();
+      logger.warn({
+        upstreamStatus: upstream.status,
+        responseBody: errorBody.slice(0, 500),
+      }, "OpenRouter assistant request was rejected");
+      if (upstream.status === 429 || upstream.status === 503 || upstream.status === 502) {
+        return ChatAssistantResponse.parse({ status: "rate_limited", reply: RATE_LIMIT_MESSAGE, provider: OPENROUTER_MODEL, intent: null, strategyDraft: null, compatibility: null, backtestSetup: null });
+      }
+      throw new Error(`OpenRouter request failed with status ${upstream.status}`);
     }
-    if (!upstream.ok) throw new Error(`OpenRouter request failed with status ${upstream.status}`);
     const payload = await upstream.json() as any;
     const content = typeof payload?.choices?.[0]?.message?.content === "string" ? payload.choices[0].message.content : "";
     const parsed = normalizeModelResponse(parseModelJson(content));
@@ -296,7 +307,11 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
       endDate: input.context.endDate ?? parsed.backtestSetup.endDate,
     } : null;
     return ChatAssistantResponse.parse({ status: "available", provider: OPENROUTER_MODEL, ...parsed, backtestSetup });
-  } catch {
+  } catch (error) {
+    logger.warn({
+      error: error instanceof Error ? error.message : "Unknown assistant error",
+      timedOut: controller.signal.aborted,
+    }, "OpenRouter assistant request failed");
     return ChatAssistantResponse.parse({ status: "unavailable", reply: UNAVAILABLE_MESSAGE, provider: OPENROUTER_MODEL, intent: null, strategyDraft: null, compatibility: null, backtestSetup: null });
   } finally {
     clearTimeout(timeout);
