@@ -1,0 +1,224 @@
+Expand the existing News / Economic Calendar system with additional official public economic calendars.
+
+IMPORTANT:
+
+The current News foundation and Federal Reserve FOMC integration are already implemented and working.
+
+Do NOT rebuild the existing system.
+
+Do NOT remove or replace the Federal Reserve integration.
+
+Do NOT add Trading Economics.
+
+Do NOT use API keys.
+
+Do NOT use paid data providers.
+
+Do NOT use fake or hard-coded future events.
+
+Do NOT bypass CAPTCHAs, anti-bot systems, login requirements, rate limits, or access controls.
+
+GOAL:
+
+Add additional official public economic-calendar sources using the same no-API architecture already implemented.
+
+Potential sources to investigate:
+
+- UK Office for National Statistics (ONS)
+- European Central Bank (ECB)
+- Other official central-bank or government economic-release calendars where public automated access is permitted
+
+IMPORTANT:
+
+Before implementing each source, inspect its current public-access and usage conditions.
+
+Only implement a source if genuine data can be retrieved without bypassing access controls.
+
+If a source blocks automated retrieval or does not permit the intended access method, do NOT attempt to circumvent it.
+
+Simply report that it could not be used.
+
+EXISTING ARCHITECTURE:
+
+Continue using the existing provider-neutral Economic Events service.
+
+Each source must have its own adapter.
+
+Do not put source-specific logic throughout the frontend.
+
+Normalize available information into the existing event model:
+
+- Event name
+- Date/time
+- Region
+- Currency
+- Impact
+- Previous
+- Forecast
+- Actual
+- Release status
+- Source
+- Provider/source identifier where available
+
+Do not invent unavailable fields.
+
+If a source does not provide:
+
+- Forecast
+- Previous
+- Actual
+- Exact time
+- Impact
+
+leave the field null or display "Not provided" / "Not classified" as appropriate.
+
+IMPORTANT:
+
+Do not assume an event has HIGH IMPACT simply because it appears on an official calendar.
+
+If the source does not provide an impact rating, keep it unclassified.
+
+MARKET MAPPINGS:
+
+Use the existing event-to-market mapping system.
+
+Add conservative informational mappings where appropriate.
+
+Examples:
+
+UK economic releases
+→ GBP
+→ UK markets
+→ potentially relevant GBP pairs and UK indices
+
+Euro-area/ECB releases
+→ EUR
+→ European markets
+→ potentially relevant EUR pairs and European indices
+
+US/Federal Reserve releases
+→ USD
+→ Gold
+→ US indices
+
+These are informational relationships only.
+
+Do not make predictions about whether a market will rise or fall.
+
+DEDUPLICATION:
+
+Continue using stable source/provider identifiers.
+
+The same event must not appear multiple times because it came from a refresh.
+
+Do not duplicate the existing FOMC events.
+
+REFRESH:
+
+Use the existing server-side refresh/cache approach.
+
+Handle:
+
+- Source unavailable
+- Network errors
+- Invalid data
+- Changed event information
+- Duplicate events
+
+Never display stale data as newly retrieved data.
+
+NEWS PAGE:
+
+Keep the existing /news interface.
+
+The existing filters must continue working:
+
+- Today
+- Upcoming
+- Recently released
+- All
+- Impact
+- Region
+- Currency
+- Affected market
+- Search
+
+Do not redesign the page.
+
+Do not add AI analysis yet.
+
+Do not add trading recommendations.
+
+Do not add BUY/SELL signals.
+
+Do not add alerts.
+
+Do not add push notifications.
+
+Do not add broker integrations.
+
+Do not add backtesting.
+
+Do not add automatic trading.
+
+COMMERCIAL CONSIDERATION:
+
+This app may eventually become a paid product.
+
+For every new source, document:
+
+- Source name
+- Source URL
+- Whether automated retrieval is permitted/appropriate
+- Any attribution requirement
+- Any important usage limitation
+
+Do not assume that public availability automatically means unrestricted commercial redistribution.
+
+VERIFICATION:
+
+For each successfully implemented source:
+
+1. Retrieve genuine data.
+2. Verify normalization.
+3. Verify source attribution.
+4. Verify deduplication.
+5. Verify event updates.
+6. Verify date/time handling.
+7. Verify missing fields remain empty.
+8. Verify filters.
+9. Verify upcoming/released states.
+10. Verify unavailable-source handling.
+
+Then run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+- Existing Steps 1–8 regression tests
+- Existing BiQuote regression tests
+- Desktop verification
+- Mobile verification
+
+IMPORTANT:
+
+Do not fabricate a source or pretend an integration works.
+
+If a source cannot legally/reliably be accessed without an API or bypassing restrictions, leave it out and report why.
+
+At the end report:
+
+1. Every official source successfully added.
+2. Every source that could not be added and why.
+3. Whether each source requires an API key.
+4. Whether each source costs £0.
+5. What fields each source provides.
+6. What fields are unavailable.
+7. Any attribution/licensing considerations.
+8. Number of genuine events retrieved during testing.
+9. Tests passed.
+10. Any remaining limitations.
+
+Keep the existing Federal Reserve integration working exactly as it does now.
