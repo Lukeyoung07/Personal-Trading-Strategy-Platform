@@ -1,0 +1,774 @@
+TRADEX — FULL APP UI/UX REVAMP + REBRAND
+
+I want a COMPLETE FRONTEND UI/UX REDESIGN of my existing trading application.
+
+The application should now be branded as:
+
+TRADEX
+
+The goal is NOT a small visual update.
+
+The previous redesign did not make enough visible changes, so this time I want a genuine transformation of the application's layout, navigation, visual identity and usability.
+
+The finished application should feel like a completely new, clean and professional trading platform while preserving all existing functionality.
+
+==================================================
+1. BRAND — TRADEX
+==================================================
+
+Rename the visible application branding to:
+
+TradeX
+
+Use this consistently throughout the frontend where the application name is displayed.
+
+Update:
+
+- Application logo/wordmark
+- Sidebar/navigation branding
+- Browser/page titles
+- Dashboard branding
+- Mobile navigation
+- Loading/empty states where appropriate
+- Any other visible references to the old application name
+
+Do not rename internal database identifiers, API identifiers, routes or code unnecessarily.
+
+Only change visible branding where appropriate.
+
+Use:
+
+TRADEX
+Trading Intelligence Platform
+
+as the general branding direction.
+
+==================================================
+2. IMPORTANT — THIS MUST BE A REAL REDESIGN
+==================================================
+
+DO NOT simply:
+
+- Change the colours
+- Change border radius
+- Increase/decrease padding
+- Add a purple gradient
+- Rearrange a few cards
+- Keep the same page layouts
+
+That is NOT enough.
+
+I want the application's INFORMATION ARCHITECTURE and PAGE LAYOUTS redesigned.
+
+When I open the finished application, the difference from the current UI should be immediately obvious.
+
+Think:
+
+"new trading platform"
+
+rather than:
+
+"old application with a new theme."
+
+==================================================
+3. VISUAL STYLE
+==================================================
+
+Create a premium dark trading-platform aesthetic.
+
+Primary direction:
+
+BLACK / DARK + PURPLE
+
+Use:
+
+- Dark/black main background
+- Slightly lighter dark surfaces
+- Purple accent colour
+- White/light primary text
+- Muted secondary text
+- Subtle borders
+- Clear hover states
+- Clear active states
+- Consistent spacing
+
+Purple should be an accent rather than covering the entire interface.
+
+Avoid:
+
+- Excessive neon
+- Excessive glow
+- Giant gradients
+- Gaming-style effects
+- Excessive animations
+- Huge rounded cards everywhere
+- Unnecessary visual clutter
+
+The design should feel like a serious trading/analysis application.
+
+==================================================
+4. NAVIGATION — REDESIGN COMPLETELY
+==================================================
+
+Create a much cleaner navigation system.
+
+Desktop:
+
+Use a compact, modern sidebar.
+
+Mobile:
+
+Use a proper mobile navigation solution.
+
+The current location must be obvious.
+
+Organise the existing functionality logically.
+
+Suggested structure:
+
+WORKSPACE
+- Dashboard
+- Markets
+- Strategies
+- Builder
+- Monitoring
+
+TRADING
+- Journal
+- Performance
+- Backtesting
+
+TOOLS
+- AI Assistant
+- Alerts
+- News
+- Settings
+
+You may adjust this structure if there is a better UX solution.
+
+The important thing is that users should immediately understand where everything is.
+
+==================================================
+5. GLOBAL PAGE STRUCTURE
+==================================================
+
+Every page should have:
+
+- Clear page title
+- Short useful description where needed
+- One obvious primary purpose
+- Important controls immediately accessible
+- Secondary information hidden behind appropriate interactions
+
+Avoid giant pages containing every possible piece of information.
+
+Use:
+
+- Tabs
+- Drawers
+- Modals
+- Expandable sections
+- Detail views
+- Side panels
+
+where appropriate.
+
+I would rather click to see additional information than scroll through a huge page.
+
+==================================================
+6. DASHBOARD
+==================================================
+
+Redesign the Dashboard as a simple overview.
+
+Prioritise:
+
+- Active strategy
+- Active version
+- Current monitoring status
+- Today's P/L
+- Important alerts
+- Recent performance
+- Current market
+
+Do not duplicate entire Markets, Journal or Performance pages inside the Dashboard.
+
+The Dashboard should provide an overview and let me navigate to the detailed pages.
+
+==================================================
+7. MARKETS — MAJOR REDESIGN
+==================================================
+
+This is one of the highest priorities.
+
+When I click Markets, I want the MARKET and CHART to be the main focus.
+
+The screen should primarily contain:
+
+Instrument selector
+Current price
+Market status
+Timeframe controls
+Large chart
+
+The chart should occupy most of the available screen.
+
+Do NOT make me scroll through configuration panels before reaching the chart.
+
+Market selection should be extremely simple.
+
+I should immediately understand:
+
+- What instrument I'm viewing
+- Current price
+- Market status
+- Current timeframe
+
+Secondary information should not dominate the screen.
+
+==================================================
+8. CHART — MAJOR IMPROVEMENT
+==================================================
+
+Make the actual trading chart look substantially more professional.
+
+Keep the existing real BiQuote market data.
+
+Do NOT fabricate market data.
+
+Improve the chart experience with intuitive controls for:
+
+- Zoom in
+- Zoom out
+- Pan left
+- Pan right
+- Return to latest
+- Reset/fit chart
+- Timeframe selection
+
+Where supported by the current chart library, include:
+
+- Crosshair
+- OHLC information
+- Current price marker
+- Clean tooltips
+
+Keep chart controls compact.
+
+Do not surround the chart with unnecessary buttons.
+
+The chart should feel like a proper trading chart.
+
+It must work well on desktop and mobile.
+
+==================================================
+9. JOURNAL — MAJOR REDESIGN
+==================================================
+
+When I open Journal, the MAIN FEATURE should be the monthly trading calendar.
+
+I want to immediately see the current month.
+
+Every day should show the realised P/L when trades exist.
+
+Example:
+
++£8.42
+-£3.17
+£0.00
+
+Positive and negative days should be visually obvious.
+
+Days without trades should remain quiet.
+
+The calendar should be the main focus of the page.
+
+Do NOT put a huge list of statistics above the calendar.
+
+==================================================
+10. JOURNAL DAY DETAILS
+==================================================
+
+When I click a day, open a clean modal, drawer or dedicated detail view.
+
+Show:
+
+- Full date
+- Daily P/L
+- Trade count
+- Winners
+- Losers
+- Win rate
+- Average winner
+- Average loser
+- Best trade
+- Worst trade
+- Individual trades
+- Strategy
+- Exact strategy version
+- Direction
+- Daily notes
+
+Allow notes to be edited and saved.
+
+Closing the detail view should return me to the calendar.
+
+==================================================
+11. RECORD TRADE
+==================================================
+
+Do not permanently display a large trade-entry form.
+
+Have a clear:
+
++ Record Trade
+
+button.
+
+Open the trade form only when requested.
+
+Keep all existing trade fields and functionality.
+
+After saving, return to the Journal.
+
+==================================================
+12. STRATEGY LIBRARY
+==================================================
+
+Redesign Strategies so the main view is extremely easy to scan.
+
+Show primarily:
+
+- Strategy name
+- Market
+- Direction
+- Active/inactive
+- Current version
+
+Do not display every strategy condition on the main list.
+
+Clicking a strategy should open its details.
+
+==================================================
+13. STRATEGY BUILDER
+==================================================
+
+Make the Strategy Builder much easier to understand.
+
+Do not present it as one giant wall of fields.
+
+Organise it into logical sections such as:
+
+Details
+Market
+Timeframe
+Entry
+Exit
+Risk
+Review
+
+Use tabs, steps or expandable sections where appropriate.
+
+Keep:
+
+- Strategy creation
+- Editing
+- Versioning
+- AI draft handoff
+- Review Strategy
+- Save as New Version
+
+working exactly as before.
+
+==================================================
+14. AI ASSISTANT
+==================================================
+
+Redesign the Assistant to feel modern and clean.
+
+Keep the existing AI functionality.
+
+Clearly distinguish:
+
+- User messages
+- AI responses
+- Strategy drafts
+- Unsupported concepts
+- Warnings
+- Review Strategy
+- Save as New Version
+
+The action buttons should be easy to find.
+
+Do not allow the Assistant interface to become visually overwhelming.
+
+==================================================
+15. MONITORING
+==================================================
+
+Make Monitoring immediately understandable.
+
+Prioritise:
+
+Strategy
+Version
+Market
+Overall status
+
+Clearly display:
+
+MET
+NOT MET
+WAITING
+INVALID
+
+Show the reason clearly.
+
+Put technical information into expandable details where possible.
+
+Keep the existing monitoring behaviour unchanged.
+
+==================================================
+16. ALERTS
+==================================================
+
+Make Alerts a clean chronological feed.
+
+Each alert should compactly show:
+
+- Alert
+- Strategy
+- Version
+- Time
+- Reason
+- Acknowledge
+
+Do not make each alert take up huge amounts of space.
+
+==================================================
+17. BACKTESTING
+==================================================
+
+Make the primary flow extremely clear:
+
+Strategy
+→ Version
+→ Market
+→ Date range
+→ Run Backtest
+
+Do not overwhelm the setup screen.
+
+Present results cleanly after a backtest has completed.
+
+Keep all existing calculations and validation.
+
+==================================================
+18. PERFORMANCE
+==================================================
+
+Make Performance primarily visual.
+
+Prioritise:
+
+- P/L
+- Win rate
+- Drawdown
+- Profit factor
+- Equity progression
+
+Use charts where they genuinely improve understanding.
+
+Keep detailed information accessible without making the entire page huge.
+
+==================================================
+19. NEWS / ECONOMIC CALENDAR
+==================================================
+
+Keep the existing functionality.
+
+Present upcoming/released events in a clean, easy-to-scan interface.
+
+Prioritise:
+
+- Event
+- Date/time
+- Currency
+- Impact
+- Affected market
+
+==================================================
+20. SETTINGS
+==================================================
+
+Make Settings easy to navigate.
+
+If there are many settings, group them logically rather than putting everything into one enormous page.
+
+==================================================
+21. RESPONSIVE DESIGN
+==================================================
+
+Mobile is a major requirement.
+
+Do NOT simply shrink the desktop UI.
+
+Actually redesign layouts for:
+
+- 375px
+- 402px
+- 768px
+- Desktop
+
+Pay particular attention to:
+
+- Navigation
+- Markets
+- Chart
+- Journal calendar
+- Journal day details
+- Strategy Builder
+- AI Assistant
+- Backtesting
+- Tables
+- Modals
+- Drawers
+
+Avoid unnecessary horizontal scrolling.
+
+Make buttons and controls comfortable to use on touch screens.
+
+==================================================
+22. REMOVE EXCESSIVE SCROLLING
+==================================================
+
+This is a major problem with the current interface.
+
+For every page, ask:
+
+"What is the ONE main thing the user came here to do?"
+
+Show that first.
+
+Examples:
+
+Markets → Chart
+Journal → Monthly calendar
+Strategies → Strategy list
+Builder → Build strategy
+Backtesting → Configure/run test
+Performance → Performance analysis
+Monitoring → Current strategy status
+Alerts → Alerts
+AI Assistant → Assistant
+
+Everything else should be secondary.
+
+==================================================
+23. DESIGN SYSTEM
+==================================================
+
+Create one consistent visual system across TradeX.
+
+Standardise:
+
+- Typography
+- Spacing
+- Buttons
+- Inputs
+- Dropdowns
+- Tabs
+- Cards
+- Tables
+- Modals
+- Drawers
+- Status badges
+- Calendar
+- Charts
+- Loading states
+- Empty states
+- Error states
+
+The entire application should feel like one cohesive product.
+
+==================================================
+24. DO NOT BREAK EXISTING FUNCTIONALITY
+==================================================
+
+Preserve all existing functionality including:
+
+- BiQuote
+- Market data
+- Strategy creation
+- Strategy editing
+- Strategy versioning
+- Strategy Builder
+- AI Assistant
+- AI strategy drafts
+- Trading concepts
+- Monitoring
+- Alerts
+- News/calendar
+- Backtesting
+- Journal
+- Performance
+- Settings
+
+Do not introduce:
+
+- Fake market data
+- Fake trades
+- Fake performance
+- Fake backtests
+- Automatic trading
+- Broker execution
+- Unsupported futures functionality
+
+Do not modify backend logic unless absolutely necessary to support a genuine frontend bug fix.
+
+==================================================
+25. FIX UI BUGS YOU FIND
+==================================================
+
+While redesigning, if you find genuine frontend bugs:
+
+1. Reproduce them.
+2. Identify the cause.
+3. Fix them.
+4. Test the fix.
+5. Run regression tests.
+
+Do not change working trading logic unnecessarily.
+
+==================================================
+26. IMPORTANT IMPLEMENTATION APPROACH
+==================================================
+
+FIRST inspect the existing application and understand its current frontend architecture.
+
+Then redesign the existing pages/components.
+
+Do not create unnecessary duplicate implementations.
+
+Reuse existing functionality where appropriate.
+
+However, DO restructure pages when the current structure is causing the clutter and excessive scrolling.
+
+The goal is not to preserve the current layout.
+
+The goal is to preserve the functionality while creating a much better interface.
+
+==================================================
+27. SUCCESS CRITERIA
+==================================================
+
+The redesign is NOT complete if:
+
+- It only looks slightly different
+- The old layouts remain mostly unchanged
+- The same huge pages still exist
+- The same excessive scrolling remains
+- Markets still feels cluttered
+- Journal still feels cluttered
+- Navigation is still confusing
+
+The redesign IS complete when:
+
+- TradeX has a clear identity
+- Navigation is immediately understandable
+- Pages have a clear purpose
+- Markets feels like a proper trading workspace
+- The chart is a major focal point
+- Journal feels like a proper trading calendar
+- Secondary information is accessed when needed
+- Scrolling is significantly reduced
+- Mobile feels intentionally designed
+- The entire application feels cohesive
+
+==================================================
+28. FINAL QA
+==================================================
+
+After implementation, test the real application.
+
+Test:
+
+- Dashboard
+- Markets
+- Chart
+- Strategies
+- Strategy Builder
+- AI Assistant
+- Monitoring
+- Alerts
+- News
+- Backtesting
+- Journal
+- Performance
+- Settings
+
+Test important workflows, not just whether pages load.
+
+Test at:
+
+1440px
+768px
+402px
+375px
+
+Verify:
+
+- Navigation
+- Market selection
+- Live chart
+- Zoom/pan controls
+- Journal calendar
+- Journal day details
+- Trade recording
+- Strategy creation
+- Strategy editing
+- AI Review Strategy
+- Save as New Version
+- Monitoring
+- Alerts
+- Backtesting
+- Performance
+
+Run:
+
+- Frontend tests
+- API tests
+- Typechecks
+- Production builds
+- git diff --check
+
+Check the browser console for errors.
+
+Fix genuine regressions caused by the redesign.
+
+Do NOT declare the task complete simply because the application compiles.
+
+The visual transformation is the PRIMARY deliverable.
+
+==================================================
+FINAL GOAL
+==================================================
+
+I want TradeX to feel like a clean, modern, professional trading platform.
+
+The user should be able to open any page and immediately understand:
+
+WHERE THEY ARE
+WHAT THEY ARE LOOKING AT
+WHAT THEY CAN DO
+WHERE TO GO NEXT
+
+The biggest priority is:
+
+SIMPLICITY + CLARITY + PROFESSIONAL DESIGN.
+
+Do not sacrifice existing functionality.
+
+Do not merely restyle the current application.
+
+Actually redesign it.

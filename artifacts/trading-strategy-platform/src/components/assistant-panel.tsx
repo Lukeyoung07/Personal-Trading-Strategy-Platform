@@ -433,7 +433,7 @@ export function AssistantPanel({
               <Sparkles size={17} />
             </div>
             <div>
-              <div className="eyebrow">Tandem copilot</div>
+               <div className="eyebrow">TradeX copilot</div>
               <h2 id="assistant-panel-title" className="mt-1 text-base font-bold tracking-tight">AI Trading Assistant</h2>
               <div className="mt-1 flex max-w-[280px] items-center gap-1.5 truncate text-[10px] text-muted-foreground">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />

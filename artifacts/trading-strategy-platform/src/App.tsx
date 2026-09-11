@@ -35,17 +35,26 @@ import { setPendingAssistantDraft } from '@/lib/assistant-draft-store';
 import '@/index.css';
 
 const queryClient = new QueryClient();
-const nav = [
-  { href:'/', label:'Overview', icon:LayoutDashboard },
-  { href:'/strategy-builder', label:'Builder', icon:SlidersHorizontal },
-  { href:'/strategy-library', label:'Strategies', icon:Boxes },
-  { href:'/market-monitor', label:'Markets', icon:BarChart3 },
-  { href:'/trade-journal', label:'Journal', icon:BookOpen },
-  { href:'/performance', label:'Performance', icon:TrendingUp },
-  { href:'/strategy-monitoring', label:'Monitor', icon:Activity },
-  { href:'/alerts', label:'Alerts', icon:Bell },
-  { href:'/news', label:'News', icon:CalendarClock },
+const navGroups = [
+  { label: 'Workspace', items: [
+    { href:'/', label:'Overview', icon:LayoutDashboard },
+    { href:'/market-monitor', label:'Markets', icon:BarChart3 },
+    { href:'/strategy-library', label:'Strategies', icon:Boxes },
+  ]},
+  { label: 'Trading', items: [
+    { href:'/strategy-builder', label:'Builder', icon:SlidersHorizontal },
+    { href:'/strategy-monitoring', label:'Monitor', icon:Activity },
+    { href:'/trade-journal', label:'Journal', icon:BookOpen },
+    { href:'/performance', label:'Performance', icon:TrendingUp },
+  ]},
+  { label: 'Tools', items: [
+    { href:'/alerts', label:'Alerts', icon:Bell },
+    { href:'/news', label:'News', icon:CalendarClock },
+    { href:'/backtesting', label:'Backtesting', icon:Clock3 },
+    { href:'/settings', label:'Settings', icon:Settings },
+  ]},
 ];
+const nav = navGroups.flatMap(group => group.items);
 
 function Shell({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -83,27 +92,26 @@ function Shell({ children }: { children: ReactNode }) {
   };
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`} aria-label="Primary navigation">
-      <div className="px-5 pt-6 pb-7 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-sm shadow-primary/20"><Target size={17}/></div>
-        <div className="brand-copy"><div className="font-bold tracking-tight text-sm">Tandem</div><div className="mono text-[9px] text-muted-foreground mt-0.5">TRADING WORKSPACE</div></div>
+      <div className="brand-lockup px-5 pt-6 pb-7 flex items-center gap-3">
+        <div className="brand-mark"><Target size={17}/></div>
+        <div className="brand-copy"><div className="font-bold tracking-tight text-sm">TradeX</div><div className="mono text-[9px] text-muted-foreground mt-0.5">TRADING INTELLIGENCE PLATFORM</div></div>
       </div>
-      <div className="side-caption px-5 mb-2 eyebrow">Core workspace</div>
       <nav className="flex-1">
-        {nav.map(({href,label,icon:Icon}) => <Link key={href} href={href} title={label} aria-current={isNavActive(href, location) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase()}`} className={`nav-link ${isNavActive(href, location) ? 'active' : ''}`} onClick={()=>setMobileOpen(false)}><Icon size={16}/><span className="nav-label">{label}</span>{isNavActive(href, location) && <span className="ml-auto nav-label w-1.5 h-1.5 rounded-full bg-primary"/>}</Link>)}
-        <div className="side-caption px-5 mt-7 mb-2 eyebrow">Utilities</div>
-        <Link href="/backtesting" title="Backtesting" aria-current={isNavActive('/backtesting', location) ? 'page' : undefined} data-testid="link-nav-backtesting" className={`nav-link ${isNavActive('/backtesting', location) ? 'active' : ''}`} onClick={()=>setMobileOpen(false)}><Clock3 size={16}/><span className="nav-label">Backtesting</span></Link>
-        <Link href="/settings" title="Settings" aria-current={isNavActive('/settings', location) ? 'page' : undefined} data-testid="link-nav-settings" className={`nav-link ${isNavActive('/settings', location) ? 'active' : ''}`} onClick={()=>setMobileOpen(false)}><Settings size={16}/><span className="nav-label">Settings</span></Link>
+        {navGroups.map(group => <div className="nav-group" key={group.label}>
+          <div className="side-caption px-5 mb-2 eyebrow">{group.label}</div>
+          {group.items.map(({href,label,icon:Icon}) => <Link key={href} href={href} title={label} aria-current={isNavActive(href, location) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase()}`} className={`nav-link ${isNavActive(href, location) ? 'active' : ''}`} onClick={()=>setMobileOpen(false)}><Icon size={16}/><span className="nav-label">{label}</span>{isNavActive(href, location) && <span className="ml-auto nav-label w-1.5 h-1.5 rounded-full bg-primary"/>}</Link>)}
+        </div>)}
       </nav>
       <div className="side-footer-copy px-5 py-6 border-t border-sidebar-border">
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><span className="w-2 h-2 bg-primary rounded-full"/>Private workspace</div>
-        <div className="mono text-[10px] text-muted-foreground mt-2 opacity-60">RECORDS OVER SIGNAL</div>
+         <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><span className="status-dot"/>Private workspace</div>
+         <div className="mono text-[10px] text-muted-foreground mt-2 opacity-60">RECORDS OVER SIGNAL</div>
       </div>
     </aside>
     <main className="main-shell">
       <header className="topbar">
         <button className="btn btn-ghost md:hidden mobile-menu-toggle" onClick={()=>setMobileOpen(!mobileOpen)} aria-expanded={mobileOpen} aria-label="Toggle navigation" data-testid="button-toggle-menu"><Menu size={18}/></button>
         <div className="mobile-page-title">{pageName(location)}</div>
-        <div className="hidden md:flex items-center gap-2 text-[11px] text-muted-foreground"><span className="w-1.5 h-1.5 bg-primary rounded-full"/> Personal workspace <ChevronRight size={13}/><span className="text-foreground">{pageName(location)}</span></div>
+         <div className="hidden md:flex items-center gap-2 text-[11px] text-muted-foreground"><span className="status-dot"/> TradeX workspace <ChevronRight size={13}/><span className="text-foreground">{pageName(location)}</span></div>
         <div className="flex items-center gap-3 ml-auto"><span className="mono text-[10px] text-muted-foreground mobile-hide">LOCAL RECORDS / NO FEED</span><div className="w-7 h-7 rounded-full border border-primary/40 text-primary flex items-center justify-center text-[10px] font-bold">TR</div></div>
       </header>
       {children}
@@ -145,9 +153,9 @@ function Dashboard() {
   const strategies=useListStrategies(); const monitors=useListStrategyMonitors(); const trades=useListTrades(); const alerts=useListAlerts();
   const activeStrategy=strategies.data?.find(strategy=>strategy.status==='active') ?? null;
   const activeMonitor=activeStrategy ? monitors.data?.find(monitor=>monitor.strategyId===activeStrategy.id) : undefined;
-  if(q.isLoading) return <Page eyebrow="Overview" title="Good to see you." description="Your workspace, kept deliberately close to the record."><LoadingBlock/></Page>;
-  if(q.isError) return <Page eyebrow="Overview" title="Good to see you."><ErrorState retry={()=>q.refetch()}/></Page>;
-  return <Page eyebrow="Overview" title="Good to see you." description="A quiet view of what you have built, recorded, and still need to examine.">
+  if(q.isLoading) return <Page eyebrow="Workspace / Overview" title="Trading intelligence, in one view." description="Your workspace, kept deliberately close to the record."><LoadingBlock/></Page>;
+  if(q.isError) return <Page eyebrow="Workspace / Overview" title="Trading intelligence, in one view."><ErrorState retry={()=>q.refetch()}/></Page>;
+  return <Page eyebrow="Workspace / Overview" title="Trading intelligence, in one view." description="A focused read of what you have built, recorded, and still need to examine.">
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
       <Stat label="Strategies" value={summary?.strategyCount??0} sub={`${summary?.activeStrategyCount??0} active`} icon={Boxes}/>
       <Stat label="Journal entries" value={summary?.tradeCount??0} sub={summary?.latestTradeAt?`Last ${formatDate(summary.latestTradeAt)}`:'No entries yet'} icon={BookOpen}/>
