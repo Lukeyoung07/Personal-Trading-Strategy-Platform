@@ -6,6 +6,7 @@
 - [BiQuote regression testing](biquote-regression-testing.md) — frontend Vitest uses a standalone jsdom/React config because the app Vite config requires runtime env variables.
 - [Market selection persistence](market-selection-persistence.md) — persisted monitor selections must be cleared when their instrument no longer exists, or stale streams reconnect against deleted records.
 - [Market catalog presentation](market-catalog-presentation.md) — provider descriptions are the only human-facing names; empty provider categories stay visible but unavailable with an explicit explanation.
+- [Chart interaction model](chart-interaction-model.md) — the Markets chart is a custom SVG; extend its native pointer model for pan, zoom, axis scaling, and crosshair rather than replacing it.
 - [Economic calendar boundaries](economic-calendar-boundaries.md) — provider-neutral events use stable source deduplication, structured market mappings, and an honest disconnected state until a calendar provider is connected.
 - [Assistant provider boundary](assistant-provider-boundary.md) — the assistant uses only server-side OpenRouter free routing with no paid fallback or fabricated data.
 - [Assistant backtest context](assistant-backtest-context.md) — result explanations require an explicit completed persisted backtest and honest no-data handling.

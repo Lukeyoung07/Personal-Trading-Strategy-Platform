@@ -986,6 +986,8 @@ function CandleSvg({
       originalVerticalScale: verticalScale,
       didMove: false,
     };
+    setHoveredIndex(null);
+    setHoverPoint(null);
     lastPointerWasDrag.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -1061,8 +1063,8 @@ function CandleSvg({
         <text x={width - pad.right} y={height - 8} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(visibleBars[visibleBars.length - 1].openTime).toLocaleString()}</text>
          <text x={width - pad.right} y={pad.top + 10} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{displayHigh.toFixed(5)}</text>
          <text x={width - pad.right} y={height - pad.bottom - 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{displayLow.toFixed(5)}</text>
-         <path d={`M ${width - pad.right - 55} ${pad.top} H ${width - pad.right} V ${height - pad.bottom} H ${width - pad.right - 55} Z`} fill="transparent" pointerEvents="all" aria-label="Drag to scale price axis" />
-         <path d={`M ${pad.left} ${height - pad.bottom - 22} H ${width - pad.right} V ${height - pad.bottom} H ${pad.left} Z`} fill="transparent" pointerEvents="all" aria-label="Drag to scale time axis" />
+         <path d={`M ${width - pad.right - 55} ${pad.top} H ${width - pad.right} V ${height - pad.bottom} H ${width - pad.right - 55} Z`} fill="transparent" pointerEvents="all" style={{ cursor: "ns-resize" }} aria-label="Drag to scale price axis" />
+         <path d={`M ${pad.left} ${height - pad.bottom - 22} H ${width - pad.right} V ${height - pad.bottom} H ${pad.left} Z`} fill="transparent" pointerEvents="all" style={{ cursor: "ew-resize" }} aria-label="Drag to scale time axis" />
        </svg>
       </div>
       {hoveredIndex != null && visibleBars[hoveredIndex] && <div className="chart-hover-readout" role="status">
