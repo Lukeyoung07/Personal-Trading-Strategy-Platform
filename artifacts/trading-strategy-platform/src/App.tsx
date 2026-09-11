@@ -9,13 +9,13 @@ import {
 } from 'lucide-react';
 import {
   AlertStatus, getGetDashboardSummaryQueryKey, getGetPerformanceSummaryQueryKey, getGetSettingsQueryKey,
-  getListBacktestsQueryKey, useCreateBacktest, useListBacktests,
+  getListBacktestsQueryKey, getListStrategyVersionConditionsQueryKey, useCreateBacktest, useListBacktests,
   getGetStrategyQueryKey, getListAlertsQueryKey, getListConceptsQueryKey, getListConditionsQueryKey,
   getListMarketsQueryKey, getListStrategiesQueryKey, getListStrategyVersionsQueryKey, getListTradesQueryKey,
   useCreateAlert, useCreateConcept, useCreateCondition, useCreateMarket, useCreateStrategy, useCreateStrategyVersion,
   useCreateTrade, useDeleteAlert, useDeleteConcept, useDeleteCondition, useDeleteMarket, useDeleteStrategy,
   useDeleteTrade, useGetDashboardSummary, useGetPerformanceSummary, useGetSettings, useGetStrategy, useListAlerts,
-  useListConcepts, useListConditions, useListMarkets, useListStrategies, useListStrategyMonitors, useListStrategyVersions, useListTimeframes, useListTrades,
+  useListConcepts, useListConditions, useListMarkets, useListStrategies, useListStrategyMonitors, useListStrategyVersionConditions, useListStrategyVersions, useListTimeframes, useListTrades,
   useUpdateAlert, useUpdateConcept, useUpdateCondition, useUpdateMarket, useUpdateSettings, useUpdateStrategy,
   useUpdateTrade, type Alert, type AssistantStrategyDraft, type Backtest, type Condition, type Market, type Strategy, type StrategyMonitor, type Trade, type TradingConcept
 } from '@workspace/api-client-react';
@@ -434,6 +434,14 @@ function backtestErrorCopy(value: unknown) {
   return "This backtest could not run. Check the selected setup and try again.";
 }
 
+function historicalRuleSupported(rule: string | null | undefined) {
+  if (!rule?.trim()) return false;
+  const normalized = rule.trim().toLowerCase().replace(/[()[\],]/g, " ").replace(/\s+/g, " ");
+  if (["always", "bullish", "bullish candle", "bearish", "bearish candle"].includes(normalized)) return true;
+  if (/^(open|high|low|close) crosses (above|below) previous[_ ](open|high|low|close)$/.test(normalized)) return true;
+  return /^(open|high|low|close|previous[_ ](?:open|high|low|close))\s*(>=|<=|>|<|=|==)\s*(open|high|low|close|previous[_ ](?:open|high|low|close)|\d+(?:\.\d+)?)$/.test(normalized);
+}
+
 function presetRange(preset: string) {
   const end = new Date();
   const days = preset === "last_30_days" ? 30 : preset === "last_90_days" ? 90 : 7;
@@ -470,6 +478,12 @@ function Backtesting() {
     query: {
       enabled: strategyId != null,
       queryKey: getListStrategyVersionsQueryKey(strategyId ?? 0),
+    },
+  });
+  const versionConditions = useListStrategyVersionConditions(strategyId ?? 0, versionId ?? 0, {
+    query: {
+      enabled: versionId != null,
+      queryKey: getListStrategyVersionConditionsQueryKey(strategyId ?? 0, versionId ?? 0),
     },
   });
   const queryClient = useQueryClient();
@@ -520,6 +534,12 @@ function Backtesting() {
   const chosenVersion = versions.data?.find(version => version.id === versionId);
   const chosenInstrument = markets.data?.find(market => market.id === instrumentId);
   const chosenTimeframe = timeframes.data?.find(timeframe => timeframe.id === timeframeId);
+  const unsupportedVersionConditions = (versionConditions.data || [])
+    .filter(condition => !historicalRuleSupported(condition.triggerRules || condition.conceptDetectionRules))
+    .map(condition => condition.name || "Unnamed condition");
+  const hasEntryRule = Boolean((versionConditions.data || []).some(condition => condition.stage === "entry" || condition.stage === "confirmation") || chosenVersion?.entryRules?.trim());
+  const compatibilityLoading = versionId != null && versionConditions.isLoading;
+  const backtestReady = Boolean(chosenVersion && !compatibilityLoading && hasEntryRule && unsupportedVersionConditions.length === 0);
   const periodLabel = preset === "custom" ? `${startDate || "Start"} – ${endDate || "End"}` : preset === "last_30_days" ? "Last 30 days" : preset === "last_90_days" ? "Last 90 days" : "Last 7 days";
 
   return <Page eyebrow="Utilities" title="Backtesting" description="Run a historical review from your saved strategy versions using genuine provider candles.">
@@ -580,9 +600,14 @@ function Backtesting() {
            </div>
            <p className="text-[11px] text-muted-foreground mt-4">Nothing runs until you choose Run Backtest. The selected strategy version will remain fixed for this run.</p>
          </section>
+          <section className={`rounded-lg border p-4 md:p-5 ${compatibilityLoading || backtestReady ? "border-primary/25 bg-primary/5" : "border-amber-500/40 bg-amber-500/10"}`} data-testid="backtest-compatibility">
+            <div className="eyebrow">Compatibility check</div>
+            <h3 className="font-semibold mt-2">{compatibilityLoading ? "Checking the selected version…" : backtestReady ? "✓ Ready to backtest" : "⚠ Review required before backtesting"}</h3>
+            {compatibilityLoading ? <p className="text-xs text-muted-foreground mt-2">TradeX is checking the exact saved version before any historical data is requested.</p> : backtestReady ? <p className="text-xs text-muted-foreground mt-2">Every saved condition for this exact version has an executable historical rule.</p> : <div className="text-xs text-amber-100 mt-2 leading-relaxed"><p>This strategy contains conditions that Backtesting cannot currently execute. No run will be created.</p><ul className="mt-2 space-y-1">{!chosenVersion && <li>• Select an exact strategy version</li>}{!hasEntryRule && <li>• Add an executable entry condition or entry rule</li>}{unsupportedVersionConditions.map(condition => <li key={condition}>• {condition}</li>)}</ul></div>}
+          </section>
         <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
           <p className="text-xs text-muted-foreground">The server evaluates completed candles chronologically and saves simulated trades separately from the journal.</p>
-          <button className="btn btn-primary whitespace-nowrap" type="submit" disabled={create.isPending || strategies.isLoading || markets.isLoading || timeframes.isLoading}>{create.isPending ? "Saving…" : "Run Backtest"}</button>
+           <button className="btn btn-primary whitespace-nowrap" type="submit" disabled={create.isPending || strategies.isLoading || markets.isLoading || timeframes.isLoading || compatibilityLoading || !backtestReady}>{create.isPending ? "Saving…" : "Run Backtest"}</button>
         </div>
         {create.isSuccess && create.data?.status === "completed" && <p className="text-sm text-primary">Backtest completed: {create.data.candlesProcessed} candles processed and {create.data.tradeCount} simulated trades saved. {create.data.resultMessage}</p>}
         {create.isSuccess && create.data?.status === "failed" && <p className="text-sm text-destructive">Backtest failed: {backtestErrorCopy(create.data.errorMessage)}</p>}

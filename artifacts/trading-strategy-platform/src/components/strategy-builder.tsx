@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Edit3, FileText, Pencil, Plus,
+  ArrowDown, ArrowRight, ArrowUp, Check, ChevronDown, ChevronRight, Edit3, FileText, Pencil, Plus,
   Save, Search, ShieldCheck, SlidersHorizontal, Trash2, X, Zap,
 } from "lucide-react";
 import {
@@ -16,12 +16,14 @@ import {
   useListMarkets,
   useListStrategies,
   useListStrategyConditions,
+  useListTimeframes,
   useReorderStrategyConditions,
   useUpdateStrategy,
   useUpdateStrategyCondition,
   type Market,
   type Strategy,
   type StrategyCondition,
+  type Timeframe,
   type TradingConcept,
   type AssistantStrategyDraft,
 } from "@workspace/api-client-react";
@@ -157,7 +159,7 @@ function SearchableConcept({ concepts, value, onChange }: { concepts: TradingCon
   </div>;
 }
 
-function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { strategy: Strategy | null; markets: Market[]; onClose?: () => void; onSaved: (strategy: Strategy) => void; initialDraft?: AssistantStrategyDraft | null }) {
+function StrategyForm({ strategy, markets, timeframes, onClose, onSaved, initialDraft }: { strategy: Strategy | null; markets: Market[]; timeframes: Timeframe[]; onClose?: () => void; onSaved: (strategy: Strategy) => void; initialDraft?: AssistantStrategyDraft | null }) {
   const create = useCreateStrategy();
   const update = useUpdateStrategy();
   const queryClient = useQueryClient();
@@ -166,11 +168,16 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
     ? markets.find(market => market.symbol.toLowerCase() === initialDraft.marketSymbol?.toLowerCase())?.id
     : undefined;
   const [selectedMarketId, setSelectedMarketId] = useState(() => String(strategy?.marketId || draftMarketId || ""));
+  const initialTimeframes = strategy?.timeframes || initialDraft?.timeframes || [];
+  const [selectedTimeframes, setSelectedTimeframes] = useState<string[]>(initialTimeframes);
   const marketSelectionTouched = useRef(false);
   useEffect(() => {
     if (marketSelectionTouched.current) return;
     setSelectedMarketId(String(strategy?.marketId || draftMarketId || ""));
   }, [strategy?.id, strategy?.marketId, draftMarketId]);
+  useEffect(() => {
+    setSelectedTimeframes(strategy?.timeframes || initialDraft?.timeframes || []);
+  }, [strategy?.id, initialDraft?.name]);
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -179,14 +186,15 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
       setError("Please give your strategy a name.");
       return;
     }
-    const timeframes = String(form.get("timeframes") || "").split(",").map(value => value.trim()).filter(Boolean);
+     const typedTimeframes = String(form.get("timeframes") || "").split(",").map(value => value.trim()).filter(Boolean);
+     const savedTimeframes = timeframes.length ? selectedTimeframes : typedTimeframes;
     const data = {
       name,
       description: String(form.get("description") || "") || null,
        marketId: form.get("marketId") ? Number(form.get("marketId")) : null,
       assetClass: String(form.get("assetClass") || "") || null,
        direction: strategy ? strategy.direction : String(form.get("direction") || initialDraft?.direction || "both") as "long" | "short" | "both",
-      timeframes,
+       timeframes: savedTimeframes,
        riskManagementRules: strategy ? strategy.riskManagementRules : String(form.get("riskManagementRules") || initialDraft?.riskManagementRules || "") || null,
       resetRules: String(form.get("resetRules") || "") || null,
       alertRules: String(form.get("alertRules") || "") || null,
@@ -235,9 +243,17 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
          <p className="mt-1">Direction and exit rules are edited once in the Builder controls after this strategy is saved.</p>
        </div>}
     </div>
-    <Field label="Timeframes" hint="Separate multiple timeframes with commas. This is descriptive only; it does not connect to market data.">
-       <input className="input mono" name="timeframes" defaultValue={strategy?.timeframes?.join(", ") || initialDraft?.timeframes.join(", ") || ""} placeholder="e.g. Daily, 4H, 15m" data-testid="input-builder-timeframes" />
-    </Field>
+     <Field label="Timeframes" hint="Choose from the active TradeX timeframes. These describe where the strategy is reviewed; they do not create signals.">
+       {timeframes.length ? <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="builder-timeframe-options">
+         {timeframes.filter(timeframe => timeframe.isActive).map(timeframe => {
+           const selected = selectedTimeframes.some(value => value.toLowerCase() === timeframe.code.toLowerCase() || value.toLowerCase() === timeframe.label.toLowerCase());
+           return <label key={timeframe.id} className={`rounded-md border p-3 cursor-pointer ${selected ? "border-primary bg-primary/10" : "border-border hover:bg-secondary"}`}>
+             <span className="flex items-center gap-2"><input type="checkbox" checked={selected} onChange={event => setSelectedTimeframes(current => event.target.checked ? [...current.filter(value => value !== timeframe.code), timeframe.code] : current.filter(value => value.toLowerCase() !== timeframe.code.toLowerCase() && value.toLowerCase() !== timeframe.label.toLowerCase()))} data-testid={`checkbox-builder-timeframe-${timeframe.code}`} /><span className="text-sm font-semibold">{timeframe.label}</span></span>
+             <span className="block text-[10px] text-muted-foreground mt-1 ml-5">{timeframe.code}</span>
+           </label>;
+         })}
+       </div> : <input className="input mono" name="timeframes" defaultValue={initialTimeframes.join(", ")} placeholder="e.g. Daily, 4H, 15m" data-testid="input-builder-timeframes" />}
+     </Field>
     <details className="border-t border-border pt-6 group" data-testid="builder-advanced-notes">
       <summary className="cursor-pointer list-none flex items-center justify-between">
         <span><span className="eyebrow">Advanced notes</span><span className="block text-xs text-muted-foreground mt-2">Optional reset, risk, and review notes.</span></span>
@@ -256,7 +272,7 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
   </form>;
 }
 
-function ConditionModal({ strategyId, concepts, condition, onClose, onSaved }: { strategyId: number; concepts: TradingConcept[]; condition: StrategyCondition | null; onClose: () => void; onSaved: () => void }) {
+function ConditionModal({ strategyId, concepts, timeframes, condition, defaultStage, onClose, onSaved }: { strategyId: number; concepts: TradingConcept[]; timeframes: Timeframe[]; condition: StrategyCondition | null; defaultStage: "entry" | "confirmation" | "exit"; onClose: () => void; onSaved: () => void }) {
   const create = useCreateStrategyCondition();
   const update = useUpdateStrategyCondition();
   const queryClient = useQueryClient();
@@ -308,6 +324,8 @@ function ConditionModal({ strategyId, concepts, condition, onClose, onSaved }: {
     else create.mutate({ strategyId, data }, { onSuccess: done, onError });
   };
   const busy = create.isPending || update.isPending;
+  const activeTimeframes = timeframes.filter(timeframe => timeframe.isActive);
+  const timeframeKnown = activeTimeframes.some(timeframe => timeframe.code.toLowerCase() === (condition?.timeframe || "").toLowerCase() || timeframe.label.toLowerCase() === (condition?.timeframe || "").toLowerCase());
   return <Modal title={condition ? "Edit condition" : "Add condition"} onClose={onClose}>
     <form onSubmit={save} className="space-y-5">
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive" role="alert" data-testid="status-builder-condition-error">{error}</div>}
@@ -317,7 +335,7 @@ function ConditionModal({ strategyId, concepts, condition, onClose, onSaved }: {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Condition name" hint="Use words you would say out loud."><input className="input" name="name" defaultValue={condition?.name || ""} placeholder="e.g. Candle confirms momentum" data-testid="input-builder-condition-name" /></Field>
         <Field label="Stage">
-          <select className="select" name="stage" defaultValue={condition?.stage || "entry"} data-testid="select-builder-condition-stage">
+           <select className="select" name="stage" defaultValue={condition?.stage || defaultStage} data-testid="select-builder-condition-stage">
             {STAGES.map(stage => <option key={stage.value} value={stage.value}>{stage.label}</option>)}
           </select>
         </Field>
@@ -336,8 +354,14 @@ function ConditionModal({ strategyId, concepts, condition, onClose, onSaved }: {
         {rulePreset && rulePreset !== "custom" && <div className={`mt-3 rounded-md p-3 text-xs ${RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported ? "bg-background/70 text-muted-foreground" : "border border-amber-500/40 bg-amber-500/10 text-amber-200"}`}><ShieldCheck size={14} className={`inline mr-2 ${RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported ? "text-primary" : "text-amber-300"}`} />{RULE_PRESETS.find(preset => preset.value === rulePreset)?.description}{!RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported && <strong className="block mt-1 ml-6">Not currently supported by Backtesting.</strong>}</div>}
         {rulePreset === "custom" && <Field label="Technical rule" hint="Only use this for a rule already supported by Backtesting: OHLC comparisons, bullish, bearish, always, or previous-candle crossing rules."><textarea className="textarea mt-2" name="customRule" defaultValue={condition?.triggerRules || ""} placeholder="e.g. close > previous_high" data-testid="input-builder-condition-custom-rule" /></Field>}
       </section>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Field label="Timeframe" hint="Example: 4H or 15m."><input className="input" name="timeframe" defaultValue={condition?.timeframe || ""} placeholder="e.g. 4H" data-testid="input-builder-condition-timeframe" /></Field>
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <Field label="Timeframe" hint="Choose an active timeframe for this condition.">
+           {activeTimeframes.length ? <select className="select" name="timeframe" defaultValue={condition?.timeframe && timeframeKnown ? activeTimeframes.find(timeframe => timeframe.code.toLowerCase() === condition.timeframe?.toLowerCase() || timeframe.label.toLowerCase() === condition.timeframe?.toLowerCase())?.code : ""} data-testid="select-builder-condition-timeframe">
+             <option value="">Choose timeframe</option>
+             {condition?.timeframe && !timeframeKnown && <option value={condition.timeframe}>{condition.timeframe} · saved value</option>}
+             {activeTimeframes.map(timeframe => <option key={timeframe.id} value={timeframe.code}>{timeframe.label} · {timeframe.code}</option>)}
+           </select> : <input className="input" name="timeframe" defaultValue={condition?.timeframe || ""} placeholder="e.g. 4H" data-testid="input-builder-condition-timeframe" />}
+         </Field>
         <Field label="Direction">
           <select className="select" name="direction" defaultValue={condition?.direction || "both"} data-testid="select-builder-condition-direction">
             {DIRECTIONS.map(direction => <option key={direction.value} value={direction.value}>{direction.value === "long" ? "BUY only" : direction.value === "short" ? "SELL only" : "BUY or SELL"}</option>)}
@@ -366,11 +390,16 @@ function ConditionModal({ strategyId, concepts, condition, onClose, onSaved }: {
   </Modal>;
 }
 
-function ConditionFlow({ strategyId, conditions, concepts, marketSymbol, onAdd, onEdit, onChanged }: { strategyId: number; conditions: StrategyCondition[]; concepts: TradingConcept[]; marketSymbol: string | null; onAdd: () => void; onEdit: (condition: StrategyCondition) => void; onChanged: () => void }) {
+function ConditionFlow({ strategyId, conditions, marketSymbol, onAdd, onEdit, onChanged }: { strategyId: number; conditions: StrategyCondition[]; marketSymbol: string | null; onAdd: (stage: "entry" | "confirmation" | "exit") => void; onEdit: (condition: StrategyCondition) => void; onChanged: () => void }) {
   const reorder = useReorderStrategyConditions();
   const remove = useDeleteStrategyCondition();
   const queryClient = useQueryClient();
   const ordered = [...conditions].sort((a, b) => a.order - b.order);
+  const groups = [
+    { key: "entry" as const, label: "Entry", description: "Conditions that must be met before the strategy can enter." },
+    { key: "confirmation" as const, label: "Confirmation", description: "Additional conditions that confirm the setup." },
+    { key: "exit" as const, label: "Exit", description: "Conditions that cause the strategy to leave, including invalidation rules." },
+  ];
   const move = (index: number, delta: number) => {
     const next = [...ordered];
     const target = index + delta;
@@ -392,14 +421,10 @@ function ConditionFlow({ strategyId, conditions, concepts, marketSymbol, onAdd, 
       },
     });
   };
-  if (!ordered.length) return <div className="panel empty-grid p-8 md:p-12 text-center" data-testid="builder-empty-entry-conditions">
-    <div className="w-11 h-11 mx-auto rounded-xl border border-primary/30 bg-primary/10 text-primary flex items-center justify-center mb-5"><SlidersHorizontal size={20} /></div>
-    <h3 className="font-semibold text-lg">No entry conditions yet.</h3>
-    <p className="text-sm text-muted-foreground max-w-md mx-auto mt-2 leading-relaxed">Add a condition to tell the strategy when to enter a trade.</p>
-    <button className="btn btn-primary mt-6" onClick={onAdd} data-testid="button-empty-add-strategy-condition"><Plus size={14} /> Add Condition</button>
-  </div>;
-  return <div className="space-y-0" data-testid="strategy-condition-flow">
-    {ordered.map((condition, index) => <div key={condition.id}>
+  const renderCard = (condition: StrategyCondition) => {
+    const index = ordered.findIndex(item => item.id === condition.id);
+    const supported = isBacktestCompatibleRule(condition.triggerRules);
+    return <div key={condition.id}>
       <div className="panel panel-hover p-4 md:p-5">
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center mono text-xs font-bold shrink-0">{String(index + 1).padStart(2, "0")}</div>
@@ -414,7 +439,11 @@ function ConditionFlow({ strategyId, conditions, concepts, marketSymbol, onAdd, 
             <h3 className="font-semibold mt-3">{condition.name}</h3>
             <div className="text-xs text-primary mt-1">{condition.conceptName}</div>
             {condition.description && <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{condition.description}</p>}
-            {condition.triggerRules && <div className="mt-4 p-3 rounded-md bg-secondary/50"><div className="flex flex-wrap items-center justify-between gap-2"><div className="eyebrow">Parameters / rule</div><span className={`tag ${isBacktestCompatibleRule(condition.triggerRules) ? "tag-active" : "tag-draft"}`}>{isBacktestCompatibleRule(condition.triggerRules) ? "Executable" : "Review required"}</span></div><p className="text-xs text-muted-foreground mt-1 leading-relaxed">{condition.triggerRules}</p>{!isBacktestCompatibleRule(condition.triggerRules) && <p className="text-[11px] text-amber-200 mt-2">This condition is preserved as descriptive logic, but Backtesting cannot evaluate it yet.</p>}</div>}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className={`tag ${supported ? "tag-active" : "border-amber-500/40 text-amber-200"}`}>{supported ? "Backtest supported" : "Review required"}</span>
+              {!supported && <span className="text-[11px] text-amber-200">Not currently supported by Backtesting.</span>}
+            </div>
+            {condition.triggerRules && <div className="mt-3 p-3 rounded-md bg-secondary/50"><div className="eyebrow">What should be true?</div><p className="text-xs text-muted-foreground mt-1 leading-relaxed">{condition.triggerRules}</p></div>}
           </div>
           <div className="flex shrink-0">
             <button className="btn btn-ghost" onClick={() => move(index, -1)} disabled={index === 0 || reorder.isPending} aria-label="Move condition up" data-testid={`button-move-condition-up-${condition.id}`}><ArrowUp size={14} /></button>
@@ -424,12 +453,24 @@ function ConditionFlow({ strategyId, conditions, concepts, marketSymbol, onAdd, 
           </div>
         </div>
       </div>
-       {index < ordered.length - 1 && <div className="flex flex-col items-center py-2 text-primary/70" aria-hidden="true"><span className="w-px h-3 bg-primary/30" /><span className="tag tag-active my-1">AND</span><ChevronDown size={16} /></div>}
-    </div>)}
+      {index < ordered.length - 1 && <div className="flex flex-col items-center py-2 text-primary/70" aria-hidden="true"><span className="w-px h-3 bg-primary/30" /><span className="tag tag-active my-1">AND</span><ChevronDown size={16} /></div>}
+    </div>;
+  };
+  return <div className="space-y-5" data-testid="strategy-condition-flow">
+    {groups.map(group => {
+      const groupConditions = ordered.filter(condition => group.key === "exit" ? condition.stage === "exit" || condition.stage === "invalidation" : condition.stage === group.key);
+      return <section key={group.key} className="space-y-3" data-testid={`condition-group-${group.key}`}>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div><div className="eyebrow">{group.label}</div><h3 className="font-semibold mt-1">{group.description}</h3></div>
+          <button className="btn btn-secondary shrink-0" onClick={() => onAdd(group.key)} data-testid={`button-add-condition-${group.key}`}><Plus size={14} /> Add condition</button>
+        </div>
+        {groupConditions.length ? groupConditions.map(renderCard) : <div className="panel border-dashed p-5 text-sm text-muted-foreground">No {group.label.toLowerCase()} conditions yet.</div>}
+      </section>;
+    })}
     <div className="panel border-primary/30 bg-primary/5 px-5 py-4 text-center">
-      <div className="eyebrow text-primary">Strategy endpoint</div>
-      <div className="font-semibold mt-2 flex items-center justify-center gap-2"><Zap size={15} className="text-primary" /> ENTRY</div>
-      <p className="text-[11px] text-muted-foreground mt-1">Required conditions are combined as AND. No entry signal is generated here.</p>
+      <div className="eyebrow text-primary">Review boundary</div>
+      <div className="font-semibold mt-2 flex items-center justify-center gap-2"><Zap size={15} className="text-primary" /> Save, version, then backtest</div>
+      <p className="text-[11px] text-muted-foreground mt-1">Conditions remain descriptive until an executable detector exists. Unsupported concepts are never converted into fake rules.</p>
     </div>
   </div>;
 }
@@ -578,7 +619,7 @@ function StrategyControls({ strategy, conditions }: { strategy: Strategy; condit
         <div className="min-w-0">
           <div className="eyebrow">Backtesting compatibility</div>
           <h2 className="font-semibold mt-2">{compatible ? "This strategy can be backtested." : missingEntryCondition ? "Add an entry condition before backtesting." : "Some conditions cannot currently be backtested."}</h2>
-          {compatible ? <p className="text-xs text-muted-foreground mt-2 leading-relaxed">The saved conditions and percentage exit rules use capabilities available in the current historical backtester.</p> : <><p className="text-xs text-muted-foreground mt-2 leading-relaxed">You can still save this strategy, but the current backtester cannot evaluate:</p><ul className="mt-3 space-y-1.5 text-xs text-amber-100">{missingEntryCondition && <li>• No entry condition has been added</li>}{unsupportedConditions.map(condition => <li key={condition}>• {condition}</li>)}{!isBacktestCompatibleRiskRules(strategy.riskManagementRules) && <li>• The current risk rules</li>}</ul><p className="text-[11px] text-muted-foreground mt-3">This limitation is shown before you try to run a backtest.</p></>}
+           {compatible ? <><p className="text-xs text-muted-foreground mt-2 leading-relaxed">The saved conditions and percentage exit rules use capabilities available in the current historical backtester.</p><Link className="btn btn-primary mt-4" href="#strategy-version-manager" data-testid="link-builder-backtest-version"><ArrowRight size={13} /> Save a version, then Backtest This Version</Link></> : <><p className="text-xs text-muted-foreground mt-2 leading-relaxed">You can still save this strategy, but the current backtester cannot evaluate:</p><ul className="mt-3 space-y-1.5 text-xs text-amber-100">{missingEntryCondition && <li>• No entry condition has been added</li>}{unsupportedConditions.map(condition => <li key={condition}>• {condition}</li>)}{!isBacktestCompatibleRiskRules(strategy.riskManagementRules) && <li>• The current risk rules</li>}</ul><p className="text-[11px] text-muted-foreground mt-3">This limitation is shown before you try to run a backtest.</p></>}
         </div>
       </div>
     </section>
@@ -665,6 +706,7 @@ export function StrategyBuilder() {
   const strategies = useListStrategies();
   const markets = useListMarkets();
   const concepts = useListConcepts();
+  const timeframes = useListTimeframes();
   const queryClient = useQueryClient();
   const searchParams = useMemo(() => new URLSearchParams(window.location.search), [routeLocation]);
   const requestedStrategyId = Number(searchParams.get("strategyId")) || null;
@@ -674,6 +716,7 @@ export function StrategyBuilder() {
   const [selectedStrategyId, setSelectedStrategyId] = useState<number | null>(requestedStrategyId);
   const [strategyModal, setStrategyModal] = useState<"new" | "edit" | false>(false);
   const [conditionModal, setConditionModal] = useState<StrategyCondition | "new" | false>(false);
+  const [newConditionStage, setNewConditionStage] = useState<"entry" | "confirmation" | "exit">("entry");
   const [assistantDraft, setAssistantDraft] = useState<AssistantStrategyDraft | null>(() => {
     if (!requestedAssistantDraft) return null;
     return getPendingAssistantDraft();
@@ -737,13 +780,13 @@ export function StrategyBuilder() {
   const action = <button className="btn btn-primary" onClick={() => setStrategyModal("new")} data-testid="button-new-builder-strategy"><Plus size={15} /> New strategy</button>;
 
   if (strategies.isLoading) return <BuilderPage><div className="panel p-10 text-center text-sm text-muted-foreground">Loading your strategies…</div></BuilderPage>;
-  if (strategies.isError || markets.isError || concepts.isError) return <BuilderPage><div className="panel p-10 text-center"><div className="font-semibold">Couldn’t load the builder records</div><p className="text-sm text-muted-foreground mt-2">Your workspace is intact. Try refreshing the page.</p></div></BuilderPage>;
+  if (strategies.isError || markets.isError || concepts.isError || timeframes.isError) return <BuilderPage><div className="panel p-10 text-center"><div className="font-semibold">Couldn’t load the builder records</div><p className="text-sm text-muted-foreground mt-2">Your workspace is intact. Try refreshing the page.</p></div></BuilderPage>;
   return <BuilderPage action={action}>
      {!activeStrategy ? <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5">
-      <Panel title="Create the strategy foundation" eyebrow="Start without assumptions">
+       <Panel title="Create the strategy foundation" eyebrow="Start without assumptions">
          {assistantDraft && <AssistantDraftReview draft={assistantDraft} action={assistantDraftAction} />}
         <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">Give your strategy a name and describe the market context in your own words. Everything else can stay open until you are ready to define it.</p>
-         <div className="mt-6"><StrategyForm markets={markets.data || []} strategy={null} initialDraft={assistantDraft} onSaved={savedStrategy} /></div>
+          <div className="mt-6"><StrategyForm markets={markets.data || []} timeframes={timeframes.data || []} strategy={null} initialDraft={assistantDraft} onSaved={savedStrategy} /></div>
       </Panel>
       <ConceptsCard concepts={concepts.data || []} />
      </div> : <div className="space-y-5">
@@ -781,7 +824,7 @@ export function StrategyBuilder() {
               <div><div className="eyebrow">02 · Ordered conditions</div><h2 className="font-semibold mt-2">Build the strategy logic</h2><p className="text-xs text-muted-foreground mt-2">Organise entry, confirmation, and exit checkpoints. Each card keeps its market, direction, timeframe, parameters, and execution status visible.</p><div className="flex flex-wrap items-center gap-2 mt-3 text-[11px]" data-testid="builder-logic-legend"><span className="tag tag-active">AND</span><span className="text-muted-foreground">required checkpoints must all match</span><span className="tag ml-2">OR</span><span className="text-muted-foreground">not currently supported by Backtesting</span><span className="tag ml-2">Review required</span><span className="text-muted-foreground">descriptive only until supported</span></div></div>
              <button className="btn btn-primary" onClick={() => setConditionModal("new")} data-testid="button-add-strategy-condition"><Plus size={14} /> Add Condition</button>
           </div>
-           {strategyConditions.isLoading ? <div className="panel p-8 text-center text-sm text-muted-foreground">Loading conditions…</div> : strategyConditions.isError ? <div className="panel p-8 text-center text-sm text-muted-foreground">Couldn’t load conditions.</div> : <ConditionFlow strategyId={strategyId} conditions={strategyConditions.data || []} concepts={concepts.data || []} marketSymbol={activeStrategy.marketSymbol || null} onAdd={() => setConditionModal("new")} onEdit={condition => setConditionModal(condition)} onChanged={refreshConditions} />}
+           {strategyConditions.isLoading ? <div className="panel p-8 text-center text-sm text-muted-foreground">Loading conditions…</div> : strategyConditions.isError ? <div className="panel p-8 text-center text-sm text-muted-foreground">Couldn’t load conditions.</div> : <ConditionFlow strategyId={strategyId} conditions={strategyConditions.data || []} marketSymbol={activeStrategy.marketSymbol || null} onAdd={stage => { setNewConditionStage(stage); setConditionModal("new"); }} onEdit={condition => setConditionModal(condition)} onChanged={refreshConditions} />}
            <StrategyControls strategy={activeStrategy} conditions={strategyConditions.data || []} />
         </div>
         <div className="space-y-5">
@@ -797,8 +840,8 @@ export function StrategyBuilder() {
         </div>
       </div>
     </div>}
-    {strategyModal && <Modal title={strategyModal === "edit" ? "Edit strategy details" : "New strategy"} onClose={() => setStrategyModal(false)}><StrategyForm strategy={strategyModal === "edit" ? activeStrategy : null} markets={markets.data || []} onClose={() => setStrategyModal(false)} onSaved={savedStrategy} /></Modal>}
-     {conditionModal && activeStrategy && <ConditionModal key={conditionModal === "new" ? "new" : conditionModal.id} strategyId={activeStrategy.id} concepts={concepts.data || []} condition={conditionModal === "new" ? null : conditionModal} onClose={() => setConditionModal(false)} onSaved={refreshConditions} />}
+     {strategyModal && <Modal title={strategyModal === "edit" ? "Edit strategy details" : "New strategy"} onClose={() => setStrategyModal(false)}><StrategyForm strategy={strategyModal === "edit" ? activeStrategy : null} markets={markets.data || []} timeframes={timeframes.data || []} onClose={() => setStrategyModal(false)} onSaved={savedStrategy} /></Modal>}
+      {conditionModal && activeStrategy && <ConditionModal key={conditionModal === "new" ? `new-${newConditionStage}` : conditionModal.id} strategyId={activeStrategy.id} concepts={concepts.data || []} timeframes={timeframes.data || []} defaultStage={newConditionStage} condition={conditionModal === "new" ? null : conditionModal} onClose={() => setConditionModal(false)} onSaved={refreshConditions} />}
   </BuilderPage>;
 }
 

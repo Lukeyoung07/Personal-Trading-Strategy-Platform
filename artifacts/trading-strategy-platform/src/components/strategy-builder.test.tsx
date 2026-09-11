@@ -25,6 +25,7 @@ vi.mock("@workspace/api-client-react", () => ({
   useListMarkets: () => ({ data: state.markets, isLoading: false, isError: false }),
   useListStrategies: () => ({ data: state.strategies, isLoading: false, isError: false }),
   useListStrategyConditions: () => ({ data: state.conditions, isLoading: false, isError: false }),
+  useListTimeframes: () => ({ data: [], isLoading: false, isError: false }),
   useReorderStrategyConditions: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateStrategy: () => ({ mutate: state.updateStrategy, isPending: false }),
   useUpdateStrategyCondition: () => ({ mutate: vi.fn(), isPending: false }),

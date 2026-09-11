@@ -199,7 +199,7 @@ export function StrategyVersionManager({ strategy, compact = false, initialVersi
       onError: failure => setError(failure instanceof Error ? failure.message : "Could not create this version."),
     });
   };
-  return <section className={compact ? "panel p-5" : ""} data-testid="strategy-version-manager">
+  return <section id="strategy-version-manager" className={compact ? "panel p-5" : ""} data-testid="strategy-version-manager">
     <div className={`flex flex-col ${compact ? "" : "sm:flex-row sm:items-center"} justify-between gap-3`}>
       <div><div className="eyebrow">Version history</div><h2 className="font-semibold mt-2">{strategy.name}</h2><p className="text-xs text-muted-foreground mt-1">Saved versions are immutable. Current Builder edits become a new version when you choose to save one.</p></div>
       <div className={`grid ${compact ? "grid-cols-2" : "grid-cols-2"} gap-2`}><button className="btn btn-secondary" disabled={versions.length < 2} onClick={() => setShowCompare(value => !value)} data-testid="button-compare-versions"><GitCompareArrows size={14} /> Compare</button><button className="btn btn-primary" onClick={() => setSaveOpen(true)} data-testid="button-save-new-version"><Plus size={14} /> Save as New Version</button></div>
