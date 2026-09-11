@@ -14,3 +14,9 @@ Market overview values must stay honest about their source: derive current price
 **Why:** The reference layout asks for compact market information, but the provider contract does not guarantee every session field. Explicit provenance preserves trust instead of filling the panel with plausible-looking values.
 
 **How to apply:** Prefer provider values when available; otherwise calculate only from genuine loaded bars and label the scope. Never call a loaded range “today” or infer volume from candle count.
+
+Historical backtest preflight may probe empty or stale timeframe caches through the existing provider/cache retrieval service, then uses the earliest latest candle across all required timeframes as the usable end boundary.
+
+**Why:** A cache-only check incorrectly blocked valid instruments such as USTEC when one required timeframe had not been downloaded yet, while independently using the newest timeframe could allow a multi-timeframe backtest past its slowest series.
+
+**How to apply:** Keep provider retrieval server-side, persist successful probe pages, tolerate expected current-period provider errors, and reject end dates beyond the shared multi-timeframe boundary without shortening the request.

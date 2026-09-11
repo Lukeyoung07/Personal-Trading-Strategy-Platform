@@ -945,6 +945,40 @@ paths:
                 $ref: "#/components/schemas/RefreshCandlesResponse"
         "400":
           description: Provider or request error
+  /market-data/historical-availability/latest:
+    get:
+      operationId: getLatestHistoricalAvailability
+      tags: [market-data]
+      summary: Get latest cached historical candle availability for required timeframes
+      parameters:
+        - name: instrumentId
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: timeframeIds
+          in: query
+          required: true
+          style: form
+          explode: false
+          schema:
+            type: array
+            minItems: 1
+            items: { type: integer, minimum: 1 }
+        - name: sourceId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Latest cached historical availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LatestHistoricalAvailability"
+        "400":
+          description: Invalid availability request
+        "404":
+          description: Historical availability is not available
   /market-data/quotes/stream:
     get:
       operationId: streamMarketDataQuotes
@@ -2267,6 +2301,32 @@ components:
         instrumentId: { type: integer }
         timeframeId: { type: integer }
         ingested: { type: integer }
+    LatestHistoricalAvailability:
+      type: object
+      required: [sourceId, instrumentId, providerStatus, providerMessage, latestAvailableCandle, timeframes]
+      properties:
+        sourceId: { type: integer }
+        instrumentId: { type: integer }
+        providerStatus:
+          type: ["string", "null"]
+          enum: [disconnected, connecting, connected, degraded, error, null]
+        providerMessage: { type: ["string", "null"] }
+        latestAvailableCandle: { type: ["string", "null"], format: date-time }
+        timeframes:
+          type: array
+          items:
+            type: object
+            required: [timeframeId, timeframeCode, timeframeLabel, storedCount, earliestCandle, latestCandle, coverageState]
+            properties:
+              timeframeId: { type: integer }
+              timeframeCode: { type: string }
+              timeframeLabel: { type: string }
+              storedCount: { type: integer, minimum: 0 }
+              earliestCandle: { type: ["string", "null"], format: date-time }
+              latestCandle: { type: ["string", "null"], format: date-time }
+              coverageState:
+                type: string
+                enum: [available, unavailable]
     Trade:
       type: object
       required: [id, strategyId, strategyVersionId, strategyName, strategyVersionNumber, marketId, side, status, quantity, entryPrice, exitPrice, stopLoss, takeProfit, riskUnit, riskAmount, openedAt, closedAt, thesis, notes, createdAt]
@@ -2532,7 +2592,7 @@ components:
         timeframeLabel: { type: string }
         preset:
           type: string
-          enum: [last_7_days, last_30_days, last_90_days, custom]
+          enum: [last_7_days, last_30_days, last_90_days, last_6_months, last_1_year, custom]
         startDate: { type: string, format: date-time }
         endDate: { type: string, format: date-time }
         status:
@@ -2688,7 +2748,7 @@ components:
         timeframeId: { type: integer, minimum: 1 }
         preset:
           type: string
-          enum: [last_7_days, last_30_days, last_90_days, custom]
+          enum: [last_7_days, last_30_days, last_90_days, last_6_months, last_1_year, custom]
         startDate: { type: string, format: date-time }
         endDate: { type: string, format: date-time }
     AssistantMessage:

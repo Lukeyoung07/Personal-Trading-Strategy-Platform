@@ -8,13 +8,13 @@ import {
   Sparkles, Target, Trash2, TrendingUp, X, Zap
 } from 'lucide-react';
 import {
-  AlertStatus, getGetDashboardSummaryQueryKey, getGetPerformanceSummaryQueryKey, getGetSettingsQueryKey,
+  AlertStatus, getGetDashboardSummaryQueryKey, getGetLatestHistoricalAvailabilityQueryKey, getGetPerformanceSummaryQueryKey, getGetSettingsQueryKey,
   getListBacktestsQueryKey, getListStrategyVersionConditionsQueryKey, useCreateBacktest, useListBacktests,
   getGetStrategyQueryKey, getListAlertsQueryKey, getListConceptsQueryKey, getListConditionsQueryKey,
   getListMarketsQueryKey, getListStrategiesQueryKey, getListStrategyVersionsQueryKey, getListTradesQueryKey,
   useCreateAlert, useCreateConcept, useCreateCondition, useCreateMarket, useCreateStrategy, useCreateStrategyVersion,
   useCreateTrade, useDeleteAlert, useDeleteConcept, useDeleteCondition, useDeleteMarket, useDeleteStrategy,
-  useCancelBacktest, useDeleteTrade, useGetDashboardSummary, useGetPerformanceSummary, useGetSettings, useGetStrategy, useListAlerts,
+  useCancelBacktest, useDeleteTrade, useGetDashboardSummary, useGetLatestHistoricalAvailability, useGetPerformanceSummary, useGetSettings, useGetStrategy, useListAlerts,
   useListConcepts, useListConditions, useListMarkets, useListStrategies, useListStrategyMonitors, useListStrategyVersionConditions, useListStrategyVersions, useListTimeframes, useListTrades,
   useUpdateAlert, useUpdateConcept, useUpdateCondition, useUpdateMarket, useUpdateSettings, useUpdateStrategy,
   useUpdateTrade, type Alert, type AssistantStrategyDraft, type Backtest, type Condition, type Market, type Strategy, type StrategyMonitor, type Trade, type TradingConcept
@@ -32,6 +32,7 @@ import { EconomicCalendar } from '@/components/economic-calendar';
 import { BacktestResultsPanel } from '@/components/backtest-results';
 import { AssistantPanel, type AssistantPanelContext } from '@/components/assistant-panel';
 import { setPendingAssistantDraft } from '@/lib/assistant-draft-store';
+import { formatDateInput, formatHistoricalDateTime, isEndDateWithinAvailability, presetRange, requiredBacktestTimeframeIds } from '@/lib/backtest-availability';
 import { executableConceptKind, normalizeExecutableParameters } from '@workspace/api-zod';
 import '@/index.css';
 
@@ -428,9 +429,6 @@ function Alerts() {
 
 function SettingsPage() { const q=useGetSettings();const u=useUpdateSettings();const qc=useQueryClient();const [saved,setSaved]=useState(false);if(q.isLoading)return <Page eyebrow="Workspace" title="Settings"><LoadingBlock/></Page>;if(q.isError)return <Page eyebrow="Workspace" title="Settings"><ErrorState retry={()=>q.refetch()}/></Page>;const s=q.data;const save=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const f=new FormData(e.currentTarget);u.mutate({data:{timezone:String(f.get('timezone')),baseCurrency:String(f.get('baseCurrency')),defaultRiskUnit:String(f.get('defaultRiskUnit')) as 'percent'|'amount'|'r',compactMode:f.get('compactMode')==='on'}},{onSuccess:()=>{setSaved(true);qc.invalidateQueries({queryKey:getGetSettingsQueryKey()});setTimeout(()=>setSaved(false),2600)}})};return <Page eyebrow="Workspace" title="Settings" description="Small preferences that make the daily record feel like yours."><div className="max-w-2xl panel p-6 md:p-8"><form onSubmit={save} className="space-y-6"><div><div className="eyebrow">Locale</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5"><Field label="Timezone"><select className="select" name="timezone" defaultValue={s?.timezone||'UTC'} data-testid="select-settings-timezone"><option value="UTC">UTC</option><option value="America/New_York">America / New York</option><option value="America/Los_Angeles">America / Los Angeles</option><option value="Europe/London">Europe / London</option><option value="Asia/Tokyo">Asia / Tokyo</option></select></Field><Field label="Base currency"><select className="select" name="baseCurrency" defaultValue={s?.baseCurrency||'USD'} data-testid="select-settings-currency"><option value="USD">USD — US Dollar</option><option value="EUR">EUR — Euro</option><option value="GBP">GBP — Pound</option><option value="JPY">JPY — Yen</option></select></Field></div></div><div className="border-t border-border pt-6"><div className="eyebrow">Risk language</div><Field label="Default risk unit"><select className="select mt-5" name="defaultRiskUnit" defaultValue={s?.defaultRiskUnit||'percent'} data-testid="select-settings-risk"><option value="percent">Percent</option><option value="amount">Amount</option><option value="r">R multiple</option></select></Field></div><div className="border-t border-border pt-6 flex items-center justify-between gap-4"><div><div className="text-sm font-semibold">Compact mode</div><div className="text-xs text-muted-foreground mt-1">Tighten row spacing in dense records.</div></div><input type="checkbox" name="compactMode" defaultChecked={s?.compactMode} className="accent-[hsl(var(--primary))] w-4 h-4" data-testid="input-settings-compact"/></div><div className="flex items-center justify-end gap-4 pt-2"><span className="text-xs text-primary">{saved?'Preferences saved.':''}</span><button className="btn btn-primary" disabled={u.isPending} data-testid="button-save-settings">{u.isPending?'Saving…':'Save preferences'}</button></div></form></div></Page>; }
 
-function formatDateInput(value: Date) {
-  return value.toISOString().slice(0, 10);
-}
 function backtestErrorCopy(value: unknown) {
   const message = typeof value === "string" ? value : value instanceof Error ? value.message : "";
   if (/rate.?limit|rate limit/i.test(message)) return "The historical provider is rate-limited right now. Try again later; candles already cached locally remain available.";
@@ -452,14 +450,6 @@ function historicalRuleSupported(rule: string | null | undefined) {
 function historicalConditionSupported(condition: { conceptName?: string | null; triggerRules?: string | null; conceptDetectionRules?: string | null; parameters?: unknown }) {
   if (historicalRuleSupported(condition.triggerRules || condition.conceptDetectionRules)) return true;
   return Boolean(condition.conceptName && normalizeExecutableParameters(condition.conceptName, condition.parameters));
-}
-
-function presetRange(preset: string) {
-  const end = new Date();
-  const days = preset === "last_30_days" ? 30 : preset === "last_90_days" ? 90 : 7;
-  const start = new Date(end);
-  start.setDate(start.getDate() - days);
-  return { start: formatDateInput(start), end: formatDateInput(end) };
 }
 
 function isActiveBacktest(status: Backtest["status"]) {
@@ -518,6 +508,29 @@ function Backtesting() {
       queryKey: getListStrategyVersionConditionsQueryKey(strategyId ?? 0, versionId ?? 0),
     },
   });
+  const requiredAvailabilityTimeframeIds = useMemo(() => {
+    return requiredBacktestTimeframeIds(timeframeId, versionConditions.data || [], timeframes.data || []);
+  }, [timeframeId, timeframes.data, versionConditions.data]);
+  const availabilityEnabled = Boolean(
+    instrumentId != null
+    && versionId != null
+    && timeframeId != null
+    && !versionConditions.isLoading
+    && requiredAvailabilityTimeframeIds.length,
+  );
+  const historicalAvailability = useGetLatestHistoricalAvailability({
+    instrumentId: instrumentId ?? 1,
+    timeframeIds: requiredAvailabilityTimeframeIds.length ? requiredAvailabilityTimeframeIds : [timeframeId ?? 1],
+  }, {
+    query: {
+      enabled: availabilityEnabled,
+      staleTime: 30_000,
+      queryKey: getGetLatestHistoricalAvailabilityQueryKey({
+        instrumentId: instrumentId ?? 1,
+        timeframeIds: requiredAvailabilityTimeframeIds.length ? requiredAvailabilityTimeframeIds : [timeframeId ?? 1],
+      }),
+    },
+  });
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -527,10 +540,22 @@ function Backtesting() {
     if (versionId == null && versions.data?.[0]) setVersionId(versions.data[0].id);
   }, [versionId, versions.data]);
 
+  const latestAvailableEnd = historicalAvailability.data?.latestAvailableCandle
+    ? new Date(historicalAvailability.data.latestAvailableCandle)
+    : null;
+  const latestAvailableDate = latestAvailableEnd ? formatDateInput(latestAvailableEnd) : "";
+  useEffect(() => {
+    if (preset !== "custom" && latestAvailableEnd) {
+      const range = presetRange(preset, latestAvailableEnd);
+      setStartDate(range.start);
+      setEndDate(range.end);
+    }
+  }, [latestAvailableDate, preset]);
+
   const selectPreset = (value: string) => {
     setPreset(value);
     if (value !== "custom") {
-      const range = presetRange(value);
+      const range = presetRange(value, latestAvailableEnd);
       setStartDate(range.start);
       setEndDate(range.end);
     }
@@ -545,6 +570,22 @@ function Backtesting() {
       setSetupError("Start date must be before end date.");
       return;
     }
+    if (!availabilityEnabled || historicalAvailability.isLoading) {
+      setSetupError("Wait for historical data availability to finish checking.");
+      return;
+    }
+    if (historicalAvailability.isError || !historicalAvailability.data) {
+      setSetupError("Historical data availability could not be checked for this setup.");
+      return;
+    }
+    if (historicalAvailability.data.timeframes.some(timeframe => timeframe.latestCandle == null)) {
+      setSetupError("This setup does not have cached historical data for every required timeframe.");
+      return;
+    }
+    if (!latestAvailableDate || endDate > latestAvailableDate) {
+      setSetupError(`The selected end date exceeds available historical data through ${latestAvailableEnd ? formatHistoricalDateTime(latestAvailableEnd) : "the latest completed candle"}.`);
+      return;
+    }
     setSetupError("");
     create.mutate({
       data: {
@@ -552,7 +593,7 @@ function Backtesting() {
         strategyVersionId: versionId,
         instrumentId,
         timeframeId,
-        preset: preset as "last_7_days" | "last_30_days" | "last_90_days" | "custom",
+        preset: preset as "last_7_days" | "last_30_days" | "last_90_days" | "last_6_months" | "last_1_year" | "custom",
         startDate: new Date(`${startDate}T00:00:00.000Z`).toISOString(),
         endDate: new Date(`${endDate}T23:59:59.999Z`).toISOString(),
       },
@@ -572,7 +613,16 @@ function Backtesting() {
   const hasEntryRule = Boolean((versionConditions.data || []).some(condition => condition.stage === "entry" || condition.stage === "confirmation") || chosenVersion?.entryRules?.trim());
   const compatibilityLoading = versionId != null && versionConditions.isLoading;
   const backtestReady = Boolean(chosenVersion && !compatibilityLoading && hasEntryRule && unsupportedVersionConditions.length === 0);
-  const periodLabel = preset === "custom" ? `${startDate || "Start"} – ${endDate || "End"}` : preset === "last_30_days" ? "Last 30 days" : preset === "last_90_days" ? "Last 90 days" : "Last 7 days";
+  const unavailableTimeframes = historicalAvailability.data?.timeframes.filter(timeframe => timeframe.latestCandle == null) || [];
+  const endDateBeyondAvailability = !isEndDateWithinAvailability(endDate, latestAvailableDate);
+  const availabilityReady = Boolean(
+    availabilityEnabled
+    && !historicalAvailability.isLoading
+    && historicalAvailability.data?.latestAvailableCandle
+    && unavailableTimeframes.length === 0
+    && !endDateBeyondAvailability,
+  );
+  const periodLabel = preset === "custom" ? `${startDate || "Start"} – ${endDate || "End"}` : preset === "last_30_days" ? "Last 30 days" : preset === "last_90_days" ? "Last 90 days" : preset === "last_6_months" ? "Last 6 months" : preset === "last_1_year" ? "Last 1 year" : "Last 7 days";
   const activeRuns = (saved.data || []).filter(backtest => isActiveBacktest(backtest.status));
 
   return <Page eyebrow="Utilities" title="Backtesting" description="Run a historical review from your saved strategy versions using genuine provider candles.">
@@ -637,13 +687,24 @@ function Backtesting() {
         <div>
           <div className="label">Date range</div>
           <div className="flex flex-wrap gap-2 mt-2">
-            {[["last_7_days", "Last 7 Days"], ["last_30_days", "Last 30 Days"], ["last_90_days", "Last 90 Days"], ["custom", "Custom"]].map(([value, label]) => <button type="button" key={value} className={`btn ${preset === value ? "btn-primary" : "btn-secondary"}`} onClick={() => selectPreset(value)} data-testid={`button-backtest-preset-${value}`}>{label}</button>)}
+            {[["last_7_days", "Last 7 Days"], ["last_30_days", "Last 30 Days"], ["last_90_days", "Last 90 Days"], ["last_6_months", "Last 6 Months"], ["last_1_year", "Last 1 Year"], ["custom", "Custom"]].map(([value, label]) => <button type="button" key={value} className={`btn ${preset === value ? "btn-primary" : "btn-secondary"}`} onClick={() => selectPreset(value)} data-testid={`button-backtest-preset-${value}`}>{label}</button>)}
           </div>
         </div>
          {preset === "custom" && <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-           <Field label="Start date"><input className="input" type="date" value={startDate} onChange={event => { setStartDate(event.target.value); setSetupError(""); }} required data-testid="input-backtest-start-date" /></Field>
-           <Field label="End date"><input className="input" type="date" value={endDate} onChange={event => { setEndDate(event.target.value); setSetupError(""); }} required data-testid="input-backtest-end-date" /></Field>
+           <Field label="Start date"><input className="input" type="date" value={startDate} max={latestAvailableDate || undefined} onChange={event => { setStartDate(event.target.value); setSetupError(""); }} required data-testid="input-backtest-start-date" /></Field>
+           <Field label="End date"><input className="input" type="date" value={endDate} max={latestAvailableDate || undefined} onChange={event => { setEndDate(event.target.value); setSetupError(""); }} required data-testid="input-backtest-end-date" /></Field>
         </div>}
+        {availabilityEnabled && <section className={`rounded-lg border p-4 md:p-5 ${historicalAvailability.isError || unavailableTimeframes.length > 0 || endDateBeyondAvailability ? "border-amber-500/40 bg-amber-500/10" : "border-primary/25 bg-primary/5"}`} data-testid="backtest-historical-availability">
+          <div className="eyebrow">Historical data availability</div>
+          <h3 className="font-semibold mt-2">{historicalAvailability.isLoading ? "Checking completed provider candles…" : historicalAvailability.isError ? "Availability could not be checked" : historicalAvailability.data?.latestAvailableCandle ? "Latest available historical data" : "No cached historical data available"}</h3>
+          {historicalAvailability.isLoading && <p className="text-xs text-muted-foreground mt-2">TradeX is checking every timeframe required by this exact strategy version.</p>}
+          {historicalAvailability.isError && <p className="text-xs text-amber-100 mt-2">Select a different setup or try again after historical data is available.</p>}
+          {historicalAvailability.data && <div className="mt-3 space-y-2">
+            {historicalAvailability.data.latestAvailableCandle && <p className="text-sm text-foreground">Usable backtest data is available through <strong>{formatHistoricalDateTime(historicalAvailability.data.latestAvailableCandle)}</strong>.</p>}
+            {historicalAvailability.data.timeframes.map(timeframe => <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-background/40 px-3 py-2 text-xs" key={timeframe.timeframeId}><span className="font-medium">{timeframe.timeframeLabel}</span><span className={timeframe.latestCandle ? "text-primary" : "text-amber-100"}>{timeframe.latestCandle ? `through ${formatHistoricalDateTime(timeframe.latestCandle)}` : "No cached candles"}</span></div>)}
+            {endDateBeyondAvailability && latestAvailableEnd && <p className="text-xs text-amber-100">The selected end date is after the latest completed candle. Choose {latestAvailableDate} or earlier; the range will not be shortened automatically.</p>}
+          </div>}
+        </section>}
          {setupError && <p className="text-sm text-destructive" data-testid="backtest-setup-error">{setupError}</p>}
          <section className="rounded-lg border border-primary/25 bg-primary/5 p-4 md:p-5" data-testid="backtest-setup-confirmation">
            <div className="eyebrow text-primary">Review before running</div>
@@ -660,7 +721,7 @@ function Backtesting() {
           </section>
         <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
           <p className="text-xs text-muted-foreground">The server evaluates completed candles chronologically and saves simulated trades separately from the journal.</p>
-           <button className="btn btn-primary whitespace-nowrap" type="submit" disabled={create.isPending || strategies.isLoading || markets.isLoading || timeframes.isLoading || compatibilityLoading || !backtestReady}>{create.isPending ? "Starting…" : "Run Backtest"}</button>
+           <button className="btn btn-primary whitespace-nowrap" type="submit" disabled={create.isPending || strategies.isLoading || markets.isLoading || timeframes.isLoading || compatibilityLoading || historicalAvailability.isLoading || !backtestReady || !availabilityReady}>{create.isPending ? "Starting…" : "Run Backtest"}</button>
         </div>
         {create.isSuccess && create.data && <p className="text-sm text-primary">Backtest job created. It will continue in the background and appear in Active jobs while it runs.</p>}
         {create.isSuccess && create.data?.status === "failed" && <p className="text-sm text-destructive">Backtest failed: {backtestErrorCopy(create.data.errorMessage)}</p>}

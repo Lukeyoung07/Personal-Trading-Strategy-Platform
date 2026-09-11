@@ -1897,6 +1897,43 @@ export const RefreshMarketDataCandlesResponse = zod.object({
 
 
 /**
+ * @summary Get latest cached historical candle availability for required timeframes
+ */
+
+
+
+
+
+
+export const GetLatestHistoricalAvailabilityQueryParams = zod.object({
+  "instrumentId": zod.coerce.number().int().min(1),
+  "timeframeIds": zod.array(zod.coerce.number().int().min(1)).min(1),
+  "sourceId": zod.coerce.number().int().min(1).optional()
+})
+
+export const getLatestHistoricalAvailabilityResponseTimeframesItemStoredCountMin = 0;
+
+
+
+export const GetLatestHistoricalAvailabilityResponse = zod.object({
+  "sourceId": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "providerStatus": zod.union([zod.literal('disconnected'),zod.literal('connecting'),zod.literal('connected'),zod.literal('degraded'),zod.literal('error'),zod.literal(null)]).nullable(),
+  "providerMessage": zod.string().nullable(),
+  "latestAvailableCandle": zod.coerce.date().nullable(),
+  "timeframes": zod.array(zod.object({
+  "timeframeId": zod.number().int(),
+  "timeframeCode": zod.string(),
+  "timeframeLabel": zod.string(),
+  "storedCount": zod.number().int().min(getLatestHistoricalAvailabilityResponseTimeframesItemStoredCountMin),
+  "earliestCandle": zod.coerce.date().nullable(),
+  "latestCandle": zod.coerce.date().nullable(),
+  "coverageState": zod.enum(['available', 'unavailable'])
+}))
+})
+
+
+/**
  * @summary Stream normalized quotes as server-sent events
  */
 
@@ -2348,7 +2385,7 @@ export const ListBacktestsResponseItem = zod.object({
   "instrumentSymbol": zod.string(),
   "timeframeId": zod.number().int(),
   "timeframeLabel": zod.string(),
-  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'last_6_months', 'last_1_year', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
   "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
@@ -2409,7 +2446,7 @@ export const CreateBacktestBody = zod.object({
   "strategyVersionId": zod.number().int().min(1),
   "instrumentId": zod.number().int().min(1),
   "timeframeId": zod.number().int().min(1),
-  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'last_6_months', 'last_1_year', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date()
 })
@@ -2424,7 +2461,7 @@ export const CreateBacktestResponse = zod.object({
   "instrumentSymbol": zod.string(),
   "timeframeId": zod.number().int(),
   "timeframeLabel": zod.string(),
-  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'last_6_months', 'last_1_year', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
   "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
@@ -2490,7 +2527,7 @@ export const GetBacktestResponse = zod.object({
   "instrumentSymbol": zod.string(),
   "timeframeId": zod.number().int(),
   "timeframeLabel": zod.string(),
-  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'last_6_months', 'last_1_year', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
   "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
@@ -2556,7 +2593,7 @@ export const RunBacktestResponse = zod.object({
   "instrumentSymbol": zod.string(),
   "timeframeId": zod.number().int(),
   "timeframeLabel": zod.string(),
-  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'last_6_months', 'last_1_year', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
   "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
@@ -2622,7 +2659,7 @@ export const CancelBacktestResponse = zod.object({
   "instrumentSymbol": zod.string(),
   "timeframeId": zod.number().int(),
   "timeframeLabel": zod.string(),
-  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'last_6_months', 'last_1_year', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
   "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
@@ -2721,7 +2758,7 @@ export const GetBacktestResultsResponse = zod.object({
   "instrumentSymbol": zod.string(),
   "timeframeId": zod.number().int(),
   "timeframeLabel": zod.string(),
-  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'last_6_months', 'last_1_year', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
   "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),

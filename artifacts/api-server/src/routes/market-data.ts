@@ -46,6 +46,7 @@ import {
   UpdateTimeframeBody,
   UpdateTimeframeParams,
   UpdateTimeframeResponse,
+  GetLatestHistoricalAvailabilityResponse,
 } from "@workspace/api-zod";
 import { biQuoteAdapter } from "../services/biquote";
 import { marketDataService } from "../services/market-data";
@@ -437,6 +438,34 @@ router.get("/market-data/historical-availability", async (req, res): Promise<voi
     }));
   } catch (error) {
     res.status(404).json({ error: error instanceof Error ? error.message : "Historical availability is not available." });
+  }
+});
+
+router.get("/market-data/historical-availability/latest", async (req, res): Promise<void> => {
+  const numberParam = (value: unknown) => typeof value === "string" ? Number(value) : NaN;
+  const instrumentId = numberParam(req.query.instrumentId);
+  const requestedSourceId = req.query.sourceId == null ? null : numberParam(req.query.sourceId);
+  const rawTimeframeIds = Array.isArray(req.query.timeframeIds)
+    ? req.query.timeframeIds
+    : typeof req.query.timeframeIds === "string"
+      ? req.query.timeframeIds.split(",")
+      : [];
+  const timeframeIds = rawTimeframeIds.map(numberParam);
+  if (!Number.isInteger(instrumentId) || instrumentId < 1
+    || (requestedSourceId != null && (!Number.isInteger(requestedSourceId) || requestedSourceId < 1))
+    || !timeframeIds.length || timeframeIds.some(timeframeId => !Number.isInteger(timeframeId) || timeframeId < 1)) {
+    res.status(400).json({ error: "instrumentId and timeframeIds are required; sourceId is optional." });
+    return;
+  }
+  try {
+    const sourceId = requestedSourceId ?? (await marketDataService.historicalSourceForInstrument(instrumentId)).id;
+    res.json(GetLatestHistoricalAvailabilityResponse.parse(await marketDataService.latestHistoricalDataAvailability({
+      sourceId,
+      instrumentId,
+      timeframeIds: [...new Set(timeframeIds)],
+    })));
+  } catch (error) {
+    res.status(404).json({ error: error instanceof Error ? error.message : "Latest historical availability is not available." });
   }
 });
 

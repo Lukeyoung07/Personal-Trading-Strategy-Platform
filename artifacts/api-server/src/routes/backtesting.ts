@@ -106,6 +106,54 @@ function timeframeKey(value: string | null | undefined) {
   return (value || "").trim().toLowerCase().replace(/\s+/g, "");
 }
 
+function requiredBacktestTimeframes(
+  timeframes: Array<{ id: number; code: string; label: string; durationSeconds: number }>,
+  configuredTimeframeId: number,
+  conditions: BacktestCondition[],
+) {
+  const configuredTimeframe = timeframes.find(timeframe => timeframe.id === configuredTimeframeId);
+  if (!configuredTimeframe) throw new Error("The selected backtest timeframe no longer exists.");
+  const requestedCodes = [...new Set([
+    configuredTimeframe.code,
+    ...conditions.map(condition => condition.timeframe).filter((value): value is string => Boolean(value?.trim())),
+  ])];
+  return requestedCodes.map(code => {
+    const match = timeframes.find(timeframe =>
+      timeframeKey(timeframe.code) === timeframeKey(code) || timeframeKey(timeframe.label) === timeframeKey(code),
+    );
+    if (!match) throw new Error(`The strategy references an unavailable timeframe: ${code}.`);
+    return match;
+  });
+}
+
+export function utcDay(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+export function availabilityBoundaryError(endDate: Date, timeframes: Array<{
+  timeframeLabel: string;
+  latestCandle: Date | null;
+}>) {
+  const unavailable = timeframes.filter(timeframe => timeframe.latestCandle == null);
+  if (unavailable.length) {
+    return `Backtest cannot start because no cached historical data is available for ${unavailable.map(timeframe => timeframe.timeframeLabel).join(", ")}.`;
+  }
+  const latestAvailableCandle = new Date(Math.min(...timeframes.map(timeframe => timeframe.latestCandle!.getTime())));
+  if (utcDay(endDate) <= utcDay(latestAvailableCandle)) return null;
+  const timeframeBoundaries = timeframes
+    .map(timeframe => `${timeframe.timeframeLabel}: ${formatHistoricalBoundary(new Date(timeframe.latestCandle!))}`)
+    .join("; ");
+  return `Backtest cannot start because historical data is only available through ${formatHistoricalBoundary(latestAvailableCandle)} for the selected data series. ${timeframeBoundaries}`;
+}
+
+function formatHistoricalBoundary(value: Date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(value) + " UTC";
+}
+
 async function timeframeSummariesForBacktest(id: number) {
   const rows = await db.select({
     timeframeId: timeframesTable.id,
@@ -317,19 +365,7 @@ async function executeBacktestInternal(backtestId: number) {
     if (compatibilityErrors.length) throw new Error(`This strategy version is not compatible with the historical engine: ${compatibilityErrors.join(" ")}`);
     const source = await marketDataService.historicalSourceForInstrument(configuration.instrumentId);
 
-    const configuredTimeframe = timeframes.find(timeframe => timeframe.id === configuration.timeframeId);
-    if (!configuredTimeframe) throw new Error("The selected backtest timeframe no longer exists.");
-    const requestedCodes = [...new Set([
-      configuredTimeframe.code,
-      ...engineConditions.map(condition => condition.timeframe).filter((value): value is string => Boolean(value?.trim())),
-    ])];
-    const requestedTimeframes = requestedCodes.map(code => {
-      const match = timeframes.find(timeframe =>
-        timeframeKey(timeframe.code) === timeframeKey(code) || timeframeKey(timeframe.label) === timeframeKey(code),
-      );
-      if (!match) throw new Error(`The strategy references an unavailable timeframe: ${code}.`);
-      return match;
-    });
+    const requestedTimeframes = requiredBacktestTimeframes(timeframes, configuration.timeframeId, engineConditions);
     progressTimeframes = requestedTimeframes.map(timeframe => ({
       timeframeId: timeframe.id,
       code: timeframe.code,
@@ -650,6 +686,37 @@ router.post("/backtests", async (req, res): Promise<void> => {
   });
   if (compatibilityErrors.length) {
     res.status(400).json({ error: `This strategy version is not compatible with the historical engine: ${compatibilityErrors.join(" ")}` });
+    return;
+  }
+
+  const activeTimeframes = await db.select({
+    id: timeframesTable.id,
+    code: timeframesTable.code,
+    label: timeframesTable.label,
+    durationSeconds: timeframesTable.durationSeconds,
+  }).from(timeframesTable).where(eq(timeframesTable.isActive, true));
+  let requestedTimeframes: typeof activeTimeframes;
+  try {
+    requestedTimeframes = requiredBacktestTimeframes(activeTimeframes, timeframeId, conditions.map(engineCondition));
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "The selected strategy references an unavailable timeframe." });
+    return;
+  }
+  let availability;
+  try {
+    const source = await marketDataService.historicalSourceForInstrument(instrumentId);
+    availability = await marketDataService.latestHistoricalDataAvailability({
+      sourceId: source.id,
+      instrumentId,
+      timeframeIds: requestedTimeframes.map(timeframe => timeframe.id),
+    });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Historical availability could not be checked." });
+    return;
+  }
+  const availabilityError = availabilityBoundaryError(endDate, availability.timeframes);
+  if (availabilityError) {
+    res.status(400).json({ error: availabilityError });
     return;
   }
 

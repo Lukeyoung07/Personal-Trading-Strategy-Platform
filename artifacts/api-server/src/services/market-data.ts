@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gte, lte, max, min, sql } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, lte, max, min, sql } from "drizzle-orm";
 import {
   candlesTable,
   db,
@@ -121,6 +121,25 @@ export interface HistoricalDataAvailability {
     code: HistoricalDataError["code"] | "unknown";
     message: string;
   } | null;
+}
+
+export interface LatestHistoricalTimeframeAvailability {
+  timeframeId: number;
+  timeframeCode: string;
+  timeframeLabel: string;
+  storedCount: number;
+  earliestCandle: Date | null;
+  latestCandle: Date | null;
+  coverageState: "available" | "unavailable";
+}
+
+export interface LatestHistoricalDataAvailability {
+  sourceId: number;
+  instrumentId: number;
+  providerStatus: MarketDataConnectionState | null;
+  providerMessage: string | null;
+  latestAvailableCandle: Date | null;
+  timeframes: LatestHistoricalTimeframeAvailability[];
 }
 
 export interface CanonicalCandleRequest {
@@ -594,6 +613,92 @@ export class MarketDataService {
         code: "unknown",
         message: connection.statusMessage ?? "Historical provider failed.",
       } : null,
+    };
+  }
+
+  async latestHistoricalDataAvailability(request: {
+    sourceId: number;
+    instrumentId: number;
+    timeframeIds: number[];
+  }): Promise<LatestHistoricalDataAvailability> {
+    const [[source], [connection], timeframes] = await Promise.all([
+      db.select({ id: marketDataSourcesTable.id }).from(marketDataSourcesTable)
+        .where(eq(marketDataSourcesTable.id, request.sourceId)),
+      db.select({
+        status: marketDataConnectionsTable.status,
+        statusMessage: marketDataConnectionsTable.statusMessage,
+      }).from(marketDataConnectionsTable)
+        .where(eq(marketDataConnectionsTable.sourceId, request.sourceId)),
+      db.select({
+        id: timeframesTable.id,
+        code: timeframesTable.code,
+        label: timeframesTable.label,
+      }).from(timeframesTable)
+        .where(inArray(timeframesTable.id, request.timeframeIds)),
+    ]);
+    if (!source) throw new Error("Market-data source not found");
+    if (request.timeframeIds.some(timeframeId => !timeframes.some(timeframe => timeframe.id === timeframeId))) {
+      throw new Error("One or more requested timeframes were not found");
+    }
+
+    const loadSummaries = async () => Promise.all(timeframes.map(async timeframe => {
+      const [summary] = await db.select({
+          storedCount: count(candlesTable.id),
+          earliestCandle: min(candlesTable.openTime),
+          latestCandle: max(candlesTable.openTime),
+        }).from(candlesTable).where(and(
+          eq(candlesTable.sourceId, request.sourceId),
+          eq(candlesTable.instrumentId, request.instrumentId),
+          eq(candlesTable.timeframeId, timeframe.id),
+          eq(candlesTable.isClosed, true),
+        ));
+        return {
+          timeframeId: timeframe.id,
+          timeframeCode: timeframe.code,
+          timeframeLabel: timeframe.label,
+          storedCount: Number(summary?.storedCount ?? 0),
+          earliestCandle: summary?.earliestCandle ?? null,
+          latestCandle: summary?.latestCandle ?? null,
+          coverageState: summary?.latestCandle ? "available" as const : "unavailable" as const,
+        };
+      }));
+    let summaries = await loadSummaries();
+
+    const now = new Date();
+    const staleBefore = new Date(now.getTime() - 31 * 24 * 60 * 60 * 1_000);
+    for (const timeframe of timeframes.filter(candidate => {
+      const latestCandle = summaries.find(summary => summary.timeframeId === candidate.id)?.latestCandle;
+      return !latestCandle || latestCandle < staleBefore;
+    })) {
+      const isMinuteTimeframe = timeframe.code.toLowerCase().includes("m");
+      const probeFrom = isMinuteTimeframe
+        ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1_000)
+        : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+      try {
+        await this.historicalCandles({
+          sourceId: request.sourceId,
+          instrumentId: request.instrumentId,
+          timeframeId: timeframe.id,
+          from: probeFrom,
+          to: now,
+        });
+      } catch {
+        // A current/future provider boundary is expected here. Successful
+        // earlier pages have already been persisted by historicalCandles.
+      }
+    }
+    summaries = await loadSummaries();
+
+    const providerStatus = isMarketDataConnectionState(connection?.status) ? connection.status : null;
+    return {
+      sourceId: source.id,
+      instrumentId: request.instrumentId,
+      providerStatus,
+      providerMessage: connection?.statusMessage ?? null,
+      latestAvailableCandle: summaries.length && summaries.every(summary => summary.latestCandle)
+        ? new Date(Math.min(...summaries.map(summary => summary.latestCandle!.getTime())))
+        : null,
+      timeframes: request.timeframeIds.map(timeframeId => summaries.find(summary => summary.timeframeId === timeframeId)!),
     };
   }
 

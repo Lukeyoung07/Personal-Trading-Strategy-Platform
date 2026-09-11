@@ -43,6 +43,7 @@ import type {
   EconomicEventUpdate,
   EconomicEventsList,
   GetJournalPerformanceParams,
+  GetLatestHistoricalAvailabilityParams,
   HealthStatus,
   Instrument,
   InstrumentInput,
@@ -50,6 +51,7 @@ import type {
   JournalDayNote,
   JournalDayNoteInput,
   JournalPerformance,
+  LatestHistoricalAvailability,
   ListCandlesParams,
   ListEconomicEventsParams,
   Market,
@@ -4318,6 +4320,90 @@ export const useRefreshMarketDataCandles = <TError = ErrorType<void>,
       > => {
       return useMutation(getRefreshMarketDataCandlesMutationOptions(options));
     }
+
+export const getGetLatestHistoricalAvailabilityUrl = (params: GetLatestHistoricalAvailabilityParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/market-data/historical-availability/latest?${stringifiedParams}` : `/api/market-data/historical-availability/latest`
+}
+
+/**
+ * @summary Get latest cached historical candle availability for required timeframes
+ */
+export const getLatestHistoricalAvailability = async (params: GetLatestHistoricalAvailabilityParams, options?: Parameters<typeof customFetch>[1]): Promise<LatestHistoricalAvailability> => {
+
+  return customFetch<LatestHistoricalAvailability>(getGetLatestHistoricalAvailabilityUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLatestHistoricalAvailabilityQueryKey = (params?: GetLatestHistoricalAvailabilityParams,) => {
+    return [
+    `/api/market-data/historical-availability/latest`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetLatestHistoricalAvailabilityQueryOptions = <TData = Awaited<ReturnType<typeof getLatestHistoricalAvailability>>, TError = ErrorType<void>>(params: GetLatestHistoricalAvailabilityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLatestHistoricalAvailability>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLatestHistoricalAvailabilityQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLatestHistoricalAvailability>>> = ({ signal }) => getLatestHistoricalAvailability(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLatestHistoricalAvailability>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLatestHistoricalAvailabilityQueryResult = NonNullable<Awaited<ReturnType<typeof getLatestHistoricalAvailability>>>
+export type GetLatestHistoricalAvailabilityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get latest cached historical candle availability for required timeframes
+ */
+
+export function useGetLatestHistoricalAvailability<TData = Awaited<ReturnType<typeof getLatestHistoricalAvailability>>, TError = ErrorType<void>>(
+ params: GetLatestHistoricalAvailabilityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLatestHistoricalAvailability>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLatestHistoricalAvailabilityQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getStreamMarketDataQuotesUrl = (params: StreamMarketDataQuotesParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -13,5 +13,7 @@ export const BacktestPreset = {
   last_7_days: 'last_7_days',
   last_30_days: 'last_30_days',
   last_90_days: 'last_90_days',
+  last_6_months: 'last_6_months',
+  last_1_year: 'last_1_year',
   custom: 'custom',
 } as const;

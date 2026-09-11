@@ -1432,6 +1432,53 @@ export interface RefreshCandlesResponse {
   ingested: number;
 }
 
+/**
+ * @nullable
+ */
+export type LatestHistoricalAvailabilityProviderStatus = typeof LatestHistoricalAvailabilityProviderStatus[keyof typeof LatestHistoricalAvailabilityProviderStatus] | null;
+
+
+export const LatestHistoricalAvailabilityProviderStatus = {
+  disconnected: 'disconnected',
+  connecting: 'connecting',
+  connected: 'connected',
+  degraded: 'degraded',
+  error: 'error',
+} as const;
+
+export type LatestHistoricalAvailabilityTimeframesItemCoverageState = typeof LatestHistoricalAvailabilityTimeframesItemCoverageState[keyof typeof LatestHistoricalAvailabilityTimeframesItemCoverageState];
+
+
+export const LatestHistoricalAvailabilityTimeframesItemCoverageState = {
+  available: 'available',
+  unavailable: 'unavailable',
+} as const;
+
+export type LatestHistoricalAvailabilityTimeframesItem = {
+  timeframeId: number;
+  timeframeCode: string;
+  timeframeLabel: string;
+  /** @minimum 0 */
+  storedCount: number;
+  /** @nullable */
+  earliestCandle: string | null;
+  /** @nullable */
+  latestCandle: string | null;
+  coverageState: LatestHistoricalAvailabilityTimeframesItemCoverageState;
+};
+
+export interface LatestHistoricalAvailability {
+  sourceId: number;
+  instrumentId: number;
+  /** @nullable */
+  providerStatus: LatestHistoricalAvailabilityProviderStatus;
+  /** @nullable */
+  providerMessage: string | null;
+  /** @nullable */
+  latestAvailableCandle: string | null;
+  timeframes: LatestHistoricalAvailabilityTimeframesItem[];
+}
+
 export type TradeSide = typeof TradeSide[keyof typeof TradeSide];
 
 
@@ -1857,6 +1904,8 @@ export const BacktestPreset = {
   last_7_days: 'last_7_days',
   last_30_days: 'last_30_days',
   last_90_days: 'last_90_days',
+  last_6_months: 'last_6_months',
+  last_1_year: 'last_1_year',
   custom: 'custom',
 } as const;
 
@@ -2063,6 +2112,8 @@ export const BacktestInputPreset = {
   last_7_days: 'last_7_days',
   last_30_days: 'last_30_days',
   last_90_days: 'last_90_days',
+  last_6_months: 'last_6_months',
+  last_1_year: 'last_1_year',
   custom: 'custom',
 } as const;
 
@@ -2345,6 +2396,22 @@ export const ListEconomicEventsRelevance = {
   relevant: 'relevant',
   all: 'all',
 } as const;
+
+export type GetLatestHistoricalAvailabilityParams = {
+/**
+ * @minimum 1
+ */
+instrumentId: number;
+/**
+ * @minItems 1
+ * @items.minimum 1
+ */
+timeframeIds: number[];
+/**
+ * @minimum 1
+ */
+sourceId?: number;
+};
 
 export type StreamMarketDataQuotesParams = {
 /**
