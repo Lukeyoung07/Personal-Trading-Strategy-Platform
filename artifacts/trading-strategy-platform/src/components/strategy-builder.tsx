@@ -27,6 +27,7 @@ import {
   type TradingConcept,
   type AssistantStrategyDraft,
 } from "@workspace/api-client-react";
+import { isHistoricalRuleSupported } from "@workspace/api-zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { StrategyVersionManager } from "@/components/strategy-versioning";
 import { clearPendingAssistantDraft, getPendingAssistantDraft } from "@/lib/assistant-draft-store";
@@ -55,6 +56,34 @@ const RULE_PRESETS = [
   { value: "rsi_above", label: "RSI is above a value", rule: "RSI above 70", description: "Stored as a descriptive rule for now. RSI is not currently supported by Backtesting.", supported: false },
 ] as const;
 
+const CONCEPT_ALIASES: Record<string, string[]> = {
+  "Break of Structure": ["bos"],
+  "Change of Character": ["choch"],
+  "Fair Value Gap": ["fvg", "imbalance"],
+  "Inverse Fair Value Gap": ["ifvg"],
+  "Market Structure Shift": ["mss"],
+  "Higher Timeframe Bias": ["htf"],
+  "Lower Timeframe Confirmation": ["ltf"],
+  "Power of 3 / AMD": ["amd", "power of three"],
+  "SMT Divergence": ["smt"],
+};
+
+function conceptSearchText(concept: TradingConcept) {
+  return `${concept.name} ${concept.category || ""} ${(CONCEPT_ALIASES[concept.name] || []).join(" ")}`.toLowerCase();
+}
+
+function conditionNameFor(concept: TradingConcept | undefined, rule: string) {
+  if (!concept) return "";
+  const preset = RULE_PRESETS.find(candidate => candidate.value === rule);
+  if (!preset) return concept.name;
+  const lead = preset.label
+    .replace(/^Candle is /, "")
+    .replace(/^Price is /, "")
+    .replace(/^Price /, "")
+    .replace(/^Always true$/, "Always");
+  return `${lead} ${concept.name}`;
+}
+
 function rulePresetFor(value: string | null) {
   return RULE_PRESETS.find(preset => preset.rule === value?.trim().toLowerCase())?.value ?? "custom";
 }
@@ -64,11 +93,7 @@ function friendlyMutationError(error: unknown, fallback: string) {
 }
 
 function isBacktestCompatibleRule(rule: string | null | undefined) {
-  if (!rule?.trim()) return false;
-  const normalized = rule.trim().toLowerCase().replace(/[()[\],]/g, " ").replace(/\s+/g, " ");
-  if (normalized === "always" || normalized === "bullish" || normalized === "bullish candle" || normalized === "bearish" || normalized === "bearish candle") return true;
-  if (/^(open|high|low|close) crosses (above|below) previous[_ ](open|high|low|close)$/.test(normalized)) return true;
-  return /^(open|high|low|close|previous[_ ](?:open|high|low|close))\s*(>=|<=|>|<|=|==)\s*(open|high|low|close|previous[_ ](?:open|high|low|close)|\d+(?:\.\d+)?)$/.test(normalized);
+  return isHistoricalRuleSupported(rule);
 }
 
 function isBacktestCompatibleRiskRules(riskRules: string | null | undefined) {
@@ -127,7 +152,7 @@ function SearchableConcept({ concepts, value, onChange }: { concepts: TradingCon
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const selected = concepts.find(concept => concept.id === value);
-  const filtered = concepts.filter(concept => `${concept.name} ${concept.category || ""}`.toLowerCase().includes(query.toLowerCase()));
+  const filtered = concepts.filter(concept => conceptSearchText(concept).includes(query.toLowerCase()));
   return <div className="relative">
     <div className="relative">
       <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />
@@ -270,13 +295,19 @@ function StrategyForm({ strategy, markets, timeframes, onClose, onSaved, initial
   </form>;
 }
 
-function ConditionModal({ strategyId, concepts, timeframes, condition, defaultStage, onClose, onSaved }: { strategyId: number; concepts: TradingConcept[]; timeframes: Timeframe[]; condition: StrategyCondition | null; defaultStage: "entry" | "confirmation" | "exit"; onClose: () => void; onSaved: () => void }) {
+function ConditionModal({ strategyId, strategyDirection, concepts, timeframes, condition, defaultStage, onClose, onSaved }: { strategyId: number; strategyDirection: Strategy["direction"]; concepts: TradingConcept[]; timeframes: Timeframe[]; condition: StrategyCondition | null; defaultStage: "entry" | "confirmation" | "exit"; onClose: () => void; onSaved: () => void }) {
   const create = useCreateStrategyCondition();
   const update = useUpdateStrategyCondition();
   const queryClient = useQueryClient();
   const [conceptId, setConceptId] = useState<number | null>(condition?.conceptId || null);
   const [rulePreset, setRulePreset] = useState(rulePresetFor(condition?.triggerRules || null));
+  const [conditionName, setConditionName] = useState(condition?.name || "");
+  const nameTouched = useRef(Boolean(condition?.name));
   const [error, setError] = useState("");
+  const selectedConcept = concepts.find(concept => concept.id === conceptId);
+  useEffect(() => {
+    if (!nameTouched.current) setConditionName(conditionNameFor(selectedConcept, rulePreset));
+  }, [selectedConcept?.id, rulePreset]);
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -333,19 +364,19 @@ function ConditionModal({ strategyId, concepts, timeframes, condition, defaultSt
       {!conceptId && <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">Choose a trading concept to continue.</div>}
       {conceptId && <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Condition name" hint="Use words you would say out loud."><input className="input" name="name" defaultValue={condition?.name || ""} placeholder="e.g. Candle confirms momentum" data-testid="input-builder-condition-name" /></Field>
-          <Field label="When should it matter?">
+          <Field label="Condition name" hint="A name is suggested from your concept and rule. You can edit it."><input className="input" name="name" value={conditionName} onChange={event => { nameTouched.current = true; setConditionName(event.target.value); }} placeholder="e.g. Bullish Liquidity Sweep" data-testid="input-builder-condition-name" /></Field>
+          {defaultStage === "entry" ? <Field label="When should it matter?">
             <select className="select" name="stage" defaultValue={condition?.stage || defaultStage} data-testid="select-builder-condition-stage">
               {STAGES.filter(stage => stage.value !== "invalidation" || condition?.stage === "invalidation").map(stage => <option key={stage.value} value={stage.value}>{stage.value === "invalidation" ? "Exit" : stage.label}</option>)}
             </select>
-          </Field>
+          </Field> : <div className="rounded-md border border-border bg-secondary/30 p-3 self-end"><div className="label">When should it matter?</div><div className="text-sm font-semibold mt-2">{defaultStage === "confirmation" ? "Confirmation" : "Exit"}</div><input type="hidden" name="stage" value={condition?.stage || defaultStage} /></div>}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Which direction?">
+          {strategyDirection === "both" ? <Field label="Which direction?">
             <select className="select" name="direction" defaultValue={condition?.direction || "both"} data-testid="select-builder-condition-direction">
               {DIRECTIONS.map(direction => <option key={direction.value} value={direction.value}>{direction.label}</option>)}
             </select>
-          </Field>
+          </Field> : <div className="rounded-md border border-border bg-secondary/30 p-3"><div className="label">Which direction?</div><div className="text-sm font-semibold mt-2">{strategyDirection === "long" ? "Long" : "Short"}</div><input type="hidden" name="direction" value={strategyDirection} /></div>}
           <Field label="Which timeframe?">
             {activeTimeframes.length ? <select className="select" name="timeframe" defaultValue={condition?.timeframe && timeframeKnown ? activeTimeframes.find(timeframe => timeframe.code.toLowerCase() === condition.timeframe?.toLowerCase() || timeframe.label.toLowerCase() === condition.timeframe?.toLowerCase())?.code : ""} data-testid="select-builder-condition-timeframe">
               <option value="">Choose timeframe</option>
@@ -718,7 +749,9 @@ function ReviewControls({ strategy, controls }: { strategy: Strategy; controls: 
 function ConceptsCard({ concepts }: { concepts: TradingConcept[] }) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const filtered = concepts.filter(concept => `${concept.name} ${concept.category || ""}`.toLowerCase().includes(search.toLowerCase()));
+  const [category, setCategory] = useState("All");
+  const categories = ["All", ...Array.from(new Set(concepts.map(concept => concept.category || "CUSTOM"))).sort()];
+  const filtered = concepts.filter(concept => (category === "All" || (concept.category || "CUSTOM") === category) && conceptSearchText(concept).includes(search.toLowerCase()));
   return <Panel title="Trading Concept Library" eyebrow="Use your own vocabulary">
     <p className="text-xs text-muted-foreground mt-2 leading-relaxed">Conditions reference concepts centrally. Definitions stay independent from this strategy and can be customised in the library.</p>
     <div className="relative mt-5">
@@ -726,6 +759,9 @@ function ConceptsCard({ concepts }: { concepts: TradingConcept[] }) {
       <input className="input pl-9 pr-9" value={search} onChange={event => { setSearch(event.target.value); setOpen(true); }} onFocus={() => setOpen(true)} placeholder="Search concepts to review" data-testid="input-builder-library-search" />
       <ChevronDown size={15} className="absolute right-3 top-3 text-muted-foreground" />
       {open && <div className="absolute z-30 left-0 right-0 top-full mt-2 panel p-2 max-h-56 overflow-y-auto shadow-xl">{filtered.length ? filtered.map(concept => <div key={concept.id} className="px-3 py-2 rounded-md hover:bg-secondary"><div className="text-sm font-semibold">{concept.name}</div><div className="text-[10px] text-muted-foreground mt-1">{concept.category || "CUSTOM"} · {concept.isBuiltIn ? "Library concept" : "Custom concept"}</div></div>) : <div className="p-4 text-sm text-muted-foreground">No concepts match that search.</div>}</div>}
+    </div>
+    <div className="flex flex-wrap gap-1.5 mt-4" data-testid="builder-concept-category-filters">
+      {categories.map(option => <button key={option} type="button" className={`tag ${category === option ? "tag-active" : ""}`} onClick={() => setCategory(option)}>{option}</button>)}
     </div>
     <div className="flex items-center justify-between gap-3 mt-5 pt-4 border-t border-border">
       <span className="text-[11px] text-muted-foreground">{concepts.length} concepts available</span>
@@ -931,7 +967,7 @@ export function StrategyBuilder() {
        </details>
     </div>}
      {strategyModal && <Modal title={strategyModal === "edit" ? "Edit strategy details" : "New strategy"} onClose={() => setStrategyModal(false)}><StrategyForm strategy={strategyModal === "edit" ? activeStrategy : null} markets={markets.data || []} timeframes={timeframes.data || []} onClose={() => setStrategyModal(false)} onSaved={savedStrategy} /></Modal>}
-      {conditionModal && activeStrategy && <ConditionModal key={conditionModal === "new" ? `new-${newConditionStage}` : conditionModal.id} strategyId={activeStrategy.id} concepts={concepts.data || []} timeframes={timeframes.data || []} defaultStage={newConditionStage} condition={conditionModal === "new" ? null : conditionModal} onClose={() => setConditionModal(false)} onSaved={refreshConditions} />}
+      {conditionModal && activeStrategy && <ConditionModal key={conditionModal === "new" ? `new-${newConditionStage}` : conditionModal.id} strategyId={activeStrategy.id} strategyDirection={activeStrategy.direction} concepts={concepts.data || []} timeframes={timeframes.data || []} defaultStage={newConditionStage} condition={conditionModal === "new" ? null : conditionModal} onClose={() => setConditionModal(false)} onSaved={refreshConditions} />}
   </BuilderPage>;
 }
 

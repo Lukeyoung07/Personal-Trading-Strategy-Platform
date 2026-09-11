@@ -1,3 +1,5 @@
+import { historicalRuleCompatibilityError, normalizeHistoricalRule } from "@workspace/api-zod";
+
 export type BacktestSide = "long" | "short";
 
 export interface HistoricalCandle {
@@ -59,11 +61,7 @@ export class BacktestEngineError extends Error {
 type PriceField = "open" | "high" | "low" | "close";
 
 function normalizedRule(rule: string) {
-  return rule
-    .trim()
-    .toLowerCase()
-    .replace(/[()[\],]/g, " ")
-    .replace(/\s+/g, " ");
+  return normalizeHistoricalRule(rule);
 }
 
 function operandNumber(operand: string, candle: HistoricalCandle, previous: HistoricalCandle | undefined) {
@@ -121,19 +119,7 @@ function evaluateRule(rule: string, candle: HistoricalCandle, previous: Historic
 }
 
 export function validateHistoricalRule(rule: string) {
-  const normalized = normalizedRule(rule)
-    .replace(/\s+and\s+/g, "&&")
-    .replace(/\s+or\s+/g, "||");
-  for (const group of normalized.split("||")) {
-    for (const clause of group.split("&&")) {
-      const compact = clause.trim();
-      if (compact === "always" || compact === "bullish" || compact === "bullish candle" || compact === "bearish" || compact === "bearish candle") continue;
-      if (/^(open|high|low|close) crosses (above|below) previous[_ ](open|high|low|close)$/.test(compact)) continue;
-      if (/^(open|high|low|close|previous[_ ](?:open|high|low|close))\s*(>=|<=|>|<|=|==)\s*(open|high|low|close|previous[_ ](?:open|high|low|close)|\d+(?:\.\d+)?)$/.test(compact)) continue;
-      return `Condition rule '${rule}' is not supported by the historical engine. Use always, bullish/bearish, OHLC comparisons, or previous-candle crossings.`;
-    }
-  }
-  return null;
+  return historicalRuleCompatibilityError(rule);
 }
 
 export function validateHistoricalBacktestStrategy(strategy: BacktestStrategy) {

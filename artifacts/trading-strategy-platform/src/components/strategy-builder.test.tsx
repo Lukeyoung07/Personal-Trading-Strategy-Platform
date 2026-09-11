@@ -251,6 +251,8 @@ describe("StrategyBuilder", () => {
     render(<StrategyBuilder />);
 
     fireEvent.click(screen.getByTestId("button-add-strategy-condition"));
+    fireEvent.focus(screen.getByTestId("input-condition-concept"));
+    fireEvent.click(screen.getByTestId("option-condition-concept-1"));
     fireEvent.change(screen.getByTestId("select-builder-condition-rule"), { target: { value: "rsi_above" } });
 
     expect(screen.getByText("Not currently supported by Backtesting.")).toBeInTheDocument();
