@@ -1,0 +1,346 @@
+Continue the master build, but ONLY work on the three remaining follow-up areas identified in the previous audit:
+
+1. AI taxonomy completeness
+2. Browser/mobile regression coverage
+3. Production hardening
+
+IMPORTANT:
+Do not rebuild existing functionality.
+
+Do not change:
+- OpenRouter configuration
+- AI provider
+- API key handling
+- Backtesting calculations
+- Market-data calculations
+- Strategy monitoring calculations
+- Strategy Builder architecture
+- Strategy versioning architecture
+- Trade Journal calculations
+- Existing alert logic
+- Existing working AI → Builder Review Strategy handoff
+
+The goal is to strengthen the existing application, not redesign it.
+
+==================================================
+1. AI TAXONOMY COMPLETENESS
+==================================================
+
+Audit the current AI concept-recognition system against the trading concepts already specified in the project.
+
+Ensure the AI can correctly recognise, explain and preserve:
+
+Market Structure:
+- HH
+- HL
+- LH
+- LL
+- BOS
+- CHoCH
+
+Liquidity:
+- Buy-side liquidity
+- Sell-side liquidity
+- Liquidity sweep
+- Liquidity grab
+- Equal highs
+- Equal lows
+- Previous high/low liquidity
+
+Support/Resistance:
+- Support
+- Resistance
+- Break and retest
+- Rejection
+- Previous day high/low
+- Previous week high/low
+
+Supply/Demand:
+- Supply
+- Demand
+- Zone reaction
+- Zone retest
+
+FVG:
+- Bullish FVG
+- Bearish FVG
+- FVG fill
+- FVG retest
+- IFVG
+
+Order Blocks:
+- Bullish order block
+- Bearish order block
+- Order block retest
+- Breaker block
+
+Price Action:
+- Displacement
+- Breakout
+- Pullback
+- Retest
+- Rejection candle
+- Bullish candle
+- Bearish candle
+
+Premium/Discount:
+- Premium
+- Discount
+- Equilibrium
+
+Multi-Timeframe:
+- Higher-timeframe bias
+- Lower-timeframe confirmation
+- Multiple timeframe analysis
+- Higher-timeframe levels
+
+ICT/SMC:
+- IRL
+- ERL
+- SMT divergence
+- AMD
+- Power of 3
+
+Moving Averages:
+- EMA
+- SMA
+- Price above/below EMA
+- EMA crossover
+- EMA rejection
+- EMA trend confirmation
+
+Risk:
+- Stop loss
+- Take profit
+- Risk/reward
+- Percentage risk
+- Position sizing
+- Maximum risk per trade
+
+IMPORTANT:
+Do not claim any concept is backtest-compatible unless the existing Backtesting engine genuinely supports it.
+
+If a concept is understood but unsupported:
+- Preserve it in the strategy draft.
+- Mark it as unsupported.
+- Explain the limitation.
+- Do not silently replace it with another rule.
+
+Add regression tests for the taxonomy.
+
+Test natural-language requests such as:
+
+"Build me a liquidity sweep strategy."
+
+"Create an XAUUSD strategy using an FVG."
+
+"Use a 4H bullish bias and 15M entry."
+
+"Build an SMC strategy using BOS and an order block."
+
+"Use the 20 EMA as confirmation."
+
+"Create a strategy using premium and discount."
+
+Confirm the AI preserves the concepts correctly.
+
+==================================================
+2. BROWSER REGRESSION COVERAGE
+==================================================
+
+Add reliable regression coverage for the most important real user workflows.
+
+Cover:
+
+AI Assistant:
+- Open Assistant
+- Ask normal question
+- Ask concept question
+- Generate strategy
+- Generate unsupported strategy concept
+- Review Strategy
+- Return to Assistant
+- Generate another strategy
+- Review Strategy again
+- Save as New Version flow
+- Existing strategy context
+- Backtest explanation when a real completed backtest exists
+- No-backtest explanation when no backtest exists
+
+Strategy Builder:
+- New strategy
+- Existing strategy
+- AI draft
+- Market/instrument population
+- Manual edits
+- Review Strategy
+- Save workflow
+
+Backtesting:
+- Valid compatible strategy
+- Unsupported strategy
+- Invalid date range
+- Zero-trade result
+- Completed result
+- Result persistence
+- Strategy/version association
+
+Trade Journal:
+- Create trade
+- Edit trade
+- Close trade
+- View performance
+
+Alerts:
+- Monitoring transition
+- Alert persistence
+- Acknowledge alert
+
+IMPORTANT:
+Use real application workflows/data where possible.
+Do not use fake results to claim the complete backtest workflow works.
+
+==================================================
+3. MOBILE REGRESSION COVERAGE
+==================================================
+
+Test the application at mobile viewport sizes.
+
+Inspect:
+
+- Dashboard
+- AI Assistant
+- Strategy Builder
+- Strategy Library
+- Monitoring
+- Alerts
+- Backtesting
+- Backtest Results
+- Trade Journal
+- Performance
+
+Fix only genuine responsive/layout issues.
+
+Do not redesign the application.
+
+Make sure:
+
+- Buttons remain accessible.
+- Forms do not overflow.
+- Tables remain usable.
+- AI messages remain readable.
+- Strategy Builder controls remain usable.
+- Backtest charts/results remain usable.
+- Navigation works.
+- Important actions are not hidden or clipped.
+
+==================================================
+4. PRODUCTION HARDENING
+==================================================
+
+Audit the application for obvious production-readiness problems.
+
+Check:
+
+- Error handling
+- Loading states
+- Empty states
+- API failures
+- Database failures
+- Missing data
+- Invalid IDs
+- Invalid strategy versions
+- Invalid backtest IDs
+- Unsupported conditions
+- Rate-limit handling
+- AI timeout handling
+- Concurrent requests
+- Duplicate submissions
+- Stale client state
+- Session/storage edge cases
+
+Do not expose:
+- API keys
+- secrets
+- internal credentials
+- sensitive server information
+
+Make error messages useful to the user without exposing internal implementation details.
+
+Do not invent fallback data.
+
+If an external AI request fails, clearly distinguish:
+- temporary provider/rate-limit failure
+- invalid request
+- unavailable context
+- server/database failure
+
+Do not convert every failure into "AI unavailable."
+
+==================================================
+5. CRITICAL REGRESSION PROTECTION
+==================================================
+
+Before making changes, establish the current behaviour of:
+
+- AI Assistant
+- Review Strategy
+- Strategy Builder
+- Market selection
+- Backtesting
+- Backtest Results
+- Trade Journal
+- Performance
+- Alerts
+
+After changes, verify these still work.
+
+Especially protect the existing AI → Builder workflow:
+
+AI draft
+→ Review Strategy
+→ Builder populated
+→ User reviews
+→ User explicitly saves
+
+Do not automatically save anything.
+
+==================================================
+6. TESTING
+==================================================
+
+Run:
+
+- API tests
+- Frontend tests
+- Shared tests where applicable
+- Typechecks
+- Production builds
+- git diff --check
+
+Perform real browser verification of the key workflows.
+
+Do not claim something works solely because a unit test passes if it requires browser interaction.
+
+==================================================
+FINAL REPORT
+==================================================
+
+Report:
+
+1. AI concepts audited/added/fixed.
+2. AI taxonomy regression tests.
+3. Browser workflows tested.
+4. Mobile issues found and fixed.
+5. Production-hardening changes.
+6. Bugs found.
+7. Bugs fixed.
+8. Existing functionality confirmed unchanged.
+9. Tests passed.
+10. Typechecks passed.
+11. Production builds passed.
+12. Remaining limitations.
+
+Do not claim production readiness unless the relevant workflows were actually tested.
+
+Do not make unrelated changes.
