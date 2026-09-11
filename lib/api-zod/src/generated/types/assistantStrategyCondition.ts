@@ -5,6 +5,7 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { AssistantStrategyConditionDirection } from './assistantStrategyConditionDirection';
 import type { AssistantStrategyConditionRequirement } from './assistantStrategyConditionRequirement';
 import type { AssistantStrategyConditionStage } from './assistantStrategyConditionStage';
 
@@ -14,6 +15,8 @@ export interface AssistantStrategyCondition {
   requirement: AssistantStrategyConditionRequirement;
   conceptName: string;
   timeframe: string;
+  direction: AssistantStrategyConditionDirection;
   triggerRules: string;
+  ruleSupported: boolean;
   supported?: boolean;
 }

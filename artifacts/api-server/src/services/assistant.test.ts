@@ -108,7 +108,7 @@ describe("AI Trading Assistant provider boundary", () => {
     }), { status: 200, headers: { "content-type": "application/json" } }));
 
     const response = await answerAssistant({
-      message: "Build a compatible candle strategy",
+      message: "Build a compatible candle strategy with explicit entry and exit rules.",
       messages: [],
       context: { page: "/strategy-builder" },
     });
@@ -151,13 +151,169 @@ describe("AI Trading Assistant provider boundary", () => {
     }), { status: 200, headers: { "content-type": "application/json" } }));
 
     const response = await answerAssistant({
-      message: "Build a bullish and bearish candle strategy",
+      message: "Build a bullish and bearish candle strategy with entry and exit rules.",
       messages: [],
       context: { page: "/strategy-builder" },
     });
 
     expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
     expect(response.strategyDraft?.conditions.map(condition => condition.triggerRules)).toEqual(["bullish", "bearish"]);
+  });
+
+  it("builds the requested Gold reversal stages without inventing risk or exits", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the requested reversal draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "Gold 15m Liquidity Sweep Reversal",
+              description: "A reversal setup with a liquidity sweep followed by fair value gap confirmation.",
+              direction: "both",
+              marketSymbol: "Gold",
+              timeframes: ["15 minutes"],
+              conditions: [
+                {
+                  name: "Liquidity Sweep",
+                  stage: "entry",
+                  requirement: "required",
+                  conceptName: "Liquidity Sweep",
+                  timeframe: "15 minutes",
+                  direction: "both",
+                  triggerRules: "close crosses above previous low",
+                },
+                {
+                  name: "Fair Value Gap confirmation",
+                  stage: "confirmation",
+                  requirement: "required",
+                  conceptName: "Fair Value Gap",
+                  timeframe: "15 minutes",
+                  direction: "both",
+                  triggerRules: "bullish",
+                },
+                {
+                  name: "Take Profit",
+                  stage: "exit",
+                  requirement: "optional",
+                  conceptName: "Take Profit",
+                  timeframe: "15 minutes",
+                  direction: "both",
+                  triggerRules: "always",
+                },
+              ],
+              riskManagementRules: "stop-loss: 1%; take-profit: 2%",
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: "Create me a Gold reversal strategy using a liquidity sweep followed by Fair Value Gap confirmation on the 15 minute timeframe.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.marketSymbol).toBe("XAUUSD");
+    expect(response.strategyDraft?.timeframes).toEqual(["15m"]);
+    expect(response.strategyDraft?.conditions.map(condition => ({
+      conceptName: condition.conceptName,
+      stage: condition.stage,
+      direction: condition.direction,
+      triggerRules: condition.triggerRules,
+      ruleSupported: condition.ruleSupported,
+    }))).toEqual([
+      { conceptName: "Liquidity Sweep", stage: "entry", direction: "both", triggerRules: "close crosses above previous low", ruleSupported: true },
+      { conceptName: "Fair Value Gap", stage: "confirmation", direction: "both", triggerRules: "bullish", ruleSupported: true },
+    ]);
+    expect(response.strategyDraft?.riskManagementRules).toBeNull();
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).toEqual(expect.arrayContaining([
+      "Liquidity Sweep",
+      "Fair Value Gap confirmation",
+    ]));
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Take Profit");
+  });
+
+  it("transfers structured TRADEX fields, directions, and requested risk settings", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the structured strategy draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "Gold Liquidity Reversal",
+              description: "A multi-timeframe reversal process.",
+              direction: "both",
+              marketSymbol: "XAUUSD",
+              timeframes: ["15M", "5M"],
+              conditions: [
+                {
+                  name: "Liquidity Sweep",
+                  stage: "entry",
+                  requirement: "required",
+                  conceptName: "Liquidity Sweep",
+                  timeframe: "15M",
+                  direction: "long",
+                  triggerRules: "close crosses above previous low",
+                },
+                {
+                  name: "Fair Value Gap",
+                  stage: "confirmation",
+                  requirement: "required",
+                  conceptName: "FVG",
+                  timeframe: "5M",
+                  direction: "long",
+                  triggerRules: "bullish",
+                },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: `TRADEX STRATEGY
+Name: Gold Liquidity Reversal
+Market: XAUUSD
+Direction: Both
+Timeframes:
+15M
+5M
+
+ENTRY
+1. Concept: Liquidity Sweep
+   Direction: Long
+   Timeframe: 15M
+
+CONFIRMATION
+1. Concept: Fair Value Gap
+   Direction: Long
+   Timeframe: 5M
+
+RISK
+Risk per trade: 1%
+Risk/Reward: 2:1`,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.marketSymbol).toBe("XAUUSD");
+    expect(response.strategyDraft?.timeframes).toEqual(["15m", "5m"]);
+    expect(response.strategyDraft?.conditions.map(condition => ({
+      stage: condition.stage,
+      direction: condition.direction,
+      timeframe: condition.timeframe,
+    }))).toEqual([
+      { stage: "entry", direction: "long", timeframe: "15m" },
+      { stage: "confirmation", direction: "long", timeframe: "5m" },
+    ]);
+    expect(response.strategyDraft?.riskManagementRules).toBe("risk: 1%; risk/reward: 2R");
   });
 
   it("does not trust a model-supported flag for concepts the engine cannot execute", async () => {
@@ -205,7 +361,7 @@ describe("AI Trading Assistant provider boundary", () => {
       supported: false,
       explanation: "The model should not be able to override this guardrail.",
     }]));
-    expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("Fair Value Gap (FVG)");
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("Bullish FVG");
   });
 
   it("keeps an unsupported strategy request as a reviewable draft when the model omits one", async () => {

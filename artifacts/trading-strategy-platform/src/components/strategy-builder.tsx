@@ -928,10 +928,10 @@ function DraftCondition({ condition }: { condition: AssistantStrategyDraft["cond
     <div className="flex flex-wrap items-center gap-2">
       <span className="tag tag-active">{condition.stage}</span>
       <span className="tag tag-draft">{condition.requirement}</span>
-      {!condition.supported && <span className="tag border-amber-500/40 text-amber-200">Review</span>}
+      {!condition.supported && <span className="tag border-amber-500/40 text-amber-200">{condition.ruleSupported ? "Concept review" : "Rule review"}</span>}
     </div>
     <div className="text-xs font-semibold mt-2">{condition.name}</div>
-    <div className="text-[11px] text-primary mt-1">{condition.conceptName}</div>
+    <div className="text-[11px] text-primary mt-1">{condition.conceptName} · {condition.direction}</div>
     <div className="text-[11px] text-muted-foreground mt-2 leading-relaxed">{condition.triggerRules}</div>
   </div>;
 }
@@ -993,7 +993,9 @@ export function StrategyBuilder() {
             name: condition.name,
             description: `Prepared by AI Assistant from the ${condition.conceptName} concept.`,
             timeframe: condition.timeframe || strategy.timeframes?.[0] || "Not specified",
-            direction: strategy.direction,
+            direction: strategy.direction === "both" && ["long", "short", "both"].includes(condition.direction)
+              ? condition.direction
+              : strategy.direction,
             requirement: condition.requirement,
             triggerRules: condition.triggerRules || null,
             invalidationRules: null,

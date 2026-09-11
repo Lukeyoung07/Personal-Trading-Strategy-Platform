@@ -50,7 +50,8 @@ function normalizeSupportedRule(rule: string | null | undefined) {
 function normalizeConditionRule(condition: any) {
   const normalized = normalizeSupportedRule(String(condition?.triggerRules || ""));
   if (supportedRule(normalized)) return normalized;
-  const descriptor = `${condition?.name || ""} ${condition?.conceptName || ""} ${condition?.triggerRules || ""}`.toLowerCase();
+  const descriptor = `${condition?.name || ""} ${condition?.conceptName || ""}`.toLowerCase();
+  if (!/\b(?:bullish|bearish)\s+candle\b|\bcandle direction\b/.test(descriptor)) return normalized;
   if (/\bbullish\b/.test(descriptor)) return "bullish";
   if (/\bbearish\b/.test(descriptor)) return "bearish";
   return normalized;
@@ -152,6 +153,11 @@ function compatibilityForDraft(draft: any) {
   const unsupportedConcepts = Array.isArray(draft?.conceptsUsed)
     ? draft.conceptsUsed
       .filter((concept: any) => concept && concept.supported === false)
+      .filter((concept: any) => !conditions.some((condition: any) => {
+        const conditionName = catalogKey(String(condition?.conceptName || ""));
+        const conceptName = catalogKey(String(concept.name || ""));
+        return conditionName === conceptName || conditionName.includes(conceptName) || conceptName.includes(conditionName);
+      }))
       .map((concept: any) => String(concept.name || "Unnamed concept"))
     : [];
   unsupported.push(...unsupportedConcepts);
@@ -330,13 +336,30 @@ function matchCatalogMarket(value: string | null | undefined, catalog: BuilderCa
   return target || null;
 }
 
-function normalizeRiskRules(value: string | null | undefined) {
-  if (!value?.trim()) return null;
-  return value
+function normalizeRiskRules(value: string | null | undefined, requestMessage?: string) {
+  const normalized = value?.trim()
+    ? value
     .replace(/risk\s*per\s*trade\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/gi, "risk: $1%")
     .replace(/risk\s*\/\s*reward\s*[:=]\s*(\d+(?:\.\d+)?)\s*:\s*1/gi, "risk/reward: $1R")
     .replace(/risk\s*reward\s*[:=]\s*(\d+(?:\.\d+)?)\s*:\s*1/gi, "risk/reward: $1R")
-    .slice(0, 400);
+    .slice(0, 400)
+    : null;
+  if (requestMessage == null) return normalized;
+
+  const requestedRules: string[] = [];
+  const addMatch = (pattern: RegExp, formatter: (value: string) => string) => {
+    const match = requestMessage.match(pattern);
+    if (match?.[1]) requestedRules.push(formatter(match[1]));
+  };
+  addMatch(/(?:risk\s*per\s*trade|percentage\s*risk|risk)\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/i, value => `risk: ${value}%`);
+  addMatch(/(?:risk\s*\/\s*reward|risk\s*reward|r\s*:\s*r)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*:\s*1/i, value => `risk/reward: ${value}R`);
+  addMatch(/\btarget\s+(\d+(?:\.\d+)?)\s*R\b/i, value => `risk/reward: ${value}R`);
+  addMatch(/(?:stop[- ]loss|sl)\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/i, value => `stop-loss: ${value}%`);
+  addMatch(/(?:take[- ]profit|tp)\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/i, value => `take-profit: ${value}%`);
+  if (requestedRules.length) return [...new Set(requestedRules)].join("; ");
+  if (!/(?:stop[- ]loss|take[- ]profit|\bsl\b|\btp\b|\brisk\b|\btarget\b)/i.test(requestMessage)) return null;
+  const narrative = requestMessage.match(/(?:stop[- ]loss|take[- ]profit|sl|tp|target)[^.!?]*/i)?.[0]?.trim();
+  return narrative ? narrative.slice(0, 400) : null;
 }
 
 async function builderCatalog(): Promise<BuilderCatalog> {
@@ -357,7 +380,7 @@ async function builderCatalog(): Promise<BuilderCatalog> {
   };
 }
 
-function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog) {
+function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, requestMessage?: string) {
   if (!draft) return draft;
   const warnings: string[] = [];
   const conditions = (draft.conditions || []).map((condition: any) => {
@@ -369,20 +392,42 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog) {
       ...condition,
       conceptName: conceptName || String(condition.conceptName || "Unmapped concept").slice(0, 160),
       timeframe: timeframe || String(condition.timeframe || "Not specified").slice(0, 40),
+      direction: ["long", "short", "both"].includes(condition.direction) ? condition.direction : draft.direction,
+      ruleSupported: condition.ruleSupported === true,
       supported: Boolean(conceptName) && condition.supported === true,
     };
+  }).filter((condition: any) => {
+    if (requestMessage && !/(?:\bexit\b|\binvalidation\b|\bclose\b|\bstop[- ]loss\b|\btake[- ]profit\b|\btarget\b|\btp\b|\bsl\b)/i.test(requestMessage)) {
+      return condition.stage !== "exit" && condition.stage !== "invalidation";
+    }
+    return true;
   });
   const marketSymbol = matchCatalogMarket(draft.marketSymbol, catalog);
   if (draft.marketSymbol && !marketSymbol) warnings.push(`Market “${String(draft.marketSymbol)}” is not in the active market catalog.`);
   if (!String(draft.name || "").trim()) warnings.push("Strategy name needs review.");
   if (!["long", "short", "both"].includes(draft.direction)) warnings.push("Strategy direction needs review.");
-  const conceptsUsed = normalizeConcepts(draft.conceptsUsed, conditions);
+  const conditionConceptKeys = conditions.map((condition: any) => catalogKey(String(condition.conceptName || "")));
+  const requestedConceptKeys = requestMessage
+    ? conceptsRequestedInMessage(requestMessage).map(concept => catalogKey(concept.name))
+    : [];
+  const retainedConcepts = Array.isArray(draft.conceptsUsed)
+    ? draft.conceptsUsed.filter((concept: any) => {
+      const key = catalogKey(String(typeof concept === "string" ? concept : concept?.name || ""));
+      return conditionConceptKeys.some((conditionKey: string) => conditionKey === key || conditionKey.includes(key) || key.includes(conditionKey))
+        || requestedConceptKeys.some((requestedKey: string) => requestedKey === key || requestedKey.includes(key) || key.includes(requestedKey));
+    })
+    : [];
+  const conceptsUsed = normalizeConcepts(retainedConcepts, conditions);
+  const timeframes = Array.isArray(draft.timeframes)
+    ? draft.timeframes.map((timeframe: string) => matchCatalogTimeframe(String(timeframe), catalog) || String(timeframe).slice(0, 40)).filter(Boolean).slice(0, 8)
+    : [];
   const next = {
     ...draft,
     marketSymbol,
+    timeframes,
     conditions,
     conceptsUsed,
-    riskManagementRules: normalizeRiskRules(draft.riskManagementRules),
+    riskManagementRules: normalizeRiskRules(draft.riskManagementRules, requestMessage),
   };
   const compatibility = compatibilityForDraft(next);
   return {
@@ -411,7 +456,11 @@ function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | 
         ? "Candle Direction"
         : rawConceptName),
       timeframe: String(condition?.timeframe || "Not specified").slice(0, 40),
+      direction: ["long", "short", "both"].includes(condition?.direction)
+        ? condition.direction
+        : (draft.direction === "long" || draft.direction === "short" || draft.direction === "both" ? draft.direction : "both"),
       triggerRules: normalizedRule.slice(0, 400),
+      ruleSupported: ruleIsSupported,
       supported: ruleIsSupported && !unsupportedConcept,
     };
   }).slice(0, 20) : [];
@@ -427,7 +476,7 @@ function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | 
     timeframes: Array.isArray(draft.timeframes) ? draft.timeframes.map(String).slice(0, 8) : [],
     conditions,
     conceptsUsed,
-     riskManagementRules: draft.riskManagementRules ? String(draft.riskManagementRules).slice(0, 400) : null,
+    riskManagementRules: draft.riskManagementRules ? String(draft.riskManagementRules).slice(0, 400) : null,
     compatibility,
   } : null;
   return {
@@ -668,6 +717,7 @@ Safety and product boundaries:
 - For strategy drafts, use only concept names, market symbols, and timeframe codes/labels from builderCatalog. Common aliases such as FVG, BOS, CHoCH, MSS, SMT, HTF, LTF, AMD, OB, and Gold must be mapped to a matching catalog item only when one exists. If no match exists, preserve the requested wording and mark it for review; never invent a library item.
 - Recognise both normal-language requests and the structured TRADEX STRATEGY format with NAME, MARKET, DIRECTION, TIMEFRAMES, ENTRY, CONFIRMATION, EXIT, and RISK sections.
 - Use only the exact historical rules supported by the Builder: always, bullish, bearish, close > open, close < open, and close crosses above/below a previous OHLC value. Preserve other requested concepts as descriptive unsupported conditions.
+- Only infer bullish or bearish from an explicit Bullish Candle, Bearish Candle, or Candle Direction descriptor. Never convert an FVG, liquidity, structure, indicator, or other concept description into a candle rule.
 - Never silently save, overwrite, activate, or run anything. Prepare drafts and explain the user's next explicit action.
 - When setup context contains a strategy or version ID, copy those IDs unchanged. Never substitute a different strategy version.
 - Keep explanations beginner-friendly and concise.
@@ -682,13 +732,13 @@ Return JSON only with this shape:
     "direction": "long | short | both",
     "marketSymbol": "string or null",
     "timeframes": ["string"],
-    "conditions": [{"name":"string","stage":"entry|confirmation|invalidation|exit","requirement":"required|optional","conceptName":"string","timeframe":"string","triggerRules":"exact supported rule or descriptive unsupported rule"}],
+     "conditions": [{"name":"string","stage":"entry|confirmation|invalidation|exit","requirement":"required|optional","conceptName":"string","timeframe":"string","direction":"long|short|both","triggerRules":"exact supported rule or descriptive unsupported rule"}],
     "conceptsUsed": [{"name":"string","supported":true,"explanation":"string"}],
     "riskManagementRules": "string or null"
   },
   "backtestSetup": null or {"strategyId": number|null,"versionId":number|null,"instrumentId":number|null,"timeframeId":number|null,"startDate":"ISO string|null","endDate":"ISO string|null"}
 }
-When proposing a strategy, include a draft even if one requested condition is unsupported; explain that limitation in reply. For result explanations, use only actual numbers from context.
+ When proposing a strategy, include a draft even if one requested condition is unsupported; explain that limitation in reply. Keep unsupported concepts as named conditions, but distinguish that from whether the triggerRules value is one of the supported historical rules. Do not add exit conditions, stop loss, take profit, risk values, or indicator parameters unless the user explicitly requested them. For each condition, preserve an explicitly requested direction; otherwise use the strategy direction. For result explanations, use only actual numbers from context.
 ${CONCEPT_GUIDE}
 
 Builder catalog and current workspace context:
@@ -784,6 +834,7 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
       const validatedFallback = validateDraftAgainstCatalog(
         fallbackDraft,
         (context.builderCatalog || { concepts: [], markets: [], timeframes: [] }) as BuilderCatalog,
+        input.message,
       );
       parsed.strategyDraft = validatedFallback;
       parsed.intent = "strategy_proposal";
@@ -793,6 +844,7 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
       const validatedDraft = validateDraftAgainstCatalog(
         enrichedDraft,
         (context.builderCatalog || { concepts: [], markets: [], timeframes: [] }) as BuilderCatalog,
+        input.message,
       );
       parsed.strategyDraft = validatedDraft;
       parsed.compatibility = validatedDraft.compatibility;

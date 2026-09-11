@@ -2063,13 +2063,24 @@ export const AssistantStrategyConditionRequirement = {
   optional: 'optional',
 } as const;
 
+export type AssistantStrategyConditionDirection = typeof AssistantStrategyConditionDirection[keyof typeof AssistantStrategyConditionDirection];
+
+
+export const AssistantStrategyConditionDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
 export interface AssistantStrategyCondition {
   name: string;
   stage: AssistantStrategyConditionStage;
   requirement: AssistantStrategyConditionRequirement;
   conceptName: string;
   timeframe: string;
+  direction: AssistantStrategyConditionDirection;
   triggerRules: string;
+  ruleSupported: boolean;
   supported?: boolean;
 }
 

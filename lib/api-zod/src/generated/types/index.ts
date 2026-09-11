@@ -25,6 +25,7 @@ export * from './assistantContext';
 export * from './assistantMessage';
 export * from './assistantMessageRole';
 export * from './assistantStrategyCondition';
+export * from './assistantStrategyConditionDirection';
 export * from './assistantStrategyConditionRequirement';
 export * from './assistantStrategyConditionStage';
 export * from './assistantStrategyDraft';

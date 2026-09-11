@@ -20,3 +20,9 @@ Generated Builder drafts should be validated against the live concept, market, a
 **Why:** AI output can use aliases such as FVG or Gold, while the Builder requires exact catalog references. Mapping only against current records keeps the handoff editable without creating concepts or instruments that do not exist.
 
 **How to apply:** Normalize recognized aliases to exact catalog names on the server, preserve unknown references in the draft, and keep the existing Builder as the only save path.
+
+Generated conditions should distinguish executable trigger-rule support from concept support: a condition can carry a supported Builder rule while still requiring concept review. Do not infer candle rules from FVG, liquidity, structure, or indicator descriptions.
+
+**Why:** Treating concept support and rule support as one flag made honest mapped rules look indistinguishable from unsupported executable logic, and broad inference could silently change the requested condition.
+
+**How to apply:** Preserve condition-level direction and trigger text, compute rule support independently, and show concept review versus rule review without saving or activating the draft.

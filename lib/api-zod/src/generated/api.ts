@@ -61,7 +61,9 @@ export const ChatAssistantResponse = zod.object({
   "requirement": zod.enum(['required', 'optional']),
   "conceptName": zod.string(),
   "timeframe": zod.string(),
+  "direction": zod.enum(['long', 'short', 'both']),
   "triggerRules": zod.string(),
+  "ruleSupported": zod.boolean(),
   "supported": zod.boolean().optional()
 })),
   "conceptsUsed": zod.array(zod.object({
@@ -2294,8 +2296,6 @@ export const CreateAlertResponse = zod.object({
   "marketSymbol": zod.string().nullable(),
   "monitorSessionId": zod.number().int().nullable(),
   "strategyVersionId": zod.number().int().nullable(),
-  "strategyName": zod.string().nullable(),
-  "versionNumber": zod.number().int().nullable(),
   "sourceType": zod.enum(['manual', 'monitoring']),
   "condition": zod.string(),
   "threshold": zod.string().nullable(),
@@ -2621,8 +2621,6 @@ export const UpdateAlertResponse = zod.object({
   "marketSymbol": zod.string().nullable(),
   "monitorSessionId": zod.number().int().nullable(),
   "strategyVersionId": zod.number().int().nullable(),
-  "strategyName": zod.string().nullable(),
-  "versionNumber": zod.number().int().nullable(),
   "sourceType": zod.enum(['manual', 'monitoring']),
   "condition": zod.string(),
   "threshold": zod.string().nullable(),

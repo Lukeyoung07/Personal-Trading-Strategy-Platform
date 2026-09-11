@@ -2650,7 +2650,7 @@ components:
           $ref: "#/components/schemas/AssistantContext"
     AssistantStrategyCondition:
       type: object
-      required: [name, stage, requirement, conceptName, timeframe, triggerRules]
+      required: [name, stage, requirement, conceptName, timeframe, direction, triggerRules, ruleSupported]
       properties:
         name: { type: string }
         stage:
@@ -2661,7 +2661,11 @@ components:
           enum: [required, optional]
         conceptName: { type: string }
         timeframe: { type: string }
+        direction:
+          type: string
+          enum: [long, short, both]
         triggerRules: { type: string }
+        ruleSupported: { type: boolean }
         supported: { type: boolean }
     AssistantCompatibility:
       type: object
