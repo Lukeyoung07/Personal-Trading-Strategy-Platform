@@ -1,0 +1,357 @@
+TRADEX — FIX AI MAPPING TO STRUCTURED EXECUTABLE CONCEPTS
+
+The structured Liquidity Sweep and Fair Value Gap functionality has already been implemented.
+
+Do NOT rebuild those concepts.
+
+Do NOT redesign the Strategy Builder.
+
+Do NOT change the Backtesting engine.
+
+The problem is specifically the AI → Builder mapping.
+
+==================================================
+CURRENT PROBLEM
+==================================================
+
+When I ask Build with AI:
+
+"Create me a reversal strategy for Gold using liquidity sweeps and Fair Value Gap retests. Use 15m for the main setup and 5m for confirmation. Trade both long and short."
+
+The AI correctly understands:
+
+Market:
+XAUUSD
+
+Direction:
+Both
+
+Timeframes:
+15m + 5m
+
+Entry:
+Liquidity Sweep
+
+Confirmation:
+FVG Retest
+
+However, the generated draft still says:
+
+"Liquidity Sweep is understood but not natively supported..."
+
+and marks:
+
+5m FVG Retest
+Fair Value Gap
+
+as:
+
+Review required.
+
+This is incorrect because structured executable Liquidity Sweep and FVG support has already been implemented.
+
+==================================================
+1. USE THE EXISTING EXECUTABLE CONCEPT DEFINITIONS
+==================================================
+
+The AI normalization/generation layer must use the existing shared executable concept definitions.
+
+Do NOT maintain a separate AI definition.
+
+Do NOT create another set of concept rules.
+
+The AI must resolve:
+
+Liquidity Sweep
+
+to the existing executable Liquidity Sweep definition.
+
+The AI must resolve:
+
+Fair Value Gap
+
+and:
+
+Fair Value Gap Retest
+
+to the existing executable FVG definition and parameters.
+
+==================================================
+2. LIQUIDITY SWEEP
+==================================================
+
+When the user requests:
+
+Liquidity Sweep
+
+the AI must create the structured Liquidity Sweep condition using the existing Builder schema.
+
+Populate the actual parameters required by the existing implementation, including where appropriate:
+
+- Liquidity level type
+- Sweep side
+- Lookback
+
+Do not turn it into a generic candle rule.
+
+Do not describe it as merely a concept.
+
+==================================================
+3. FVG RETEST
+==================================================
+
+When the user requests:
+
+FVG Retest
+
+or:
+
+Fair Value Gap Retest
+
+the AI must create the existing structured FVG condition.
+
+Populate the actual supported parameters, including where appropriate:
+
+- FVG polarity
+- Formation vs retest
+- Retest lookback
+- Minimum gap size
+
+Do not create a generic descriptive condition.
+
+Do not mark it as unsupported if the existing executable FVG definition supports it.
+
+==================================================
+4. AI MUST NOT FALL BACK TO DESCRIPTIVE TEXT
+==================================================
+
+The current output contains language such as:
+
+"the historical engine needs a prior-candle/prior-extreme + close-back-inside-level rule"
+
+The AI should NOT be inventing or proposing a rule like this.
+
+The executable concept definition already exists.
+
+The AI's job is to select and populate that definition.
+
+==================================================
+5. REMOVE FALSE REVIEW WARNINGS
+==================================================
+
+If the generated condition successfully maps to an existing executable concept definition:
+
+show:
+
+✓ Backtest supported
+
+Do NOT show:
+
+Review required
+
+Do NOT say:
+
+"not natively supported"
+
+Do NOT say:
+
+"would require advanced pattern detection"
+
+if the existing implementation already supports the concept.
+
+==================================================
+6. EXACT TEST
+==================================================
+
+Run this exact request:
+
+"Create me a reversal strategy for Gold using liquidity sweeps and Fair Value Gap retests. Use 15m for the main setup and 5m for confirmation, trading both long and short."
+
+The generated result should contain:
+
+Market:
+XAUUSD
+
+Direction:
+Both
+
+Timeframes:
+15m
+5m
+
+ENTRY
+
+Concept:
+Liquidity Sweep
+
+Timeframe:
+15m
+
+Structured executable parameters:
+[existing Liquidity Sweep parameters]
+
+CONFIRMATION
+
+Concept:
+Fair Value Gap
+
+Timeframe:
+5m
+
+Formation/Retest:
+Retest
+
+Structured executable parameters:
+[existing FVG parameters]
+
+The result should NOT contain a Review Required warning for either concept if the existing executable definitions validate successfully.
+
+==================================================
+7. DO NOT INVENT DEFAULTS
+==================================================
+
+Only populate parameter defaults if the existing executable concept definition already specifies valid defaults.
+
+Do not invent arbitrary trading parameters.
+
+If a required parameter genuinely cannot be determined from the user's request and has no valid existing default:
+
+ask the user for that parameter or leave it explicitly requiring configuration.
+
+Do not silently invent values.
+
+==================================================
+8. BUILDER HANDOFF
+==================================================
+
+After AI generation, pass the structured conditions directly into the existing Strategy Builder.
+
+The Builder should display the same condition that would have been created manually.
+
+There should be no difference between:
+
+Manual Builder condition
+
+and:
+
+AI-generated Builder condition.
+
+==================================================
+9. VALIDATION
+==================================================
+
+After AI generation:
+
+AI request
+↓
+Concept resolution
+↓
+Executable concept lookup
+↓
+Parameter mapping
+↓
+Condition validation
+↓
+Builder draft
+
+If the condition validates:
+
+✓ Backtest supported
+
+If it doesn't:
+
+show the actual validation error.
+
+Do not use a generic "Review required" message when the condition is actually valid.
+
+==================================================
+10. PRESERVE EXISTING FUNCTIONALITY
+==================================================
+
+Do not change:
+
+- Trading Concept Library
+- Strategy Builder UI
+- Manual condition creation
+- Existing Liquidity Sweep implementation
+- Existing FVG implementation
+- Backtesting engine
+- Markets
+- Alerts
+- Journal
+- Monitoring
+- Strategy Versioning
+
+Only correct the AI mapping to the already-existing executable definitions.
+
+==================================================
+11. REGRESSION TESTS
+==================================================
+
+Add tests covering:
+
+1. "Liquidity Sweep" → executable Liquidity Sweep definition.
+
+2. "Fair Value Gap" → executable FVG definition.
+
+3. "FVG Retest" → executable FVG retest definition.
+
+4. "Fair Value Gap Retest" → executable FVG retest definition.
+
+5. Gold → XAUUSD.
+
+6. 15 minute → 15m.
+
+7. Both directions → both.
+
+8. AI-generated Liquidity Sweep condition matches manually created condition structure.
+
+9. AI-generated FVG Retest condition matches manually created condition structure.
+
+10. Unsupported concepts still correctly remain unsupported.
+
+==================================================
+FINAL GOAL
+==================================================
+
+The workflow must now be:
+
+User:
+
+"Create me a reversal strategy for Gold using liquidity sweeps and Fair Value Gap retests. Use 15m for the main setup and 5m for confirmation, trading both long and short."
+
+↓
+
+AI understands the request.
+
+↓
+
+AI resolves the concepts against the EXISTING executable concept definitions.
+
+↓
+
+AI creates structured conditions.
+
+↓
+
+Builder receives the structured conditions.
+
+↓
+
+Liquidity Sweep:
+✓ Backtest supported
+
+↓
+
+FVG Retest:
+✓ Backtest supported
+
+↓
+
+User reviews the strategy.
+
+No false "Review required" warning.
+
+Do not fix this by changing the wording of the AI response.
+
+Fix the actual AI → executable concept → Builder mapping.
