@@ -1,0 +1,439 @@
+Now perform a full end-to-end QA and bug-fixing pass across the entire application.
+
+IMPORTANT:
+Do NOT add new features during this task.
+Do NOT redesign the application.
+Do NOT refactor working systems unnecessarily.
+
+The goal is to find, reproduce and FIX genuine bugs, broken workflows, data inconsistencies, UI problems and regressions across the existing application.
+
+Before changing anything:
+
+1. Inspect the current implementation.
+2. Identify the critical user workflows.
+3. Test each workflow in the actual running application.
+4. Reproduce any failure before fixing it.
+5. Fix only confirmed issues.
+6. Re-test the affected workflow after every fix.
+
+==================================================
+1. AI ASSISTANT
+==================================================
+
+Test the AI Assistant thoroughly.
+
+Test:
+
+- Normal questions
+- Strategy creation
+- Simple XAUUSD strategy
+- EMA strategy
+- SMA strategy
+- FVG
+- IFVG
+- Liquidity sweep
+- Order block
+- BOS
+- CHoCH
+- HH / HL / LH / LL
+- Support/resistance
+- Supply/demand
+- Premium/discount
+- IRL / ERL
+- SMT
+- AMD
+- Power of 3
+- Multi-timeframe strategies
+- Unsupported concepts
+- Multiple concepts in one strategy
+- BUY strategies
+- SELL strategies
+- Both-direction strategies
+- Stop loss
+- Take profit
+- Risk/reward
+- Position sizing
+
+Verify that concepts are classified correctly and unsupported concepts are not falsely marked as executable.
+
+Test:
+
+- Review Strategy
+- Save as New Version
+- Returning to the Assistant
+- Leaving the Assistant and coming back
+- Repeating Review Strategy
+- Repeating Save as New Version
+- Opening Builder from an AI draft
+- Existing strategies being present while using an AI draft
+
+Verify that AI drafts never disappear or become stale.
+
+==================================================
+2. STRATEGY BUILDER
+==================================================
+
+Test the complete Strategy Builder workflow.
+
+Test:
+
+- Creating a strategy
+- Editing a strategy
+- Saving a strategy
+- Selecting market/instrument
+- Selecting timeframe
+- Adding conditions
+- Removing conditions
+- Entry conditions
+- Exit conditions
+- Stop loss
+- Take profit
+- Direction
+- Saving versions
+- Creating a new version
+- Reviewing versions
+- Activating a version
+- Creating a version from another version
+
+Verify immutable version behaviour.
+
+Verify that existing strategies cannot accidentally be overwritten.
+
+==================================================
+3. MARKET DATA
+==================================================
+
+Test:
+
+- Adding markets
+- Searching instruments
+- Selecting instruments
+- Different asset categories
+- Different timeframes
+- Historical candle loading
+- Live quote updates
+- Stale state
+- Market closed state
+- Disconnected state
+- Invalid/missing market data
+
+Verify that timeframes do not accidentally display the wrong candle data.
+
+Verify provider-neutral architecture remains intact.
+
+Do not invent unsupported futures data.
+
+==================================================
+4. STRATEGY MONITORING
+==================================================
+
+Test monitoring using real available market data.
+
+Verify:
+
+- Active strategy version is used
+- Conditions are evaluated in the correct order
+- Closed candles are used correctly
+- MET state
+- NOT MET state
+- WAITING state
+- INVALID state
+- Missing data
+- Unsupported/unregistered detectors
+- Switching active strategy versions
+
+Verify that monitoring never evaluates the wrong strategy version.
+
+==================================================
+5. ALERTS
+==================================================
+
+Test:
+
+- Alert creation
+- Alert history
+- MET alerts
+- INVALID alerts
+- Meaningful state transitions
+- Acknowledgement
+- Existing manual reminders
+
+Verify duplicate alerts are not unnecessarily generated.
+
+Verify alerts remain associated with the correct strategy/monitoring event.
+
+==================================================
+6. BACKTESTING
+==================================================
+
+Test:
+
+- Valid strategy
+- Unsupported strategy
+- Missing data
+- Invalid date range
+- Empty date range
+- Zero-trade backtest
+- Multiple trades
+- Backtest completion
+- Backtest results
+- Backtest statistics
+- Individual trades
+- Strategy-version association
+- Concurrent backtest submissions
+- Duplicate submissions
+- Missing backtest ID
+- Invalid backtest ID
+
+Verify unsupported strategies fail BEFORE historical data is unnecessarily consumed or a backtest is created.
+
+Verify valid zero-trade backtests remain supported.
+
+==================================================
+7. BACKTEST AI EXPLANATION
+==================================================
+
+Test:
+
+- Asking to explain a completed backtest
+- Asking without selecting a backtest
+- Missing backtest
+- Incomplete backtest
+- Completed backtest with results
+
+Verify the Assistant receives the correct persisted backtest context.
+
+Verify it never fabricates results.
+
+Verify errors are clear and do not expose raw provider responses.
+
+==================================================
+8. TRADE JOURNAL
+==================================================
+
+Test:
+
+- Creating trades
+- Editing trades
+- Viewing trades
+- Stop loss
+- Take profit
+- Risk amount
+- Risk unit
+- Opened date/time
+- Closed date/time
+- Strategy association
+- Exact strategy-version association
+- Trade notes
+- Existing CRUD
+
+Verify Journal trades remain completely separate from backtest trades.
+
+==================================================
+9. DAILY/MONTHLY PERFORMANCE
+==================================================
+
+Test:
+
+- Monthly P/L
+- Daily P/L calendar
+- Previous month
+- Next month
+- Current month
+- Days with no trades
+- Future days
+- One trade
+- Multiple trades
+- Winners and losers on same day
+- Day selection
+- Daily notes
+- Monthly cumulative chart
+- Winning streak
+- Losing streak
+- Best day
+- Worst day
+- Average trading day
+- Strategy performance
+- Exact strategy-version performance
+- Filters
+
+Verify every displayed number reconciles with actual persisted Journal trades.
+
+Verify editing a trade updates performance correctly.
+
+Verify date grouping uses the intended existing Journal date semantics consistently.
+
+==================================================
+10. MOBILE
+==================================================
+
+Test the application at mobile widths.
+
+At minimum test approximately:
+
+- 375px
+- 402px
+- 768px
+
+Check:
+
+- Dashboard
+- AI Assistant
+- Strategy Builder
+- Strategy Library
+- Market Monitor
+- Monitoring
+- Alerts
+- Backtesting
+- Backtest Results
+- Trade Journal
+- Performance/calendar
+
+Look specifically for:
+
+- Horizontal overflow
+- Clipped content
+- Broken buttons
+- Unusable dropdowns
+- Tiny text
+- Broken dialogs
+- Calendar layout problems
+- Charts overflowing
+- Navigation problems
+
+==================================================
+11. DATA INTEGRITY
+==================================================
+
+Look for:
+
+- Stale state
+- Incorrect caching
+- Incorrect IDs
+- Wrong strategy versions
+- Wrong market IDs
+- Duplicate records
+- Missing records
+- Incorrect date handling
+- Incorrect associations
+- Frontend/backend mismatches
+
+Pay particular attention to state surviving navigation and repeated actions.
+
+==================================================
+12. ERROR HANDLING
+==================================================
+
+Test expected failure conditions.
+
+Verify users receive clear messages for:
+
+- Validation errors
+- Provider rate limits
+- Provider failures
+- Timeouts
+- Missing data
+- Missing backtests
+- Invalid IDs
+- Unsupported strategy conditions
+
+Never expose:
+
+- API keys
+- Raw upstream responses
+- Sensitive internal information
+- Stack traces to the user
+
+==================================================
+13. PERFORMANCE / PRODUCTION
+==================================================
+
+Check for obvious:
+
+- Infinite loops
+- Repeated unnecessary requests
+- Broken caching
+- Excessive polling
+- Console errors
+- Unhandled promise errors
+- Failed network requests
+- UI freezes
+
+Do not optimise code that is already working unless a real problem is found.
+
+==================================================
+14. TESTING REQUIREMENTS
+==================================================
+
+Use the actual running application wherever possible.
+
+Do not rely solely on unit tests.
+
+For every confirmed bug:
+
+1. Reproduce it.
+2. Record the exact cause.
+3. Make the smallest safe fix.
+4. Reproduce the original failure again.
+5. Confirm it is fixed.
+6. Run relevant regression tests.
+
+After all fixes run:
+
+- API tests
+- Frontend tests
+- Shared tests where applicable
+- API typecheck
+- Frontend typecheck
+- Shared typecheck where applicable
+- Production builds
+- git diff --check
+
+Also perform a final real-browser smoke test.
+
+==================================================
+IMPORTANT SAFETY RULE
+==================================================
+
+Do NOT change working behaviour simply because you think it could be improved.
+
+Do NOT add new features.
+
+Do NOT change trading calculations.
+
+Do NOT change Backtesting calculations.
+
+Do NOT change the AI taxonomy unless an actual bug is discovered.
+
+Do NOT change OpenRouter/provider behaviour unless an actual integration bug is discovered.
+
+Do NOT redesign the UI.
+
+Only fix confirmed problems.
+
+==================================================
+FINAL REPORT
+==================================================
+
+Provide a clear report containing:
+
+1. Every confirmed bug found.
+2. How each bug was reproduced.
+3. Root cause of each bug.
+4. Exact fix made.
+5. How each fix was verified.
+6. Any bugs that could not be reproduced.
+7. Any remaining limitations.
+8. API tests passed.
+9. Frontend tests passed.
+10. Shared tests passed, if applicable.
+11. Typechecks passed.
+12. Production build results.
+13. git diff --check result.
+14. Final browser verification result.
+
+If no bugs are found in a particular area, explicitly say:
+
+"No confirmed bugs found."
+
+Do not claim something was fixed unless the failure was actually reproduced and the fix was verified.
