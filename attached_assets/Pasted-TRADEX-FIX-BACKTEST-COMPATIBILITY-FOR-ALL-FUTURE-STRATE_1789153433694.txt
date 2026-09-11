@@ -1,0 +1,316 @@
+TRADEX — FIX BACKTEST COMPATIBILITY FOR ALL FUTURE STRATEGIES
+
+Fix the underlying Strategy Builder → Strategy Version → Backtesting compatibility system.
+
+IMPORTANT:
+
+This must be a GENERAL fix.
+
+Do NOT hard-code XAUUSD, Gold Reversal 1H/5M, v1, FVG Retest, MSS, or any other specific strategy.
+
+Do NOT create a workaround for the current strategy.
+
+The goal is that EVERY strategy created through the Builder or Build with AI is correctly recognised by Backtesting based on its actual saved conditions.
+
+==================================================
+CURRENT PROBLEM
+==================================================
+
+A strategy can show:
+
+Backtest compatible
+
+during the AI → Review Strategy stage,
+
+but after creating/saving the strategy, the Backtesting page can report:
+
+"Add an executable entry condition or entry rule"
+
+and clicking Run Backtest does nothing.
+
+This indicates that the executable-condition information is not being consistently preserved or interpreted between:
+
+AI draft
+→ Review
+→ Strategy creation
+→ Strategy version
+→ Backtesting compatibility check
+→ Run Backtest
+
+Find and fix the underlying data/logic mismatch.
+
+==================================================
+1. SINGLE SOURCE OF TRUTH
+==================================================
+
+The Builder, AI handoff, saved strategies, immutable versions, compatibility checker, and Backtesting engine must all use the same canonical condition representation.
+
+Do not maintain separate definitions that can disagree about whether a condition is executable.
+
+A condition that is marked:
+
+Backtest supported
+
+in the Builder/review stage must remain backtest-supported after saving and versioning, provided its data has not changed.
+
+==================================================
+2. STRATEGY CREATION
+==================================================
+
+When a strategy is created from an AI draft:
+
+Preserve every condition exactly, including:
+
+- Stage
+- Direction
+- Timeframe
+- Concept
+- Rule
+- Structured parameters
+- Executability
+- Compatibility information
+
+Do not lose executable-condition information during draft → strategy conversion.
+
+==================================================
+3. VERSIONING
+==================================================
+
+When v1/v2/etc. is created, the immutable version must contain the complete executable condition representation.
+
+Backtesting must read the selected immutable version.
+
+Do NOT check the current Builder draft instead.
+
+Do NOT infer conditions from the strategy name or description.
+
+==================================================
+4. COMPATIBILITY CHECK
+==================================================
+
+The Backtesting compatibility check must evaluate the actual conditions stored in the selected strategy version.
+
+For each condition determine:
+
+- Is it an entry condition?
+- Is its rule executable?
+- Is its concept executable?
+- Is its timeframe supported?
+- Are its parameters valid?
+- Can the current Backtesting engine evaluate it?
+
+Then return the correct result.
+
+Do not incorrectly report:
+
+"Add an executable entry condition"
+
+when an executable entry condition actually exists.
+
+==================================================
+5. GENERIC SUPPORT
+==================================================
+
+This must work for ALL currently executable concepts and future executable concepts.
+
+Do not create individual fixes for:
+
+- XAUUSD
+- Gold
+- USTEC
+- MSS
+- BOS
+- FVG
+- FVG Retest
+- Liquidity Sweep
+- EMA
+- RSI
+- etc.
+
+The compatibility system must work from the canonical executable concept/rule definitions.
+
+==================================================
+6. MULTI-TIMEFRAME
+==================================================
+
+Preserve the existing multi-timeframe implementation.
+
+Conditions may use different timeframes.
+
+For example:
+
+1H entry
++
+5M confirmation
+
+must remain valid if both conditions are executable.
+
+Do not mark a strategy incompatible simply because conditions use different timeframes.
+
+Preserve:
+
+- Closed-candle logic
+- Correct HTF/LTF alignment
+- No look-ahead bias
+- Exact condition timeframes
+- Smallest-timeframe execution series
+
+==================================================
+7. RUN BACKTEST BUTTON
+==================================================
+
+If the compatibility check passes:
+
+Run Backtest must actually submit the backtest request.
+
+If the compatibility check fails:
+
+Run Backtest must provide a clear reason.
+
+It must NEVER silently do nothing.
+
+Add proper error handling so any API validation or request failure is displayed to the user.
+
+==================================================
+8. FUTURE STRATEGIES
+==================================================
+
+Test multiple different strategy types to prove this is generic.
+
+At minimum test:
+
+A single-timeframe strategy.
+
+A multi-timeframe strategy.
+
+A long-only strategy.
+
+A short-only strategy.
+
+A both-directions strategy.
+
+A strategy containing multiple executable concepts.
+
+A strategy created manually in the Builder.
+
+A strategy created through Build with AI.
+
+A strategy with an unsupported concept.
+
+A strategy with an unsupported rule.
+
+The results must correctly distinguish:
+
+Backtest supported
+
+from:
+
+Concept review
+
+from:
+
+Rule review
+
+and other genuine incompatibilities.
+
+==================================================
+9. REAL END-TO-END TEST
+==================================================
+
+Create temporary strategies through the actual UI.
+
+For each:
+
+Build
+→ Save
+→ Create version
+→ Activate
+→ Open Backtesting
+→ Select exact version
+→ Select instrument
+→ Select timeframe
+→ Select date range
+→ Run Backtest
+
+Verify that the compatibility result shown in Backtesting matches the compatibility result shown when the strategy was created.
+
+If supported, the backtest must actually run.
+
+If unsupported, the user must receive a clear explanation.
+
+Do not fabricate successful results.
+
+Delete all temporary test strategies afterward.
+
+==================================================
+10. REGRESSION
+==================================================
+
+Preserve all existing functionality:
+
+- Strategy Builder
+- Build with AI
+- Trading Concept Library
+- Executable concepts
+- Liquidity Sweep
+- FVG
+- FVG Retest
+- BOS
+- CHoCH
+- MSS
+- Indicators
+- Price action concepts
+- Multi-timeframe Backtesting
+- Strategy Versioning
+- Markets
+- Alerts
+- Monitoring
+- Journal
+
+Run:
+
+- Frontend tests
+- API tests
+- Typechecks
+- Production builds
+- git diff --check
+
+Check the browser console.
+
+==================================================
+FINAL REQUIREMENT
+==================================================
+
+Do NOT fix this by adding a special case for the current Gold strategy.
+
+Fix the underlying architecture so:
+
+ANY valid executable strategy
+
+created manually or through Build with AI
+
+↓
+
+is saved with its complete canonical conditions
+
+↓
+
+creates an immutable version containing those conditions
+
+↓
+
+Backtesting reads that exact version
+
+↓
+
+compatibility is calculated from the actual stored conditions
+
+↓
+
+Run Backtest works when compatible
+
+↓
+
+clear validation is shown when incompatible
+
+The Builder, AI, Strategy Versioning and Backtesting systems must agree on what constitutes an executable strategy.
