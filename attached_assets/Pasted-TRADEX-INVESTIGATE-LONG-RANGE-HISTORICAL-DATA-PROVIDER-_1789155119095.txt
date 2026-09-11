@@ -1,0 +1,125 @@
+TRADEX — INVESTIGATE LONG-RANGE HISTORICAL DATA PROVIDER
+
+The Backtesting historical-range system has now been fixed and correctly handles:
+
+- 7 days
+- 30 days
+- 90 days
+- 6 months
+- 1 year
+- Multi-year ranges
+- Custom ranges
+- Pagination
+- Chunking
+- Duplicate removal
+- Chronological ordering
+- Partial-data detection
+
+However, the current BiQuote provider only exposes limited recent XAUUSD historical data.
+
+Do NOT change the Backtesting engine again.
+
+Do NOT fabricate historical candles.
+
+Do NOT bypass the new partial-data validation.
+
+Investigate the best way to provide TradeX with substantially longer historical market data while preserving the existing provider-neutral MarketDataService architecture.
+
+Requirements:
+
+1. Keep MarketDataService provider-neutral.
+
+2. Keep BiQuote as the current live-data provider.
+
+3. Investigate whether BiQuote can legitimately provide longer historical XAUUSD data through another supported endpoint, pagination method, or historical-data product.
+
+4. If BiQuote cannot provide sufficient history, identify suitable alternative historical-data providers that can provide long-range data for the instruments TradeX supports.
+
+5. Do not add a provider just because it claims to have historical data. Verify its actual:
+   - Instruments
+   - Historical depth
+   - Timeframes
+   - API availability
+   - Rate limits
+   - Pricing/free limits
+   - UK accessibility
+   - Licensing/redistribution restrictions
+
+6. The architecture should allow historical data to come from a different provider from the live market-data provider.
+
+Example:
+
+Live:
+BiQuote
+
+Historical:
+HistoricalDataProvider
+
+without changing the Strategy Builder or Backtesting engine.
+
+7. The historical provider must support the timeframes required by TradeX, including:
+
+1m
+5m
+15m
+30m
+1h
+4h
+1d
+
+where available.
+
+8. It must support the instruments TradeX is intended to test, including:
+
+Gold/XAUUSD
+US Tech 100/USTEC
+Stocks
+Indices
+Forex
+Futures
+Commodities
+Crypto
+
+Do not assume every provider supports every asset.
+
+9. Do not implement anything until the provider's actual historical availability has been verified.
+
+10. If a provider is suitable, implement it behind the existing provider-neutral MarketDataService rather than replacing the architecture.
+
+11. Preserve all existing:
+
+- Backtesting logic
+- Multi-timeframe evaluation
+- Closed-candle logic
+- No look-ahead bias
+- Strategy versions
+- AI Builder
+- Concept Library
+- Alerts
+- Monitoring
+- Journal
+- BiQuote live data
+
+12. Test the new historical source with a real long-range request.
+
+At minimum verify:
+
+- 90 days
+- 1 year
+
+using XAUUSD if the provider supports it.
+
+Confirm the actual earliest and latest candle timestamps.
+
+Do not consider the task complete if the UI merely says "90 Days". The actual candles must cover the requested range.
+
+If no suitable provider is currently available without unacceptable cost/licensing limitations, do not force an implementation. Report the available options and their limitations instead.
+
+IMPORTANT:
+
+Do not create fake data.
+Do not modify historical Backtest results that already exist.
+Do not weaken partial-data validation.
+Do not hard-code a provider into the Backtest engine.
+
+The goal is to give TradeX a reliable way to obtain genuinely long-range historical data while keeping the current architecture intact.
