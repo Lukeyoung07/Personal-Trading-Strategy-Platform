@@ -1,0 +1,251 @@
+TRADEX — STRATEGY BUILDER + BACKTEST END-TO-END TEST
+
+Do not redesign anything.
+
+Do not add new concepts.
+
+Do not add new UI features.
+
+I want to properly test the complete Strategy Builder workflow using the existing TradeX functionality.
+
+==================================================
+1. CREATE A TEST STRATEGY
+==================================================
+
+Use the running application and create a temporary strategy through the actual UI.
+
+Name:
+
+XAUUSD Reversal Test
+
+Market:
+
+XAUUSD
+
+Direction:
+
+Both
+
+Use a supported timeframe.
+
+==================================================
+2. BUILD CONDITIONS THROUGH THE UI
+==================================================
+
+Actually use the new Builder flow.
+
+Test:
+
+- Selecting a trading concept
+- Selecting a rule
+- Selecting a timeframe
+- Direction handling
+- Automatic condition naming
+- Adding the condition
+- Editing the condition
+- Removing the condition
+- Adding multiple conditions
+- Reordering conditions
+- Entry conditions
+- Confirmation conditions
+- Exit conditions
+
+Do not create the strategy directly through the API.
+
+The purpose is to verify that a real user can actually build it.
+
+==================================================
+3. TEST BACKTEST COMPATIBILITY
+==================================================
+
+Use a mixture of concepts/rules that are actually supported by the current Backtesting engine.
+
+Confirm that the Builder correctly says:
+
+✓ Backtest supported
+
+when appropriate.
+
+Also deliberately test an unsupported concept.
+
+Confirm it correctly says:
+
+⚠ Review required
+
+Do not fabricate support.
+
+==================================================
+4. TEST SAVE AND RELOAD
+==================================================
+
+Save the strategy.
+
+Reload the application.
+
+Open the strategy again.
+
+Confirm:
+
+- Name is preserved
+- Market is preserved
+- Direction is preserved
+- Timeframes are preserved
+- Conditions are preserved
+- Condition order is preserved
+- Concept is preserved
+- Rule is preserved
+- Entry/Confirmation/Exit stage is preserved
+
+==================================================
+5. TEST STRATEGY VERSIONING
+==================================================
+
+Create a new version from the test strategy.
+
+Confirm:
+
+- Original version remains unchanged
+- New version contains the intended changes
+- Versions remain immutable
+- Correct version is shown in the Builder
+- Activation still works
+
+==================================================
+6. TEST BACKTESTING
+==================================================
+
+Run an actual Backtest using a strategy version that contains only conditions the Backtesting engine genuinely supports.
+
+Verify:
+
+- Historical data request is made
+- Historical data is actually returned
+- Strategy conditions are evaluated
+- Backtest completes
+- Results are generated
+- Results are associated with the exact strategy version
+- No fabricated market data is used
+
+If Backtesting fails because of historical data, DO NOT hide the error.
+
+Trace exactly:
+
+Strategy
+→ Backtest request
+→ Instrument
+→ Provider symbol
+→ Timeframe
+→ Date range
+→ Historical candle request
+→ Returned candles
+→ Backtest engine
+
+Identify the exact failure.
+
+==================================================
+7. TEST UNSUPPORTED STRATEGY
+==================================================
+
+Create a temporary strategy containing a concept/rule that Backtesting does not support.
+
+Confirm TradeX clearly explains that the strategy cannot currently be fully backtested.
+
+Do not silently replace or ignore the unsupported condition.
+
+==================================================
+8. TEST THE UI AS A BEGINNER
+==================================================
+
+While doing the test, specifically check:
+
+Can I understand what I am supposed to select?
+
+Can I tell which section I am in?
+
+Can I understand what each condition means?
+
+Can I tell whether the condition is backtestable?
+
+Can I understand what I need to do next?
+
+If anything is confusing, fix the specific usability problem rather than redesigning the whole page.
+
+==================================================
+9. TEST MOBILE
+==================================================
+
+Check the complete Builder flow at:
+
+375px
+402px
+768px
+1440px
+
+Make sure:
+
+- Dropdowns work
+- Condition cards are readable
+- Sections remain clear
+- No horizontal scrolling occurs
+- Buttons are accessible
+- The Builder does not become excessively long
+
+==================================================
+10. CLEANUP
+==================================================
+
+All test strategies, versions and temporary data must be removed after testing.
+
+Do not modify existing user strategies.
+
+Do not delete existing trades.
+
+Do not modify existing backtests.
+
+==================================================
+11. REGRESSION
+==================================================
+
+Run:
+
+Frontend tests
+API tests
+Frontend typecheck
+API typecheck
+Frontend production build
+API production build
+git diff --check
+
+Check the browser console for errors.
+
+==================================================
+FINAL REPORT
+==================================================
+
+Do NOT simply report that the tests passed.
+
+Tell me specifically:
+
+1. Could a strategy be created successfully?
+2. Could conditions be added/edited/removed?
+3. Did Entry / Confirmation / Exit work correctly?
+4. Did save/reload work?
+5. Did versioning work?
+6. Did Backtesting actually receive historical data?
+7. Did a real supported strategy successfully backtest?
+8. What happened with an unsupported condition?
+9. Were any actual bugs found?
+10. What, if anything, should be fixed next?
+
+IMPORTANT:
+
+The goal is to prove that TradeX can go from:
+
+BUILD STRATEGY
+→ SAVE
+→ VERSION
+→ ACTIVATE
+→ BACKTEST
+→ RESULTS
+
+using the actual application and real historical market data.
