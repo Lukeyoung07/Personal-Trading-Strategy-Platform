@@ -1,0 +1,235 @@
+TradeX — Fix Historical Backtest Data Availability and Dukascopy Historical Data Pipeline
+
+The backtest currently fails with:
+
+“Historical data is not available for this market and timeframe during the selected period.”
+
+We already have a working Dukascopy historical adapter and have verified that the official Dukascopy endpoints return genuine historical candles for:
+
+- XAUUSD → Dukascopy XAU-USD
+- USTEC → Dukascopy USATECH.IDX-USD
+
+Verified timeframes:
+- 5m, derived from genuine 1m candles
+- 1h, retrieved from the official monthly historical endpoint
+
+Do NOT replace the backtest engine.
+Do NOT remove BiQuote.
+Do NOT add a paid provider.
+Do NOT scrape the Dukascopy website.
+
+The goal is to fix the actual historical-data availability pipeline so the existing backtesting engine can reliably consume real Dukascopy historical data.
+
+1. Diagnose the current failure
+
+Trace the complete flow:
+
+Strategy
+→ exact strategy version
+→ selected instrument
+→ selected timeframe
+→ historical source selection
+→ Dukascopy adapter
+→ historical candle retrieval
+→ normalization/storage
+→ backtest engine
+
+Identify exactly why the current backtest reports that historical data is unavailable despite the Dukascopy adapter successfully retrieving historical candles during provider verification.
+
+Do not mask the problem with a fallback or by changing the error message.
+
+2. Make Dukascopy historical retrieval reliable
+
+Implement robust sequential historical retrieval using the existing Dukascopy adapter.
+
+Requirements:
+
+- Never make large concurrent requests.
+- Respect Dukascopy rate limits.
+- Use throttling between requests.
+- Retry HTTP 429 responses with exponential backoff.
+- Retry transient network/server failures.
+- Stop safely if the provider continues rate limiting.
+- Handle monthly boundaries correctly.
+- Handle newest-first and chronological responses correctly.
+- Remove duplicate candles.
+- Sort candles chronologically.
+- Preserve genuine OHLCV values.
+- Never fabricate missing candles.
+
+The retrieval system must be able to request a bounded historical period rather than only the small recent windows currently being returned.
+
+3. Add persistent historical candle storage/cache
+
+When TradeX successfully downloads historical candles from Dukascopy, store them using the existing database/data architecture.
+
+The cache must include at minimum:
+
+- provider/source
+- TradeX instrument
+- provider symbol
+- timeframe
+- candle timestamp
+- open
+- high
+- low
+- close
+- volume where available
+
+Use a unique key preventing duplicate candles.
+
+If the same historical period is requested again, TradeX should use already stored candles rather than downloading the entire range again.
+
+4. Backtest data retrieval
+
+Before running a backtest:
+
+- Determine every timeframe required by the strategy.
+- Determine the exact requested start/end timestamps.
+- Check the stored historical data for complete coverage.
+- If coverage is incomplete, retrieve only the missing periods from Dukascopy.
+- Store the newly retrieved candles.
+- Re-check coverage.
+- Only then start the backtest.
+
+For multi-timeframe strategies:
+
+- Load every required timeframe.
+- Keep the smallest timeframe as the execution series.
+- Keep higher/lower timeframe condition series separate.
+- Preserve the existing closed-candle-only and no-lookahead behavior.
+
+5. Support all existing backtest date ranges
+
+The system must work generically with:
+
+- Last 7 days
+- Last 30 days
+- Last 90 days
+- 6 months
+- 1 year
+- Custom ranges
+- Multi-year ranges where Dukascopy provides the data
+
+Do not hard-code 90 days, 1 year, Gold, or USTEC.
+
+6. Important: distinguish unavailable data from retrieval failure
+
+If Dukascopy returns HTTP 429, do NOT report:
+
+“Historical data is not available.”
+
+Instead report a clear provider/data retrieval failure such as:
+
+“Historical data retrieval was rate-limited by Dukascopy. Please retry later.”
+
+If the provider genuinely has no data for the requested period, report the actual available range.
+
+If only part of the requested period was retrieved, the backtest MUST NOT run.
+
+7. Add a historical-data status/check
+
+Add a reusable historical-data availability check that reports:
+
+Market
+Provider
+Timeframe
+Requested start
+Requested end
+Stored candle count
+Earliest stored candle
+Latest stored candle
+Coverage status
+
+For example:
+
+XAUUSD
+Dukascopy
+5m
+Requested: 90 days
+Available: complete
+Earliest: [timestamp]
+Latest: [timestamp]
+Candles: [count]
+
+This should be based on actual stored data, not assumptions.
+
+8. Verify both required markets
+
+Perform real provider verification for:
+
+XAUUSD
+- 5m
+- 1h
+
+USTEC
+- 5m
+- 1h
+
+Use genuinely returned Dukascopy candles.
+
+Then verify at least one long-range request, preferably:
+
+- XAUUSD 5m, 90 days
+
+If Dukascopy rate-limits the verification, do not claim it passed. Clearly report whether the failure is caused by rate limiting or unavailable data.
+
+9. Preserve existing functionality
+
+Do not break:
+
+- Strategy Builder
+- Build with AI
+- Strategy Library
+- Strategy Versioning
+- Multi-timeframe backtesting
+- Live BiQuote data
+- Monitoring
+- Alerts
+- Journal
+- Existing saved strategies
+- Existing saved backtests
+
+Do not modify or delete existing historical backtest results.
+
+10. Testing
+
+Add/update regression tests for:
+
+- Historical source selection
+- Dukascopy instrument mappings
+- 5m retrieval
+- 1h retrieval
+- Pagination
+- Duplicate removal
+- Chronological ordering
+- Rate limiting
+- Retry/backoff
+- Partial coverage
+- Complete coverage
+- Cache reuse
+- Missing-period retrieval
+- Multi-timeframe historical loading
+- 90-day range
+- 6-month range
+- 1-year range
+- Multi-year/custom ranges
+- XAUUSD
+- USTEC
+
+Run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+- git diff --check
+
+Finally, perform a real end-to-end test through the Backtesting UI:
+
+Strategy → exact version → XAUUSD → 5m → historical period → Dukascopy → stored candles → backtest engine → result.
+
+Only report success if the requested historical range was actually retrieved and covered.
+
+Most importantly: do not solve this by simply changing the UI or compatibility checks. Find and fix the actual reason the backtest cannot currently see the verified Dukascopy historical data.
