@@ -69,6 +69,8 @@ vi.mock("@workspace/api-client-react", () => ({
   useAddBiQuoteMarket: () => ({ isPending: false, isError: false, mutate: addMarketMutate }),
   useListEconomicEvents: () => ({ data: { providerConnected: true, providerName: "Test source", message: "Connected sources: Test source.", events: [] }, isLoading: false, isError: false }),
   getListEconomicEventsQueryKey: (params: unknown) => ["economic-events", params],
+  useCreateAlert: () => ({ isPending: false, isError: false, mutate: vi.fn() }),
+  getListAlertsQueryKey: () => ["alerts"],
   useListCandles: () => ({ data: candleData.current, isLoading: false, isError: false, refetch: vi.fn() }),
   useRefreshMarketDataCandles: () => ({ isPending: false, isError: false, mutate: refreshCandleMutate }),
   getListCandlesQueryKey: (params: unknown) => ["candles", params],
@@ -113,8 +115,8 @@ describe("Market Monitor live state", () => {
       isLive: true,
     });
 
-    expect(await screen.findByText("LIVE")).toBeInTheDocument();
-    expect(screen.getByText("1.15000")).toBeInTheDocument();
+    expect(await screen.findByText("LIVE", { selector: "span.tag" })).toBeInTheDocument();
+    expect(screen.getAllByText("1.15000").length).toBeGreaterThan(0);
     expect(screen.getByText("Includes live forming bar")).toBeInTheDocument();
     const chart = screen.getByRole("img", { name: "BiQuote candlestick chart" });
     expect(chart).toBeInTheDocument();
@@ -132,7 +134,7 @@ describe("Market Monitor live state", () => {
       quoteAgeSeconds: 1,
       isLive: true,
     });
-    await waitFor(() => expect(screen.getByText("1.18000")).toBeInTheDocument());
+     await waitFor(() => expect(screen.getAllByText("1.18000").length).toBeGreaterThan(0));
     expect(chart.querySelectorAll("rect")).toHaveLength(2);
   });
 
@@ -155,8 +157,8 @@ describe("Market Monitor live state", () => {
       isLive: false,
     });
     await waitFor(() => {
-      expect(screen.getByText("STALE")).toBeInTheDocument();
-      expect(screen.queryByText("LIVE")).not.toBeInTheDocument();
+       expect(screen.getByText("STALE", { selector: "span.tag" })).toBeInTheDocument();
+       expect(screen.queryByText("LIVE", { selector: "span.tag" })).not.toBeInTheDocument();
     });
 
     stream.emit("quote", {
@@ -171,11 +173,11 @@ describe("Market Monitor live state", () => {
       quoteAgeSeconds: 600,
       isLive: false,
     });
-    expect(await screen.findByText("MARKET CLOSED")).toBeInTheDocument();
+     expect(await screen.findByText("MARKET CLOSED", { selector: "span.tag" })).toBeInTheDocument();
 
     stream.fail();
-    expect(await screen.findByText("DISCONNECTED")).toBeInTheDocument();
-    expect(screen.queryByText("LIVE")).not.toBeInTheDocument();
+     expect(await screen.findByText("DISCONNECTED", { selector: "span.tag" })).toBeInTheDocument();
+     expect(screen.queryByText("LIVE", { selector: "span.tag" })).not.toBeInTheDocument();
   });
 
   it("requests genuine historical candles when a selected timeframe has no stored bars", async () => {

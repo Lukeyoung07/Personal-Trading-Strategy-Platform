@@ -178,7 +178,7 @@ export function TradeJournalPage() {
   const strategies = useListStrategies();
   const remove = useDeleteTrade();
   const queryClient = useQueryClient();
-  const [modal, setModal] = useState<Trade | "new" | null>(null);
+  const [modal, setModal] = useState<Trade | "new" | null>(() => new URLSearchParams(window.location.search).get("record") === "1" ? "new" : null);
   const [confirm, setConfirm] = useState<Trade | null>(null);
   const [filter, setFilter] = useState("all");
   const [month, setMonth] = useState(() => {

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 import {
   BarChart3, Database, Globe, Network, Clock, DatabaseZap, Search, Plus, Check,
   Pencil, Trash2, X, Info, Activity, AlertTriangle, FileText, Settings2, ShieldAlert, Link2,
@@ -17,6 +18,7 @@ import {
   useListSourceInstrumentMappings, useCreateSourceInstrumentMapping, useUpdateSourceInstrumentMapping, useDeleteSourceInstrumentMapping, getListSourceInstrumentMappingsQueryKey,
   useGetBiQuoteCatalog, useAddBiQuoteMarket,
   useListEconomicEvents, getListEconomicEventsQueryKey,
+  useCreateAlert, getListAlertsQueryKey,
   type Instrument, type MarketDataSource, type Timeframe, type MarketDataConnection, type Candle, type MarketDataSummary, type SourceInstrumentMapping, type BiQuoteCatalogItem, type BiQuoteMarketResult, type EconomicEvent
 } from "@workspace/api-client-react";
 
@@ -61,13 +63,12 @@ export function MarketMonitor() {
 
   return (
     <div className="page-wrap">
-      <div className="page-heading flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-8">
+      <div className="page-heading flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
         <div>
-          <div className="eyebrow mb-3">Coverage</div>
-          <h1 className="display text-3xl md:text-4xl font-bold">Market Monitor</h1>
-          <p className="text-muted-foreground text-sm mt-3 max-w-2xl leading-relaxed">
-            Watch genuine BiQuote market data through the provider-neutral market-data service.
-            Closed, stale, and unavailable data remain visibly distinct.
+          <div className="eyebrow mb-2">Markets</div>
+          <h1 className="display text-2xl md:text-3xl font-bold">Market workspace</h1>
+          <p className="text-muted-foreground text-xs mt-2 max-w-2xl leading-relaxed">
+            Real BiQuote prices and historical candles. No signals, recommendations, or execution.
           </p>
         </div>
       </div>
@@ -168,6 +169,42 @@ type FormingCandle = {
   isClosed: false;
 };
 
+type ChartBar = {
+  openTime: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  isClosed: boolean;
+};
+
+type IndicatorKind = "sma20" | "ema20";
+
+function formatPrice(value: number | null | undefined) {
+  return value == null || !Number.isFinite(value) ? "—" : value.toFixed(5);
+}
+
+function movingAverage(bars: ChartBar[], period: number, exponential: boolean) {
+  const values: Array<number | null> = [];
+  let previous: number | null = null;
+  bars.forEach((bar, index) => {
+    if (index < period - 1) {
+      values.push(null);
+      return;
+    }
+    if (exponential) {
+      const alpha = 2 / (period + 1);
+      previous = previous == null
+        ? bars.slice(index - period + 1, index + 1).reduce((sum, item) => sum + item.close, 0) / period
+        : (bar.close - previous) * alpha + previous;
+      values.push(previous);
+    } else {
+      values.push(bars.slice(index - period + 1, index + 1).reduce((sum, item) => sum + item.close, 0) / period);
+    }
+  });
+  return values;
+}
+
 function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
   const instruments = useListInstruments();
   const sources = useListMarketDataSources();
@@ -177,6 +214,14 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
   const [sourceId, setSourceId] = useState<number | "">("");
   const [instrumentId, setInstrumentId] = useState<number | "">("");
   const [timeframeId, setTimeframeId] = useState<number | "">("");
+  const [marketSearch, setMarketSearch] = useState("");
+  const [indicators, setIndicators] = useState<IndicatorKind[]>([]);
+  const [drawingPrice, setDrawingPrice] = useState<number | null>(null);
+  const [workspaceTab, setWorkspaceTab] = useState<"overview" | "indicators" | "drawings" | "alerts">("overview");
+  const [alertCondition, setAlertCondition] = useState<"above" | "below">("above");
+  const [alertThreshold, setAlertThreshold] = useState("");
+  const [alertName, setAlertName] = useState("");
+  const [alertSaved, setAlertSaved] = useState("");
   const [streamStatus, setStreamStatus] = useState<StreamStatus>({
     state: "disconnected",
     message: "Select an instrument to connect.",
@@ -185,6 +230,7 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
   const [quote, setQuote] = useState<LiveQuote | null>(null);
   const [formingCandle, setFormingCandle] = useState<FormingCandle | null>(null);
   const autoRefreshKey = useRef<string | null>(null);
+  const createAlert = useCreateAlert();
 
   useEffect(() => {
     if (sourceId === "" && sources.data?.length) {
@@ -222,6 +268,11 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
 
   useEffect(() => {
     saveMarketSelection(instrumentId, timeframeId);
+  }, [instrumentId, timeframeId]);
+
+  useEffect(() => {
+    setDrawingPrice(null);
+    setAlertSaved("");
   }, [instrumentId, timeframeId]);
 
   const ready = sourceId !== "" && instrumentId !== "" && timeframeId !== "";
@@ -340,6 +391,43 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
   const isLive = connectionLabel === "LIVE";
   const source = sources.data?.find(item => item.id === sourceId);
   const selectedInstrument = instruments.data?.find(item => item.id === instrumentId);
+  const filteredInstruments = useMemo(() => {
+    const query = marketSearch.trim().toLowerCase();
+    if (!query) return instruments.data ?? [];
+    return (instruments.data ?? []).filter(instrument =>
+      `${instrument.symbol} ${instrument.displayName ?? ""} ${instrument.assetClass}`.toLowerCase().includes(query),
+    );
+  }, [instruments.data, marketSearch]);
+  const latestBar = chartBars[chartBars.length - 1];
+  const previousBar = chartBars.length > 1 ? chartBars[chartBars.length - 2] : undefined;
+  const currentPrice = quote?.last ?? latestBar?.close ?? null;
+  const priceChange = currentPrice != null && previousBar?.close != null ? currentPrice - previousBar.close : null;
+  const priceChangePercent = priceChange != null && previousBar?.close ? (priceChange / previousBar.close) * 100 : null;
+  const loadedHigh = chartBars.length ? Math.max(...chartBars.map(bar => bar.high)) : null;
+  const loadedLow = chartBars.length ? Math.min(...chartBars.map(bar => bar.low)) : null;
+  const loadedOpen = chartBars[0]?.open ?? null;
+  const activeTimeframes = (timeframes.data ?? []).filter(timeframe => timeframe.isActive);
+
+  const submitPriceAlert = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedInstrument || !alertThreshold.trim()) return;
+    createAlert.mutate({
+      data: {
+        name: alertName.trim() || `${selectedInstrument.symbol} price ${alertCondition}`,
+        marketId: selectedInstrument.id,
+        condition: alertCondition === "above" ? "Price above" : "Price below",
+        threshold: alertThreshold.trim(),
+        status: "active",
+      },
+    }, {
+      onSuccess: () => {
+        setAlertSaved(`Alert saved for ${selectedInstrument.symbol}.`);
+        setAlertName("");
+        setAlertThreshold("");
+        qc.invalidateQueries({ queryKey: getListAlertsQueryKey() });
+      },
+    });
+  };
 
   const refreshCandles = () => {
     if (!ready) return;
@@ -371,41 +459,67 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="panel market-terminal-header p-4 md:p-5">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="market-instrument-row">
           <div className="min-w-0">
             <div className="eyebrow mb-2">BiQuote market data</div>
             <h2 className="display text-2xl md:text-3xl font-bold truncate">{selectedInstrument?.symbol ?? "Select an instrument"}</h2>
-            <p className="text-xs text-muted-foreground mt-2 truncate">{selectedInstrument?.displayName || selectedInstrument?.description || selectedInstrument?.assetClass || "Choose a configured market to inspect its provider record."}</p>
+            <p className="text-xs text-muted-foreground mt-1 truncate">{selectedInstrument?.displayName || selectedInstrument?.description || selectedInstrument?.assetClass || "Choose a configured market to inspect its provider record."}</p>
           </div>
-          <div className="market-quote flex flex-wrap items-start gap-5 lg:min-w-[310px] lg:justify-end">
-            <div>
-              <div className="eyebrow">Last price</div>
-              <div className="metric-value text-2xl mt-2">{quote?.last?.toFixed(5) ?? "—"}</div>
+          <div className="market-header-price">
+            <div className="eyebrow">Last price</div>
+            <div className="metric-value text-2xl mt-1">{formatPrice(currentPrice)}</div>
+            <div className={`text-[11px] mt-1 ${priceChange == null ? "text-muted-foreground" : priceChange >= 0 ? "text-primary" : "text-destructive"}`}>
+              {priceChange == null ? "Change unavailable" : `${priceChange >= 0 ? "+" : ""}${priceChange.toFixed(5)} (${priceChangePercent?.toFixed(2)}%)`}
             </div>
-            <div className="pt-0.5">
-              <span className={`tag ${isLive ? "tag-open" : connectionLabel === "MARKET CLOSED" || connectionLabel === "STALE" ? "tag-draft" : "tag-archived"}`}>
-                {isLive ? <Radio size={11} className="mr-1" /> : <WifiOff size={11} className="mr-1" />}
-                {connectionLabel}
-              </span>
-              <div className="text-[11px] text-muted-foreground mt-2">{streamStatus.message}</div>
-            </div>
+          </div>
+          <div className="market-header-status">
+            <span className={`tag ${isLive ? "tag-open" : connectionLabel === "MARKET CLOSED" || connectionLabel === "STALE" ? "tag-draft" : "tag-archived"}`}>
+              {isLive ? <Radio size={11} className="mr-1" /> : <WifiOff size={11} className="mr-1" />}
+              {connectionLabel}
+            </span>
+            <div className="text-[11px] text-muted-foreground mt-2">{streamStatus.message}</div>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-end gap-3 mt-5 pt-4 border-t border-border">
-          <div className="flex-1 min-w-0">
+        <div className="market-selector-row mt-4 pt-4 border-t border-border">
+          <div className="min-w-0 flex-1">
             <span className="label">Instrument</span>
-            <select className="select" value={instrumentId} onChange={event => setInstrumentId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-instrument">
+            <div className="market-select-search">
+              <Search size={14} className="text-muted-foreground" aria-hidden="true" />
+              <input
+                className="market-search-input"
+                value={marketSearch}
+                onChange={event => setMarketSearch(event.target.value)}
+                placeholder="Search symbol or market name…"
+                aria-label="Search markets"
+                data-testid="input-search-live-markets"
+              />
+            </div>
+            <select className="select mt-2" value={instrumentId} onChange={event => setInstrumentId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-instrument">
               <option value="">Select instrument…</option>
-              {(instruments.data ?? []).map(instrument => <option key={instrument.id} value={instrument.id}>{instrument.symbol} — {instrument.displayName || instrument.assetClass}</option>)}
+              {filteredInstruments.map(instrument => <option key={instrument.id} value={instrument.id}>{instrument.symbol} — {instrument.displayName || instrument.assetClass}</option>)}
             </select>
           </div>
-          <div className="sm:w-36">
+          <div className="market-timeframe-control">
             <span className="label">Timeframe</span>
-            <select className="select" value={timeframeId} onChange={event => setTimeframeId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-timeframe">
+            <div className="timeframe-buttons hidden sm:flex" role="group" aria-label="Market timeframe">
+              {activeTimeframes.map(timeframe => (
+                <button
+                  key={timeframe.id}
+                  type="button"
+                  className={`timeframe-button ${timeframe.id === timeframeId ? "active" : ""}`}
+                  onClick={() => setTimeframeId(timeframe.id)}
+                  aria-pressed={timeframe.id === timeframeId}
+                  data-testid={`button-timeframe-${timeframe.code}`}
+                >
+                  {timeframe.code}
+                </button>
+              ))}
+            </div>
+            <select className="select sm:hidden" value={timeframeId} onChange={event => setTimeframeId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-timeframe">
               <option value="">Select timeframe…</option>
-              {(timeframes.data ?? []).map(timeframe => <option key={timeframe.id} value={timeframe.id}>{timeframe.code}</option>)}
+              {activeTimeframes.map(timeframe => <option key={timeframe.id} value={timeframe.id}>{timeframe.code}</option>)}
             </select>
           </div>
         </div>
@@ -413,14 +527,14 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
 
       {refresh.isError && <div className="panel p-4 text-sm text-destructive">Candles could not be refreshed: {refresh.error instanceof Error ? refresh.error.message : "provider error"}</div>}
 
-      <div className="panel market-chart-panel p-4 md:p-6">
-        <div className="flex flex-col gap-4 mb-5">
-          <div className="flex items-start justify-between gap-4">
+      <div className="market-workspace-grid">
+        <div className="panel market-chart-panel p-4 md:p-5">
+          <div className="chart-heading-row">
             <div><h2 className="font-semibold">BiQuote candlestick chart</h2><p className="text-xs text-muted-foreground mt-1">Stored OHLC bars plus a forming bar built only from received provider ticks.</p></div>
             <CandlestickChart size={18} className="text-primary shrink-0" />
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-end gap-3 pt-3 border-t border-border">
-            <div className="sm:w-56">
+          <div className="chart-source-row">
+            <div className="sm:w-52">
               <span className="label">Data source</span>
               <select className="select" value={sourceId} onChange={event => setSourceId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-source">
                 <option value="">Select source…</option>
@@ -431,19 +545,133 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
               <RefreshCw size={14} className={refresh.isPending ? "animate-spin" : ""} />
               {refresh.isPending ? "Refreshing…" : "Refresh candles"}
             </button>
-            <div className="text-[11px] text-muted-foreground sm:ml-auto pb-2">{source?.name ?? "No source selected"} · {selectedTimeframe?.code ?? "—"}</div>
+            <div className="text-[11px] text-muted-foreground sm:ml-auto sm:pb-2">{source?.name ?? "No source selected"} · {selectedTimeframe?.code ?? "—"}</div>
           </div>
+          {candles.isError ? <ErrorBlock retry={() => candles.refetch()} /> : !ready ? <div className="p-10 text-center text-sm text-muted-foreground">Select an instrument, source, and timeframe to view genuine market data.</div> : candles.isLoading || refresh.isPending ? <LoadingBlock /> : !chartBars.length ? <EmptyState icon={CandlestickChart} title="No candle data yet" text="BiQuote did not return OHLC data for this instrument and timeframe. No substitute candles are shown." action={<button className="btn btn-primary" onClick={refreshCandles} disabled={refresh.isPending}>Request BiQuote candles</button>} /> : <CandleSvg bars={chartBars} currentPrice={currentPrice} indicators={indicators} drawingPrice={drawingPrice} drawingMode={workspaceTab === "drawings"} onChartClickPrice={setDrawingPrice} />}
         </div>
-        {candles.isError ? <ErrorBlock retry={() => candles.refetch()} /> : !ready ? <div className="p-10 text-center text-sm text-muted-foreground">Select an instrument, source, and timeframe to view genuine market data.</div> : candles.isLoading || refresh.isPending ? <LoadingBlock /> : !chartBars.length ? <EmptyState icon={CandlestickChart} title="No candle data yet" text="BiQuote did not return OHLC data for this instrument and timeframe. No substitute candles are shown." action={<button className="btn btn-primary" onClick={refreshCandles} disabled={refresh.isPending}>Request BiQuote candles</button>} /> : <CandleSvg bars={chartBars} />}
+
+        <aside className="space-y-4">
+          <div className="panel market-overview-panel p-4">
+            <div className="eyebrow mb-3">Market overview</div>
+            <OverviewRow label="Current price" value={formatPrice(currentPrice)} mono />
+            <OverviewRow label="Change" value={priceChange == null ? "Unavailable" : `${priceChange >= 0 ? "+" : ""}${priceChange.toFixed(5)}`} tone={priceChange == null ? undefined : priceChange >= 0 ? "positive" : "negative"} mono />
+            <OverviewRow label="Loaded high" value={formatPrice(loadedHigh)} mono />
+            <OverviewRow label="Loaded low" value={formatPrice(loadedLow)} mono />
+            <OverviewRow label="Loaded open" value={formatPrice(loadedOpen)} mono />
+            <OverviewRow label="Volume" value="Unavailable" />
+            <OverviewRow label="Status" value={isLive ? "Open" : connectionLabel} tone={isLive ? "positive" : undefined} />
+            <OverviewRow label="Source" value={source?.name ?? "Unavailable"} />
+          </div>
+          <div className="panel p-4">
+            <div className="eyebrow mb-3">Quick actions</div>
+            <div className="grid gap-2">
+              <Link href="/trade-journal?record=1" className="btn btn-primary justify-center"><Plus size={14} /> Record trade</Link>
+              <button className="btn btn-secondary justify-center" onClick={onAddMarket}><Plus size={14} /> Add another market</button>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-3">Market lists are provider-backed. No unsupported watchlist entries are created.</p>
+          </div>
+        </aside>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <div className="panel p-4"><div className="eyebrow">Bid / ask</div><div className="mt-3 mono text-sm">{quote?.bid?.toFixed(5) ?? "—"} <span className="text-muted-foreground">/</span> {quote?.ask?.toFixed(5) ?? "—"}</div><div className="text-[11px] text-muted-foreground mt-2">Provider quote</div></div>
-        <div className="panel p-4"><div className="eyebrow">Last update</div><div className="mt-3 mono text-sm">{quote?.receivedAt ? new Date(quote.receivedAt).toLocaleTimeString() : "—"}</div><div className="text-[11px] text-muted-foreground mt-2">{quote?.quoteAgeSeconds != null ? `${quote.quoteAgeSeconds}s quote age` : "No timestamp yet"}</div></div>
-        <div className="panel p-4 col-span-2 lg:col-span-1"><div className="eyebrow">Candles loaded</div><div className="metric-value mt-3">{chartBars.length}</div><div className="text-[11px] text-muted-foreground mt-2">{formingCandle ? "Includes live forming bar" : "Stored provider bars"}</div></div>
+      <div className="panel market-workspace-tabs">
+        <div className="market-tab-list" role="tablist" aria-label="Market details">
+          {([
+            ["overview", "Overview"],
+            ["indicators", "Indicators"],
+            ["drawings", "Drawing tools"],
+            ["alerts", "Price alerts"],
+          ] as const).map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={workspaceTab === id} className={`market-tab ${workspaceTab === id ? "active" : ""}`} onClick={() => setWorkspaceTab(id)}>{label}</button>
+          ))}
+        </div>
+        <div className="p-4 md:p-5">
+          {workspaceTab === "overview" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="market-detail-card"><div className="eyebrow">Bid / ask</div><div className="mt-3 mono text-sm">{formatPrice(quote?.bid)} <span className="text-muted-foreground">/</span> {formatPrice(quote?.ask)}</div><div className="text-[11px] text-muted-foreground mt-2">Provider quote</div></div>
+              <div className="market-detail-card"><div className="eyebrow">Last update</div><div className="mt-3 mono text-sm">{quote?.receivedAt ? new Date(quote.receivedAt).toLocaleTimeString() : "—"}</div><div className="text-[11px] text-muted-foreground mt-2">{quote?.quoteAgeSeconds != null ? `${quote.quoteAgeSeconds}s quote age` : "No timestamp yet"}</div></div>
+              <div className="market-detail-card"><div className="eyebrow">Candles loaded</div><div className="metric-value mt-3">{chartBars.length}</div><div className="text-[11px] text-muted-foreground mt-2">{formingCandle ? "Includes live forming bar" : "Stored provider bars"}</div></div>
+            </div>
+          )}
+          {workspaceTab === "indicators" && (
+            <IndicatorPanel indicators={indicators} setIndicators={setIndicators} />
+          )}
+          {workspaceTab === "drawings" && (
+            <DrawingPanel price={drawingPrice} currentPrice={currentPrice} onChange={setDrawingPrice} />
+          )}
+          {workspaceTab === "alerts" && selectedInstrument && (
+            <form className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end" onSubmit={submitPriceAlert}>
+              <Field label="Alert name"><input className="input" value={alertName} onChange={event => setAlertName(event.target.value)} placeholder={`${selectedInstrument.symbol} price check`} /></Field>
+              <Field label="Condition"><select className="select" value={alertCondition} onChange={event => setAlertCondition(event.target.value as "above" | "below")}><option value="above">Price above</option><option value="below">Price below</option></select></Field>
+              <Field label="Threshold"><input className="input" type="number" step="any" required value={alertThreshold} onChange={event => setAlertThreshold(event.target.value)} placeholder="e.g. 30000" /></Field>
+              <button className="btn btn-primary" type="submit" disabled={createAlert.isPending}>{createAlert.isPending ? "Saving…" : "Create alert"}</button>
+              {alertSaved && <div className="text-xs text-primary md:col-span-4">{alertSaved} Manage it from Alerts.</div>}
+              {createAlert.isError && <div className="text-xs text-destructive md:col-span-4">The alert could not be saved. {createAlert.error instanceof Error ? createAlert.error.message : ""}</div>}
+            </form>
+          )}
+          {workspaceTab === "alerts" && !selectedInstrument && <p className="text-sm text-muted-foreground">Select a market before creating a price alert.</p>}
+        </div>
       </div>
 
       {selectedInstrument && <MarketEconomicEvents instrument={selectedInstrument} />}
+    </div>
+  );
+}
+
+function OverviewRow({ label, value, mono, tone }: { label: string; value: string; mono?: boolean; tone?: "positive" | "negative" }) {
+  return (
+    <div className="market-overview-row">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className={`${mono ? "mono" : ""} text-xs ${tone === "positive" ? "text-primary" : tone === "negative" ? "text-destructive" : "text-foreground"}`}>{value}</span>
+    </div>
+  );
+}
+
+function IndicatorPanel({ indicators, setIndicators }: { indicators: IndicatorKind[]; setIndicators: (next: IndicatorKind[]) => void }) {
+  const toggle = (indicator: IndicatorKind) => {
+    setIndicators(indicators.includes(indicator) ? indicators.filter(item => item !== indicator) : [...indicators, indicator]);
+  };
+  return (
+    <div>
+      <div className="flex flex-col gap-1 mb-4">
+        <div className="eyebrow">Calculated from loaded candles</div>
+        <p className="text-sm text-muted-foreground">Indicators update from the real OHLC series currently shown on the chart.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {([
+          ["sma20", "SMA 20", "Simple moving average over the latest 20 closes."],
+          ["ema20", "EMA 20", "Exponential moving average over the latest 20 closes."],
+        ] as const).map(([id, label, description]) => {
+          const enabled = indicators.includes(id);
+          return (
+            <button key={id} type="button" className={`market-tool-card text-left ${enabled ? "active" : ""}`} onClick={() => toggle(id)} aria-pressed={enabled}>
+              <span className="flex items-center justify-between gap-3"><span className="font-semibold">{label}</span><span className={`tag ${enabled ? "tag-open" : "bg-secondary text-muted-foreground"}`}>{enabled ? "On" : "Off"}</span></span>
+              <span className="block text-[11px] text-muted-foreground mt-2">{description}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DrawingPanel({ price, currentPrice, onChange }: { price: number | null; currentPrice: number | null; onChange: (value: number | null) => void }) {
+  const [draft, setDraft] = useState(price == null ? currentPrice?.toString() ?? "" : price.toString());
+  useEffect(() => {
+    setDraft(price == null ? currentPrice?.toString() ?? "" : price.toString());
+  }, [currentPrice, price]);
+  return (
+    <div className="max-w-xl">
+      <div className="eyebrow mb-2">Horizontal price level</div>
+      <p className="text-sm text-muted-foreground mb-4">Add a real reference line to the chart. It is session-only and does not create an alert or trading instruction.</p>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input className="input" type="number" step="any" value={draft} onChange={event => setDraft(event.target.value)} placeholder="Price level" aria-label="Horizontal price level" />
+        <button type="button" className="btn btn-primary" onClick={() => {
+          const value = Number(draft);
+          if (Number.isFinite(value)) onChange(value);
+        }}>Add level</button>
+        <button type="button" className="btn btn-secondary" onClick={() => onChange(null)} disabled={price == null}>Clear</button>
+      </div>
+      <div className="text-[11px] text-muted-foreground mt-3">{price == null ? "No horizontal level is active." : `Active at ${formatPrice(price)}.`}</div>
     </div>
   );
 }
@@ -605,7 +833,21 @@ function MarketEconomicEvents({ instrument }: { instrument: Instrument }) {
   );
 }
 
-function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; high: number; low: number; close: number; isClosed: boolean }> }) {
+function CandleSvg({
+  bars,
+  currentPrice,
+  indicators,
+  drawingPrice,
+  drawingMode,
+  onChartClickPrice,
+}: {
+  bars: ChartBar[];
+  currentPrice: number | null;
+  indicators: IndicatorKind[];
+  drawingPrice: number | null;
+  drawingMode: boolean;
+  onChartClickPrice: (value: number) => void;
+}) {
   const [windowSize, setWindowSize] = useState(() => Math.min(60, bars.length));
   const [start, setStart] = useState(() => Math.max(0, bars.length - Math.min(60, bars.length)));
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -649,6 +891,32 @@ function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; hig
   const chartWidth = width - pad.left - pad.right;
   const xStep = chartWidth / Math.max(visibleBars.length, 1);
   const y = (value: number) => pad.top + ((high - value) / range) * chartHeight;
+  const indicatorSeries = useMemo(() => ({
+    sma20: movingAverage(bars, 20, false),
+    ema20: movingAverage(bars, 20, true),
+  }), [bars]);
+  const indicatorColor: Record<IndicatorKind, string> = { sma20: "#a875e8", ema20: "#5bc0eb" };
+  const pathPoints = (kind: IndicatorKind) => visibleBars.map((_, index) => {
+    const value = indicatorSeries[kind][effectiveStart + index];
+    if (value == null) return null;
+    const x = pad.left + xStep * index + xStep / 2;
+    return `${x},${y(value)}`;
+  }).filter(Boolean).join(" ");
+  const handlePointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const localX = ((event.clientX - rect.left) / rect.width) * width;
+    const nextIndex = Math.max(0, Math.min(visibleBars.length - 1, Math.floor((localX - pad.left) / xStep)));
+    setHoveredIndex(nextIndex);
+  };
+  const handleChartClick = (event: PointerEvent<SVGSVGElement>) => {
+    if (!drawingMode) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const localY = ((event.clientY - rect.top) / rect.height) * height;
+    const value = high - ((localY - pad.top) / chartHeight) * range;
+    if (Number.isFinite(value)) onChartClickPrice(value);
+  };
+  const markerY = currentPrice == null ? null : Math.max(pad.top, Math.min(height - pad.bottom, y(currentPrice)));
+  const levelY = drawingPrice == null ? null : Math.max(pad.top, Math.min(height - pad.bottom, y(drawingPrice)));
   return (
     <div>
       <div className="chart-toolbar">
@@ -666,7 +934,11 @@ function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; hig
         </div>
       </div>
       <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[680px] h-[300px] md:h-[360px]" role="img" aria-label="BiQuote candlestick chart">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[680px] h-[300px] md:h-[360px]" role="img" aria-label="BiQuote candlestick chart" onPointerMove={handlePointerMove} onPointerLeave={() => setHoveredIndex(null)} onClick={handleChartClick}>
+        {[0, 1, 2, 3, 4].map(index => {
+          const gridY = pad.top + (chartHeight / 4) * index;
+          return <line key={index} x1={pad.left} x2={width - pad.right} y1={gridY} y2={gridY} stroke="hsl(var(--border) / .55)" strokeDasharray="2 5" />;
+        })}
         <line x1={pad.left} x2={width - pad.right} y1={height - pad.bottom} y2={height - pad.bottom} stroke="hsl(var(--border))" />
         {visibleBars.map((bar, index) => {
           const x = pad.left + xStep * index + xStep / 2;
@@ -677,11 +949,14 @@ function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; hig
           const bodyHeight = Math.max(2, Math.abs(y(bar.open) - y(bar.close)));
           return <g key={`${bar.openTime}-${index}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}><title>{`${new Date(bar.openTime).toLocaleString()} · O ${bar.open.toFixed(5)} · H ${bar.high.toFixed(5)} · L ${bar.low.toFixed(5)} · C ${bar.close.toFixed(5)}`}</title>{hoveredIndex === index && <line x1={x} x2={x} y1={pad.top} y2={height - pad.bottom} stroke="hsl(var(--accent))" strokeDasharray="3 4" />}<line x1={x} x2={x} y1={y(bar.high)} y2={y(bar.low)} stroke={color} strokeWidth="1.5" /><rect x={x - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={color} rx="1" /></g>;
         })}
+        {indicators.map(kind => <polyline key={kind} points={pathPoints(kind)} fill="none" stroke={indicatorColor[kind]} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />)}
+        {markerY != null && <g><line x1={pad.left} x2={width - pad.right} y1={markerY} y2={markerY} stroke="hsl(var(--primary))" strokeDasharray="5 4" /><text x={width - pad.right} y={markerY - 4} textAnchor="end" fill="hsl(var(--primary))" fontSize="10">{formatPrice(currentPrice)}</text></g>}
+        {levelY != null && <g><line x1={pad.left} x2={width - pad.right} y1={levelY} y2={levelY} stroke="hsl(var(--accent))" strokeDasharray="7 4" /><text x={pad.left + 5} y={levelY - 4} fill="hsl(var(--accent))" fontSize="10">{formatPrice(drawingPrice)}</text></g>}
         <text x={pad.left} y={height - 8} fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(visibleBars[0].openTime).toLocaleString()}</text>
         <text x={width - pad.right} y={height - 8} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(visibleBars[visibleBars.length - 1].openTime).toLocaleString()}</text>
         <text x={width - pad.right} y={pad.top + 10} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{high.toFixed(5)}</text>
         <text x={width - pad.right} y={height - pad.bottom - 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{low.toFixed(5)}</text>
-      </svg>
+       </svg>
       </div>
       {hoveredIndex != null && visibleBars[hoveredIndex] && <div className="chart-hover-readout" role="status">
         <span className="mono">{new Date(visibleBars[hoveredIndex].openTime).toLocaleString()}</span>
@@ -690,7 +965,13 @@ function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; hig
         <span>L {visibleBars[hoveredIndex].low.toFixed(5)}</span>
         <span>C {visibleBars[hoveredIndex].close.toFixed(5)}</span>
       </div>}
-      <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground mt-2"><span><i className="inline-block w-2 h-2 rounded-sm mr-1" style={{ backgroundColor: "#35c98b" }} />bullish close</span><span><i className="inline-block w-2 h-2 rounded-sm mr-1" style={{ backgroundColor: "#ef6b73" }} />bearish close</span><span><i className="inline-block w-2 h-2 rounded-sm mr-1" style={{ backgroundColor: "#d6a85d" }} />forming from genuine ticks</span></div>
+      <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground mt-2">
+        <span><i className="inline-block w-2 h-2 rounded-sm mr-1" style={{ backgroundColor: "#35c98b" }} />bullish close</span>
+        <span><i className="inline-block w-2 h-2 rounded-sm mr-1" style={{ backgroundColor: "#ef6b73" }} />bearish close</span>
+        <span><i className="inline-block w-2 h-2 rounded-sm mr-1" style={{ backgroundColor: "#d6a85d" }} />forming from genuine ticks</span>
+        {indicators.map(kind => <span key={kind}><i className="inline-block w-3 h-0.5 align-middle mr-1" style={{ backgroundColor: indicatorColor[kind] }} />{kind === "sma20" ? "SMA 20" : "EMA 20"}</span>)}
+        {drawingMode && <span className="text-primary">Click chart to place horizontal level</span>}
+      </div>
     </div>
   );
 }
