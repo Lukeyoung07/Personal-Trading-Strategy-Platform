@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   conditions: [] as any[],
   concepts: [{ id: 1, name: "Momentum", category: "PRICE", isBuiltIn: true }] as any[],
   markets: [] as any[],
+  createStrategy: vi.fn(),
   createCondition: vi.fn(),
   updateStrategy: vi.fn(),
   chat: {
@@ -22,7 +23,7 @@ vi.mock("@workspace/api-client-react", () => ({
   getListMarketsQueryKey: () => ["markets"],
   getListStrategiesQueryKey: () => ["strategies"],
   getListStrategyConditionsQueryKey: (id: number) => ["strategy-conditions", id],
-  useCreateStrategy: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateStrategy: () => ({ mutate: state.createStrategy, isPending: false }),
   useCreateStrategyCondition: () => ({ mutate: state.createCondition, isPending: false }),
   useDeleteStrategyCondition: () => ({ mutate: vi.fn(), isPending: false }),
   useListConcepts: () => ({ data: state.concepts, isLoading: false, isError: false }),
@@ -87,6 +88,7 @@ afterEach(() => {
   state.strategies = [];
   state.conditions = [];
   state.markets = [];
+  state.createStrategy.mockReset();
   state.createCondition.mockReset();
   state.updateStrategy.mockReset();
   state.chat.mutate.mockReset();
@@ -207,6 +209,53 @@ describe("StrategyBuilder", () => {
     expect(screen.getByTestId("assistant-draft-builder-preview")).toHaveTextContent("Stop loss: 1%; Take profit: 2%");
     expect(screen.getByTestId("input-builder-strategy-name")).toHaveValue("XAUUSD candle review");
     expect(screen.getByTestId("select-builder-direction")).toHaveValue("long");
+  });
+
+  it("sends mapped AI conditions with structured parameters in the atomic strategy-create request", () => {
+    const draft = {
+      name: "Momentum handoff",
+      description: "An AI-reviewed strategy.",
+      direction: "long",
+      marketSymbol: null,
+      timeframes: ["1H"],
+      conditions: [{
+        name: "Momentum entry",
+        stage: "entry",
+        requirement: "required",
+        conceptName: "Momentum",
+        timeframe: "1H",
+        direction: "long",
+        triggerRules: "bullish",
+        parameters: { kind: "indicator", indicator: "rsi", period: 14, comparison: "above", threshold: 50 },
+        supported: true,
+      }],
+      riskManagementRules: null,
+      compatibility: { compatible: true, unsupportedConditions: [] },
+    };
+    state.createStrategy.mockImplementation((_request: unknown, options: { onSuccess?: (value: unknown) => void }) => {
+      options.onSuccess?.({ ...strategy, id: 9, name: "Momentum handoff" });
+    });
+    window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=review");
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+
+    render(<StrategyBuilder />);
+    fireEvent.click(screen.getByTestId("button-save-builder-strategy"));
+
+    expect(state.createStrategy).toHaveBeenCalled();
+    expect(state.createStrategy.mock.calls[0][0].data.conditions).toEqual([{
+      conceptId: 1,
+      stage: "entry",
+      name: "Momentum entry",
+      description: "Prepared by AI Assistant from the Momentum concept.",
+      timeframe: "1H",
+      direction: "long",
+      requirement: "required",
+      triggerRules: "bullish",
+      parameters: { kind: "indicator", indicator: "rsi", period: 14, comparison: "above", threshold: 50 },
+      invalidationRules: null,
+      resetBehavior: null,
+    }]);
+    expect(state.createCondition).not.toHaveBeenCalled();
   });
 
   it("renders paired HTF structure and FVG retest conditions with their review metadata", () => {

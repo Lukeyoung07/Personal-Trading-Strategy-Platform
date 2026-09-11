@@ -32,7 +32,7 @@ import { EconomicCalendar } from '@/components/economic-calendar';
 import { BacktestResultsPanel } from '@/components/backtest-results';
 import { AssistantPanel, type AssistantPanelContext } from '@/components/assistant-panel';
 import { setPendingAssistantDraft } from '@/lib/assistant-draft-store';
-import { executableConceptKind } from '@workspace/api-zod';
+import { executableConceptKind, normalizeExecutableParameters } from '@workspace/api-zod';
 import '@/index.css';
 
 const queryClient = new QueryClient();
@@ -446,12 +446,9 @@ function historicalRuleSupported(rule: string | null | undefined) {
   return /^(open|high|low|close|previous[_ ](?:open|high|low|close))\s*(>=|<=|>|<|=|==)\s*(open|high|low|close|previous[_ ](?:open|high|low|close)|\d+(?:\.\d+)?)$/.test(normalized);
 }
 
-function historicalConditionSupported(condition: { triggerRules?: string | null; conceptDetectionRules?: string | null; parameters?: unknown }) {
+function historicalConditionSupported(condition: { conceptName?: string | null; triggerRules?: string | null; conceptDetectionRules?: string | null; parameters?: unknown }) {
   if (historicalRuleSupported(condition.triggerRules || condition.conceptDetectionRules)) return true;
-  const kind = typeof condition.parameters === "object" && condition.parameters !== null && "kind" in condition.parameters
-    ? String((condition.parameters as { kind?: unknown }).kind || "")
-    : "";
-  return ["liquidity_sweep", "fair_value_gap", "market_structure", "liquidity_level", "indicator", "price_action", "range_location"].includes(kind);
+  return Boolean(condition.conceptName && normalizeExecutableParameters(condition.conceptName, condition.parameters));
 }
 
 function presetRange(preset: string) {

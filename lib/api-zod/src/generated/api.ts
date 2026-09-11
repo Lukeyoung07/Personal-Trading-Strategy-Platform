@@ -355,6 +355,10 @@ export const ListStrategiesResponse = zod.array(ListStrategiesResponseItem)
 export const createStrategyBodyStatusDefault = `draft`;
 export const createStrategyBodyDirectionDefault = `both`;
 
+
+export const createStrategyBodyConditionsItemDirectionDefault = `both`;
+export const createStrategyBodyConditionsItemRequirementDefault = `required`;
+
 export const CreateStrategyBody = zod.object({
   "name": zod.string().min(1),
   "description": zod.string().nullish(),
@@ -363,6 +367,19 @@ export const CreateStrategyBody = zod.object({
   "assetClass": zod.string().nullish(),
   "direction": zod.enum(['long', 'short', 'both']).default(createStrategyBodyDirectionDefault),
   "timeframes": zod.array(zod.string()).optional(),
+  "conditions": zod.array(zod.object({
+  "conceptId": zod.number().int().min(1),
+  "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
+  "name": zod.string().min(1),
+  "description": zod.string().nullish(),
+  "timeframe": zod.string().min(1),
+  "direction": zod.enum(['long', 'short', 'both']).default(createStrategyBodyConditionsItemDirectionDefault),
+  "requirement": zod.enum(['required', 'optional']).default(createStrategyBodyConditionsItemRequirementDefault),
+  "triggerRules": zod.string().nullish(),
+  "parameters": zod.record(zod.string(), zod.unknown()).nullish(),
+  "invalidationRules": zod.string().nullish(),
+  "resetBehavior": zod.string().nullish()
+})).optional(),
   "riskManagementRules": zod.string().nullish(),
   "resetRules": zod.string().nullish(),
   "alertRules": zod.string().nullish()

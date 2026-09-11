@@ -883,26 +883,57 @@ router.post("/strategies", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const created = await db.transaction(async (tx) => {
-    const [strategy] = await tx.insert(strategiesTable).values(parsed.data).returning();
-    await tx.insert(strategyVersionsTable).values({
-      strategyId: strategy.id,
-      versionNumber: 1,
-      isActive: true,
-      label: "Initial version",
-      name: strategy.name,
-      description: strategy.description,
-      marketId: strategy.marketId,
-      marketSymbol: await snapshotMarketSymbol(tx, strategy.marketId),
-      assetClass: strategy.assetClass,
-      direction: strategy.direction,
-      timeframes: strategy.timeframes,
-      riskManagementRules: strategy.riskManagementRules,
-      resetRules: strategy.resetRules,
-      alertRules: strategy.alertRules,
+  const { conditions = [], ...strategyData } = parsed.data;
+  let created: typeof strategiesTable.$inferSelect;
+  try {
+    created = await db.transaction(async (tx) => {
+      const [strategy] = await tx.insert(strategiesTable).values(strategyData).returning();
+      const [version] = await tx.insert(strategyVersionsTable).values({
+        strategyId: strategy.id,
+        versionNumber: 1,
+        isActive: true,
+        label: "Initial version",
+        name: strategy.name,
+        description: strategy.description,
+        marketId: strategy.marketId,
+        marketSymbol: await snapshotMarketSymbol(tx, strategy.marketId),
+        assetClass: strategy.assetClass,
+        direction: strategy.direction,
+        timeframes: strategy.timeframes,
+        riskManagementRules: strategy.riskManagementRules,
+        resetRules: strategy.resetRules,
+        alertRules: strategy.alertRules,
+      }).returning();
+      const persistedConditions = [];
+      for (const [index, inputCondition] of conditions.entries()) {
+        const [concept] = await tx
+          .select({ id: tradingConceptsTable.id, name: tradingConceptsTable.name })
+          .from(tradingConceptsTable)
+          .where(eq(tradingConceptsTable.id, inputCondition.conceptId));
+        if (!concept) throw new Error("Concept not found.");
+        const parameters = conditionParameters(concept.name, inputCondition.parameters);
+        const [condition] = await tx.insert(strategyConditionsTable).values({
+          ...inputCondition,
+          strategyId: strategy.id,
+          conditionOrder: index + 1,
+          parameters,
+        }).returning();
+        persistedConditions.push(condition);
+      }
+      if (persistedConditions.length) {
+        await tx.insert(strategyVersionConditionsTable).values(
+          await buildVersionConditionSnapshots(tx, persistedConditions, version.id),
+        );
+      }
+      return strategy;
     });
-    return strategy;
-  });
+  } catch (error) {
+    if (error instanceof Error && (/^Concept not found/.test(error.message) || /^Parameters for /.test(error.message))) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
   res.status(201).json(CreateStrategyResponse.parse(await strategyView(created)));
 });
 

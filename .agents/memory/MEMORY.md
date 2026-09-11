@@ -17,3 +17,4 @@
 - [Backtest rule contract](backtest-rule-contract.md) — Builder compatibility and server evaluation must consume the same historical-rule definitions.
 - [Builder end-to-end cleanup](builder-e2e-cleanup.md) — temporary no-trade strategies can be tested with provider candles and removed cleanly through Strategy Library.
 - [Multi-timeframe backtesting](multi-timeframe-backtesting.md) — evaluate each condition on its own closed-candle series and align only candles completed at the execution decision time.
+- [Initial version snapshots](initial-version-snapshots.md) — strategy creation must persist initial conditions and the immutable v1 snapshot atomically.

@@ -311,7 +311,7 @@ function SearchableConcept({ concepts, value, onChange }: { concepts: TradingCon
   </div>;
 }
 
-function StrategyForm({ strategy, markets, timeframes, onClose, onSaved, initialDraft }: { strategy: Strategy | null; markets: Market[]; timeframes: Timeframe[]; onClose?: () => void; onSaved: (strategy: Strategy) => void; initialDraft?: AssistantStrategyDraft | null }) {
+function StrategyForm({ strategy, markets, concepts, timeframes, onClose, onSaved, initialDraft }: { strategy: Strategy | null; markets: Market[]; concepts: TradingConcept[]; timeframes: Timeframe[]; onClose?: () => void; onSaved: (strategy: Strategy) => void; initialDraft?: AssistantStrategyDraft | null }) {
   const create = useCreateStrategy();
   const update = useUpdateStrategy();
   const queryClient = useQueryClient();
@@ -340,7 +340,7 @@ function StrategyForm({ strategy, markets, timeframes, onClose, onSaved, initial
     }
      const typedTimeframes = String(form.get("timeframes") || "").split(",").map(value => value.trim()).filter(Boolean);
      const savedTimeframes = timeframes.length ? selectedTimeframes : typedTimeframes;
-    const data = {
+     const baseData = {
       name,
       description: String(form.get("description") || "") || null,
        marketId: form.get("marketId") ? Number(form.get("marketId")) : null,
@@ -351,6 +351,27 @@ function StrategyForm({ strategy, markets, timeframes, onClose, onSaved, initial
       resetRules: String(form.get("resetRules") || "") || null,
       alertRules: String(form.get("alertRules") || "") || null,
     };
+     const initialConditions = !strategy && initialDraft
+       ? initialDraft.conditions.flatMap(condition => {
+         const concept = concepts.find(item => item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase());
+         if (!concept) return [];
+         return [{
+           conceptId: concept.id,
+           stage: condition.stage,
+           name: condition.name,
+           description: `Prepared by AI Assistant from the ${condition.conceptName} concept.`,
+           timeframe: condition.timeframe || savedTimeframes[0] || "Not specified",
+           direction: baseData.direction === "both" && ["long", "short", "both"].includes(condition.direction)
+             ? condition.direction
+             : baseData.direction,
+           requirement: condition.requirement,
+           triggerRules: condition.triggerRules || null,
+           parameters: condition.parameters || null,
+           invalidationRules: null,
+           resetBehavior: null,
+         }];
+       })
+       : undefined;
     setError("");
     const done = (saved: Strategy) => {
       queryClient.invalidateQueries({ queryKey: getListStrategiesQueryKey() });
@@ -359,8 +380,8 @@ function StrategyForm({ strategy, markets, timeframes, onClose, onSaved, initial
       onClose?.();
     };
     const onError = (failure: unknown) => setError(friendlyMutationError(failure, "Could not save this strategy. Please check the details and try again."));
-    if (strategy) update.mutate({ strategyId: strategy.id, data }, { onSuccess: done, onError });
-    else create.mutate({ data }, { onSuccess: done, onError });
+     if (strategy) update.mutate({ strategyId: strategy.id, data: baseData }, { onSuccess: done, onError });
+     else create.mutate({ data: { ...baseData, conditions: initialConditions } }, { onSuccess: done, onError });
   };
   const busy = create.isPending || update.isPending;
   return <form onSubmit={save} className="space-y-6" key={strategy?.id ?? initialDraft?.name ?? "new-strategy"}>
@@ -1064,7 +1085,6 @@ export function StrategyBuilder() {
   }, [requestedAssistantDraft, routeLocation]);
   const [draftImportMessage, setDraftImportMessage] = useState("");
   const [unmatchedDraftConditions, setUnmatchedDraftConditions] = useState<AssistantStrategyDraft["conditions"]>([]);
-  const createDraftCondition = useCreateStrategyCondition();
   const activeStrategy = useMemo(() => {
     if (assistantDraft) return null;
     const rows = strategies.data || [];
@@ -1072,42 +1092,13 @@ export function StrategyBuilder() {
   }, [assistantDraft, selectedStrategyId, strategies.data]);
   const strategyId = activeStrategy?.id || 0;
   const strategyConditions = useListStrategyConditions(strategyId, { query: { enabled: !!strategyId, queryKey: getListStrategyConditionsQueryKey(strategyId) } });
-  const savedStrategy = async (strategy: Strategy) => {
+  const savedStrategy = (strategy: Strategy) => {
     setSelectedStrategyId(strategy.id);
     if (!assistantDraft) return;
-    const unmatched: AssistantStrategyDraft["conditions"] = [];
-    for (const [index, condition] of assistantDraft.conditions.entries()) {
-      const concept = concepts.data?.find(item => item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase());
-      if (!concept) {
-        unmatched.push(condition);
-        continue;
-      }
-      try {
-        await createDraftCondition.mutateAsync({
-          strategyId: strategy.id,
-          data: {
-            conceptId: concept.id,
-            stage: condition.stage,
-            name: condition.name,
-            description: `Prepared by AI Assistant from the ${condition.conceptName} concept.`,
-            timeframe: condition.timeframe || strategy.timeframes?.[0] || "Not specified",
-            direction: strategy.direction === "both" && ["long", "short", "both"].includes(condition.direction)
-              ? condition.direction
-              : strategy.direction,
-            requirement: condition.requirement,
-            triggerRules: condition.triggerRules || null,
-            parameters: condition.parameters || null,
-            invalidationRules: null,
-            resetBehavior: null,
-          },
-        });
-      } catch {
-        unmatched.push(condition);
-      }
-      if (index === assistantDraft.conditions.length - 1) {
-        queryClient.invalidateQueries({ queryKey: getListStrategyConditionsQueryKey(strategy.id) });
-      }
-    }
+    const unmatched = assistantDraft.conditions.filter(condition =>
+      !concepts.data?.some(item => item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase()),
+    );
+    queryClient.invalidateQueries({ queryKey: getListStrategyConditionsQueryKey(strategy.id) });
     setUnmatchedDraftConditions(unmatched);
     setDraftImportMessage(unmatched.length ? `Strategy created. These draft conditions need review before they can be added: ${unmatched.map(condition => condition.name).join(", ")}.` : "Strategy created with the assistant’s conditions. Review it, then save a new immutable version.");
     setAssistantDraft(null);
@@ -1132,7 +1123,7 @@ export function StrategyBuilder() {
        <Panel title="Create the strategy foundation" eyebrow="Start without assumptions">
          {assistantDraft && <AssistantDraftReview draft={assistantDraft} action={assistantDraftAction} />}
         <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">Give your strategy a name and describe the market context in your own words. Everything else can stay open until you are ready to define it.</p>
-          <div className="mt-6"><StrategyForm markets={markets.data || []} timeframes={timeframes.data || []} strategy={null} initialDraft={assistantDraft} onSaved={savedStrategy} /></div>
+           <div className="mt-6"><StrategyForm markets={markets.data || []} concepts={concepts.data || []} timeframes={timeframes.data || []} strategy={null} initialDraft={assistantDraft} onSaved={savedStrategy} /></div>
       </Panel>
       <ConceptsCard concepts={concepts.data || []} />
       </div> : <div className="space-y-5">
@@ -1186,7 +1177,7 @@ export function StrategyBuilder() {
          <div className="space-y-5 mt-5"><StrategyVersionManager strategy={activeStrategy} compact initialVersionId={requestedVersionId} /><ConceptsCard concepts={concepts.data || []} /></div>
        </details>
     </div>}
-     {strategyModal && <Modal title={strategyModal === "edit" ? "Edit strategy details" : "New strategy"} onClose={() => setStrategyModal(false)}><StrategyForm strategy={strategyModal === "edit" ? activeStrategy : null} markets={markets.data || []} timeframes={timeframes.data || []} onClose={() => setStrategyModal(false)} onSaved={savedStrategy} /></Modal>}
+     {strategyModal && <Modal title={strategyModal === "edit" ? "Edit strategy details" : "New strategy"} onClose={() => setStrategyModal(false)}><StrategyForm strategy={strategyModal === "edit" ? activeStrategy : null} markets={markets.data || []} concepts={concepts.data || []} timeframes={timeframes.data || []} onClose={() => setStrategyModal(false)} onSaved={savedStrategy} /></Modal>}
       {conditionModal && activeStrategy && <ConditionModal key={conditionModal === "new" ? `new-${newConditionStage}` : conditionModal.id} strategyId={activeStrategy.id} strategyDirection={activeStrategy.direction} concepts={concepts.data || []} timeframes={timeframes.data || []} defaultStage={newConditionStage} condition={conditionModal === "new" ? null : conditionModal} onClose={() => setConditionModal(false)} onSaved={refreshConditions} />}
   </BuilderPage>;
 }

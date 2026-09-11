@@ -1695,6 +1695,10 @@ components:
         timeframes:
           type: array
           items: { type: string }
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/StrategyConditionInput"
         riskManagementRules: { type: ["string", "null"] }
         resetRules: { type: ["string", "null"] }
         alertRules: { type: ["string", "null"] }

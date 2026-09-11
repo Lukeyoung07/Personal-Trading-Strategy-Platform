@@ -430,6 +430,60 @@ export const StrategyInputDirection = {
   both: 'both',
 } as const;
 
+export type StrategyConditionInputStage = typeof StrategyConditionInputStage[keyof typeof StrategyConditionInputStage];
+
+
+export const StrategyConditionInputStage = {
+  entry: 'entry',
+  confirmation: 'confirmation',
+  invalidation: 'invalidation',
+  exit: 'exit',
+} as const;
+
+export type StrategyConditionInputDirection = typeof StrategyConditionInputDirection[keyof typeof StrategyConditionInputDirection];
+
+
+export const StrategyConditionInputDirection = {
+  long: 'long',
+  short: 'short',
+  both: 'both',
+} as const;
+
+export type StrategyConditionInputRequirement = typeof StrategyConditionInputRequirement[keyof typeof StrategyConditionInputRequirement];
+
+
+export const StrategyConditionInputRequirement = {
+  required: 'required',
+  optional: 'optional',
+} as const;
+
+/**
+ * @nullable
+ */
+export type StrategyConditionInputParameters = { [key: string]: unknown } | null;
+
+export interface StrategyConditionInput {
+  /** @minimum 1 */
+  conceptId: number;
+  stage: StrategyConditionInputStage;
+  /** @minLength 1 */
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  /** @minLength 1 */
+  timeframe: string;
+  direction?: StrategyConditionInputDirection;
+  requirement?: StrategyConditionInputRequirement;
+  /** @nullable */
+  triggerRules?: string | null;
+  /** @nullable */
+  parameters?: StrategyConditionInputParameters;
+  /** @nullable */
+  invalidationRules?: string | null;
+  /** @nullable */
+  resetBehavior?: string | null;
+}
+
 export interface StrategyInput {
   /** @minLength 1 */
   name: string;
@@ -442,6 +496,7 @@ export interface StrategyInput {
   assetClass?: string | null;
   direction?: StrategyInputDirection;
   timeframes?: string[];
+  conditions?: StrategyConditionInput[];
   /** @nullable */
   riskManagementRules?: string | null;
   /** @nullable */
@@ -691,60 +746,6 @@ export interface StrategyCondition {
   resetBehavior: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-export type StrategyConditionInputStage = typeof StrategyConditionInputStage[keyof typeof StrategyConditionInputStage];
-
-
-export const StrategyConditionInputStage = {
-  entry: 'entry',
-  confirmation: 'confirmation',
-  invalidation: 'invalidation',
-  exit: 'exit',
-} as const;
-
-export type StrategyConditionInputDirection = typeof StrategyConditionInputDirection[keyof typeof StrategyConditionInputDirection];
-
-
-export const StrategyConditionInputDirection = {
-  long: 'long',
-  short: 'short',
-  both: 'both',
-} as const;
-
-export type StrategyConditionInputRequirement = typeof StrategyConditionInputRequirement[keyof typeof StrategyConditionInputRequirement];
-
-
-export const StrategyConditionInputRequirement = {
-  required: 'required',
-  optional: 'optional',
-} as const;
-
-/**
- * @nullable
- */
-export type StrategyConditionInputParameters = { [key: string]: unknown } | null;
-
-export interface StrategyConditionInput {
-  /** @minimum 1 */
-  conceptId: number;
-  stage: StrategyConditionInputStage;
-  /** @minLength 1 */
-  name: string;
-  /** @nullable */
-  description?: string | null;
-  /** @minLength 1 */
-  timeframe: string;
-  direction?: StrategyConditionInputDirection;
-  requirement?: StrategyConditionInputRequirement;
-  /** @nullable */
-  triggerRules?: string | null;
-  /** @nullable */
-  parameters?: StrategyConditionInputParameters;
-  /** @nullable */
-  invalidationRules?: string | null;
-  /** @nullable */
-  resetBehavior?: string | null;
 }
 
 export type StrategyConditionUpdateStage = typeof StrategyConditionUpdateStage[keyof typeof StrategyConditionUpdateStage];
