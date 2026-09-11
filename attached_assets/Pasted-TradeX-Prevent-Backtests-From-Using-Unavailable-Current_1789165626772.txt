@@ -1,0 +1,229 @@
+TradeX — Prevent Backtests From Using Unavailable/Current Data
+
+The Dukascopy historical-data and background backtest systems are now working correctly.
+
+The latest investigation confirmed that Dukascopy only provides completed historical candles. The Backtesting UI currently allows a user to request a range extending beyond the latest available historical data, which then correctly fails.
+
+Fix the user experience so this is prevented BEFORE a backtest is started.
+
+IMPORTANT:
+- Do not replace Dukascopy.
+- Do not change the backtest engine.
+- Do not change strategy logic.
+- Do not fabricate or estimate future/current candles.
+- Do not silently shorten a user's requested date range.
+- Do not modify existing saved strategies or completed backtests.
+
+GOAL:
+
+The Backtesting UI should know the latest genuinely available historical data for the selected instrument/timeframe and prevent the user from requesting data beyond that point.
+
+1. AVAILABLE DATA ENDPOINT
+
+Use the existing historical-availability infrastructure.
+
+For the selected:
+
+- Instrument
+- Execution timeframe
+- Required higher/lower condition timeframes
+
+determine the latest genuinely available completed candle.
+
+Do not hard-code a date such as September 10, 2026.
+
+The latest available date must come from the actual provider/cache availability.
+
+2. DATE RANGE UI
+
+When the user selects:
+
+- Strategy
+- Version
+- Instrument
+- Timeframe
+
+check the available historical coverage.
+
+Display something like:
+
+Latest available historical data:
+10 September 2026, 23:55
+
+The exact timestamp should come from the actual available candle.
+
+Prevent the user from selecting an end date after the latest available historical data.
+
+3. MULTI-TIMEFRAME STRATEGIES
+
+For strategies requiring multiple timeframes, use the availability of ALL required timeframes.
+
+Example:
+
+5m execution:
+Latest available = 10 Sept 2026 23:55
+
+1h condition timeframe:
+Latest available = 10 Sept 2026 23:00
+
+The usable backtest end must respect the earliest required coverage boundary.
+
+Do not allow the user to request a range that requires unavailable data from any required timeframe.
+
+4. CURRENT-DATE PROTECTION
+
+Do not assume today's date is the latest available date.
+
+Use actual provider/cache coverage.
+
+If today's date is September 11 but the latest completed historical candle is September 10, the UI should clearly show:
+
+Historical data available through:
+10 September 2026
+
+and prevent selecting September 11 or later.
+
+5. CLEAR VALIDATION
+
+If the user somehow submits an end date beyond available coverage through an API request or stale UI:
+
+- Reject the request before starting the background job.
+- Return a clear validation error.
+- Do not create a failed backtest job unnecessarily.
+- Explain the actual available end date.
+
+Example:
+
+"Backtest cannot start because historical data is only available through 10 September 2026 23:55 for the selected data series."
+
+6. DO NOT SHORTEN RANGES
+
+If the user selects:
+
+1 June 2026 → 11 September 2026
+
+but data only exists through 10 September:
+
+DO NOT automatically change it to:
+
+1 June → 10 September
+
+Instead tell the user that the requested end date exceeds available historical data and let them choose another date.
+
+7. PRESERVE CUSTOM DATE RANGES
+
+Keep:
+
+- Last 7 Days
+- Last 30 Days
+- Last 90 Days
+- Last 6 Months
+- Last 1 Year
+- Custom
+
+working normally.
+
+For relative ranges, calculate them against the latest available historical data rather than blindly using the current calendar date when necessary.
+
+For example, if the latest available candle is yesterday, "Last 90 Days" should produce a genuinely available 90-day historical range.
+
+Do not silently include today's incomplete data.
+
+8. PROVIDER AND CACHE BEHAVIOUR
+
+Continue using the existing:
+
+- Dukascopy adapter
+- cache-first loading
+- historical availability endpoint
+- sequential retrieval
+- throttling
+- Retry-After handling
+- exponential backoff
+- incremental persistence
+- complete coverage validation
+
+Do not duplicate the historical-data logic in the frontend.
+
+9. MULTI-TIMEFRAME COVERAGE
+
+The availability check must account for every timeframe required by the selected strategy.
+
+For example:
+
+Strategy:
+Gold Reversal Strategy
+
+Timeframes:
+1h + 5m
+
+The UI should show the relevant coverage for both.
+
+10. BACKGROUND BACKTEST COMPATIBILITY
+
+This validation happens BEFORE creating the background backtest job.
+
+The existing background system remains unchanged after validation succeeds.
+
+Valid request:
+UI validation → create background job → historical retrieval/cache → processing → completed result
+
+Invalid request:
+UI validation → clear error → NO job created
+
+11. REAL VERIFICATION
+
+Test through the actual Backtesting UI with:
+
+Gold Reversal Strategy (1H Bias + 5M FVG Retest)
+v1
+XAUUSD
+5m execution
+1h condition timeframe
+
+Verify that a range extending beyond the latest available Dukascopy data cannot be started.
+
+Then verify that a genuinely available historical range can still be started and completes successfully.
+
+Also test USTEC to ensure this is not hard-coded specifically to Gold.
+
+12. REGRESSION TESTS
+
+Add tests for:
+
+- Latest available candle detection
+- End date beyond coverage
+- End date exactly at coverage
+- Multi-timeframe coverage
+- Relative date ranges
+- Custom ranges
+- Current/incomplete candle protection
+- Empty coverage
+- Partial coverage
+- XAUUSD
+- USTEC
+- API-side validation
+- Frontend date-picker validation
+- No background job created for invalid requests
+
+Run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- API production build
+- Frontend production build
+- git diff --check
+
+Finally report:
+
+- How the latest available historical date is determined.
+- How the UI prevents invalid dates.
+- How multi-timeframe coverage is handled.
+- Whether invalid requests create zero background jobs.
+- Whether a valid historical XAUUSD backtest still completes.
+- Whether USTEC works.
+- Test counts and build results.
+
+Do not claim success unless the real Backtesting UI has been tested.
