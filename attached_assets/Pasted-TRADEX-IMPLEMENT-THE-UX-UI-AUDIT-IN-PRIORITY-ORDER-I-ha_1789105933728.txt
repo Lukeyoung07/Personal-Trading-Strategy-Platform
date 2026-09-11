@@ -1,0 +1,514 @@
+TRADEX — IMPLEMENT THE UX/UI AUDIT IN PRIORITY ORDER
+
+I have reviewed the full UX/UI audit of the current TradeX application.
+
+The audit found that the main problem is not the overall visual styling. The main problem is that several related workflows are split across pages, repeated in multiple places, or use inconsistent terminology.
+
+I want you to now IMPLEMENT the highest-value UX improvements from the audit.
+
+IMPORTANT:
+
+Do not randomly redesign the application.
+
+Keep the existing TradeX visual identity and dark/purple design.
+
+The goal is:
+
+CLEANER
+SIMPLER
+EASIER TO NAVIGATE
+LESS SCROLLING
+CLEARER WORKFLOWS
+NO LOSS OF EXISTING FUNCTIONALITY
+
+Do not remove functionality simply because a page is being simplified.
+
+==================================================
+PHASE 1 — AI ASSISTANT
+==================================================
+
+Fix the AI Assistant conversation context.
+
+Every request must send the complete conversation history, including the newest user message, in exactly the order shown in the chat.
+
+Make sure follow-up questions have access to the immediately preceding conversation.
+
+Keep:
+
+- Strategy drafting
+- Concept explanations
+- Backtest setup
+- Review Strategy
+- Existing structured strategy drafts
+
+Do not change the AI's trading capabilities or introduce automatic trading.
+
+Also make the current assistant context understandable to the user instead of exposing confusing internal terminology.
+
+==================================================
+PHASE 2 — STRATEGY WORKFLOW
+==================================================
+
+Make the strategy lifecycle obvious throughout TradeX.
+
+The consistent workflow should be:
+
+1. Create strategy
+2. Define conditions
+3. Save edits
+4. Save immutable version
+5. Activate version
+6. Backtest or monitor
+
+Use consistent terminology everywhere.
+
+Clearly distinguish:
+
+EDITABLE STRATEGY
+IMMUTABLE VERSION
+ACTIVE VERSION
+BACKTEST
+MONITORING
+
+A user should never be confused about whether they are editing a strategy, saving a version, activating it, backtesting it, or monitoring it.
+
+==================================================
+PHASE 3 — STRATEGY BUILDER
+==================================================
+
+Make Strategy Builder the ONE canonical place for editing strategy logic.
+
+Reduce the amount of vertical scrolling.
+
+Organize the Builder into a clean progressive workflow:
+
+BASICS
+- Strategy name
+- Market/instrument
+- Direction
+- Timeframe
+
+CONDITIONS
+- Entry
+- Confirmation
+- Exit
+
+RISK & EXITS
+- Stop loss
+- Take profit
+- Risk settings
+
+REVIEW & SAVE
+- Strategy summary
+- Compatibility
+- Save
+- Save immutable version
+
+Do not remove existing functionality.
+
+Do not duplicate fields.
+
+Make ONE direction field authoritative.
+
+Separate structured risk fields from free-form notes.
+
+If an existing exit-condition control does not persist correctly, either fix it or remove it only if it is genuinely redundant.
+
+Keep Version Management separate from the main editing workflow.
+
+==================================================
+PHASE 4 — STRATEGY LIBRARY
+==================================================
+
+Make the Library primarily about managing strategies.
+
+Keep:
+
+- Search
+- Filtering
+- Strategy cards
+- Rename
+- Duplicate
+- Archive
+- Delete
+- Open Builder
+- Versions
+- Activate/deactivate
+
+Avoid having the Library behave like a second Strategy Builder.
+
+When the user wants to change strategy logic, send them to the Builder.
+
+Use the same terminology as the Builder.
+
+==================================================
+PHASE 5 — RESPONSIVE NAVIGATION
+==================================================
+
+Simplify navigation.
+
+Desktop:
+
+Keep the Workspace / Trading / Tools grouping.
+
+Tablet:
+
+Do not hide all navigation labels behind icons with no explanation.
+
+Provide an obvious way to expand/discover navigation.
+
+Mobile:
+
+Keep the most important destinations immediately accessible.
+
+Move secondary destinations into a clearly labelled "More" menu/drawer.
+
+Do NOT rely on horizontal scrolling to discover pages.
+
+Make sure these are clearly accessible:
+
+- Dashboard
+- Markets
+- Strategies
+- Builder
+- Monitor
+- Journal
+- Performance
+- Alerts
+- Economic Calendar
+- Backtesting
+- Settings
+
+Rename "News" to "Economic Calendar" everywhere.
+
+==================================================
+PHASE 6 — JOURNAL + PERFORMANCE
+==================================================
+
+Keep the Journal's existing functionality including:
+
+- Trade records
+- Daily/monthly calendar
+- Daily P/L
+- Notes
+- Performance calculations
+- Filters
+
+But simplify the information architecture.
+
+Do not make the user scroll through a huge performance dashboard before reaching their actual trades.
+
+Use a clean structure such as:
+
+JOURNAL
+→ Trade Records
+
+PERFORMANCE
+→ Overall performance
+→ Daily/monthly review
+
+DAILY REVIEW
+→ Calendar
+→ Day details
+→ Notes
+
+The user should immediately understand where to:
+
+- Add a trade
+- View trades
+- Review a day
+- View overall performance
+
+Keep journal performance based only on real journal trades.
+
+Keep backtest performance separate from real journal performance.
+
+==================================================
+PHASE 7 — STRATEGY MONITORING
+==================================================
+
+Rename "Monitor" to:
+
+Strategy Monitoring
+
+Make it user-facing rather than technical.
+
+Keep the existing monitoring states:
+
+- MET
+- NOT MET
+- WAITING
+- INVALID
+
+But explain them in plain English.
+
+Add a small status legend.
+
+Clearly explain:
+
+- What the monitor is doing
+- What each status means
+- What the user should do next
+
+Do not expose unnecessary internal architecture terminology as the primary UI.
+
+Make the empty state actionable.
+
+For example:
+
+"No strategy version is being monitored."
+
+Then provide a clear path to:
+
+Open Strategy Library → Activate Version
+
+Do not invent monitoring results.
+
+Keep the existing monitoring logic unchanged.
+
+==================================================
+PHASE 8 — MARKETS
+==================================================
+
+Keep the current Markets chart and functionality exactly as it currently works.
+
+Do NOT redesign the chart.
+
+Do NOT change:
+
+- BiQuote
+- Live prices
+- Candles
+- Indicators
+- Crosshair
+- Zoom
+- Pan
+- Price-axis scaling
+- Time-axis scaling
+- Drawing tools
+- Price alerts
+
+Simplify everything around the chart.
+
+The main Markets workflow should be:
+
+SELECT MARKET
+↓
+SEE PRICE + STATUS
+↓
+USE CHART
+↓
+OPTIONAL TOOLS
+
+Avoid repeating the same price/change/status information in multiple places.
+
+Keep technical information available but secondary.
+
+Add a small unobtrusive chart interaction hint:
+
+"Drag chart to pan • Scroll to zoom • Drag price scale to resize • Drag time scale to change density"
+
+Do not clutter the chart.
+
+==================================================
+PHASE 9 — BACKTESTING
+==================================================
+
+Simplify the Backtesting information architecture.
+
+Use:
+
+SETUP
+SAVED RUNS
+RESULTS
+
+Rename "Saved setups" to:
+
+Saved Runs
+
+or
+
+Recent Results
+
+Do not change backtest calculations.
+
+On results, organize information into clear sections:
+
+RUN DETAILS
+PERFORMANCE
+EQUITY CURVE
+MARKET REPLAY
+SIMULATED TRADES
+
+On mobile, avoid forcing the user to horizontally scroll through huge trade tables.
+
+Use compact expandable trade rows/cards where appropriate.
+
+==================================================
+PHASE 10 — ALERTS
+==================================================
+
+Separate the two types of alerts:
+
+REMINDERS
+MONITORING EVENTS
+
+Use tabs or filters.
+
+Make it obvious whether an alert is:
+
+- User-created reminder
+- Monitoring-generated event
+
+Keep acknowledgement and existing alert functionality.
+
+Do not change monitoring logic.
+
+==================================================
+PHASE 11 — MOBILE
+==================================================
+
+Improve mobile layouts without creating a completely separate application.
+
+At mobile widths:
+
+- Avoid unnecessary two-column forms
+- Use one-column fields where appropriate
+- Group forms into logical sections
+- Use sticky Save/Cancel controls for long forms
+- Replace wide tables with stacked cards/expandable rows
+- Ensure the AI Assistant button does not overlap navigation
+- Add safe spacing around bottom navigation
+
+Test:
+
+375px
+402px
+768px
+1440px
+
+==================================================
+PHASE 12 — TERMINOLOGY
+==================================================
+
+Standardize terminology throughout the application.
+
+Use:
+
+Draft
+Active
+Archived
+
+Planned
+Open
+Closed
+Cancelled
+
+Realized P/L
+for journal results
+
+Simulated P/L
+for backtests
+
+Long
+Short
+
+Economic Calendar
+
+Saved Runs
+
+Use the same terminology everywhere.
+
+==================================================
+IMPORTANT DESIGN RULE
+==================================================
+
+DO NOT turn every page into a giant dashboard.
+
+The goal is the opposite.
+
+Each page should answer:
+
+"What is the ONE main thing I am here to do?"
+
+Markets:
+→ Read and interact with the market chart.
+
+Journal:
+→ Manage and review trades.
+
+Performance:
+→ Understand performance.
+
+Strategy Builder:
+→ Build/edit a strategy.
+
+Strategy Library:
+→ Manage strategies.
+
+Backtesting:
+→ Test a strategy and review results.
+
+Strategy Monitoring:
+→ See whether the active strategy conditions are currently satisfied.
+
+Alerts:
+→ See things requiring attention.
+
+Dashboard:
+→ See the most important overview and next actions.
+
+==================================================
+IMPORTANT SAFETY RULE
+==================================================
+
+Before changing anything, inspect the existing implementation.
+
+Preserve all existing:
+
+- Trading logic
+- Strategy logic
+- AI functionality
+- Market data
+- BiQuote integration
+- Journal calculations
+- Backtest calculations
+- Monitoring calculations
+- Alert behaviour
+- Database behaviour
+- Existing CRUD
+- Version immutability
+
+This is primarily a UX/information-architecture improvement.
+
+Do not rewrite working backend systems unnecessarily.
+
+==================================================
+IMPLEMENTATION
+==================================================
+
+Implement the changes in sensible batches.
+
+After each batch:
+
+- Run tests
+- Run typecheck
+- Run production build
+- Check for regressions
+
+Then perform a final browser QA pass.
+
+Test:
+
+1440px
+768px
+402px
+375px
+
+Check navigation and core workflows.
+
+Most importantly, make sure existing functionality still works.
+
+Do NOT simply make cosmetic changes and report completion.
+
+The finished TradeX should feel like one connected application rather than a collection of separate pages.
