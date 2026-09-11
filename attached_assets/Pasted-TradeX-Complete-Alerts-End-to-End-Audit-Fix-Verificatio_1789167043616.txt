@@ -1,0 +1,244 @@
+TradeX — Complete Alerts End-to-End Audit, Fix & Verification
+
+Audit the EXISTING Alerts system in TradeX and make whatever changes are necessary for it to work reliably end-to-end.
+
+IMPORTANT:
+- Do NOT rebuild Alerts from scratch.
+- Preserve all existing Alerts functionality.
+- Preserve the existing Strategy Monitoring Engine.
+- Preserve closed-candle evaluation.
+- Preserve existing strategy/version architecture.
+- Preserve the existing News & Economic Calendar foundation.
+- Do NOT change Backtesting or historical-data behaviour unless an Alerts dependency is genuinely broken.
+- Do NOT invent unsupported market/news data.
+- Do NOT silently convert unsupported concepts into executable rules.
+
+GOAL:
+
+Prove that:
+
+Strategy monitoring condition becomes satisfied
+→ Alert is generated
+→ Correct strategy/version/instrument/timeframe/direction is attached
+→ Alert is persisted
+→ Alert appears in the Alerts UI
+→ Duplicate alerts are prevented
+→ Alert state/read status works
+→ News/economic events work correctly
+→ System remains correct after restart.
+
+1. AUDIT EXISTING ALERTS
+
+Inspect the current implementation and identify:
+
+- Alert database/storage
+- Alert creation logic
+- Monitoring → alert handoff
+- Alert API endpoints
+- Alerts UI
+- Read/unread handling
+- Duplicate prevention
+- News/economic calendar integration
+- Notification infrastructure, if already present
+- Any existing TODOs/placeholders
+
+Do not assume something is missing just because it was not mentioned here.
+
+2. STRATEGY ALERT GENERATION
+
+Use the existing Strategy Monitoring Engine.
+
+Verify that when an executable strategy condition becomes satisfied:
+
+- An alert is created.
+- It is linked to the exact strategy version being monitored.
+- Correct instrument is recorded.
+- Correct timeframe is recorded.
+- Correct direction is recorded.
+- Correct condition/reason is recorded.
+- Timestamp is recorded.
+- Only completed candles can trigger alerts.
+- WAITING / NOT MET / INVALID states do not incorrectly create alerts.
+
+Do not alter the monitoring engine's existing evaluation semantics.
+
+3. DUPLICATE PREVENTION
+
+Ensure the same underlying condition does not create repeated alerts from:
+
+- repeated polling
+- page refreshes
+- server restarts
+- duplicate monitoring evaluations
+- the same completed candle being evaluated more than once
+
+Use a deterministic identity/idempotency mechanism appropriate to the existing schema.
+
+4. ALERT PERSISTENCE
+
+Verify alerts survive:
+
+- page refresh
+- API restart
+- frontend restart
+
+An alert should remain available through the Alerts page after it has been generated.
+
+5. ALERT HISTORY
+
+Verify the existing Alerts UI correctly displays:
+
+- Alert type
+- Strategy
+- Exact strategy version
+- Instrument
+- Timeframe
+- Direction
+- Reason
+- Timestamp
+- Read/unread state
+
+Do not add unnecessary UI if equivalent functionality already exists.
+
+6. READ / UNREAD
+
+Verify:
+
+- New alerts appear unread.
+- Opening/acknowledging an alert changes its state correctly.
+- Refreshing the page preserves the state.
+- Marking one alert read does not affect other alerts.
+
+7. NEWS & ECONOMIC CALENDAR
+
+Audit the existing News & Economic Calendar implementation.
+
+Verify:
+
+- Upcoming events load.
+- Released/past events are handled correctly where supported.
+- Impact is represented only when actually available.
+- Affected currency/market mappings are preserved.
+- Events are not fabricated.
+- Existing no-key/public-source architecture is preserved.
+- News events do not silently alter strategy signals or backtests.
+
+For example, a USD high-impact event may be shown as relevant to Gold, but it must not automatically create a trading signal unless the existing Alerts design explicitly supports that behaviour.
+
+8. NOTIFICATIONS
+
+Inspect the existing notification implementation.
+
+If notifications are already implemented, verify them end-to-end.
+
+If the existing system only supports in-app alerts, do NOT introduce an external notification provider unless it is already part of the project.
+
+The goal is to verify and fix the current scope, not introduce a new paid service.
+
+9. TEST WITH A TEMPORARY STRATEGY
+
+Create a temporary simple executable strategy through the normal Builder UI/API path specifically for testing alerts.
+
+Use an easily reproducible supported condition that can be made to trigger using known historical/live candle behaviour.
+
+Do NOT use the user's real strategy.
+
+Verify the complete flow:
+
+Strategy
+→ Version
+→ Monitoring
+→ Condition becomes MET
+→ Alert generated
+→ Alert persisted
+→ Alerts UI displays it
+→ Mark read
+→ Refresh
+→ Alert remains correctly stored
+
+Delete the temporary test strategy and any test-only alerts/data after verification where the existing application allows safe cleanup.
+
+Do not modify the user's existing strategies, trades, or backtests.
+
+10. RESTART / IDEMPOTENCY TEST
+
+After an alert has been generated:
+
+- Restart the relevant application workflows.
+- Verify the alert remains persisted.
+- Ensure the same candle does not generate a duplicate alert after restart.
+
+11. MOBILE / DESKTOP
+
+Check the Alerts UI at:
+
+- 375px
+- 402px
+- 768px
+- 1440px
+
+Ensure alerts remain readable and usable without horizontal scrolling.
+
+12. API CONTRACTS
+
+If fixes are required:
+
+- Update OpenAPI contracts.
+- Regenerate generated API types/clients.
+- Keep frontend/backend contracts synchronized.
+
+13. REGRESSION TESTS
+
+Add or update automated tests covering:
+
+- Alert creation from monitoring
+- Correct strategy/version linkage
+- Correct instrument/timeframe/direction
+- Completed-candle-only behaviour
+- Duplicate prevention
+- Persistence
+- Read/unread state
+- Restart/idempotency
+- News/economic event handling
+- Unsupported concepts remaining review-only
+- No alert from NOT MET
+- No alert from WAITING
+- No alert from INVALID
+
+14. VERIFICATION
+
+Run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- API production build
+- Frontend production build
+- git diff --check
+
+Also inspect:
+
+- Browser console
+- API logs
+- Monitoring logs
+- Alert creation logs
+
+15. FINAL REPORT
+
+Report clearly:
+
+- What Alerts functionality already existed.
+- What was actually broken.
+- What was changed.
+- Whether strategy-monitoring → alert generation works end-to-end.
+- Whether duplicate alerts are prevented.
+- Whether alerts survive restart.
+- Whether read/unread works.
+- Whether the News & Economic Calendar works correctly.
+- Whether mobile/desktop checks passed.
+- Exact test counts.
+- Whether any limitations remain.
+
+IMPORTANT:
+Do not report Alerts as "fully working" unless the complete monitoring → alert → persistence → UI flow has been actually verified with a temporary test strategy.
