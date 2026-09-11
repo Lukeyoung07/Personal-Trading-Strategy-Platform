@@ -1,0 +1,519 @@
+TRADEX — PERFECT STRATEGY BUILDER, BACKTESTING AND ALERTS
+
+We are now focusing specifically on three core areas of TradeX:
+
+1. Strategy Builder
+2. Backtesting
+3. Alerts
+
+The goal is to make these three systems extremely clear, reliable and useful without changing the overall TradeX visual design.
+
+IMPORTANT:
+
+Do not perform another broad UI redesign.
+
+Keep the current TradeX dark/purple visual system and navigation.
+
+Do not change:
+- BiQuote
+- Market data
+- Existing journal calculations
+- Existing monitoring semantics
+- Existing strategy version immutability
+- Existing working functionality
+
+Before making changes, inspect the current implementation and identify what already works.
+
+Do not rebuild working systems unnecessarily.
+
+==================================================
+PHASE 1 — STRATEGY BUILDER
+==================================================
+
+Make Strategy Builder the definitive place to create and edit strategy logic.
+
+The ideal workflow is:
+
+CREATE
+↓
+BUILD CONDITIONS
+↓
+RISK & EXITS
+↓
+REVIEW
+↓
+SAVE
+↓
+CREATE VERSION
+↓
+ACTIVATE
+
+Make this workflow extremely obvious.
+
+--------------------------------------------------
+BASICS
+--------------------------------------------------
+
+Clearly manage:
+
+- Strategy name
+- Description
+- Instrument/market
+- Direction
+- Timeframe
+
+Avoid duplicate fields that represent the same thing.
+
+Direction must have one authoritative value.
+
+--------------------------------------------------
+CONDITIONS
+--------------------------------------------------
+
+Make conditions easy to understand and organise.
+
+Clearly distinguish:
+
+ENTRY
+CONFIRMATION
+EXIT
+
+Allow conditions to be reordered.
+
+Each condition should clearly show:
+
+- Concept
+- Direction where applicable
+- Timeframe
+- Instrument
+- Parameters
+- Whether it is supported/executable
+- Any compatibility warning
+
+Do not silently change or remove unsupported concepts.
+
+--------------------------------------------------
+TRADING CONCEPTS
+--------------------------------------------------
+
+Preserve the existing concept taxonomy, including concepts such as:
+
+- EMA
+- SMA
+- FVG
+- IFVG
+- Liquidity sweeps
+- Equal highs/lows
+- Previous day/week liquidity
+- Order blocks
+- BOS
+- CHoCH
+- HH
+- HL
+- LH
+- LL
+- Breakout
+- Break/retest
+- Rejection
+- Displacement
+- Pullback
+- Supply/demand
+- Premium
+- Discount
+- Equilibrium
+- HTF/LTF
+- Multi-timeframe
+- IRL
+- ERL
+- SMT
+- AMD
+- Power of 3
+- Risk/reward
+- Percentage risk
+- Position sizing
+- Maximum risk
+
+Do not claim a concept is executable unless an actual detector/evaluator exists for it.
+
+--------------------------------------------------
+RISK & EXITS
+--------------------------------------------------
+
+Make risk settings clearly separate from descriptive strategy conditions.
+
+Support the existing:
+
+- Stop loss
+- Take profit
+- Risk %
+- Risk amount
+- Risk/reward
+
+Clearly distinguish:
+
+STRATEGY LOGIC
+from
+RISK MANAGEMENT
+
+--------------------------------------------------
+REVIEW
+--------------------------------------------------
+
+Before saving, show a clean summary:
+
+Strategy name
+Market
+Direction
+Timeframe
+Entry conditions
+Confirmation conditions
+Exit conditions
+Risk management
+Compatibility
+
+Clearly warn about unsupported conditions.
+
+Do not prevent saving a strategy simply because it contains unsupported descriptive concepts unless the existing product rules require it.
+
+--------------------------------------------------
+SAVE VS VERSION
+--------------------------------------------------
+
+Make these actions extremely clear.
+
+SAVE
+= save changes to the editable strategy.
+
+SAVE AS NEW VERSION
+= create an immutable version of the current strategy.
+
+ACTIVATE
+= make a specific immutable version the active version.
+
+Do not allow users to accidentally believe they are doing the same thing with all three actions.
+
+Preserve immutable version history.
+
+==================================================
+PHASE 2 — BACKTESTING
+==================================================
+
+Make the Backtesting workflow simple:
+
+SELECT STRATEGY
+↓
+SELECT EXACT VERSION
+↓
+SELECT MARKET
+↓
+SELECT TIMEFRAME
+↓
+SELECT DATE RANGE
+↓
+CHECK COMPATIBILITY
+↓
+RUN BACKTEST
+↓
+RESULTS
+
+The exact strategy version being tested must always be visible.
+
+--------------------------------------------------
+PRE-FLIGHT
+--------------------------------------------------
+
+Before consuming historical data:
+
+Check whether every strategy condition is actually supported by an executable detector.
+
+If unsupported:
+
+- Stop before creating a run
+- Clearly explain which condition is unsupported
+- Tell the user what needs to change
+- Do not fabricate results
+- Do not consume historical data unnecessarily
+
+Keep valid zero-trade backtests supported.
+
+--------------------------------------------------
+RESULTS
+--------------------------------------------------
+
+Make results easy to understand.
+
+Show:
+
+- Strategy
+- Exact version
+- Market
+- Timeframe
+- Date range
+- Number of trades
+- Winners
+- Losers
+- Win rate
+- Total P/L
+- Average winner
+- Average loser
+- Profit factor
+- Maximum drawdown
+- Equity progression
+
+Also show the individual simulated trades.
+
+Clearly label these as:
+
+SIMULATED / BACKTEST
+
+Never mix them with Journal trades.
+
+--------------------------------------------------
+RESULT INTERACTION
+--------------------------------------------------
+
+Make the results page easy to navigate.
+
+Use clear sections:
+
+OVERVIEW
+EQUITY
+TRADES
+DETAILS
+
+Do not put every piece of information into one giant page.
+
+On mobile, avoid forcing users to horizontally scroll through large tables.
+
+==================================================
+PHASE 3 — ALERTS
+==================================================
+
+Make Alerts extremely clear.
+
+Separate:
+
+1. PRICE ALERTS
+2. MONITORING EVENTS
+3. REMINDERS
+
+--------------------------------------------------
+PRICE ALERTS
+--------------------------------------------------
+
+Show:
+
+- Instrument
+- Current/trigger price
+- Above/below condition
+- Active/triggered status
+- Created time
+- Acknowledge/dismiss where appropriate
+
+--------------------------------------------------
+MONITORING EVENTS
+--------------------------------------------------
+
+Show:
+
+- Strategy
+- Exact version
+- Condition
+- Previous state
+- New state
+- Time
+- Reason
+
+Use plain language.
+
+For example:
+
+"XAUUSD strategy condition changed from Waiting to Met."
+
+Instead of exposing internal technical terminology as the main message.
+
+Preserve the existing monitoring states:
+
+MET
+NOT MET
+WAITING
+INVALID
+
+Explain each state clearly.
+
+--------------------------------------------------
+REMINDERS
+--------------------------------------------------
+
+Keep manually created reminders separate from automated monitoring events.
+
+Do not mix them together in a confusing feed.
+
+--------------------------------------------------
+DUPLICATES
+--------------------------------------------------
+
+Preserve the existing duplicate-transition protection.
+
+The same monitoring transition should not create repeated alerts unnecessarily.
+
+==================================================
+PHASE 4 — CONNECTION BETWEEN THE THREE
+==================================================
+
+These systems must work together cleanly.
+
+The intended workflow is:
+
+BUILD STRATEGY
+↓
+SAVE STRATEGY
+↓
+CREATE IMMUTABLE VERSION
+↓
+ACTIVATE VERSION
+↓
+BACKTEST VERSION
+↓
+MONITOR VERSION
+↓
+RECEIVE ALERTS
+
+The user should always be able to tell:
+
+"What strategy am I using?"
+
+"What exact version am I using?"
+
+"Is it editable or immutable?"
+
+"Is it being backtested?"
+
+"Is it being monitored?"
+
+"Why did I receive this alert?"
+
+==================================================
+PHASE 5 — ERROR HANDLING
+==================================================
+
+Every failure should be understandable.
+
+Do not show raw technical errors.
+
+Examples:
+
+Unsupported condition:
+"This strategy contains a condition that TradeX cannot currently execute."
+
+Missing market data:
+"Market data is currently unavailable for this instrument."
+
+Invalid backtest:
+"Check the selected date range and strategy version."
+
+Monitoring unavailable:
+"TradeX cannot currently evaluate this condition."
+
+Do not fabricate data or results.
+
+==================================================
+PHASE 6 — UX QUALITY
+==================================================
+
+Keep the current TradeX design.
+
+Improve clarity rather than adding more UI.
+
+Avoid:
+
+- Giant forms
+- Excessive scrolling
+- Duplicate information
+- Technical jargon where plain language works
+- Multiple controls doing the same thing
+- Unnecessary cards
+- Huge empty areas
+
+Every screen should have one obvious primary action.
+
+==================================================
+PHASE 7 — REGRESSION PROTECTION
+==================================================
+
+Before finishing:
+
+Test:
+
+STRATEGY BUILDER
+- Create
+- Edit
+- Add conditions
+- Reorder conditions
+- Save
+- Save as new version
+- Activate version
+- Review compatibility
+- Unsupported concepts
+
+BACKTESTING
+- Valid run
+- Invalid date range
+- Unsupported condition
+- Zero-trade result
+- Missing result
+- Exact version attribution
+
+ALERTS
+- Price alert
+- Monitoring event
+- Reminder
+- Acknowledge
+- Duplicate transition prevention
+- Empty states
+
+Test desktop:
+
+1440px
+768px
+
+Test mobile:
+
+402px
+375px
+
+Run:
+
+- Frontend tests
+- API tests
+- Typechecks
+- Production builds
+- git diff --check
+
+Then perform browser QA on the actual running application.
+
+Do not report success based only on compilation.
+
+Actually verify the important workflows.
+
+==================================================
+FINAL GOAL
+==================================================
+
+TradeX should make this feel effortless:
+
+"I create my strategy."
+
+"I save it."
+
+"I create a version."
+
+"I activate it."
+
+"I backtest that exact version."
+
+"I monitor that exact version."
+
+"I receive a clear alert when something happens."
+
+The user should never be confused about what strategy, version, market, timeframe or result they are looking at.
