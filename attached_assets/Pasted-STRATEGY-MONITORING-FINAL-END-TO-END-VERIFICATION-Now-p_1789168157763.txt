@@ -1,0 +1,178 @@
+STRATEGY MONITORING — FINAL END-TO-END VERIFICATION
+
+Now perform the final end-to-end audit of Strategy Monitoring.
+
+Do NOT redesign or replace the existing monitoring architecture.
+
+Do NOT hard-code the Gold test strategy, XAUUSD, 1H, or 5M.
+
+The goal is to prove that Strategy Monitoring works correctly for ANY valid strategy created through the normal Strategy Builder.
+
+The current Gold Reversal Strategy (1H Bias + 5M FVG Retest) is ONLY a test strategy.
+
+Audit the existing implementation and fix any genuine issues you find.
+
+Verify all of the following:
+
+1. ACTIVE VERSION
+- Monitoring evaluates the exact currently active immutable strategy version.
+- Old/inactive versions cannot accidentally be evaluated.
+- The stored version conditions and parameters are exactly what monitoring evaluates.
+
+2. EVALUATE ALL ACTIVE
+- The “Evaluate all active” button actually performs server-side evaluations.
+- Every active strategy is evaluated.
+- Results are returned to the UI.
+- Errors are surfaced clearly.
+
+3. MULTI-TIMEFRAME
+- Each condition is evaluated using its own configured timeframe.
+- 1H conditions use completed 1H candles.
+- 5M conditions use completed 5M candles.
+- Do not evaluate all conditions using the execution timeframe.
+- Verify multiple arbitrary timeframe combinations generically.
+
+4. CLOSED CANDLES
+- Never use the currently forming candle.
+- Always use the latest completed candle and any earlier completed candles required by the condition.
+- Verify candle timestamps explicitly.
+
+5. CONDITION STATES
+Verify that:
+- MET = condition genuinely evaluated and is true.
+- NOT MET = condition genuinely evaluated and is false.
+- WAITING = genuinely insufficient data/sequence/state.
+- INVALID = genuinely cannot be evaluated because the rule/configuration/data is invalid or unsupported.
+
+Do not use WAITING simply because an evaluation has not happened.
+
+6. REAL MARKET DATA
+Test monitoring against the configured market-data provider.
+
+Verify:
+- LIVE
+- STALE
+- MARKET CLOSED
+- DISCONNECTED
+- missing candles
+- insufficient historical sequence
+- provider errors
+
+Missing data must never silently become NOT MET.
+
+7. EXECUTABLE CONCEPTS
+Verify monitoring uses the same canonical executable concept evaluators as backtesting.
+
+At minimum test representative conditions across:
+- Market Structure
+- MSS/BOS/CHoCH
+- Liquidity
+- Previous day/week levels
+- EMA/SMA
+- RSI
+- MACD
+- VWAP
+- ATR
+- Breakout
+- FVG
+- FVG Retest
+- IFVG
+
+Unsupported/review-only concepts must remain explicitly unsupported.
+
+8. MULTIPLE CONDITIONS
+Verify strategies with:
+- multiple entry conditions
+- multiple confirmation conditions
+- long conditions
+- short conditions
+- both-direction conditions
+- multiple timeframes
+
+Every condition must receive its own correct result.
+
+9. UI CONSISTENCY
+Verify the Strategy Monitoring UI exactly matches the server evaluation.
+
+Display:
+- strategy
+- version
+- condition
+- timeframe
+- status
+- reason/details
+- evaluation timestamp
+- market-data state
+
+No stale “NOT_EVALUATED” result should remain after a successful evaluation.
+
+10. REPEATED EVALUATION
+Run the same evaluation repeatedly against the same market snapshot.
+
+Verify:
+- deterministic condition results
+- no duplicate alerts for the same transition
+- no strategy mutation
+- no version mutation
+- no duplicate trades
+- no corrupted monitoring state
+
+11. CURRENT GOLD TEST
+Use the existing Gold Reversal Strategy only as a diagnostic.
+
+Actually press/run “Evaluate all active”.
+
+Determine why each of its four conditions currently shows WAITING/NOT_EVALUATED if that still occurs.
+
+Do not alter the strategy simply to make the statuses look correct.
+
+The statuses must come from genuine market data and the stored strategy version.
+
+12. REGRESSION TESTS
+Add/fix automated tests covering:
+- active version selection
+- multi-timeframe evaluation
+- closed candles
+- MET
+- NOT MET
+- WAITING
+- INVALID
+- missing data
+- stale data
+- disconnected provider
+- multiple conditions
+- unsupported concepts
+- repeated evaluation
+- Evaluate all active
+- alert transition integration
+
+13. FINAL VERIFICATION
+Run:
+- API tests
+- frontend tests
+- API typecheck
+- frontend typecheck
+- API production build
+- frontend production build
+- git diff --check
+
+Restart both workflows.
+
+Check:
+- desktop UI
+- mobile UI
+- browser console
+- API logs
+
+Then perform a REAL end-to-end monitoring evaluation through the running application.
+
+Final report must state:
+- what was actually broken
+- what was fixed
+- exact tests passed
+- exact monitoring result for the Gold test strategy
+- whether multi-timeframe monitoring is now verified generically
+- whether alert transitions still work correctly
+- any remaining limitations
+
+Do not declare Strategy Monitoring complete merely because the page renders or tests pass. Perform an actual evaluation through the running application and verify the returned condition states.
