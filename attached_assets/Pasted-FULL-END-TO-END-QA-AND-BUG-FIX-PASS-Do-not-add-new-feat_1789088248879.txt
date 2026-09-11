@@ -1,0 +1,404 @@
+FULL END-TO-END QA AND BUG-FIX PASS
+
+Do not add new features or redesign anything in this task.
+
+The UI/UX overhaul has already been implemented. I now want you to test the ENTIRE application as a real user and fix any genuine bugs you find.
+
+IMPORTANT:
+Do not assume something works because the code or existing tests say it works.
+
+Actually use the running application and test the workflows below.
+
+Do not fabricate successful results.
+
+==================================================
+1. MARKETS
+==================================================
+
+Test:
+
+- Open Markets
+- Select XAUUSD
+- Change timeframe
+- Confirm real candles load
+- Confirm live price/quote information
+- Test Zoom In
+- Test Zoom Out
+- Test Pan Backwards
+- Test Pan Forwards
+- Test Return to Latest
+- Test Fit All Loaded Candles
+- Test candle hover/OHLC information
+- Test chart controls
+- Test switching between instruments
+- Test switching between timeframes
+- Test loading state
+- Test unavailable/error state
+
+Make sure the chart does not request excessive data.
+
+Test at:
+
+- Desktop
+- 768px
+- 402px
+- 375px
+
+If something genuinely doesn't work, identify the root cause and fix it.
+
+==================================================
+2. STRATEGY LIBRARY
+==================================================
+
+Test:
+
+- Create strategy
+- Open strategy
+- Edit strategy
+- Rename strategy
+- Duplicate strategy
+- Activate/deactivate
+- Archive
+- Delete
+- Open version manager
+- Create a new version
+- Activate a version
+- Confirm immutable version history is preserved
+
+Do not delete existing user data.
+
+Use temporary test data if required and clean it up afterward.
+
+==================================================
+3. AI ASSISTANT
+==================================================
+
+Test the exact workflow:
+
+Ask:
+
+"Create me a simple XAUUSD strategy."
+
+Confirm that a structured strategy draft is returned.
+
+Then test:
+
+- Review Strategy
+- Return to Assistant
+- Review Strategy again
+- Save as New Version
+- Return to Assistant
+- Save as New Version again
+
+Verify:
+
+- Draft data is preserved
+- XAUUSD is preserved
+- Direction is preserved
+- Timeframes are preserved
+- Conditions are preserved
+- Risk rules are preserved
+- Unsupported concepts remain correctly marked
+- Existing strategies do not overwrite the incoming draft
+- The Builder receives the correct draft
+
+IMPORTANT:
+
+Do not automatically save anything merely because Review Strategy or Save as New Version was clicked.
+
+Explicit user confirmation must remain required.
+
+If the AI provider temporarily fails or rate-limits, report that separately from an application bug.
+
+==================================================
+4. STRATEGY BUILDER
+==================================================
+
+Test:
+
+- Normal strategy creation
+- AI draft import
+- Market selection
+- Timeframe selection
+- Direction
+- Entry conditions
+- Exit conditions
+- Stop loss
+- Take profit
+- Unsupported-condition warnings
+- Save
+- Version creation
+
+Pay particular attention to asynchronous market loading.
+
+Confirm that an AI draft containing XAUUSD eventually displays XAUUSD in the editable Market / Instrument field.
+
+Change the market manually afterward and confirm the user's manual change is preserved.
+
+==================================================
+5. MONITORING
+==================================================
+
+Test:
+
+- Creating/selecting a monitor
+- Exact strategy version association
+- Closed-candle behaviour
+- WAITING
+- INVALID
+- MET if an executable detector genuinely exists
+- NOT MET if an executable detector genuinely exists
+
+Do NOT create fake detectors just to make MET/NOT MET appear.
+
+Verify:
+
+- Reasons are accurate
+- Strategy version is correct
+- No fabricated market data
+- Repeated evaluations behave correctly
+- Invalid transitions create the correct alert
+- Repeating the same state does not create duplicate alerts
+
+==================================================
+6. ALERTS
+==================================================
+
+Test:
+
+- Alert appears when expected
+- Alert contains correct strategy/version context
+- Alert type/source is correct
+- Acknowledge works
+- Acknowledged alerts remain correctly persisted
+- No duplicate alerts are created incorrectly
+
+==================================================
+7. BACKTESTING
+==================================================
+
+Test:
+
+- Select strategy
+- Select exact version
+- Select market
+- Select valid date range
+- Run backtest
+- Open results
+- View statistics
+- View equity curve
+- View trade list
+
+Also test:
+
+- Invalid date range
+- Missing strategy
+- Unsupported strategy conditions
+- Missing result
+- Failed result
+
+Confirm that unsupported conditions fail before historical data is unnecessarily consumed.
+
+Do not change existing backtest calculations unless a genuine bug is discovered.
+
+==================================================
+8. JOURNAL
+==================================================
+
+Test the full Journal workflow.
+
+Create a temporary trade.
+
+Verify:
+
+- Trade appears correctly
+- Open date/time
+- Close date/time
+- Instrument
+- Direction
+- P/L
+- Stop loss
+- Take profit
+- Risk information
+- Strategy
+- Exact strategy version
+
+Then close/edit/delete the trade where appropriate.
+
+Check that the monthly calendar updates correctly.
+
+Click the trading day.
+
+Verify:
+
+- Daily P/L
+- Trade count
+- Winners
+- Losers
+- Win rate
+- Average winner
+- Average loser
+- Best trade
+- Worst trade
+- Individual trades
+- Strategy/version information
+
+Add a daily note.
+
+Save it.
+
+Leave the page and return.
+
+Confirm the note remains.
+
+Check:
+
+- Previous month
+- Next month
+- Current month
+- Monthly P/L
+- Cumulative P/L
+- Best day
+- Worst day
+- Streaks
+- Filters
+
+Verify that timezone grouping uses the persisted Europe/London setting.
+
+==================================================
+9. PERFORMANCE
+==================================================
+
+Test:
+
+- Monthly P/L
+- Daily P/L
+- Cumulative P/L
+- Win rate
+- Drawdown
+- Profit factor
+- Average winner
+- Average loser
+- Winning streak
+- Losing streak
+- Strategy attribution
+- Exact-version attribution
+- Filters
+
+Confirm Journal trades and Backtest trades remain separate.
+
+==================================================
+10. MOBILE
+==================================================
+
+Repeat the most important workflows at:
+
+375px
+402px
+
+Pay particular attention to:
+
+- Navigation
+- Markets
+- Chart
+- Strategy Builder
+- AI Assistant
+- Journal calendar
+- Journal day details
+- Backtesting
+- Modals
+- Drawers
+- Dropdowns
+
+There should be no unnecessary horizontal overflow.
+
+==================================================
+11. PERFORMANCE / ERRORS
+==================================================
+
+Check for:
+
+- Browser console errors
+- Failed API requests
+- Infinite loading
+- Broken loading states
+- Stale data
+- Incorrect cache invalidation
+- Excessive API requests
+- Duplicate requests
+- UI freezing
+- Broken navigation
+- State being lost when navigating between pages
+
+Fix genuine issues.
+
+==================================================
+12. CLEANUP
+==================================================
+
+Any temporary strategies, trades, alerts, notes or other test data created during QA MUST be removed afterward.
+
+Verify that existing user data was not modified or deleted.
+
+==================================================
+13. REGRESSION TESTING
+==================================================
+
+After fixes:
+
+Run:
+
+- API tests
+- Frontend tests
+- Typechecks
+- Production builds
+- git diff --check
+
+Then repeat the affected browser workflows.
+
+==================================================
+IMPORTANT
+==================================================
+
+Do not make unnecessary changes.
+
+Do not add new features.
+
+Do not redesign the application again.
+
+Do not change working trading logic.
+
+Do not change market-data architecture.
+
+Do not fabricate data.
+
+Do not claim something passed unless you actually tested it.
+
+If a problem cannot be reproduced, say that clearly.
+
+If an external provider temporarily fails, distinguish that from an application bug.
+
+==================================================
+FINAL REPORT
+==================================================
+
+When finished, report:
+
+1. Every workflow tested
+2. Every bug actually reproduced
+3. Root cause of each bug
+4. Fix applied
+5. Regression test added
+6. Browser verification performed
+7. Desktop results
+8. Mobile results
+9. API test results
+10. Frontend test results
+11. Typecheck results
+12. Production build results
+13. Any remaining limitations
+14. Confirmation that temporary test data was cleaned up
+
+Do not simply say "everything works."
+
+Give me the actual results of the testing.
