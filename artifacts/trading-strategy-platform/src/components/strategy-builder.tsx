@@ -185,9 +185,9 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
       description: String(form.get("description") || "") || null,
        marketId: form.get("marketId") ? Number(form.get("marketId")) : null,
       assetClass: String(form.get("assetClass") || "") || null,
-      direction: String(form.get("direction") || "both") as "long" | "short" | "both",
+       direction: strategy ? strategy.direction : String(form.get("direction") || initialDraft?.direction || "both") as "long" | "short" | "both",
       timeframes,
-      riskManagementRules: String(form.get("riskManagementRules") || "") || null,
+       riskManagementRules: strategy ? strategy.riskManagementRules : String(form.get("riskManagementRules") || initialDraft?.riskManagementRules || "") || null,
       resetRules: String(form.get("resetRules") || "") || null,
       alertRules: String(form.get("alertRules") || "") || null,
     };
@@ -210,8 +210,8 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
       <Field label="Asset class" hint="Keep this general if the strategy is not asset-specific."><input className="input" name="assetClass" defaultValue={strategy?.assetClass || ""} placeholder="Optional — e.g. equity, FX, crypto" data-testid="input-builder-asset-class" /></Field>
     </div>
      <Field label="Description"><textarea className="textarea" name="description" defaultValue={strategy?.description || initialDraft?.description || ""} placeholder="What is this strategy trying to explain or capture?" data-testid="input-builder-strategy-description" /></Field>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Field label="Market / instrument" hint="Optional. Add instruments from Market Monitor first, or leave this strategy broad.">
+     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <Field label="Market / instrument" hint="Optional. Add instruments from Market Monitor first, or leave this strategy broad.">
         <select
           className="select"
           name="marketId"
@@ -226,11 +226,14 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
           {markets.map(market => <option key={market.id} value={market.id}>{market.symbol} · {market.assetClass}</option>)}
         </select>
       </Field>
-      <Field label="Trading direction">
-         <select className="select" name="direction" defaultValue={strategy?.direction || initialDraft?.direction || "both"} data-testid="select-builder-direction">
-          {DIRECTIONS.map(direction => <option key={direction.value} value={direction.value}>{direction.label}</option>)}
-        </select>
-      </Field>
+       {!strategy ? <Field label="Trading direction">
+         <select className="select" name="direction" defaultValue={initialDraft?.direction || "both"} data-testid="select-builder-direction">
+           {DIRECTIONS.map(direction => <option key={direction.value} value={direction.value}>{direction.label}</option>)}
+         </select>
+       </Field> : <div className="rounded-md border border-primary/25 bg-primary/5 p-3 text-xs text-muted-foreground self-end">
+         <div className="font-semibold text-foreground">Logic lives below</div>
+         <p className="mt-1">Direction and exit rules are edited once in the Builder controls after this strategy is saved.</p>
+       </div>}
     </div>
     <Field label="Timeframes" hint="Separate multiple timeframes with commas. This is descriptive only; it does not connect to market data.">
        <input className="input mono" name="timeframes" defaultValue={strategy?.timeframes?.join(", ") || initialDraft?.timeframes.join(", ") || ""} placeholder="e.g. Daily, 4H, 15m" data-testid="input-builder-timeframes" />
@@ -241,8 +244,8 @@ function StrategyForm({ strategy, markets, onClose, onSaved, initialDraft }: { s
         <ChevronDown size={16} className="text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
-         <Field label="Risk-management notes"><textarea className="textarea" name="riskManagementRules" defaultValue={strategy?.riskManagementRules || initialDraft?.riskManagementRules || ""} placeholder="For simple percentage exits, use the Exit Rules section after saving." data-testid="input-builder-risk-rules" /></Field>
-        <Field label="Reset notes"><textarea className="textarea" name="resetRules" defaultValue={strategy?.resetRules || ""} placeholder="When does this process reset or begin again?" data-testid="input-builder-reset-rules" /></Field>
+         {!strategy && <Field label="Risk-management notes"><textarea className="textarea" name="riskManagementRules" defaultValue={initialDraft?.riskManagementRules || ""} placeholder="For simple percentage exits, use the Exit Rules section after saving." data-testid="input-builder-risk-rules" /></Field>}
+          <Field label="Reset notes"><textarea className="textarea" name="resetRules" defaultValue={strategy?.resetRules || ""} placeholder="When does this process reset or begin again?" data-testid="input-builder-reset-rules" /></Field>
       </div>
       <Field label="Review reminders" hint="Personal notes only. No live detection or notifications are connected."><textarea className="textarea" name="alertRules" defaultValue={strategy?.alertRules || ""} placeholder="What should prompt you to review this strategy?" data-testid="input-builder-alert-rules" /></Field>
     </details>
@@ -515,7 +518,7 @@ function StrategyControls({ strategy, conditions }: { strategy: Strategy; condit
           {takeProfitEnabled && <span className="flex items-center gap-2 mt-4"><input className="input w-24" type="number" min="0.01" step="0.01" value={takeProfit} onChange={event => setTakeProfit(event.target.value)} aria-label="Take profit percentage" data-testid="input-builder-take-profit" /><span className="text-sm text-muted-foreground">%</span></span>}
         </label>
       </div>
-      <label className="block mt-4"><span className="label">Optional exit condition</span><select className="select" defaultValue="" data-testid="select-builder-exit-condition"><option value="">No condition selected</option>{exitConditions.map(condition => <option key={condition.id} value={condition.id}>{condition.name}</option>)}</select><span className="block text-[11px] text-muted-foreground mt-1.5">Add an exit-stage condition from the Entry Conditions area when you need one. Exit conditions are stored separately from risk percentages.</span></label>
+       <div className="rounded-md border border-border bg-secondary/30 p-3 text-[11px] text-muted-foreground mt-4">Exit-stage conditions are managed in the ordered Conditions section above and saved with the strategy. This control only edits percentage-based stop and target rules.</div>
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive mt-4" role="alert" data-testid="status-builder-settings-error">{error}</div>}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-5 pt-5 border-t border-border">
         <span className="text-[11px] text-muted-foreground">Save these editable settings first, then use “Save as New Version” below to create an immutable snapshot for Backtesting.</span>

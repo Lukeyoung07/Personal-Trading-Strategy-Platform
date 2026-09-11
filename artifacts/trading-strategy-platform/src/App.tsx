@@ -37,24 +37,25 @@ import '@/index.css';
 const queryClient = new QueryClient();
 const navGroups = [
   { label: 'Workspace', items: [
-    { href:'/', label:'Overview', icon:LayoutDashboard },
+    { href:'/', label:'Dashboard', icon:LayoutDashboard },
     { href:'/market-monitor', label:'Markets', icon:BarChart3 },
     { href:'/strategy-library', label:'Strategies', icon:Boxes },
   ]},
   { label: 'Trading', items: [
     { href:'/strategy-builder', label:'Builder', icon:SlidersHorizontal },
-    { href:'/strategy-monitoring', label:'Monitor', icon:Activity },
+    { href:'/strategy-monitoring', label:'Strategy Monitoring', icon:Activity },
     { href:'/trade-journal', label:'Journal', icon:BookOpen },
     { href:'/performance', label:'Performance', icon:TrendingUp },
   ]},
   { label: 'Tools', items: [
     { href:'/alerts', label:'Alerts', icon:Bell },
-    { href:'/news', label:'News', icon:CalendarClock },
+    { href:'/news', label:'Economic Calendar', icon:CalendarClock },
     { href:'/backtesting', label:'Backtesting', icon:Clock3 },
     { href:'/settings', label:'Settings', icon:Settings },
   ]},
 ];
 const nav = navGroups.flatMap(group => group.items);
+const mobilePrimaryHrefs = ['/', '/market-monitor', '/strategy-library', '/strategy-builder', '/trade-journal'];
 
 function Shell({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -96,12 +97,56 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="brand-mark"><Target size={17}/></div>
         <div className="brand-copy"><div className="font-bold tracking-tight text-sm">TradeX</div><div className="mono text-[9px] text-muted-foreground mt-0.5">TRADING INTELLIGENCE PLATFORM</div></div>
       </div>
-      <nav className="flex-1">
+      <nav className="desktop-nav flex-1">
         {navGroups.map(group => <div className="nav-group" key={group.label}>
           <div className="side-caption px-5 mb-2 eyebrow">{group.label}</div>
           {group.items.map(({href,label,icon:Icon}) => <Link key={href} href={href} title={label} aria-current={isNavActive(href, location) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase()}`} className={`nav-link ${isNavActive(href, location) ? 'active' : ''}`} onClick={()=>setMobileOpen(false)}><Icon size={16}/><span className="nav-label">{label}</span>{isNavActive(href, location) && <span className="ml-auto nav-label w-1.5 h-1.5 rounded-full bg-primary"/>}</Link>)}
         </div>)}
       </nav>
+      <nav className="mobile-primary-nav" aria-label="Primary mobile navigation">
+        {nav.filter(item => mobilePrimaryHrefs.includes(item.href)).map(({href, label, icon: Icon}) => (
+          <Link
+            key={href}
+            href={href}
+            title={label}
+            aria-current={isNavActive(href, location) ? 'page' : undefined}
+            data-testid={`link-mobile-nav-${label.toLowerCase()}`}
+            className={`nav-link ${isNavActive(href, location) ? 'active' : ''}`}
+            onClick={() => setMobileOpen(false)}
+          >
+            <Icon size={18} />
+            <span className="nav-label">{label === 'Dashboard' ? 'Home' : label}</span>
+          </Link>
+        ))}
+      </nav>
+      <button
+        type="button"
+        className={`mobile-more-toggle ${nav.some(item => !mobilePrimaryHrefs.includes(item.href) && isNavActive(item.href, location)) ? 'active' : ''}`}
+        onClick={() => setMobileOpen(open => !open)}
+        aria-expanded={mobileOpen}
+        aria-label="Open more navigation"
+        data-testid="button-mobile-more"
+      >
+        <MoreHorizontal size={18} />
+        <span>More</span>
+      </button>
+      {mobileOpen && (
+        <div className="mobile-more-menu" aria-label="More navigation">
+          <div className="eyebrow px-3 pb-2">More</div>
+          {nav.filter(item => !mobilePrimaryHrefs.includes(item.href)).map(({href, label, icon: Icon}) => (
+            <Link
+              key={href}
+              href={href}
+              aria-current={isNavActive(href, location) ? 'page' : undefined}
+              className={`mobile-more-link ${isNavActive(href, location) ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <Icon size={15} />
+              <span>{label}</span>
+            </Link>
+          ))}
+        </div>
+      )}
       <div className="side-footer-copy px-5 py-6 border-t border-sidebar-border">
          <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><span className="status-dot"/>Private workspace</div>
          <div className="mono text-[10px] text-muted-foreground mt-2 opacity-60">RECORDS OVER SIGNAL</div>
@@ -302,10 +347,14 @@ function Alerts() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<Alert | null | false>(false);
   const [confirm, setConfirm] = useState<Alert | null>(null);
+  const [view, setView] = useState<'all' | 'reminders' | 'monitoring'>('all');
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: getListAlertsQueryKey() });
     qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
   };
+  const visibleAlerts = (q.data || []).filter((alert: Alert) => (
+    view === 'all' || (view === 'reminders' ? alert.sourceType === 'manual' : alert.sourceType === 'monitoring')
+  ));
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -321,17 +370,30 @@ function Alerts() {
       ? u.mutate({ alertId: modal.id, data }, { onSuccess: done })
       : c.mutate({ data }, { onSuccess: done });
   };
-  return <Page eyebrow="Review" title="Alerts" description="Manual reminders and durable monitoring events. No external delivery or trade execution is performed." action={<button className="btn btn-primary" onClick={() => setModal(null)} data-testid="button-create-alert"><Plus size={15} /> New alert</button>}>
-    {q.isLoading ? <LoadingBlock /> : q.isError ? <ErrorState retry={() => q.refetch()} /> : q.data?.length ? <div className="panel table-wrap"><table><thead><tr><th>Alert</th><th>Market</th><th>Rule</th><th>Status</th><th /></tr></thead><tbody>
-      {q.data.map((alert: Alert) => <tr key={alert.id} data-testid={`row-alert-${alert.id}`}>
+  return <Page eyebrow="Review" title="Alerts" description="Review manual reminders and monitoring-generated events that need attention. No external delivery or trade execution is performed." action={<button className="btn btn-primary" onClick={() => setModal(null)} data-testid="button-create-alert"><Plus size={15} /> New reminder</button>}>
+    {q.isLoading ? <LoadingBlock /> : q.isError ? <ErrorState retry={() => q.refetch()} /> : <>
+      <div className="panel p-1 flex flex-wrap gap-1 mb-5 max-w-xl" role="tablist" aria-label="Alert type">
+        {([
+          ['all', 'All alerts'],
+          ['reminders', 'Reminders'],
+          ['monitoring', 'Monitoring events'],
+        ] as const).map(([value, label]) => (
+          <button key={value} type="button" role="tab" aria-selected={view === value} className={`btn flex-1 min-w-[120px] ${view === value ? 'bg-secondary text-foreground' : 'btn-ghost'}`} onClick={() => setView(value)} data-testid={`button-alert-view-${value}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {visibleAlerts.length ? <div className="panel table-wrap"><table><thead><tr><th>Alert</th><th>Market</th><th>Rule</th><th>Status</th><th /></tr></thead><tbody>
+      {visibleAlerts.map((alert: Alert) => <tr key={alert.id} data-testid={`row-alert-${alert.id}`}>
         <td><div className="font-semibold">{alert.name}</div><div className="text-[11px] text-muted-foreground">{alert.sourceType === "monitoring" ? "Monitoring event" : "Manual reminder"}{alert.triggeredAt ? ` · ${new Date(alert.triggeredAt).toLocaleString()}` : ""}</div></td>
         <td className="mono">{alert.marketSymbol || "—"}</td>
         <td className="text-muted-foreground">{alert.message || alert.condition}{alert.threshold && ` · ${alert.threshold}`}</td>
         <td>{alert.sourceType === "monitoring" ? <button className={`tag tag-${alert.status}`} onClick={() => alert.status === "triggered" && u.mutate({ alertId: alert.id, data: { status: "acknowledged" } }, { onSuccess: invalidate })} disabled={alert.status === "acknowledged"} data-testid={`button-ack-alert-${alert.id}`}>{alert.status === "triggered" ? "Acknowledge" : alert.status}</button> : <button className={`tag tag-${alert.status}`} onClick={() => u.mutate({ alertId: alert.id, data: { status: alert.status === "active" ? "paused" : "active" } }, { onSuccess: invalidate })} data-testid={`button-toggle-alert-${alert.id}`}>{alert.status}</button>}</td>
         <td><div className="flex justify-end">{alert.sourceType === "manual" && <button className="btn btn-ghost" onClick={() => setModal(alert)} data-testid={`button-edit-alert-${alert.id}`}><Pencil size={13} /></button>}<button className="btn btn-ghost text-destructive" onClick={() => setConfirm(alert)} data-testid={`button-delete-alert-${alert.id}`}><Trash2 size={13} /></button></div></td>
       </tr>)}
-    </tbody></table></div> : <EmptyState icon={Bell} title="No alerts yet" text="Create a manual reminder or start monitoring a strategy version to record meaningful monitoring events." action={<button className="btn btn-primary" onClick={() => setModal(null)} data-testid="button-empty-create-alert"><Plus size={14} /> Create alert</button>} />}
-    {modal !== false && <Modal title={modal && typeof modal === "object" ? "Edit alert" : "New alert"} onClose={() => setModal(false)}><form onSubmit={save} className="space-y-4"><Field label="Name"><input className="input" name="name" required defaultValue={modal && typeof modal === "object" ? modal.name : ""} placeholder="Give the reminder a name" data-testid="input-alert-name" /></Field><Field label="Market"><select className="select" name="marketId" defaultValue={modal && typeof modal === "object" ? modal.marketId || "" : ""} data-testid="select-alert-market"><option value="">No market</option>{(markets.data || []).map((market: Market) => <option key={market.id} value={market.id}>{market.symbol}</option>)}</select></Field><div className="grid grid-cols-2 gap-3"><Field label="Condition"><input className="input" name="condition" required defaultValue={modal && typeof modal === "object" ? modal.condition : ""} placeholder="Review when…" data-testid="input-alert-condition" /></Field><Field label="Threshold"><input className="input" name="threshold" defaultValue={modal && typeof modal === "object" ? modal.threshold || "" : ""} placeholder="Optional" data-testid="input-alert-threshold" /></Field></div><Field label="Status"><select className="select" name="status" defaultValue={modal && typeof modal === "object" ? modal.status : "active"} data-testid="select-alert-status"><option value="active">Active</option><option value="paused">Paused</option></select></Field><button className="btn btn-primary w-full" disabled={c.isPending || u.isPending} data-testid="button-submit-alert">Save alert</button></form></Modal>}
+    </tbody></table></div> : <EmptyState icon={Bell} title={view === 'monitoring' ? "No monitoring events yet" : view === 'reminders' ? "No reminders yet" : "No alerts yet"} text={view === 'monitoring' ? "Monitoring-generated events will appear here when a monitored strategy changes state." : "Create a reminder for a review you want to keep in your workspace."} action={view !== 'monitoring' ? <button className="btn btn-primary" onClick={() => setModal(null)} data-testid="button-empty-create-alert"><Plus size={14} /> Create reminder</button> : undefined} />}
+    </>}
+    {modal !== false && <Modal title={modal && typeof modal === "object" ? "Edit reminder" : "New reminder"} onClose={() => setModal(false)}><form onSubmit={save} className="space-y-4"><Field label="Name"><input className="input" name="name" required defaultValue={modal && typeof modal === "object" ? modal.name : ""} placeholder="Give the reminder a name" data-testid="input-alert-name" /></Field><Field label="Market"><select className="select" name="marketId" defaultValue={modal && typeof modal === "object" ? modal.marketId || "" : ""} data-testid="select-alert-market"><option value="">No market</option>{(markets.data || []).map((market: Market) => <option key={market.id} value={market.id}>{market.symbol}</option>)}</select></Field><div className="grid grid-cols-2 gap-3"><Field label="Condition"><input className="input" name="condition" required defaultValue={modal && typeof modal === "object" ? modal.condition : ""} placeholder="Review when…" data-testid="input-alert-condition" /></Field><Field label="Threshold"><input className="input" name="threshold" defaultValue={modal && typeof modal === "object" ? modal.threshold || "" : ""} placeholder="Optional" data-testid="input-alert-threshold" /></Field></div><Field label="Status"><select className="select" name="status" defaultValue={modal && typeof modal === "object" ? modal.status : "active"} data-testid="select-alert-status"><option value="active">Active</option><option value="paused">Paused</option></select></Field><button className="btn btn-primary w-full" disabled={c.isPending || u.isPending} data-testid="button-submit-alert">Save reminder</button></form></Modal>}
     {confirm && <Confirm title={`Remove “${confirm.name}”?`} onCancel={() => setConfirm(null)} onConfirm={() => del.mutate({ alertId: confirm.id }, { onSuccess: () => { setConfirm(null); invalidate(); } })} busy={del.isPending} />}
   </Page>;
 }
@@ -379,6 +441,7 @@ function Backtesting() {
   const [startDate, setStartDate] = useState(requestedStartDate || initialRange.start);
   const [endDate, setEndDate] = useState(requestedEndDate || initialRange.end);
   const [setupError, setSetupError] = useState("");
+  const [backtestSection, setBacktestSection] = useState<"setup" | "runs">("setup");
   const versions = useListStrategyVersions(strategyId ?? 0, {
     query: {
       enabled: strategyId != null,
@@ -436,8 +499,12 @@ function Backtesting() {
   const periodLabel = preset === "custom" ? `${startDate || "Start"} – ${endDate || "End"}` : preset === "last_30_days" ? "Last 30 days" : preset === "last_90_days" ? "Last 90 days" : "Last 7 days";
 
   return <Page eyebrow="Utilities" title="Backtesting" description="Run a historical review from your saved strategy versions using genuine provider candles.">
+    <div className="backtest-workflow-tabs panel p-1 flex flex-wrap gap-1 mb-6 max-w-xl" role="tablist" aria-label="Backtesting sections">
+      <button type="button" role="tab" aria-selected={backtestSection === "setup"} className={`btn flex-1 min-w-[150px] ${backtestSection === "setup" ? "bg-secondary text-foreground" : "btn-ghost"}`} onClick={() => { setBacktestSection("setup"); document.getElementById("backtest-setup")?.scrollIntoView({ behavior: "smooth" }); }} data-testid="button-backtest-setup-tab"><SlidersHorizontal size={14} /> Setup</button>
+      <button type="button" role="tab" aria-selected={backtestSection === "runs"} className={`btn flex-1 min-w-[150px] ${backtestSection === "runs" ? "bg-secondary text-foreground" : "btn-ghost"}`} onClick={() => { setBacktestSection("runs"); document.getElementById("backtest-runs")?.scrollIntoView({ behavior: "smooth" }); }} data-testid="button-backtest-runs-tab"><ClipboardList size={14} /> Saved Runs</button>
+    </div>
     <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5">
-      <form className="panel p-6 md:p-8 space-y-6" onSubmit={save}>
+      <form id="backtest-setup" className="panel p-6 md:p-8 space-y-6" onSubmit={save}>
         <div>
           <div className="eyebrow">Setup</div>
           <h2 className="display text-2xl font-bold mt-2">Choose what to review</h2>
@@ -497,9 +564,9 @@ function Backtesting() {
         {create.isSuccess && create.data?.status === "failed" && <p className="text-sm text-destructive">Backtest failed: {backtestErrorCopy(create.data.errorMessage)}</p>}
          {create.isError && <p className="text-sm text-destructive">{backtestErrorCopy(create.error)}</p>}
       </form>
-      <div className="space-y-5">
-        <div className="panel p-6">
-          <div className="eyebrow">Saved setups</div>
+       <div className="space-y-5" id="backtest-runs">
+         <div className="panel p-6">
+          <div className="flex items-center justify-between gap-3"><div><div className="eyebrow">Saved runs</div><h2 className="font-semibold mt-2">Recent Results</h2></div><button type="button" className="text-xs text-primary hover:underline" onClick={() => setBacktestSection("runs")}>View all</button></div>
           {saved.isLoading ? <LoadingBlock /> : saved.data?.length ? <div className="mt-4 space-y-3">{saved.data.slice(0, 5).map((backtest: Backtest) => <div className="rounded-md bg-secondary/60 p-3" key={backtest.id} data-testid={`row-backtest-${backtest.id}`}><div className="flex items-center justify-between gap-3"><span className="font-semibold text-sm">{backtest.strategyName} · v{backtest.versionNumber}</span><span className={`tag ${backtest.status === "completed" ? "tag-active" : backtest.status === "failed" ? "tag-archived" : "tag-draft"}`}>{backtest.status}</span></div><div className="text-xs text-muted-foreground mt-2">{backtest.instrumentSymbol} · {backtest.timeframeLabel}</div><div className="text-xs text-muted-foreground mt-1">{formatDate(backtest.startDate)} – {formatDate(backtest.endDate)}</div><div className="text-xs text-muted-foreground mt-1">{backtest.candlesProcessed} candles · {backtest.tradeCount} simulated trades</div>{backtest.status === "completed" && backtest.tradeCount > 0 && <div className="text-xs text-muted-foreground mt-1">{backtest.winRate === null ? "—" : `${backtest.winRate.toFixed(1)}%`} win rate · {formatMoney(backtest.totalPnl)} total P/L</div>}{backtest.status === "failed" && backtest.errorMessage && <div className="text-xs text-destructive mt-2">{backtest.errorMessage}</div>}{backtest.status === "completed" && backtest.resultMessage && <div className="text-xs text-muted-foreground mt-2">{backtest.resultMessage}</div>}<Link href={`/backtesting/${backtest.id}`} className="text-xs text-primary inline-flex items-center gap-1 mt-3 hover:underline" data-testid={`link-view-backtest-${backtest.id}`}>Review result <ChevronRight size={13}/></Link></div>)}</div> : <p className="text-sm text-muted-foreground mt-4">No backtests run yet.</p>}
         </div>
          <div className="panel p-6">

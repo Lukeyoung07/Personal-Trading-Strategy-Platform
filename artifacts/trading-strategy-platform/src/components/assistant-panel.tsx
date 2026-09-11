@@ -113,13 +113,37 @@ const promptGroups: PromptGroup[] = [
 ];
 
 function compactContext(context: AssistantPanelContext): string {
+  const currentPage = context.page || '';
+  const page = currentPage.startsWith('/strategy-builder')
+    ? 'Strategy Builder'
+    : currentPage.startsWith('/strategy-library')
+      ? 'Strategy Library'
+      : currentPage.startsWith('/market-monitor')
+        ? 'Markets'
+        : currentPage.startsWith('/trade-journal')
+          ? 'Trade Journal'
+          : currentPage.startsWith('/performance')
+            ? 'Performance'
+            : currentPage.startsWith('/strategy-monitoring')
+              ? 'Strategy Monitoring'
+              : currentPage.startsWith('/backtesting')
+                ? 'Backtesting'
+                : currentPage.startsWith('/alerts')
+                  ? 'Alerts'
+                  : currentPage.startsWith('/news')
+                    ? 'Economic Calendar'
+                    : currentPage.startsWith('/settings')
+                      ? 'Settings'
+                      : 'Workspace';
   const parts = [
-    context.page,
-    context.strategyId ? `strategy ${context.strategyId}` : null,
-    context.versionId ? `version ${context.versionId}` : null,
-    context.backtestId ? `backtest ${context.backtestId}` : null,
+    page,
+    context.strategyId ? 'strategy selected' : null,
+    context.versionId ? 'version selected' : null,
+    context.backtestId ? 'backtest results' : null,
+    context.instrumentId ? 'market selected' : null,
+    context.timeframeId ? 'timeframe selected' : null,
   ].filter(Boolean);
-  return parts.length ? parts.join(' · ') : 'Workspace context';
+  return parts.join(' · ');
 }
 
 function getErrorCopy(error: unknown): string {
@@ -380,13 +404,16 @@ export function AssistantPanel({
       role: 'user',
       content: message,
     };
+    const requestMessages: AssistantMessage[] = [...messages, userMessage]
+      .slice(-12)
+      .map(({ role, content }) => ({ role, content }));
     setMessages((current) => [...current, userMessage]);
     setInput('');
     chat.mutate(
       {
         data: {
           message,
-          messages: apiMessages,
+          messages: requestMessages,
           context,
         },
       },

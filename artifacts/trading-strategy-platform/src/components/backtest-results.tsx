@@ -140,6 +140,10 @@ function SectionHeading({
   );
 }
 
+function backtestStatusLabel(status: string) {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
 function EquityCurve({
   statistics,
   selectedTradeId,
@@ -457,9 +461,12 @@ export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRun
         <div className="flex flex-wrap items-center gap-2">
           {onViewStrategy && <button className="btn btn-secondary" onClick={() => onViewStrategy(backtest.strategyId, backtest.strategyVersionId)} data-testid="button-view-strategy-from-backtest"><ExternalLink size={14} /> View Strategy</button>}
           {onRunAgain && <button className="btn btn-primary" onClick={() => onRunAgain(backtest)} data-testid="button-run-again-backtest"><RotateCcw size={14} /> Run Again</button>}
-          <div className={`tag ${isFailed ? "tag-archived" : isCompleted ? "tag-active" : "tag-draft"} mt-1`} data-testid="status-backtest-result">{backtest.status}</div>
+           <div className={`tag ${isFailed ? "tag-archived" : isCompleted ? "tag-active" : "tag-draft"} mt-1`} data-testid="status-backtest-result">{backtestStatusLabel(backtest.status)}</div>
         </div>
       </div>
+       <nav className="backtest-results-nav panel p-1 flex flex-wrap gap-1" aria-label="Backtest result sections">
+         {[["backtest-result-metadata", "Metadata"], ["backtest-result-performance", "Performance"], ["backtest-result-trades", "Simulated trades"], ["backtest-result-replay", "Candle replay"], ["backtest-result-assumptions", "Assumptions"]].map(([id, label]) => <a key={id} className="btn btn-ghost flex-1 min-w-[120px]" href={`#${id}`}>{label}</a>)}
+       </nav>
 
       {isFailed && (
         <div className="panel border-destructive/30 bg-destructive/5 p-5 flex gap-3" data-testid="backtest-failed-state">
@@ -473,8 +480,14 @@ export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRun
           <div><div className="font-semibold text-sm">This run is still {backtest.status}</div><p className="text-xs text-muted-foreground mt-1">Performance sections will become available when the server records a completed result.</p></div>
         </div>
       )}
+       {isCompleted && (
+         <div className="panel border-accent/30 bg-accent/5 p-4 md:p-5 flex gap-3" data-testid="backtest-result-boundary">
+           <Info className="text-accent shrink-0 mt-0.5" size={17} />
+           <div><div className="font-semibold text-sm">How to interpret this result</div><p className="text-xs text-muted-foreground mt-1 leading-relaxed">These are simulated historical results from the stored candle series. Fees, slippage, signals, recommendations, and live execution are not inferred.</p></div>
+         </div>
+       )}
 
-      <section className="panel p-5 md:p-6" data-testid="backtest-metadata">
+       <section id="backtest-result-metadata" className="panel p-5 md:p-6" data-testid="backtest-metadata">
         <div className="flex items-center gap-2 mb-5"><CheckCircle2 size={15} className={isCompleted ? "text-primary" : "text-muted-foreground"} /><div className="eyebrow">Recorded metadata</div></div>
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-x-5 gap-y-5">
           {[
@@ -492,7 +505,7 @@ export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRun
 
       {hasTrades ? (
         <>
-          <section>
+           <section id="backtest-result-performance">
             <SectionHeading eyebrow="Performance" title="What the recorded trades did" icon={BarChart3} detail="All values below are returned by the backtest result; no costs or signals are inferred." />
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
               <StatCard label="Net P/L" value={money(statistics.totalPnl)} positive={(statistics.totalPnl ?? 0) > 0 ? true : (statistics.totalPnl ?? 0) < 0 ? false : undefined} detail={`${statistics.winningTrades} wins · ${statistics.losingTrades} losses`} />
@@ -509,7 +522,7 @@ export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRun
             </div>
           </section>
 
-          <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_310px] gap-5 items-start">
+           <section id="backtest-result-trades" className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_310px] gap-5 items-start">
             <div>
               <SectionHeading eyebrow="Trades" title="Every simulated trade" icon={Target} detail="Select a row to inspect its stored prices, levels, and reasons." />
               <TradeTable trades={trades} selectedTradeId={selectedTradeId} onSelect={(trade) => setSelectedTradeId(trade.id)} />
@@ -525,12 +538,12 @@ export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRun
         </div>
       )}
 
-      <section>
+       <section id="backtest-result-replay">
         <SectionHeading eyebrow="Historical record" title="The candle series behind this run" icon={LineChart} detail={`${candles.length} stored ${candles.length === 1 ? "candle" : "candles"} · entries, exits, and levels are overlaid from the stored trades`} />
         <HistoricalChart candles={candles} trades={trades} selectedTrade={selectedTrade} />
       </section>
 
-      <Assumptions backtest={backtest} />
+       <div id="backtest-result-assumptions"><Assumptions backtest={backtest} /></div>
     </div>
   );
 }

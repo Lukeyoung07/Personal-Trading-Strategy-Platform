@@ -6,7 +6,8 @@ import {
   type StrategyMonitor,
   type StrategyMonitorCondition
 } from '@workspace/api-client-react';
-import { Activity, Play, Info, RefreshCw, Clock, Layers, Database } from 'lucide-react';
+import { Activity, Play, Info, RefreshCw, Clock, Layers, Database, ChevronRight } from 'lucide-react';
+import { Link } from 'wouter';
 import { Page, LoadingBlock, ErrorState, EmptyState } from '../App';
 
 function StatusBadge({ status }: { status: string }) {
@@ -24,9 +25,14 @@ function StatusBadge({ status }: { status: string }) {
       default: return 'text-muted-foreground bg-secondary border-border';
     }
   };
+  const label = status.toLowerCase() === 'not_met'
+    ? 'Not met'
+    : status.toLowerCase() === 'not_configured'
+      ? 'Not configured'
+      : status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   return (
     <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-widest border ${getStyle(status)}`}>
-      {status.replace('_', ' ')}
+      {label}
     </span>
   );
 }
@@ -60,20 +66,20 @@ export function StrategyMonitoringPage() {
   };
 
   if (monitors.isLoading) {
-    return <Page eyebrow="Architecture" title="Monitor"><LoadingBlock /></Page>;
+    return <Page eyebrow="Trading / Monitoring" title="Strategy Monitoring"><LoadingBlock /></Page>;
   }
 
   if (monitors.isError) {
-    return <Page eyebrow="Architecture" title="Monitor"><ErrorState retry={() => monitors.refetch()} /></Page>;
+    return <Page eyebrow="Trading / Monitoring" title="Strategy Monitoring"><ErrorState retry={() => monitors.refetch()} /></Page>;
   }
 
   const data = monitors.data || [];
 
   return (
     <Page 
-      eyebrow="Architecture" 
-      title="Monitor" 
-      description="Point-in-time evaluation state for active strategies. No continuous data feeds are active. WAITING and INVALID are honest outcomes for rules lacking current executable detectors."
+      eyebrow="Trading / Monitoring" 
+      title="Strategy Monitoring" 
+      description="Check whether the active strategy version's conditions are currently satisfied. Evaluations are point-in-time reviews; no continuous feed or trade execution is active."
       action={
         <button 
           className="btn btn-primary" 
@@ -82,20 +88,36 @@ export function StrategyMonitoringPage() {
           data-testid="button-evaluate-all"
         >
           {evaluate.isPending ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />}
-          {evaluate.isPending ? 'Evaluating...' : 'Evaluate active'}
+          {evaluate.isPending ? 'Evaluating…' : 'Evaluate all active'}
         </button>
       }
     >
       {evaluate.isError && (
         <div className="panel p-4 mb-5 border-destructive/40 text-sm text-destructive" role="alert">
-          Evaluation could not be completed. Existing monitoring state has not been changed.
+          Evaluation could not be completed for the active monitors. Existing monitoring state has not been changed.
         </div>
       )}
+      <div className="panel p-4 md:p-5 mb-5" data-testid="monitor-status-legend">
+        <div className="flex items-start gap-3">
+          <Info size={16} className="text-primary mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <div className="font-semibold text-sm">How to read monitoring</div>
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">Each card belongs to one immutable strategy version. Evaluate it to refresh the current condition review.</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 text-xs">
+              <span className="flex items-center gap-2"><StatusBadge status="met" /> Condition is satisfied</span>
+              <span className="flex items-center gap-2"><StatusBadge status="not_met" /> Condition is not satisfied</span>
+              <span className="flex items-center gap-2"><StatusBadge status="waiting" /> More data or sequence is needed</span>
+              <span className="flex items-center gap-2"><StatusBadge status="invalid" /> Rule cannot be evaluated</span>
+            </div>
+          </div>
+        </div>
+      </div>
       {!data.length ? (
         <EmptyState 
           icon={Activity} 
-          title="No monitors active" 
-          text="Activate a strategy version to begin monitoring its evaluation state."
+          title="No strategy version is being monitored" 
+          text="Open the Strategy Library, choose a strategy, and activate an immutable version before returning here."
+          action={<Link href="/strategy-library" className="btn btn-primary" data-testid="link-monitor-library">Open Strategy Library <ChevronRight size={14} /></Link>}
         />
       ) : (
         <div className="space-y-6 mt-2">
@@ -122,16 +144,17 @@ export function StrategyMonitoringPage() {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3">
                   <div className="text-right hidden sm:block">
-                    <div className="eyebrow mb-1 text-[9px]">Overall Status</div>
+                     <div className="eyebrow mb-1 text-[9px]">Condition result</div>
                     <StatusBadge status={monitor.overallStatus} />
                   </div>
                   <button 
                     className="btn btn-secondary h-full"
                     onClick={() => handleEvaluateSingle(monitor.strategyId)}
                     disabled={evaluate.isPending}
-                    title="Evaluate this strategy"
+                     title={`Evaluate ${monitor.strategyName}`}
+                     aria-label={`Evaluate ${monitor.strategyName}`}
                     data-testid={`button-evaluate-${monitor.strategyId}`}
                   >
                     <RefreshCw size={13} className={evaluate.isPending ? 'animate-spin' : ''} />
@@ -181,7 +204,7 @@ export function StrategyMonitoringPage() {
               )}
 
               {/* Conditions Table */}
-              <div className="table-wrap">
+              <div className="monitor-condition-table table-wrap">
                 {monitor.conditions.length > 0 ? (
                   <table>
                     <thead>
@@ -224,6 +247,27 @@ export function StrategyMonitoringPage() {
                     No conditions defined for this version.
                   </div>
                 )}
+              </div>
+              <div className="monitor-condition-cards">
+                {monitor.conditions.length > 0 ? monitor.conditions.map((c: StrategyMonitorCondition) => (
+                  <article key={c.strategyVersionConditionId} className="monitor-condition-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="tag tag-draft">#{String(c.conditionOrder).padStart(2, '0')}</span>
+                          <span className="tag tag-draft capitalize">{c.stage}</span>
+                          {c.requirement === 'optional' && <span className="tag">Optional</span>}
+                        </div>
+                        <h3 className="font-semibold text-sm mt-3">{c.name}</h3>
+                      </div>
+                      <StatusBadge status={c.status} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-4 text-xs">
+                      <div><div className="eyebrow">Timeframe</div><div className="mono mt-1">{c.timeframe}</div></div>
+                      <div><div className="eyebrow">Details</div><div className="text-muted-foreground mt-1">{c.reason || 'No additional detail'}</div></div>
+                    </div>
+                  </article>
+                )) : <div className="text-center py-6 text-sm text-muted-foreground">No conditions defined for this version.</div>}
               </div>
             </div>
           ))}

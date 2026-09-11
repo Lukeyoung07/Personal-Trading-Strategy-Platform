@@ -62,6 +62,7 @@ describe("AssistantPanel", () => {
     expect(state.chat.mutate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         message: "Review this version",
+        messages: [{ role: "user", content: "Review this version" }],
         context,
       }),
     }), expect.anything());

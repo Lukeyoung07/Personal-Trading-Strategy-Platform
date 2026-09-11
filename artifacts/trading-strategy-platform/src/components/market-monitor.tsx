@@ -538,7 +538,7 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
       <div className="market-workspace-grid">
         <div className="panel market-chart-panel p-4 md:p-5">
           <div className="chart-heading-row">
-            <div><h2 className="font-semibold">BiQuote candlestick chart</h2><p className="text-xs text-muted-foreground mt-1">Stored OHLC bars plus a forming bar built only from received provider ticks.</p></div>
+             <div><h2 className="font-semibold">BiQuote candlestick chart</h2><p className="text-xs text-muted-foreground mt-1">Stored OHLC bars plus a forming bar built only from received provider ticks.</p><p className="text-[11px] text-accent mt-2">Scroll to zoom · drag to pan · use the chart controls to scale and inspect.</p></div>
             <CandlestickChart size={18} className="text-primary shrink-0" />
           </div>
           <div className="chart-source-row">

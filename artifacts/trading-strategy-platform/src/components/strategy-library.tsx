@@ -45,7 +45,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function statusLabel(status: Strategy["status"]) {
   if (status === "active") return "Active";
   if (status === "archived") return "Archived";
-  return "Inactive";
+  return "Draft";
 }
 
 function readError(error: unknown) {
@@ -55,11 +55,9 @@ function readError(error: unknown) {
 
 function StrategyEditor({
   strategy,
-  markets,
   onClose,
 }: {
   strategy: Strategy | null;
-  markets: Market[];
   onClose: () => void;
 }) {
   const create = useCreateStrategy();
@@ -74,13 +72,13 @@ function StrategyEditor({
       name: String(form.get("name") || "").trim(),
       description: String(form.get("description") || "") || null,
       status: (strategy?.status || "draft") as "draft" | "active" | "archived",
-      marketId: form.get("marketId") ? Number(form.get("marketId")) : null,
-      assetClass: String(form.get("assetClass") || "") || null,
-      direction: String(form.get("direction") || "both") as "long" | "short" | "both",
-      timeframes: String(form.get("timeframes") || "").split(",").map(value => value.trim()).filter(Boolean),
-      riskManagementRules: String(form.get("riskManagementRules") || "") || null,
-      resetRules: String(form.get("resetRules") || "") || null,
-      alertRules: String(form.get("alertRules") || "") || null,
+      marketId: strategy?.marketId ?? null,
+      assetClass: strategy?.assetClass ?? null,
+      direction: strategy?.direction || "both",
+      timeframes: strategy?.timeframes || [],
+      riskManagementRules: strategy?.riskManagementRules ?? null,
+      resetRules: strategy?.resetRules ?? null,
+      alertRules: strategy?.alertRules ?? null,
     };
     const done = () => {
       queryClient.invalidateQueries({ queryKey: getListStrategiesQueryKey() });
@@ -94,30 +92,13 @@ function StrategyEditor({
   const busy = create.isPending || update.isPending;
   return <form onSubmit={save} className="space-y-5">
     {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">{error}</div>}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Field label="Strategy name"><input className="input" name="name" required defaultValue={strategy?.name || ""} placeholder="Name your strategy" data-testid="input-library-strategy-name" /></Field>
-      <Field label="Market / instrument">
-        <select className="select" name="marketId" defaultValue={strategy?.marketId || ""} data-testid="select-library-strategy-market">
-          <option value="">No specific instrument</option>
-          {markets.map(market => <option key={market.id} value={market.id}>{market.symbol} · {market.assetClass}</option>)}
-        </select>
-      </Field>
-    </div>
+    <Field label="Strategy name"><input className="input" name="name" required defaultValue={strategy?.name || ""} placeholder="Name your strategy" data-testid="input-library-strategy-name" /></Field>
     <Field label="Description"><textarea className="textarea" name="description" defaultValue={strategy?.description || ""} placeholder="Describe the hypothesis in your own words" /></Field>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <Field label="Asset class"><input className="input" name="assetClass" defaultValue={strategy?.assetClass || ""} placeholder="Optional" /></Field>
-      <Field label="Direction">
-        <select className="select" name="direction" defaultValue={strategy?.direction || "both"}>
-          <option value="long">Long</option><option value="short">Short</option><option value="both">Both</option>
-        </select>
-      </Field>
-      <Field label="Timeframes" hint="Separate with commas."><input className="input" name="timeframes" defaultValue={strategy?.timeframes?.join(", ") || ""} placeholder="Daily, 4H" /></Field>
+    <div className="rounded-md border border-primary/25 bg-primary/5 p-4 text-xs text-muted-foreground leading-relaxed">
+      <div className="font-semibold text-foreground">Edit strategy logic in Strategy Builder</div>
+      <p className="mt-1.5">Direction, timeframes, risk rules, and ordered conditions have one canonical editor. This library form only manages the strategy name and description.</p>
+      <Link href={`/strategy-builder${strategy ? `?strategyId=${strategy.id}` : ""}`} className="inline-flex items-center gap-1.5 text-primary font-semibold mt-3 hover:underline" onClick={onClose}>Open Builder <ExternalLink size={12} /></Link>
     </div>
-    <div className="border-t border-border pt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Field label="Risk-management rules"><textarea className="textarea" name="riskManagementRules" defaultValue={strategy?.riskManagementRules || ""} /></Field>
-      <Field label="Reset rules"><textarea className="textarea" name="resetRules" defaultValue={strategy?.resetRules || ""} /></Field>
-    </div>
-    <Field label="Alert notes" hint="Notes only. No live alerts are created here."><textarea className="textarea" name="alertRules" defaultValue={strategy?.alertRules || ""} /></Field>
     <div className="flex justify-end gap-3">
       <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
       <button className="btn btn-primary" disabled={busy} data-testid="button-save-library-strategy">{busy ? "Saving…" : "Save strategy"}</button>
@@ -204,7 +185,6 @@ function StrategyCard({
     <div className="mt-5 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2">
       <Link href={`/strategy-builder?strategyId=${strategy.id}`} className="btn btn-primary" data-testid={`link-open-strategy-builder-${strategy.id}`}>Open in Builder <ExternalLink size={13} /></Link>
       <button className="btn btn-secondary" onClick={onVersions} data-testid={`button-view-versions-${strategy.id}`}><History size={13} /> Versions</button>
-      <button className="btn btn-secondary" disabled={busy} onClick={onEdit} data-testid={`button-edit-strategy-${strategy.id}`}><Pencil size={13} /> Edit</button>
     </div>
   </article>;
 }
@@ -266,7 +246,7 @@ export function StrategyLibraryPage() {
     <div className="panel p-3 mb-5 flex flex-col sm:flex-row gap-3">
       <div className="relative flex-1 min-w-0"><Search size={15} className="absolute left-3 top-3 text-muted-foreground" /><input className="input pl-9" placeholder="Search by strategy or market" value={search} onChange={event => setSearch(event.target.value)} data-testid="input-search-strategies" /></div>
       <div className="sm:w-48 shrink-0"><select className="select" value={status} onChange={event => setStatus(event.target.value as StatusFilter)} data-testid="select-filter-strategies">
-        <option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option>
+          <option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Draft</option><option value="archived">Archived</option>
       </select></div>
     </div>
     {actionError && <div className="mb-5 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">{actionError}</div>}
@@ -282,8 +262,8 @@ export function StrategyLibraryPage() {
             <p className="text-sm text-muted-foreground mt-2">{strategies.data?.length ? "Adjust the search or status filter." : "Create a strategy here or start in the Strategy Builder."}</p>
             {!strategies.data?.length && <div className="flex flex-col sm:flex-row justify-center gap-3 mt-6"><button className="btn btn-primary" onClick={() => setEditor({ mode: "create" })}><Plus size={14} /> Create strategy</button><Link href="/strategy-builder" className="btn btn-secondary">Open Builder</Link></div>}
           </div>}
-    {editor?.mode === "create" && <Modal title="Create strategy" onClose={() => setEditor(null)}><StrategyEditor strategy={null} markets={markets.data || []} onClose={() => setEditor(null)} /></Modal>}
-    {editor?.mode === "edit" && <Modal title="Edit strategy" onClose={() => setEditor(null)}><StrategyEditor strategy={editor.strategy} markets={markets.data || []} onClose={() => setEditor(null)} /></Modal>}
+    {editor?.mode === "create" && <Modal title="Create strategy" onClose={() => setEditor(null)}><StrategyEditor strategy={null} onClose={() => setEditor(null)} /></Modal>}
+    {editor?.mode === "edit" && <Modal title="Edit strategy details" onClose={() => setEditor(null)}><StrategyEditor strategy={editor.strategy} onClose={() => setEditor(null)} /></Modal>}
     {editor?.mode === "rename" && <Modal title="Rename strategy" onClose={() => setEditor(null)}><RenameEditor strategy={editor.strategy} onClose={() => setEditor(null)} /></Modal>}
     {versionStrategy && <Modal title="Strategy versions" wide onClose={() => setVersionStrategy(null)}><StrategyVersionManager strategy={versionStrategy} /></Modal>}
     {confirmDelete && <Modal title={`Delete “${confirmDelete.name}”?`} onClose={() => setConfirmDelete(null)}>

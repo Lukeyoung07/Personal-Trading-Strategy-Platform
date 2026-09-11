@@ -13,3 +13,4 @@
 - [Strategy builder assistant handoff](strategy-builder-assistant-handoff.md) — AI drafts enter a forced review state; saving remains explicit and versioned.
 - [Monitoring alert history](monitoring-alert-history.md) — monitoring alerts are in-app transition history with acknowledgement, not external delivery or trade execution.
 - [Journal performance semantics](journal-performance-semantics.md) — daily/monthly journal analytics use realized P/L dates with timezone-aware closedAt fallback and separate day notes.
+- [Responsive navigation override](responsive-navigation-override.md) — mobile sidebar rules must explicitly replace legacy horizontal-scroll navigation with a fixed grid.
