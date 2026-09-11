@@ -309,8 +309,18 @@ export const alertsTable = pgTable("alerts", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   marketId: integer("market_id").references(() => marketsTable.id, { onDelete: "set null" }),
+  strategyId: integer("strategy_id").references(() => strategiesTable.id, { onDelete: "set null" }),
   monitorSessionId: integer("monitor_session_id").references(() => strategyMonitorSessionsTable.id, { onDelete: "set null" }),
   strategyVersionId: integer("strategy_version_id").references(() => strategyVersionsTable.id, { onDelete: "set null" }),
+  transitionEventId: integer("transition_event_id").references(() => strategyMonitorTransitionEventsTable.id, { onDelete: "set null" }),
+  conditionId: integer("condition_id").references(() => strategyVersionConditionsTable.id, { onDelete: "set null" }),
+  timeframeId: integer("timeframe_id").references(() => timeframesTable.id, { onDelete: "set null" }),
+  timeframeCode: text("timeframe_code"),
+  direction: text("direction"),
+  reasonCode: text("reason_code"),
+  reason: text("reason"),
+  evidence: text("evidence"),
+  triggeringCandleOpenTime: timestamp("triggering_candle_open_time", { withTimezone: true }),
   sourceType: text("source_type").notNull().default("manual"),
   condition: text("condition").notNull(),
   threshold: text("threshold"),
@@ -320,7 +330,9 @@ export const alertsTable = pgTable("alerts", {
   acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, table => [
+  uniqueIndex("alerts_transition_event_unique").on(table.transitionEventId),
+]);
 
 export const backtestConfigurationsTable = pgTable("backtest_configurations", {
   id: serial("id").primaryKey(),

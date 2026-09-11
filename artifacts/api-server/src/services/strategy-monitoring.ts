@@ -12,10 +12,17 @@ import {
   alertsTable,
   strategyVersionConditionsTable,
   strategyVersionsTable,
+  tradingConceptsTable,
   timeframesTable,
   type StrategyVersion,
   type StrategyVersionCondition,
 } from "@workspace/db";
+import { executableConceptKind } from "@workspace/api-zod";
+import {
+  evaluateExecutableConditionAtLatest,
+  requiredCandleCountForCondition,
+  type BacktestCondition,
+} from "./backtest-engine";
 
 export type ConditionEvaluationStatus = "not_met" | "met" | "waiting" | "invalid";
 export type MonitoringStatus = "not_started" | "waiting" | "monitoring" | "paused" | "error";
@@ -46,16 +53,9 @@ export interface ConditionDetector {
   readonly version: string;
   readonly conceptId: number;
   dependencies?(conditionId: number, allConditionIds: readonly number[]): number[];
-  requiredCandleCount(): number;
+  requiredCandleCount(condition?: BacktestCondition): number;
   evaluate(input: {
-    condition: {
-      id: number;
-      conceptId: number;
-      timeframe: string;
-      direction: string;
-      requirement: string;
-      order: number;
-    };
+    condition: BacktestCondition & { id: number; conceptId: number; timeframe: string; order: number };
     candles: readonly EvaluationCandle[];
     dependencyStates: ReadonlyMap<number, ConditionEvaluationStatus>;
     previousStatus: ConditionEvaluationStatus | null;
@@ -87,6 +87,7 @@ export interface EvaluatedCondition {
   detectorVersion: string | null;
   evaluatorState: unknown;
   lastMarketDataAt: Date | null;
+  lastCandleOpenTime: Date | null;
 }
 
 export interface StrategyMonitorSnapshot {
@@ -142,6 +143,13 @@ export function transitionConditionStatus(
   resetTriggered = false,
 ): ConditionEvaluationStatus {
   return resetTriggered ? "waiting" : next;
+}
+
+export function shouldCreateMonitoringAlert(
+  previous: ConditionEvaluationStatus | null,
+  next: ConditionEvaluationStatus,
+): boolean {
+  return previous !== next && (next === "met" || next === "invalid");
 }
 
 export class StrategyMonitoringEngine {
@@ -362,7 +370,7 @@ export class StrategyMonitoringEngine {
             throw new Error("Stored market data contains a non-finite numeric value");
           }
           return normalized;
-        }).reverse());
+        }).sort((a, b) => a.openTime.getTime() - b.openTime.getTime()));
         candleCache.set(cacheKey, request);
       }
       return request;
@@ -389,7 +397,22 @@ export class StrategyMonitoringEngine {
         result = this.conditionResult(condition, timeframe.id, "waiting", "MARKET_DATA_SOURCE_UNAVAILABLE", "No single configured source with stored data is available for this instrument.");
       } else {
         const detector = this.detectors.find(candidate => candidate.conceptId === condition.conceptId);
-        const requiredCount = Math.max(1, detector?.requiredCandleCount() ?? 1);
+        const detectorCondition = {
+          id: condition.id,
+          conceptId: condition.conceptId,
+          name: condition.name,
+          conceptName: condition.conceptName,
+          timeframe: condition.timeframe,
+          direction: condition.direction as "long" | "short" | "both",
+          requirement: condition.requirement as "required" | "optional",
+          order: condition.conditionOrder,
+          stage: condition.stage as "entry" | "confirmation" | "invalidation" | "exit",
+          triggerRules: condition.triggerRules,
+          parameters: condition.parameters,
+          invalidationRules: condition.invalidationRules,
+          conceptDetectionRules: condition.conceptDetectionRules,
+        } satisfies BacktestCondition & { id: number; conceptId: number; timeframe: string; order: number };
+        const requiredCount = Math.max(1, detector?.requiredCandleCount(detectorCondition) ?? 1);
         let candles: readonly EvaluationCandle[];
         try {
           candles = await loadCandles(condition.timeframe, requiredCount);
@@ -399,11 +422,13 @@ export class StrategyMonitoringEngine {
           dependencyStates.set(condition.id, result.status);
           continue;
         }
-        const lastMarketDataAt = candles[candles.length - 1]?.receivedAt ?? null;
+        const lastCandle = candles[candles.length - 1];
+        const lastMarketDataAt = lastCandle?.receivedAt ?? null;
+        const lastCandleOpenTime = lastCandle?.openTime ?? null;
         if (candles.length < requiredCount) {
-          result = this.conditionResult(condition, timeframe.id, "waiting", "INSUFFICIENT_MARKET_DATA", `This condition needs ${requiredCount} closed candle${requiredCount === 1 ? "" : "s"} on ${condition.timeframe}; ${candles.length} are available.`, null, lastMarketDataAt);
+          result = this.conditionResult(condition, timeframe.id, "waiting", "INSUFFICIENT_MARKET_DATA", `This condition needs ${requiredCount} closed candle${requiredCount === 1 ? "" : "s"} on ${condition.timeframe}; ${candles.length} are available.`, null, lastMarketDataAt, null, null, null, lastCandleOpenTime);
         } else if (!detector) {
-          result = this.conditionResult(condition, timeframe.id, "waiting", "EVALUATOR_UNAVAILABLE", "The saved concept and rules are descriptive; no executable detector is registered.", null, lastMarketDataAt);
+          result = this.conditionResult(condition, timeframe.id, "waiting", "EVALUATOR_UNAVAILABLE", "The saved concept and rules are descriptive; no executable detector is registered.", null, lastMarketDataAt, null, null, null, lastCandleOpenTime);
         } else {
           const dependencies = dependenciesByCondition.get(condition.id) ?? [];
           const waitingDependency = dependencies.find(id => dependencyStates.get(id) !== "met");
@@ -412,14 +437,7 @@ export class StrategyMonitoringEngine {
           } else {
             const previous = previousByCondition.get(condition.id);
             const detectorResult = await detector.evaluate({
-              condition: {
-                id: condition.id,
-                conceptId: condition.conceptId,
-                timeframe: condition.timeframe,
-                direction: condition.direction,
-                requirement: condition.requirement,
-                order: condition.conditionOrder,
-              },
+                condition: detectorCondition,
               candles,
               dependencyStates,
               previousStatus: (previous?.status as ConditionEvaluationStatus | undefined) ?? null,
@@ -437,6 +455,7 @@ export class StrategyMonitoringEngine {
               detector.id,
               detector.version,
               detectorResult.state ?? null,
+              lastCandleOpenTime,
             );
           }
         }
@@ -615,28 +634,40 @@ export class StrategyMonitoringEngine {
       }
       changed = sessionChanged || changedConditionIds.length > 0;
       if (changed) {
-        await tx.insert(strategyMonitorTransitionEventsTable).values({
+        const [transitionEvent] = await tx.insert(strategyMonitorTransitionEventsTable).values({
           monitorSessionId: session.id,
           strategyVersionId: item.version.id,
           fromOverallStatus: currentSession?.overallStatus ?? null,
           toOverallStatus: summary.overallStatus,
           changedConditionIds,
           occurredAt: evaluatedAt,
-        });
-        if (!currentSession || currentSession.overallStatus !== summary.overallStatus) {
-          const meaningfulTransition = summary.overallStatus === "met" || summary.overallStatus === "invalid";
-          if (meaningfulTransition) {
-              const previousStatus = currentSession?.overallStatus ?? "waiting";
+        }).returning();
+          if (!currentSession || currentSession.overallStatus !== summary.overallStatus) {
+            if (shouldCreateMonitoringAlert((currentSession?.overallStatus as ConditionEvaluationStatus | null) ?? null, summary.overallStatus)) {
+            const previousStatus = currentSession?.overallStatus ?? "waiting";
+            const triggeringCondition = results.find(result =>
+              result.status === summary.overallStatus && changedConditionIds.includes(result.condition.id),
+            ) ?? results.find(result => result.status === summary.overallStatus) ?? results[0];
             await tx.insert(alertsTable).values({
               name: `${item.strategy.name} monitoring`,
               marketId: item.version.marketId,
+              strategyId: item.strategy.id,
               monitorSessionId: session.id,
               strategyVersionId: item.version.id,
+              transitionEventId: transitionEvent.id,
+              conditionId: triggeringCondition?.condition.id ?? null,
+              timeframeId: triggeringCondition ? (timeframeByName.get(triggeringCondition.condition.timeframe.trim().toLowerCase())?.id ?? null) : null,
+              timeframeCode: triggeringCondition?.condition.timeframe ?? null,
+              direction: triggeringCondition?.condition.direction ?? null,
+              reasonCode: triggeringCondition?.reasonCode ?? null,
+              reason: triggeringCondition?.reason ?? summary.statusReason,
+              evidence: triggeringCondition?.evidence ? JSON.stringify(triggeringCondition.evidence) : null,
+              triggeringCandleOpenTime: triggeringCondition?.lastCandleOpenTime ?? null,
               sourceType: "monitoring",
-                condition: "Overall monitoring state changed",
-                threshold: `${previousStatus} → ${summary.overallStatus}`,
+              condition: triggeringCondition?.condition.name || "Overall monitoring state changed",
+              threshold: `${previousStatus} → ${summary.overallStatus}`,
               status: "triggered",
-              message: summary.statusReason,
+              message: triggeringCondition?.reason ?? summary.statusReason,
               triggeredAt: evaluatedAt,
             });
           }
@@ -690,8 +721,9 @@ export class StrategyMonitoringEngine {
     detectorId: string | null = null,
     detectorVersion: string | null = null,
     evaluatorState: unknown = null,
+    lastCandleOpenTime: Date | null = null,
   ): EvaluatedCondition {
-    return { condition, timeframeId, status, reasonCode, reason, evidence, detectorId, detectorVersion, evaluatorState, lastMarketDataAt };
+    return { condition, timeframeId, status, reasonCode, reason, evidence, detectorId, detectorVersion, evaluatorState, lastMarketDataAt, lastCandleOpenTime };
   }
 
   private parseState(value: string | null | undefined): unknown {
@@ -742,3 +774,43 @@ export class StrategyMonitoringEngine {
 }
 
 export const strategyMonitoringEngine = new StrategyMonitoringEngine();
+
+export async function registerBuiltInStrategyMonitoringDetectors() {
+  const concepts = await db.select({
+    id: tradingConceptsTable.id,
+    name: tradingConceptsTable.name,
+  }).from(tradingConceptsTable);
+
+  for (const concept of concepts) {
+    if (!executableConceptKind(concept.name)) continue;
+    strategyMonitoringEngine.registerDetector({
+      id: `historical-${concept.id}`,
+      version: "1",
+      conceptId: concept.id,
+      requiredCandleCount: condition => condition ? requiredCandleCountForCondition(condition) : 1,
+      async evaluate({ condition, candles }) {
+        const matched = evaluateExecutableConditionAtLatest(condition, Array.from(candles));
+        if (matched == null) {
+          return {
+            status: "waiting",
+            reasonCode: "EVALUATOR_UNAVAILABLE",
+            reason: "The saved concept does not have a supported executable monitoring evaluator.",
+          };
+        }
+        return matched
+          ? {
+              status: "met",
+              reasonCode: "EXECUTABLE_CONDITION_MET",
+              reason: `The closed ${condition.timeframe} candle satisfies ${condition.name}.`,
+              evidence: { evaluator: `historical-${concept.name}`, candleOpenTime: candles[candles.length - 1]?.openTime ?? null },
+            }
+          : {
+              status: "not_met",
+              reasonCode: "EXECUTABLE_CONDITION_NOT_MET",
+              reason: `The latest closed ${condition.timeframe} candle does not satisfy ${condition.name}.`,
+              evidence: { evaluator: `historical-${concept.name}`, candleOpenTime: candles[candles.length - 1]?.openTime ?? null },
+            };
+      },
+    });
+  }
+}

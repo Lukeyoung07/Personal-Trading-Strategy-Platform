@@ -1807,6 +1807,11 @@ export interface JournalDayNoteInput {
   notes: string | null;
 }
 
+/**
+ * @nullable
+ */
+export type AlertEvidence = { [key: string]: unknown } | null;
+
 export type AlertSourceType = typeof AlertSourceType[keyof typeof AlertSourceType];
 
 
@@ -1833,9 +1838,29 @@ export interface Alert {
   /** @nullable */
   marketSymbol: string | null;
   /** @nullable */
+  strategyId: number | null;
+  /** @nullable */
   monitorSessionId: number | null;
   /** @nullable */
   strategyVersionId: number | null;
+  /** @nullable */
+  transitionEventId: number | null;
+  /** @nullable */
+  conditionId: number | null;
+  /** @nullable */
+  timeframeId: number | null;
+  /** @nullable */
+  timeframeCode: string | null;
+  /** @nullable */
+  direction: string | null;
+  /** @nullable */
+  reasonCode: string | null;
+  /** @nullable */
+  reason: string | null;
+  /** @nullable */
+  evidence: AlertEvidence;
+  /** @nullable */
+  triggeringCandleOpenTime: string | null;
   /** @nullable */
   strategyName?: string | null;
   /** @nullable */

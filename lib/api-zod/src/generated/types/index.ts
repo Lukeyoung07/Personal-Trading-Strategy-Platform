@@ -8,6 +8,7 @@
 
 export * from './addBiQuoteMarketInput';
 export * from './alert';
+export * from './alertEvidence';
 export * from './alertInput';
 export * from './alertInputStatus';
 export * from './alertSourceType';

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CalendarDays,
@@ -60,13 +60,13 @@ function formatDateTime(value: string, precision: EconomicEvent['timePrecision']
   }).format(date);
 }
 
-function formatRelativeTime(value: string, status: EconomicEvent['releaseStatus']) {
+function formatRelativeTime(value: string, status: EconomicEvent['releaseStatus'], now = Date.now()) {
   if (status !== 'upcoming' && status !== 'live') return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   if (status === 'live') return 'Live now';
 
-  const difference = date.getTime() - Date.now();
+  const difference = date.getTime() - now;
   if (difference <= 0) return 'Starting now';
   const minutes = Math.round(difference / 60000);
   if (minutes < 60) return `In ${minutes} min`;
@@ -104,8 +104,8 @@ function impactClassificationLabel(event: EconomicEvent) {
   return 'Not enough information';
 }
 
-function EventCard({ event }: { event: EconomicEvent }) {
-  const relativeTime = formatRelativeTime(event.scheduledAt, event.releaseStatus);
+function EventCard({ event, now }: { event: EconomicEvent; now: number }) {
+  const relativeTime = formatRelativeTime(event.scheduledAt, event.releaseStatus, now);
   const isHighImpact = event.impact === 'high';
   const isLive = event.releaseStatus === 'live';
 
@@ -240,6 +240,12 @@ export function EconomicCalendar() {
   const [market, setMarket] = useState('');
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const params = useMemo<ListEconomicEventsParams>(() => {
     const next: ListEconomicEventsParams = { view };
@@ -254,11 +260,15 @@ export function EconomicCalendar() {
   const query = useListEconomicEvents(params, {
     query: { queryKey: getListEconomicEventsQueryKey(params) },
   });
+  const facetQuery = useListEconomicEvents({ view }, {
+    query: { queryKey: getListEconomicEventsQueryKey({ view }) },
+  });
   const events = query.data?.events ?? [];
+  const facetEvents = facetQuery.data?.events ?? events;
   const hasFilters = Boolean(impact || region || currency || market || search.trim());
-  const regions = optionValues(events, 'region');
-  const currencies = optionValues(events, 'currency');
-  const markets = marketOptions(events);
+  const regions = optionValues(facetEvents, 'region');
+  const currencies = optionValues(facetEvents, 'currency');
+  const markets = marketOptions(facetEvents);
 
   const clearFilters = () => {
     setImpact(undefined);
@@ -401,7 +411,7 @@ export function EconomicCalendar() {
         ) : (
           <div className="space-y-3" data-testid="list-economic-events">
             {events.map((event) => (
-              <EventCard key={event.id} event={event} />
+              <EventCard key={event.id} event={event} now={now} />
             ))}
           </div>
         )}

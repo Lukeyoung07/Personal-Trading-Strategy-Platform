@@ -69,6 +69,21 @@ export interface BacktestEngineResult {
   message: string;
 }
 
+export function requiredCandleCountForCondition(condition: BacktestCondition) {
+  const parameters = executableParameters(condition);
+  if (!parameters) return 1;
+  if (parameters.kind === "indicator") {
+    return Math.max(parameters.period, parameters.fastPeriod ?? 1, parameters.slowPeriod ?? 1, parameters.signalPeriod ?? 1) + 1;
+  }
+  if (parameters.kind === "fair_value_gap") return Math.max(3, parameters.lookback + 2);
+  if (parameters.kind === "market_structure" || parameters.kind === "liquidity_level"
+    || parameters.kind === "liquidity_sweep" || parameters.kind === "price_action"
+    || parameters.kind === "range_location") {
+    return parameters.lookback + 1;
+  }
+  return 1;
+}
+
 export class BacktestEngineError extends Error {
   constructor(message: string) {
     super(message);
@@ -415,6 +430,28 @@ function evaluateExecutableCondition(
   if (parameters.kind === "price_action") return evaluatePriceAction(candles, index, parameters);
   if (parameters.kind === "range_location") return evaluateRangeLocation(candles, index, parameters);
   return false;
+}
+
+export function evaluateExecutableConditionAtLatest(
+  condition: BacktestCondition,
+  candles: HistoricalCandle[],
+): boolean | null {
+  if (!candles.length) return false;
+  const rule = condition.triggerRules?.trim() || condition.conceptDetectionRules?.trim();
+  if (!executableParameters(condition)) {
+    if (!rule?.trim()) return null;
+    try {
+      return evaluateRule(rule, candles[candles.length - 1], candles[candles.length - 2]);
+    } catch {
+      return null;
+    }
+  }
+  const sides: BacktestSide[] = condition.direction === "short"
+    ? ["short"]
+    : condition.direction === "long"
+      ? ["long"]
+      : ["long", "short"];
+  return sides.some(side => evaluateExecutableCondition(condition, side, candles, candles.length - 1) === true);
 }
 
 export function validateHistoricalRule(rule: string) {

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { BacktestEngineError, runHistoricalBacktest, validateHistoricalBacktestStrategy, type HistoricalCandle } from "./backtest-engine";
+import {
+  BacktestEngineError,
+  evaluateExecutableConditionAtLatest,
+  requiredCandleCountForCondition,
+  runHistoricalBacktest,
+  validateHistoricalBacktestStrategy,
+  type HistoricalCandle,
+} from "./backtest-engine";
 
 function candle(index: number, values: Partial<Pick<HistoricalCandle, "open" | "high" | "low" | "close">> = {}): HistoricalCandle {
   const open = values.open ?? 100;
@@ -32,6 +39,61 @@ describe("historical backtest engine", () => {
     parameters,
     invalidationRules: null,
     conceptDetectionRules: null,
+  });
+
+  it("shares executable rule semantics with monitoring at the latest closed candle", () => {
+    const condition = {
+      name: "Bullish close",
+      conceptName: null,
+      timeframe: "5m",
+      stage: "entry" as const,
+      direction: "long" as const,
+      requirement: "required" as const,
+      triggerRules: "close > open",
+      parameters: null,
+      invalidationRules: null,
+      conceptDetectionRules: null,
+    };
+    expect(evaluateExecutableConditionAtLatest(condition, [
+      candle(0, { open: 100, close: 99 }),
+      candle(1, { open: 100, close: 101 }),
+    ])).toBe(true);
+    expect(evaluateExecutableConditionAtLatest(condition, [
+      candle(0, { open: 100, close: 101 }),
+      candle(1, { open: 100, close: 99 }),
+    ])).toBe(false);
+    expect(requiredCandleCountForCondition(condition)).toBe(1);
+  });
+
+  it("requires enough history for structured monitoring evaluators", () => {
+    const condition = structuredCondition("Higher high", "Higher High", "long", {
+      kind: "market_structure",
+      signal: "higher_high",
+      polarity: "bullish",
+      lookback: 10,
+    });
+    expect(requiredCandleCountForCondition(condition)).toBe(11);
+    expect(evaluateExecutableConditionAtLatest(condition, Array.from({ length: 11 }, (_, index) => candle(index, {
+      high: 100 + index,
+      low: 99 + index,
+      close: 100 + index,
+    })))).toBe(true);
+    expect(evaluateExecutableConditionAtLatest({
+      ...condition,
+      name: "Lower low",
+      conceptName: "Lower Low",
+      direction: "short",
+      parameters: {
+        kind: "market_structure",
+        signal: "lower_low",
+        polarity: "bearish",
+        lookback: 2,
+      },
+    }, [
+      candle(0, { low: 100, high: 101, close: 100 }),
+      candle(1, { low: 99, high: 100, close: 99 }),
+      candle(2, { low: 98, high: 99, close: 98 }),
+    ])).toBe(true);
   });
 
   it("processes candles oldest-first and executes signals at the next open", () => {

@@ -809,6 +809,28 @@ function marketView(market: typeof marketsTable.$inferSelect) {
   };
 }
 
+function alertView(
+  alert: typeof alertsTable.$inferSelect,
+  context: { marketSymbol: string | null; strategyName: string | null; versionNumber: number | null },
+) {
+  let evidence: Record<string, unknown> | null = null;
+  if (alert.evidence) {
+    try {
+      const parsed = JSON.parse(alert.evidence);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) evidence = parsed;
+    } catch {
+      evidence = null;
+    }
+  }
+  return {
+    ...alert,
+    evidence,
+    marketSymbol: context.marketSymbol,
+    strategyName: context.strategyName,
+    versionNumber: context.versionNumber,
+  };
+}
+
 async function snapshotMarketSymbol(executor: any, marketId: number | null) {
   if (marketId == null) return null;
   const [market] = await executor.select({ symbol: marketsTable.symbol }).from(marketsTable).where(eq(marketsTable.id, marketId));
@@ -1883,8 +1905,7 @@ router.get("/alerts", async (_req, res): Promise<void> => {
     .leftJoin(strategyVersionsTable, eq(alertsTable.strategyVersionId, strategyVersionsTable.id))
     .leftJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
     .orderBy(desc(alertsTable.updatedAt));
-  res.json(ListAlertsResponse.parse(rows.map(({ alert, symbol, strategyName, versionNumber }) => ({
-    ...alert,
+  res.json(ListAlertsResponse.parse(rows.map(({ alert, symbol, strategyName, versionNumber }) => alertView(alert, {
     marketSymbol: symbol,
     strategyName,
     versionNumber,
@@ -1898,12 +1919,11 @@ router.post("/alerts", async (req, res): Promise<void> => {
     return;
   }
   const [created] = await db.insert(alertsTable).values({ ...parsed.data, sourceType: "manual" }).returning();
-  res.status(201).json(CreateAlertResponse.parse({
-    ...created,
+  res.status(201).json(CreateAlertResponse.parse(alertView(created, {
     marketSymbol: await marketSymbol(created.marketId),
     strategyName: null,
     versionNumber: null,
-  }));
+  })));
 });
 
 router.patch("/alerts/:alertId", async (req, res): Promise<void> => {
@@ -1926,12 +1946,22 @@ router.patch("/alerts/:alertId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Alert not found" });
     return;
   }
-  res.json(UpdateAlertResponse.parse({
-    ...updated,
+  const [context] = await db
+    .select({
+      marketSymbol: marketsTable.symbol,
+      strategyName: strategiesTable.name,
+      versionNumber: strategyVersionsTable.versionNumber,
+    })
+    .from(alertsTable)
+    .leftJoin(marketsTable, eq(alertsTable.marketId, marketsTable.id))
+    .leftJoin(strategyVersionsTable, eq(alertsTable.strategyVersionId, strategyVersionsTable.id))
+    .leftJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
+    .where(eq(alertsTable.id, updated.id));
+  res.json(UpdateAlertResponse.parse(alertView(updated, context ?? {
     marketSymbol: await marketSymbol(updated.marketId),
     strategyName: null,
     versionNumber: null,
-  }));
+  })));
 });
 
 router.delete("/alerts/:alertId", async (req, res): Promise<void> => {

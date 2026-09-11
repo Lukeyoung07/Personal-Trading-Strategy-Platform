@@ -2532,14 +2532,26 @@ components:
         notes: { type: ["string", "null"], maxLength: 2000 }
     Alert:
       type: object
-      required: [id, name, marketId, marketSymbol, monitorSessionId, strategyVersionId, sourceType, condition, threshold, status, message, triggeredAt, acknowledgedAt, createdAt, updatedAt]
+      required: [id, name, marketId, marketSymbol, strategyId, monitorSessionId, strategyVersionId, transitionEventId, conditionId, timeframeId, timeframeCode, direction, reasonCode, reason, evidence, triggeringCandleOpenTime, sourceType, condition, threshold, status, message, triggeredAt, acknowledgedAt, createdAt, updatedAt]
       properties:
         id: { type: integer }
         name: { type: string }
         marketId: { type: ["integer", "null"] }
         marketSymbol: { type: ["string", "null"] }
+        strategyId: { type: ["integer", "null"] }
         monitorSessionId: { type: ["integer", "null"] }
         strategyVersionId: { type: ["integer", "null"] }
+        transitionEventId: { type: ["integer", "null"] }
+        conditionId: { type: ["integer", "null"] }
+        timeframeId: { type: ["integer", "null"] }
+        timeframeCode: { type: ["string", "null"] }
+        direction: { type: ["string", "null"] }
+        reasonCode: { type: ["string", "null"] }
+        reason: { type: ["string", "null"] }
+        evidence:
+          type: ["object", "null"]
+          additionalProperties: true
+        triggeringCandleOpenTime: { type: ["string", "null"], format: date-time }
         strategyName: { type: ["string", "null"] }
         versionNumber: { type: ["integer", "null"] }
         sourceType:

@@ -375,12 +375,12 @@ function Alerts() {
   const alertDetails = (alert: Alert) => {
     const category = categoryFor(alert);
     if (category === "monitoring") {
-      return <><div className="font-semibold">{alert.strategyName || alert.name.replace(/ monitoring$/i, "")}</div><div className="text-[11px] text-muted-foreground">{alert.versionNumber ? `Exact version v${alert.versionNumber}` : "Exact version unavailable"}{alert.triggeredAt ? ` · ${new Date(alert.triggeredAt).toLocaleString()}` : ""}</div></>;
+      return <><div className="font-semibold">{alert.strategyName || alert.name.replace(/ monitoring$/i, "")}</div><div className="text-[11px] text-muted-foreground">{alert.versionNumber ? `Exact version v${alert.versionNumber}` : "Exact version unavailable"}{alert.triggeredAt ? ` · ${new Date(alert.triggeredAt).toLocaleString()}` : ""}</div><div className="mt-2 flex flex-wrap gap-1.5 text-[11px]"><span className="tag bg-secondary text-muted-foreground">{alert.condition || "Overall transition"}</span>{alert.timeframeCode && <span className="tag bg-secondary text-muted-foreground">{alert.timeframeCode}</span>}{alert.direction && <span className="tag bg-secondary text-muted-foreground">{alert.direction}</span>}</div></>;
     }
     return <><div className="font-semibold">{alert.name}</div><div className="text-[11px] text-muted-foreground">{category === "price" ? "Price alert" : "Manual reminder"} · created {new Date(alert.createdAt).toLocaleString()}</div></>;
   };
   const alertExplanation = (alert: Alert) => {
-    if (categoryFor(alert) === "monitoring") return <><div>{alert.threshold || "Monitoring transition"}</div><div className="text-[11px] text-muted-foreground mt-1">{alert.message || "The monitored strategy changed state."}</div></>;
+    if (categoryFor(alert) === "monitoring") return <><div>{alert.threshold || "Monitoring transition"}</div><div className="text-[11px] text-muted-foreground mt-1">{alert.reason || alert.message || "The monitored strategy changed state."}</div>{alert.reasonCode && <div className="mono text-[10px] text-muted-foreground mt-1">{alert.reasonCode}</div>}{alert.triggeringCandleOpenTime && <div className="text-[10px] text-muted-foreground mt-1">Closed candle: {new Date(alert.triggeringCandleOpenTime).toLocaleString()}</div>}</>;
     return <>{alert.condition}{alert.threshold && ` · trigger ${alert.threshold}`}</>;
   };
   const save = (event: FormEvent<HTMLFormElement>) => {

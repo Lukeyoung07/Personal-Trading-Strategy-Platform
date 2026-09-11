@@ -5,6 +5,7 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { AlertEvidence } from './alertEvidence';
 import type { AlertSourceType } from './alertSourceType';
 import type { AlertStatus } from './alertStatus';
 
@@ -16,9 +17,29 @@ export interface Alert {
   /** @nullable */
   marketSymbol: string | null;
   /** @nullable */
+  strategyId: number | null;
+  /** @nullable */
   monitorSessionId: number | null;
   /** @nullable */
   strategyVersionId: number | null;
+  /** @nullable */
+  transitionEventId: number | null;
+  /** @nullable */
+  conditionId: number | null;
+  /** @nullable */
+  timeframeId: number | null;
+  /** @nullable */
+  timeframeCode: string | null;
+  /** @nullable */
+  direction: string | null;
+  /** @nullable */
+  reasonCode: string | null;
+  /** @nullable */
+  reason: string | null;
+  /** @nullable */
+  evidence: AlertEvidence;
+  /** @nullable */
+  triggeringCandleOpenTime: Date | null;
   /** @nullable */
   strategyName?: string | null;
   /** @nullable */
