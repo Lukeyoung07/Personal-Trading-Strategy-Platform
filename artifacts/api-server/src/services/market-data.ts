@@ -260,6 +260,34 @@ export class MarketDataService {
     return [...this.adapters.keys()];
   }
 
+  async historicalSourceForInstrument(instrumentId: number) {
+    const candidates = await db.select({ source: marketDataSourcesTable })
+      .from(marketDataSourcesTable)
+      .innerJoin(sourceInstrumentMappingsTable, and(
+        eq(sourceInstrumentMappingsTable.sourceId, marketDataSourcesTable.id),
+        eq(sourceInstrumentMappingsTable.instrumentId, instrumentId),
+      ))
+      .where(eq(marketDataSourcesTable.isEnabled, true));
+
+    const source = candidates
+      .map(candidate => candidate.source)
+      .filter(candidate =>
+        candidate.providerKey
+        && candidate.capabilities.includes("historical")
+        && this.adapter(candidate.providerKey)?.capabilities.includes("historical"),
+      )
+      .sort((left, right) => {
+        const leftIsHistorical = left.sourceType === "historical" ? 1 : 0;
+        const rightIsHistorical = right.sourceType === "historical" ? 1 : 0;
+        return rightIsHistorical - leftIsHistorical || left.id - right.id;
+      })[0];
+
+    if (!source) {
+      throw new Error("No enabled historical market-data source is configured for this instrument.");
+    }
+    return source;
+  }
+
   async connectSource(sourceId: number) {
     const { adapter } = await this.resolveSourceAdapter(sourceId);
     await this.recordConnection(sourceId, "connecting", "Provider adapter is connecting.");

@@ -6,7 +6,6 @@ import {
   backtestTradesTable,
   db,
   marketsTable,
-  marketDataSourcesTable,
   strategiesTable,
   strategyVersionConditionsTable,
   strategyVersionsTable,
@@ -187,7 +186,7 @@ async function executeBacktestInternal(backtestId: number) {
   await db.delete(backtestCandlesTable).where(eq(backtestCandlesTable.backtestId, backtestId));
 
   try {
-    const [[version], conditions, [source], timeframes] = await Promise.all([
+    const [[version], conditions, timeframes] = await Promise.all([
       db.select().from(strategyVersionsTable).where(and(
         eq(strategyVersionsTable.id, configuration.strategyVersionId),
         eq(strategyVersionsTable.strategyId, configuration.strategyId),
@@ -195,8 +194,6 @@ async function executeBacktestInternal(backtestId: number) {
       db.select().from(strategyVersionConditionsTable)
         .where(eq(strategyVersionConditionsTable.strategyVersionId, configuration.strategyVersionId))
         .orderBy(asc(strategyVersionConditionsTable.conditionOrder)),
-      db.select().from(marketDataSourcesTable)
-        .where(eq(marketDataSourcesTable.providerKey, "biquote")),
       db.select().from(timeframesTable).where(eq(timeframesTable.isActive, true)),
     ]);
     if (!version) throw new Error("The exact strategy version for this backtest no longer exists.");
@@ -209,7 +206,7 @@ async function executeBacktestInternal(backtestId: number) {
       conditions: engineConditions,
     });
     if (compatibilityErrors.length) throw new Error(`This strategy version is not compatible with the historical engine: ${compatibilityErrors.join(" ")}`);
-    if (!source) throw new Error("BiQuote is not configured as a historical market-data source.");
+    const source = await marketDataService.historicalSourceForInstrument(configuration.instrumentId);
 
     const configuredTimeframe = timeframes.find(timeframe => timeframe.id === configuration.timeframeId);
     if (!configuredTimeframe) throw new Error("The selected backtest timeframe no longer exists.");
