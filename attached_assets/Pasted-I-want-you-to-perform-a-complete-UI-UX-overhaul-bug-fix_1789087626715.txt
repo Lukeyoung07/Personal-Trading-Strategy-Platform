@@ -1,0 +1,961 @@
+I want you to perform a complete UI/UX overhaul, bug-fix pass, usability improvement, and functionality review of my existing trading application.
+
+This is primarily a PERSONAL-USE trading application.
+
+The goal is to make the application feel like a clean, professional, simple trading workspace that is easy to navigate and actually useful for me when developing, monitoring, backtesting and journaling trading strategies.
+
+DO NOT rebuild the application from scratch.
+
+DO NOT remove existing functionality.
+
+DO NOT replace working systems unnecessarily.
+
+DO NOT change trading calculations simply for the sake of changing them.
+
+DO NOT add fake data.
+
+DO NOT fabricate market data, backtest results, trading results or AI results.
+
+DO NOT add broker execution or automatic trading.
+
+Use the existing architecture and functionality as the foundation.
+
+The biggest priority is making the entire application MUCH easier to understand and navigate.
+
+==================================================
+PART 1 — COMPLETE UI / UX OVERHAUL
+==================================================
+
+The current application feels confusing because too much information is displayed on individual pages.
+
+There is also too much vertical scrolling.
+
+I want the application redesigned so that each section has a clear purpose.
+
+The core design principle should be:
+
+PRIMARY INFORMATION FIRST.
+SECONDARY INFORMATION WHEN NEEDED.
+ADVANCED INFORMATION ON DEMAND.
+
+When I click a section, I should immediately see the main thing that section is for.
+
+I should NOT have to scroll through a huge page containing every possible feature before reaching what I actually want.
+
+Use appropriate:
+
+- Tabs
+- Sections
+- Drawers
+- Modals
+- Expandable panels
+- Detail views
+- Cards
+- Navigation controls
+
+to organise information.
+
+Do not simply make everything smaller to fit more information.
+
+Instead, reorganise the information intelligently.
+
+The application should feel:
+
+- Clean
+- Modern
+- Professional
+- Minimal
+- Easy to understand
+- Easy to navigate
+- Consistent
+- Spacious
+- Responsive
+- Trading-focused
+
+Do not introduce a completely unrelated visual style.
+
+Keep the existing visual identity but improve it significantly.
+
+==================================================
+PART 2 — NAVIGATION
+==================================================
+
+Review the current navigation and reorganise it into the simplest logical structure.
+
+Use the existing functionality.
+
+The user should always know:
+
+1. Where they are.
+2. What the page is for.
+3. What the primary action is.
+4. Where to go next.
+
+Main areas should clearly provide access to things such as:
+
+- Dashboard
+- Markets
+- Strategies
+- Strategy Builder
+- Monitoring
+- Alerts
+- Backtesting
+- Journal
+- Performance
+- AI Assistant
+- Settings
+
+If some areas should be combined for a better experience, do so only if functionality is preserved.
+
+Do not create unnecessary duplicate pages.
+
+==================================================
+PART 3 — DASHBOARD
+==================================================
+
+Redesign the Dashboard to be a simple overview.
+
+It should answer:
+
+"What is happening with my trading right now?"
+
+Prioritise:
+
+- Active strategy
+- Active strategy version
+- Current monitoring status
+- Important alerts
+- Selected market
+- Today's Journal P/L
+- Recent trading performance
+
+Do not put entire versions of other pages inside the Dashboard.
+
+Use links/cards to take the user to the relevant detailed section.
+
+==================================================
+PART 4 — MARKETS
+==================================================
+
+Markets is one of the MOST IMPORTANT sections and needs a major usability improvement.
+
+When I click Markets, I want the actual market/chart experience to be the main thing I see.
+
+Do NOT make the page look like a settings/configuration page.
+
+The primary Markets experience should be:
+
+1. Instrument selector
+2. Current price / market information
+3. Market status
+4. Timeframe selector
+5. Large chart
+6. Essential chart controls
+
+Market selection should be extremely obvious.
+
+Make it easy to:
+
+- Search instruments
+- Select instruments
+- Change instruments
+- Change timeframe
+- View market status
+- View current price
+- View live bid/ask/last where available
+
+Do not invent unsupported instruments or asset classes.
+
+Keep the existing provider-neutral market architecture.
+
+Do not falsely add futures support if the existing provider does not genuinely support futures data.
+
+==================================================
+PART 5 — MARKET CHART OVERHAUL
+==================================================
+
+The actual market chart needs a significant visual and usability upgrade.
+
+Make the existing chart look much cleaner and more professional.
+
+The chart should be the main focus of the Markets page.
+
+Use the existing real market data.
+
+Do NOT replace the market-data architecture.
+
+Do NOT fabricate candles or prices.
+
+The chart should support intuitive navigation through price history.
+
+The user should be able to:
+
+- Zoom in
+- Zoom out
+- Pan backwards through historical candles
+- Move forwards through historical candles
+- Return to the latest/current candle
+- Change timeframe
+- Easily inspect candles
+- See the current price clearly
+- Navigate historical price action smoothly
+
+Where supported by the existing chart technology, provide:
+
+- Crosshair
+- Candle hover information
+- OHLC information
+- Clear price axis
+- Clear time axis
+- Current-price indicator
+- Useful chart controls
+
+Provide simple controls such as:
+
+- Zoom in
+- Zoom out
+- Reset/Fit
+- Return to latest
+
+Do not overcrowd the chart.
+
+The controls should be intuitive and visually clean.
+
+The chart should have:
+
+- Better candle visibility
+- Better spacing
+- Clearer axes
+- Clean typography
+- Good loading states
+- Good empty states
+- Good error states
+- Smooth interaction
+- Good mobile touch behaviour
+
+Historical navigation should not be limited to only the currently loaded candles if additional historical data can safely be retrieved using the existing market-data architecture.
+
+If additional historical candles are required, retrieve them efficiently.
+
+Avoid excessive API requests.
+
+Do not create performance problems.
+
+The chart must work properly on:
+
+- Desktop
+- 375px mobile
+- 402px mobile
+- 768px tablet
+
+Do not simply shrink the desktop chart on mobile.
+
+Make the chart genuinely usable with touch controls.
+
+==================================================
+PART 6 — STRATEGIES
+==================================================
+
+Improve the Strategy Library UI while preserving the existing strategy/version architecture.
+
+The main strategy list should show only useful summary information:
+
+- Strategy name
+- Active/inactive
+- Current version
+- Market/instrument
+- Direction
+- Timeframe
+
+Provide obvious actions:
+
+- Open
+- Edit
+- Create version
+- Activate
+- View versions
+
+Do not display every detail of every version on the main page.
+
+Opening a strategy should provide its detailed information.
+
+==================================================
+PART 7 — STRATEGY BUILDER
+==================================================
+
+Keep the existing Strategy Builder functionality.
+
+Make the interface easier to understand.
+
+Organise the Builder into clear sections:
+
+1. Strategy details
+2. Market/instrument
+3. Timeframe
+4. Entry conditions
+5. Exit conditions
+6. Risk management
+7. Save/version actions
+
+Avoid an unnecessarily long single-page experience where possible.
+
+The Builder must continue supporting:
+
+- Strategy name
+- Description
+- Direction
+- Market/instrument
+- Timeframe
+- Entry conditions
+- Exit conditions
+- Stop loss
+- Take profit
+- Existing concepts
+- AI-generated drafts
+
+IMPORTANT:
+
+Fully test the AI → Strategy Builder handoff.
+
+Test:
+
+- Review Strategy
+- Save as New Version
+- Repeated Review Strategy
+- Repeated Save as New Version
+- Leaving and returning to AI Assistant
+- Existing strategies being present
+- Market mapping
+- Condition transfer
+- Risk-rule transfer
+
+The AI draft must never silently disappear.
+
+If a supported condition cannot be executed by the existing monitoring/backtesting architecture, clearly preserve the condition and show the compatibility warning.
+
+Do not pretend unsupported concepts are executable.
+
+==================================================
+PART 8 — AI ASSISTANT
+==================================================
+
+Keep the existing AI Assistant.
+
+Do not remove the current concept-recognition system.
+
+Make the Assistant visually clearer.
+
+Clearly distinguish:
+
+- Normal AI answers
+- Strategy drafts
+- Compatibility warnings
+- Unsupported concepts
+- Review Strategy
+- Save as New Version
+
+Strategy requests should produce a structured strategy draft where appropriate.
+
+The AI must not:
+
+- Fabricate market data
+- Claim guaranteed profitability
+- Execute trades
+- Pretend to connect to brokers
+- Invent unsupported trading functionality
+
+Make sure strategy drafts reliably transfer into the Strategy Builder.
+
+Test repeated handoffs.
+
+==================================================
+PART 9 — STRATEGY MONITORING
+==================================================
+
+Keep the existing Strategy Monitoring engine.
+
+Improve the UI so the user can immediately understand what is happening.
+
+The main view should clearly show:
+
+- Strategy
+- Exact strategy version
+- Market
+- Timeframe
+- Overall monitoring state
+
+Keep the existing states:
+
+- MET
+- NOT MET
+- WAITING
+- INVALID
+
+Make WAITING and INVALID reasons extremely clear.
+
+Do not fabricate MET/NOT MET results.
+
+Do not add fake detectors simply to make the UI appear functional.
+
+Keep the existing closed-candle-only behaviour.
+
+Keep correct strategy-version association.
+
+==================================================
+PART 10 — ALERTS
+==================================================
+
+Keep the existing Alerts functionality.
+
+Make the page easy to scan.
+
+Prioritise:
+
+- Unacknowledged alerts
+- Alert type
+- Strategy
+- Version
+- Time
+- Reason
+- Acknowledge action
+
+Avoid unnecessary information dominating the screen.
+
+==================================================
+PART 11 — BACKTESTING
+==================================================
+
+Keep all existing backtesting calculations and assumptions.
+
+Do not rewrite the calculation engine unless a genuine bug is found.
+
+Improve the interface.
+
+The backtest setup should clearly guide the user through:
+
+1. Strategy
+2. Version
+3. Market
+4. Date range
+5. Run backtest
+
+Results should be presented in a dedicated results-focused experience.
+
+Do not place the entire setup, history and every statistic on one huge page.
+
+==================================================
+PART 12 — BACKTEST RESULTS
+==================================================
+
+Make results easy to understand.
+
+Prioritise the main statistics:
+
+- Net P/L
+- Number of trades
+- Win rate
+- Profit factor
+- Drawdown
+
+Then provide access to:
+
+- Equity curve
+- Trade list
+- Detailed statistics
+- Strategy/version information
+- AI explanation
+
+Do not overwhelm the user with every statistic simultaneously.
+
+Keep Journal trades completely separate from backtest trades.
+
+==================================================
+PART 13 — JOURNAL
+==================================================
+
+The Journal is another MAJOR priority.
+
+I want the Journal to be extremely clean and easy to use.
+
+The main Journal view should primarily be a MONTHLY CALENDAR.
+
+The calendar should show every day of the selected month.
+
+Each day should clearly show the realised Journal P/L for that day.
+
+For example:
+
+12
++£8.42
+
+13
+-£3.17
+
+14
+£0.00
+
+Days with no trades should remain visually quiet.
+
+Use clear sign-based visual states:
+
+- Positive P/L
+- Negative P/L
+- Zero P/L
+- No trading activity
+
+At the top of the Journal show a simple monthly summary:
+
+- Monthly P/L
+- Number of trades
+- Win rate
+- Best day
+- Worst day
+- Average trading day
+
+Provide:
+
+- Previous month
+- Next month
+- Current month
+
+==================================================
+PART 14 — JOURNAL DAY DETAILS
+==================================================
+
+Clicking a day should open that day's details without forcing the user to scroll through the entire Journal.
+
+The day detail should show:
+
+- Full date
+- Daily P/L
+- Trade count
+- Winners
+- Losers
+- Win rate
+- Average winner
+- Average loser
+- Best trade
+- Worst trade
+
+Then show the individual trades for that day.
+
+Each trade should clearly show relevant information such as:
+
+- Instrument
+- Direction
+- P/L
+- Strategy
+- Exact strategy version
+- Opened time
+- Closed time
+
+Daily notes should be available from the selected day.
+
+Notes must remain persisted separately from trade data.
+
+The user should be able to:
+
+- Add a note
+- Edit a note
+- Save a note
+- Return to the calendar
+
+Do NOT permanently display every trade and every statistic underneath the calendar.
+
+Use a clean day-detail panel, drawer, modal or equivalent interface.
+
+==================================================
+PART 15 — JOURNAL PERFORMANCE
+==================================================
+
+Keep the existing performance functionality.
+
+Organise it so it is not all displayed at once.
+
+The user should be able to access:
+
+- Monthly P/L
+- Daily P/L
+- Cumulative P/L
+- Win rate
+- Winning streak
+- Losing streak
+- Best/worst day
+- Strategy performance
+- Exact strategy-version performance
+- Filters
+
+Use the existing filters:
+
+- Strategy
+- Exact version
+- Instrument
+- Direction
+- Date range
+
+Do not remove existing functionality.
+
+==================================================
+PART 16 — PERFORMANCE
+==================================================
+
+Make Performance a dedicated analysis area rather than another huge page.
+
+Prioritise:
+
+- Overall P/L
+- Equity progression
+- Win rate
+- Profit factor
+- Drawdown
+- Average winner
+- Average loser
+- Strategy performance
+- Strategy-version performance
+
+Use charts where they materially improve understanding.
+
+Do not duplicate the entire Journal.
+
+==================================================
+PART 17 — SETTINGS
+==================================================
+
+Keep Settings simple and understandable.
+
+Do not expose technical implementation details unless they are genuinely useful to the user.
+
+==================================================
+PART 18 — RESPONSIVE DESIGN
+==================================================
+
+The entire application must work properly on:
+
+- Desktop
+- 375px mobile
+- 402px mobile
+- 768px tablet
+
+Pay particular attention to:
+
+- Navigation
+- Markets
+- Chart
+- Calendar
+- Strategy Builder
+- AI Assistant
+- Backtesting
+- Tables
+- Dropdowns
+- Modals
+- Drawers
+
+Avoid unnecessary horizontal scrolling.
+
+Do not simply scale down the desktop layout.
+
+Reflow content intelligently for smaller screens.
+
+==================================================
+PART 19 — VISUAL CONSISTENCY
+==================================================
+
+Create a consistent visual system throughout the application.
+
+Standardise:
+
+- Buttons
+- Cards
+- Inputs
+- Dropdowns
+- Tabs
+- Modals
+- Drawers
+- Headers
+- Spacing
+- Typography
+- Status indicators
+- Empty states
+- Loading states
+- Error states
+
+The application should feel like ONE product.
+
+Avoid making each page look like it was designed separately.
+
+==================================================
+PART 20 — INFORMATION DENSITY
+==================================================
+
+This is extremely important.
+
+Reduce unnecessary information shown simultaneously.
+
+The application should follow:
+
+PRIMARY INFORMATION
+↓
+IMPORTANT ACTIONS
+↓
+SECONDARY INFORMATION
+↓
+ADVANCED DETAILS
+
+The user should rarely have to scroll through a massive page.
+
+Use interaction patterns to reveal detail when needed.
+
+Do not hide important information.
+
+Organise it intelligently.
+
+==================================================
+PART 21 — BUG FIXING
+==================================================
+
+After the UI/UX work, thoroughly test the entire existing application.
+
+Do not assume previous QA means there are no bugs.
+
+For every genuine bug:
+
+1. Reproduce it.
+2. Identify the root cause.
+3. Fix it.
+4. Test the fix.
+5. Run regression tests.
+
+Do not make unrelated changes.
+
+Do not change working behaviour without a reason.
+
+==================================================
+PART 22 — COMPLETE REAL USER WORKFLOW
+==================================================
+
+Test the application like a real user.
+
+WORKFLOW:
+
+Dashboard
+→ Markets
+→ Select XAUUSD
+→ Select timeframe
+→ View chart
+→ Zoom in
+→ Zoom out
+→ Pan through historical candles
+→ Return to latest
+
+Then:
+
+Strategies
+→ Open strategy
+→ Edit
+→ Create version
+→ Activate version
+
+Then:
+
+AI Assistant
+→ Ask for a simple XAUUSD strategy
+→ Receive structured draft
+→ Review Strategy
+→ Confirm Builder is populated
+→ Return to Assistant
+→ Repeat Review Strategy
+→ Test Save as New Version
+
+Then:
+
+Monitoring
+→ Select strategy
+→ Select exact version
+→ Evaluate
+→ Check state
+→ Check reason
+
+Then:
+
+Alerts
+→ Check alert history
+→ Acknowledge alert
+
+Then:
+
+Backtesting
+→ Select strategy
+→ Select version
+→ Select date range
+→ Run
+→ View results
+→ Check statistics
+→ Check trade list
+
+Then:
+
+Journal
+→ Create trade
+→ Edit trade
+→ Close trade
+→ Check calendar
+→ Select trading day
+→ View daily P/L
+→ View trades
+→ Add daily note
+→ Check monthly P/L
+→ Check performance
+
+Repeat important workflows on mobile.
+
+==================================================
+PART 23 — DATA SAFETY
+==================================================
+
+Do NOT:
+
+- Delete existing user data
+- Create fake trading data
+- Create fake market data
+- Create fake backtest results
+- Mix Journal and Backtest trades
+- Break immutable strategy versions
+- Add automatic trade execution
+- Add broker execution
+- Invent unsupported futures functionality
+- Fabricate AI responses
+
+Temporary fixtures may be used for testing when necessary.
+
+If temporary fixtures are created:
+
+- Clearly identify them
+- Do not modify existing user data
+- Remove them after testing
+- Verify they were completely removed
+
+==================================================
+PART 24 — PERFORMANCE AND RELIABILITY
+==================================================
+
+Check for genuine problems involving:
+
+- Excessive API requests
+- Unnecessary rerenders
+- Infinite loops
+- Stale data
+- Broken caching
+- Slow navigation
+- Loading states that never finish
+- Failed requests
+- Unhandled errors
+- Browser console errors
+
+Fix confirmed issues only.
+
+==================================================
+PART 25 — FINAL VERIFICATION
+==================================================
+
+After all work:
+
+Run:
+
+- API tests
+- Frontend tests
+- Shared tests where applicable
+- API typecheck
+- Frontend typecheck
+- Shared typecheck where applicable
+- Production builds
+- git diff --check
+
+Perform real browser verification.
+
+Test:
+
+- Desktop
+- 375px mobile
+- 402px mobile
+- 768px tablet
+
+Check the browser console for errors.
+
+==================================================
+IMPORTANT — DO NOT CLAIM SOMETHING WORKS WITHOUT TESTING
+==================================================
+
+Do not report that a feature works simply because the code looks correct.
+
+Actually use the running application whenever possible.
+
+If something cannot be tested, explicitly say so.
+
+If something is already working correctly, leave it alone.
+
+If a requested feature cannot be implemented safely using the existing architecture, do not fake it.
+
+Explain the limitation instead.
+
+==================================================
+FINAL REPORT
+==================================================
+
+When everything is finished, provide a detailed report containing:
+
+1. Overall UI/UX changes
+2. Navigation changes
+3. Dashboard changes
+4. Markets changes
+5. Chart changes
+6. Strategy changes
+7. Strategy Builder changes
+8. AI Assistant changes
+9. Monitoring changes
+10. Alerts changes
+11. Backtesting changes
+12. Journal changes
+13. Performance changes
+14. Mobile/responsive changes
+15. Bugs discovered
+16. Root cause of each bug
+17. Fix for each bug
+18. Features intentionally left unchanged
+19. Any remaining limitations
+20. API test results
+21. Frontend test results
+22. Shared test results
+23. Typecheck results
+24. Production build results
+25. Browser verification results
+26. Any remaining issues that still need my attention
+
+IMPORTANT:
+
+This is a PERSONAL trading application.
+
+Optimise for:
+
+- Simplicity
+- Clarity
+- Easy navigation
+- Fast access to important information
+- Clean UI
+- Reliable functionality
+- Useful trading workflow
+- Good chart interaction
+- Easy Journal use
+
+Do not optimise for public SaaS features.
+
+Do not add unnecessary enterprise features.
+
+Do not keep adding features just to make the application appear more complete.
+
+The priority is to make the EXISTING application work properly and feel significantly cleaner, simpler and easier to use.
+
+Most importantly:
+
+When I click a section, I should immediately understand what that section is for and see the main thing I came there to use.
+
+Do not make me scroll through huge pages of unrelated information.
