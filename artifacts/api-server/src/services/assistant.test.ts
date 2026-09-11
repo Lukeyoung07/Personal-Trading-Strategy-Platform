@@ -160,7 +160,7 @@ describe("AI Trading Assistant provider boundary", () => {
     expect(response.strategyDraft?.conditions.map(condition => condition.triggerRules)).toEqual(["bullish", "bearish"]);
   });
 
-  it("builds the requested Gold reversal stages without inventing risk or exits", async () => {
+  it("maps the exact Gold sweep plus FVG retest request to executable Builder conditions", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
       choices: [{
@@ -169,41 +169,32 @@ describe("AI Trading Assistant provider boundary", () => {
             reply: "Prepared the requested reversal draft.",
             intent: "strategy_proposal",
             strategyDraft: {
-              name: "Gold 15m Liquidity Sweep Reversal",
-              description: "A reversal setup with a liquidity sweep followed by fair value gap confirmation.",
+               name: "Gold Liquidity Sweep and FVG Retest Reversal",
+               description: "A reversal setup with a liquidity sweep followed by a fair value gap retest.",
               direction: "both",
               marketSymbol: "Gold",
-              timeframes: ["15 minutes"],
+               timeframes: ["15m", "5m"],
               conditions: [
                 {
                   name: "Liquidity Sweep",
                   stage: "entry",
                   requirement: "required",
                   conceptName: "Liquidity Sweep",
-                  timeframe: "15 minutes",
+                   timeframe: "15m",
                   direction: "both",
-                  triggerRules: "close crosses above previous low",
+                   triggerRules: "model prose that must not become the executable rule",
                 },
                 {
-                  name: "Fair Value Gap confirmation",
+                   name: "Fair Value Gap Retest",
                   stage: "confirmation",
                   requirement: "required",
-                  conceptName: "Fair Value Gap",
-                  timeframe: "15 minutes",
+                   conceptName: "FVG Retest",
+                   timeframe: "5m",
                   direction: "both",
-                  triggerRules: "bullish",
-                },
-                {
-                  name: "Take Profit",
-                  stage: "exit",
-                  requirement: "optional",
-                  conceptName: "Take Profit",
-                  timeframe: "15 minutes",
-                  direction: "both",
-                  triggerRules: "always",
+                   triggerRules: "retest",
                 },
               ],
-              riskManagementRules: "stop-loss: 1%; take-profit: 2%",
+               riskManagementRules: null,
             },
           }),
         },
@@ -211,27 +202,55 @@ describe("AI Trading Assistant provider boundary", () => {
     }), { status: 200, headers: { "content-type": "application/json" } }));
 
     const response = await answerAssistant({
-      message: "Create me a Gold reversal strategy using a liquidity sweep followed by Fair Value Gap confirmation on the 15 minute timeframe.",
+       message: "Create me a reversal strategy for Gold using liquidity sweeps and Fair Value Gap retests. Use 15m for the main setup and 5m for confirmation, trading both long and short.",
       messages: [],
       context: { page: "/strategy-builder" },
     });
 
     expect(response.strategyDraft?.marketSymbol).toBe("XAUUSD");
-    expect(response.strategyDraft?.timeframes).toEqual(["15m"]);
+     expect(response.strategyDraft?.timeframes).toEqual(["15m", "5m"]);
     expect(response.strategyDraft?.conditions.map(condition => ({
       conceptName: condition.conceptName,
       stage: condition.stage,
       direction: condition.direction,
+       timeframe: condition.timeframe,
       triggerRules: condition.triggerRules,
       ruleSupported: condition.ruleSupported,
+       parameters: condition.parameters,
     }))).toEqual([
-      { conceptName: "Liquidity Sweep", stage: "entry", direction: "both", triggerRules: "close crosses above previous low", ruleSupported: true },
-      { conceptName: "Fair Value Gap", stage: "confirmation", direction: "both", triggerRules: "bullish", ruleSupported: true },
+       {
+         conceptName: "Liquidity Sweep",
+         stage: "entry",
+         direction: "both",
+         timeframe: "15m",
+         triggerRules: "Liquidity sweep: close back inside the swept level",
+         ruleSupported: true,
+         parameters: {
+           kind: "liquidity_sweep",
+           level: "previous_candle",
+           sweepSide: "auto",
+           confirmation: "close_back_inside",
+           lookback: 5,
+         },
+       },
+       {
+         conceptName: "Fair Value Gap",
+         stage: "confirmation",
+         direction: "both",
+         timeframe: "5m",
+         triggerRules: "Fair Value Gap retest",
+         ruleSupported: true,
+         parameters: {
+           kind: "fair_value_gap",
+           polarity: "auto",
+           interaction: "retest",
+           lookback: 20,
+           minimumGap: 0,
+         },
+       },
     ]);
     expect(response.strategyDraft?.riskManagementRules).toBeNull();
-     expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Liquidity Sweep");
-     expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Fair Value Gap confirmation");
-    expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Take Profit");
+     expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
   });
 
   it("transfers structured TRADEX fields, directions, and requested risk settings", async () => {
@@ -349,7 +368,7 @@ Risk/Reward: 2:1`,
     }), { status: 200, headers: { "content-type": "application/json" } }));
 
     const response = await answerAssistant({
-      message: "Build a bullish FVG strategy",
+       message: "Build a bullish EMA strategy",
       messages: [],
       context: { page: "/strategy-builder" },
     });
@@ -433,7 +452,7 @@ Risk/Reward: 2:1`,
     });
 
     expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).toEqual(expect.arrayContaining([
-      "Fair Value Gap (FVG)",
+       "Fair Value Gap",
       "Higher-timeframe bias",
       "Multi-timeframe analysis",
     ]));
@@ -441,14 +460,14 @@ Risk/Reward: 2:1`,
       "Higher-timeframe bias",
       "Multi-timeframe analysis",
     ]));
-     expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Fair Value Gap (FVG)");
+     expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Fair Value Gap");
   });
 
   it("preserves the remaining taxonomy aliases as unsupported review metadata", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
      const requests = [
        { message: "Build me a liquidity sweep strategy.", expected: ["Liquidity Sweep"], unsupported: [] },
-       { message: "Create an XAUUSD strategy using an FVG.", expected: ["Fair Value Gap (FVG)"], unsupported: [] },
+       { message: "Create an XAUUSD strategy using an FVG.", expected: ["Fair Value Gap"], unsupported: [] },
        { message: "Use a 4H bullish bias and 15M entry.", expected: ["Higher-timeframe bias", "Multi-timeframe analysis"], unsupported: ["Higher-timeframe bias", "Multi-timeframe analysis"] },
        { message: "Build an SMC strategy using BOS and an order block.", expected: ["Break of Structure", "Order Block"], unsupported: ["Break of Structure", "Order Block"] },
        { message: "Use the 20 EMA as confirmation.", expected: ["Exponential Moving Average (EMA)"], unsupported: ["Exponential Moving Average (EMA)"] },

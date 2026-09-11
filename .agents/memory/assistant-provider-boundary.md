@@ -9,8 +9,8 @@ The trading assistant must use only OpenRouter's `openrouter/free` route through
 
 **How to apply:** Keep provider credentials server-side, preserve exact strategy/version context, and treat provider failure as a visible workspace-safe state rather than silently changing providers.
 
-Concept support labels are advisory model output; normalize them server-side with a deterministic alias taxonomy against the historical engine’s supported rule vocabulary, preserve unsupported requests in reviewable drafts, and enrich metadata from explicit user wording when needed.
+Concept support labels are advisory model output; normalize them server-side with a deterministic alias taxonomy against the historical engine’s supported rule vocabulary. Structured Liquidity Sweep and Fair Value Gap aliases must resolve to executable parameters, while genuinely unsupported requests remain reviewable.
 
-**Why:** Models can describe an unsupported EMA, FVG, or multi-timeframe rule using a simple proxy condition or omit the canonical concept name, which can otherwise mislead users about backtest compatibility.
+**Why:** Models can omit canonical names or describe a supported structured concept as prose, which can otherwise create false backtest warnings or downgrade it to a generic candle rule.
 
-**How to apply:** Never trust a model-provided `supported` flag for known concepts. Keep alias families such as market structure, liquidity, FVG/order blocks, multi-timeframe, indicators, and risk concepts marked as AI understanding, add them to compatibility warnings, and only use a conservative fallback draft when an available strategy response omits the requested unsupported concept entirely.
+**How to apply:** Never trust a model-provided `supported` flag. Resolve Liquidity Sweep/FVG names, retest aliases, parameters, and canonical trigger labels through the shared executable definition before catalog validation; keep other unsupported concepts in compatibility warnings and reviewable drafts.

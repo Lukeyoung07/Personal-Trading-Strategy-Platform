@@ -39,6 +39,7 @@ export function executableConceptKind(name: string | null | undefined): Executab
   if (key.includes("liquidity sweep")) return "liquidity_sweep";
   if (
     key === "fvg" ||
+    key.startsWith("fvg ") ||
     key.includes("fair value gap") ||
     key.includes("bullish fvg") ||
     key.includes("bearish fvg")
@@ -95,6 +96,14 @@ export function normalizeExecutableParameters(
     return integerInRange(result.lookback, 1, 100) && numberInRange(result.minimumGap, 0, Number.MAX_SAFE_INTEGER) ? result : null;
   }
   return null;
+}
+
+export function executableConceptTriggerRules(parameters: ExecutableConceptParameters): string {
+  return parameters.kind === "liquidity_sweep"
+    ? "Liquidity sweep: close back inside the swept level"
+    : parameters.interaction === "retest"
+      ? "Fair Value Gap retest"
+      : "Fair Value Gap formation";
 }
 
 export const EXECUTABLE_CONCEPT_DEFINITIONS = {

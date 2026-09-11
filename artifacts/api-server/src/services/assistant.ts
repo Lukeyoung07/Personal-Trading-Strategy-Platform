@@ -13,6 +13,8 @@ import {
 } from "@workspace/db";
 import {
   ChatAssistantResponse,
+  EXECUTABLE_CONCEPT_DEFINITIONS,
+  executableConceptTriggerRules,
   executableConceptKind,
   normalizeExecutableParameters,
   type ChatAssistantBody,
@@ -221,10 +223,22 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
 }
 
 function conceptsRequestedInMessage(message: string) {
-  const requested: Array<{ name: string; supported: false; explanation: string }> = [];
+  const requested: Array<{ name: string; supported: boolean; explanation: string }> = [];
   const seen = new Set<string>();
   for (const concept of UNSUPPORTED_CONCEPTS) {
     if (!concept.pattern.test(message) || seen.has(concept.name)) continue;
+    const executableKind = executableConceptKind(concept.name);
+    if (executableKind) {
+      const name = EXECUTABLE_CONCEPT_DEFINITIONS[executableKind].label;
+      if (seen.has(name)) continue;
+      seen.add(name);
+      requested.push({
+        name,
+        supported: true,
+        explanation: "Mapped to the existing structured executable concept definition.",
+      });
+      continue;
+    }
     seen.add(concept.name);
     requested.push({
       name: concept.name,
@@ -242,6 +256,68 @@ function conceptsRequestedInMessage(message: string) {
     });
   }
   return requested;
+}
+
+function requestedExecutableConcepts(message: string) {
+  const requested: string[] = [];
+  if (/\bliquidity\s+sweep(?:s|ed|ing)?\b/i.test(message)) requested.push("Liquidity Sweep");
+  if (/\b(?:fvg|fair\s+value\s+gap)(?:s|es)?\b/i.test(message)) requested.push("Fair Value Gap");
+  return requested;
+}
+
+function mapRequestedExecutableConditions(conditions: any[], message: string) {
+  const requested = requestedExecutableConcepts(message);
+  if (!requested.length) return conditions;
+  const hasRetest = /\b(?:fvg|fair\s+value\s+gap)(?:\s+\w+){0,2}\s+retests?\b|\bfvg\s+retests?\b/i.test(message);
+  return conditions.map((condition, index) => {
+    const descriptor = `${condition?.name || ""} ${condition?.conceptName || ""} ${condition?.triggerRules || ""}`;
+    const direct = requested.find(name => executableConceptKind(descriptor.replace(name, "")) === executableConceptKind(name));
+    const byStage = condition?.stage === "entry" && requested.includes("Liquidity Sweep")
+      ? "Liquidity Sweep"
+      : condition?.stage === "confirmation" && requested.includes("Fair Value Gap")
+        ? "Fair Value Gap"
+        : requested[index % requested.length];
+    const conceptName = direct || (executableConceptKind(String(condition?.conceptName || "")) ? condition.conceptName : byStage);
+    const parameters = normalizeExecutableParameters(conceptName, {
+      ...(condition?.parameters && typeof condition.parameters === "object" ? condition.parameters : {}),
+      ...(hasRetest && executableConceptKind(conceptName) === "fair_value_gap" ? { interaction: "retest" } : {}),
+    });
+    return parameters
+      ? {
+        ...condition,
+        conceptName,
+        parameters,
+        triggerRules: executableConceptTriggerRules(parameters),
+        ruleSupported: true,
+        supported: true,
+      }
+      : condition;
+  });
+}
+
+function addMissingRequestedExecutableConditions(draft: any, message: string) {
+  const requested = requestedExecutableConcepts(message);
+  if (!requested.length || (Array.isArray(draft.conditions) && draft.conditions.length > 0)) return draft;
+  const timeframes = Array.isArray(draft.timeframes) ? draft.timeframes : [];
+  const direction = ["long", "short", "both"].includes(draft.direction) ? draft.direction : "both";
+  const conditions = requested.map((conceptName, index) => {
+    const parameters = normalizeExecutableParameters(conceptName, {
+      ...(conceptName === "Fair Value Gap" && /\bretests?\b/i.test(message) ? { interaction: "retest" } : {}),
+    });
+    return {
+      name: conceptName === "Liquidity Sweep" ? "Liquidity Sweep" : /\bretests?\b/i.test(message) ? "Fair Value Gap Retest" : "Fair Value Gap",
+      stage: conceptName === "Liquidity Sweep" ? "entry" : "confirmation",
+      requirement: "required",
+      conceptName,
+      timeframe: timeframes[index] || timeframes[0] || "Not specified",
+      direction,
+      triggerRules: parameters ? executableConceptTriggerRules(parameters) : "",
+      parameters,
+      ruleSupported: Boolean(parameters),
+      supported: Boolean(parameters),
+    };
+  });
+  return { ...draft, conditions };
 }
 
 function enrichDraftConcepts(draft: any, message: string) {
@@ -394,8 +470,14 @@ async function builderCatalog(): Promise<BuilderCatalog> {
 
 function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, requestMessage?: string) {
   if (!draft) return draft;
+  const requestedDraft = requestMessage
+    ? addMissingRequestedExecutableConditions(draft, requestMessage)
+    : draft;
   const warnings: string[] = [];
-  const conditions = (draft.conditions || []).map((condition: any) => {
+  const mappedConditions = requestMessage
+    ? mapRequestedExecutableConditions(requestedDraft.conditions || [], requestMessage)
+    : requestedDraft.conditions || [];
+  const conditions = mappedConditions.map((condition: any) => {
     const conceptName = matchCatalogConcept(String(condition.conceptName || ""), catalog);
     const timeframe = matchCatalogTimeframe(String(condition.timeframe || ""), catalog);
     if (!conceptName) warnings.push(`Concept “${String(condition.conceptName || "Unnamed concept")}” is not in the Trading Concept Library.`);
@@ -438,7 +520,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
     ? draft.timeframes.map((timeframe: string) => matchCatalogTimeframe(String(timeframe), catalog) || String(timeframe).slice(0, 40)).filter(Boolean).slice(0, 8)
     : [];
   const next = {
-    ...draft,
+    ...requestedDraft,
     marketSymbol,
     timeframes,
     conditions,
@@ -482,7 +564,7 @@ function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | 
       direction: ["long", "short", "both"].includes(condition?.direction)
         ? condition.direction
         : (draft.direction === "long" || draft.direction === "short" || draft.direction === "both" ? draft.direction : "both"),
-      triggerRules: normalizedRule.slice(0, 400),
+       triggerRules: parameters ? executableConceptTriggerRules(parameters) : normalizedRule.slice(0, 400),
       parameters,
       ruleSupported: ruleIsSupported || Boolean(parameters),
       supported: (ruleIsSupported || Boolean(parameters)) && !unsupportedConcept,
