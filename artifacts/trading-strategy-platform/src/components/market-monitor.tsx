@@ -184,6 +184,14 @@ function formatPrice(value: number | null | undefined) {
   return value == null || !Number.isFinite(value) ? "—" : value.toFixed(5);
 }
 
+function formatTimeAxisLabel(openTime: string, spanMs: number) {
+  const date = new Date(openTime);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat(undefined, spanMs >= 24 * 60 * 60 * 1000
+    ? { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }
+    : { hour: "numeric", minute: "2-digit" }).format(date);
+}
+
 function movingAverage(bars: ChartBar[], period: number, exponential: boolean) {
   const values: Array<number | null> = [];
   let previous: number | null = null;
@@ -926,6 +934,23 @@ function CandleSvg({
   const chartWidth = width - pad.left - pad.right;
   const xStep = chartWidth / Math.max(visibleBars.length, 1);
   const y = (value: number) => pad.top + ((displayHigh - value) / scaledRange) * chartHeight;
+  const priceTicks = Array.from({ length: 5 }, (_, index) => {
+    const ratio = index / 4;
+    return {
+      value: displayHigh - scaledRange * ratio,
+      y: pad.top + chartHeight * ratio,
+    };
+  });
+  const timeSpan = visibleBars.length > 1
+    ? Math.max(0, new Date(visibleBars[visibleBars.length - 1].openTime).getTime() - new Date(visibleBars[0].openTime).getTime())
+    : 0;
+  const timeTickCount = Math.min(6, visibleBars.length);
+  const timeTicks = visibleBars.length <= 1
+    ? visibleBars.map((bar, index) => ({ bar, index }))
+    : Array.from({ length: timeTickCount }, (_, index) => {
+      const barIndex = Math.round(index * (visibleBars.length - 1) / Math.max(1, timeTickCount - 1));
+      return { bar: visibleBars[barIndex], index: barIndex };
+    });
   const indicatorSeries = useMemo(() => ({
     sma20: movingAverage(bars, 20, false),
     ema20: movingAverage(bars, 20, true),
@@ -1067,12 +1092,14 @@ function CandleSvg({
          {hoverPoint && <g pointerEvents="none"><line x1={hoverPoint.x} x2={hoverPoint.x} y1={pad.top} y2={height - pad.bottom} stroke="hsl(var(--accent))" strokeDasharray="3 4" /><line x1={pad.left} x2={width - pad.right} y1={hoverPoint.y} y2={hoverPoint.y} stroke="hsl(var(--accent))" strokeDasharray="3 4" /></g>}
          {markerY != null && <g><line x1={pad.left} x2={width - pad.right} y1={markerY} y2={markerY} stroke="hsl(var(--primary))" strokeDasharray="5 4" /><text x={width - pad.right} y={markerY - 4} textAnchor="end" fill="hsl(var(--primary))" fontSize="10">{formatPrice(currentPrice)}</text></g>}
         {levelY != null && <g><line x1={pad.left} x2={width - pad.right} y1={levelY} y2={levelY} stroke="hsl(var(--accent))" strokeDasharray="7 4" /><text x={pad.left + 5} y={levelY - 4} fill="hsl(var(--accent))" fontSize="10">{formatPrice(drawingPrice)}</text></g>}
-        <text x={pad.left} y={height - 8} fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(visibleBars[0].openTime).toLocaleString()}</text>
-        <text x={width - pad.right} y={height - 8} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(visibleBars[visibleBars.length - 1].openTime).toLocaleString()}</text>
-         <text data-testid="chart-price-high" x={width - pad.right} y={pad.top + 10} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{displayHigh.toFixed(5)}</text>
-         <text data-testid="chart-price-low" x={width - pad.right} y={height - pad.bottom - 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{displayLow.toFixed(5)}</text>
+         {priceTicks.map((tick, index) => (
+           <text key={`price-tick-${index}`} data-testid={index === 0 ? "chart-price-high" : index === priceTicks.length - 1 ? "chart-price-low" : `chart-price-tick-${index}`} x={width - pad.right} y={tick.y + 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{tick.value.toFixed(5)}</text>
+         ))}
+         {timeTicks.map(({ bar, index }, tickIndex) => (
+           <text key={`time-tick-${bar.openTime}-${tickIndex}`} data-testid={`chart-time-tick-${tickIndex}`} x={pad.left + xStep * index + xStep / 2} y={height - 8} textAnchor={tickIndex === 0 ? "start" : tickIndex === timeTicks.length - 1 ? "end" : "middle"} fill="hsl(var(--muted-foreground))" fontSize="10">{formatTimeAxisLabel(bar.openTime, timeSpan)}</text>
+         ))}
          <path data-testid="chart-price-axis" d={`M ${width - pad.right - 55} ${pad.top} H ${width - pad.right} V ${height - pad.bottom} H ${width - pad.right - 55} Z`} fill="transparent" pointerEvents="all" style={{ cursor: "ns-resize" }} aria-label="Drag to scale price axis" />
-         <path data-testid="chart-time-axis" d={`M ${pad.left} ${height - pad.bottom - 22} H ${width - pad.right} V ${height - pad.bottom} H ${pad.left} Z`} fill="transparent" pointerEvents="all" style={{ cursor: "ew-resize" }} aria-label="Drag to scale time axis" />
+         <path data-testid="chart-time-axis" d={`M ${pad.left} ${height - pad.bottom - 22} H ${width - pad.right} V ${height} H ${pad.left} Z`} fill="transparent" pointerEvents="all" style={{ cursor: "ew-resize" }} aria-label="Drag to scale time axis" />
        </svg>
       </div>
       {hoveredIndex != null && visibleBars[hoveredIndex] && <div className="chart-hover-readout" role="status">

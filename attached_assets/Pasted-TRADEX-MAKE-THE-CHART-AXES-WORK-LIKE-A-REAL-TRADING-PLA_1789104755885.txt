@@ -1,0 +1,334 @@
+TRADEX — MAKE THE CHART AXES WORK LIKE A REAL TRADING PLATFORM
+
+I have attached a screenshot of the Trading 212 chart as the exact interaction reference.
+
+Look at the screenshot carefully.
+
+I want the TradeX chart to behave like this.
+
+DO NOT redesign the Markets page.
+DO NOT change the current TradeX UI.
+DO NOT change the purple/dark theme.
+DO NOT change the candlestick colours.
+DO NOT change the BiQuote data.
+
+This task is specifically about making the EXISTING chart axes behave correctly.
+
+==================================================
+1. RIGHT-HAND PRICE AXIS
+==================================================
+
+The chart must have a proper PRICE SCALE running vertically along the RIGHT side of the candlestick chart.
+
+The price labels must represent the actual visible market prices.
+
+For example:
+
+4,410
+4,400
+4,390
+4,380
+4,370
+...
+
+The price scale must automatically update based on the candles currently visible.
+
+==================================================
+2. DRAG THE PRICE SCALE
+==================================================
+
+THIS IS THE MOST IMPORTANT PART.
+
+I want to be able to place my mouse directly over the RIGHT-HAND PRICE SCALE where the price numbers are shown.
+
+When I LEFT CLICK + DRAG vertically:
+
+DRAG UP
+→ vertically stretch the price scale
+→ candles become taller/larger vertically
+→ price spacing changes
+
+DRAG DOWN
+→ vertically compress the price scale
+→ candles become shorter/smaller vertically
+→ price spacing changes
+
+The actual market prices MUST NOT change.
+
+Only the visual price scale changes.
+
+This should feel like dragging the price scale on Trading 212 / TradingView.
+
+Do NOT create a separate button for this.
+
+The actual price-axis area itself must be draggable.
+
+==================================================
+3. BOTTOM TIME AXIS
+==================================================
+
+The chart must have a proper TIME SCALE along the BOTTOM.
+
+It should display the actual timestamps from the loaded candles.
+
+For example:
+
+12:00 PM   01:30 PM   03:00 PM   04:30 PM   06:00 PM
+
+The labels must update based on the currently visible candles.
+
+==================================================
+4. DRAG THE TIME SCALE
+==================================================
+
+I want to interact directly with the BOTTOM TIME AXIS.
+
+When I LEFT CLICK + DRAG the time axis horizontally:
+
+DRAG LEFT/RIGHT
+→ change the horizontal candle spacing/density
+→ candles become wider/narrower
+→ the visible time range changes appropriately
+
+The actual candle timestamps must NOT change.
+
+Only the visual time scale changes.
+
+Again, this should feel like a professional trading platform.
+
+==================================================
+5. MAIN CHART AREA
+==================================================
+
+The main candle area should have a separate interaction:
+
+LEFT CLICK + DRAG
+→ PAN through the loaded candles
+
+This should NOT change the vertical price scale.
+
+It should NOT accidentally change the time scale.
+
+==================================================
+6. MOUSE WHEEL
+==================================================
+
+When the mouse is over the chart:
+
+MOUSE WHEEL
+→ zoom the chart
+
+The web page itself must NOT scroll while the cursor is over the chart.
+
+The chart should consume the wheel interaction.
+
+==================================================
+7. CLEAR SEPARATION OF INTERACTIONS
+==================================================
+
+The three areas need to have different behaviours:
+
+RIGHT PRICE AXIS
+→ drag vertically
+→ vertical price scaling
+
+BOTTOM TIME AXIS
+→ drag horizontally
+→ horizontal/time scaling
+
+MAIN CHART
+→ drag horizontally
+→ pan through candles
+
+CHART WHEEL
+→ zoom
+
+MOUSE MOVEMENT
+→ crosshair
+
+These interactions must NOT interfere with each other.
+
+==================================================
+8. PRICE LABELS
+==================================================
+
+The price labels must remain attached to the RIGHT side of the chart.
+
+When I vertically stretch/squish the chart:
+
+- price values update correctly
+- spacing updates
+- candles remain synchronised with the scale
+- current price remains correctly positioned
+
+Do NOT display fake/static price numbers.
+
+==================================================
+9. TIME LABELS
+==================================================
+
+The time labels must remain attached to the BOTTOM of the chart.
+
+When I zoom or pan:
+
+- timestamps update
+- labels remain aligned with their candles
+- sensible intervals are displayed
+- labels do not overlap excessively
+
+Use actual candle timestamps.
+
+==================================================
+10. CURRENT PRICE
+==================================================
+
+Keep the current-price marker.
+
+It must remain aligned with the actual current price on the RIGHT price scale.
+
+Live BiQuote data must continue working.
+
+==================================================
+11. TIMEFRAMES
+==================================================
+
+This must work correctly for:
+
+1m
+5m
+15m
+30m
+1h
+4h
+1d
+
+When switching timeframe:
+
+- price scale resets to a sensible range
+- time scale resets to a sensible density
+- candles are readable
+- the user can then manually adjust both scales with the mouse
+
+==================================================
+12. USE THE EXISTING CHART LIBRARY
+
+Before implementing this, inspect the chart library currently being used.
+
+If it already supports:
+
+- price-scale interaction
+- time-scale interaction
+- zoom
+- pan
+- mouse events
+
+use its native functionality.
+
+Do NOT replace the chart unnecessarily.
+
+Do NOT create a fake HTML overlay pretending to be a price scale.
+
+The numbers must genuinely correspond to the chart's coordinate system and candle data.
+
+==================================================
+13. PRESERVE EVERYTHING ELSE
+==================================================
+
+Do NOT break:
+
+- BiQuote
+- Live quotes
+- Historical candles
+- Current price
+- Crosshair
+- OHLC
+- SMA
+- EMA
+- Horizontal price levels
+- Price alerts
+- Latest
+- Fit
+- Reset
+- Mobile touch interaction
+
+==================================================
+14. MOBILE
+==================================================
+
+Keep the existing mobile behaviour.
+
+Desktop mouse interaction is the priority, but do not break touch interaction at:
+
+375px
+402px
+768px
+
+==================================================
+15. FINAL TEST
+
+After implementation, test the actual running chart.
+
+Specifically verify:
+
+RIGHT PRICE AXIS:
+- Can I click directly on the price numbers?
+- Can I drag UP?
+- Do candles become vertically taller?
+- Can I drag DOWN?
+- Do candles become vertically shorter?
+
+BOTTOM TIME AXIS:
+- Can I interact directly with the time labels?
+- Can I drag horizontally?
+- Do candles become wider/narrower appropriately?
+
+MAIN CHART:
+- Can I click + drag through historical candles?
+
+MOUSE WHEEL:
+- Does it zoom the chart?
+- Does the webpage stay still?
+
+Also test:
+
+- 1m
+- 5m
+- 15m
+- 30m
+- 1h
+- 4h
+- 1d
+
+Check at:
+
+1440px
+768px
+402px
+375px
+
+Run the existing frontend tests, typecheck and production build.
+
+IMPORTANT:
+
+Do not report this as complete just because the chart renders.
+
+Physically test the mouse interactions in the running browser.
+
+The final result I want is essentially:
+
+                 PRICE
+                   ↑
+                   │
+        CANDLES    │
+                   │
+                   │
+                   ↓
+                 PRICE
+
+              TIME → → →
+
+RIGHT SIDE = actual draggable price scale
+BOTTOM = actual draggable time scale
+CENTRE = pannable candlestick chart
+
+It should feel like the Trading 212 screenshot I attached.
