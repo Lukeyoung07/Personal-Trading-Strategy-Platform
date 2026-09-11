@@ -1,0 +1,206 @@
+TRADEX — FIX CHART LEFT-CLICK PANNING + TEXT SELECTION
+
+There are now two remaining mouse-interaction issues with the Markets candlestick chart.
+
+DO NOT redesign anything.
+DO NOT change the chart colours.
+DO NOT change the BiQuote data.
+DO NOT change the existing visual design.
+
+ONLY fix the chart mouse interaction.
+
+==================================================
+1. FIX LEFT-CLICK + DRAG ON THE ACTUAL CHART
+==================================================
+
+I need to be able to LEFT CLICK + HOLD on the actual candlestick/chart area and drag my mouse LEFT or RIGHT to move through the market candles.
+
+Current problem:
+When I left-click and drag the actual chart, it does not reliably move/pan the chart.
+
+Desired behaviour:
+
+LEFT CLICK + HOLD ON MAIN CHART
+→ move mouse LEFT
+→ chart moves through the candles
+
+LEFT CLICK + HOLD ON MAIN CHART
+→ move mouse RIGHT
+→ chart moves through the candles
+
+The panning must be smooth and continuous.
+
+I should NOT have to use a button to pan.
+
+Use the chart library's native pan/scroll interaction if available.
+
+If pointer events are being intercepted by another chart layer, overlay, crosshair, drawing tool, or container, fix the event handling so the main chart receives the drag.
+
+Use pointer capture where appropriate so the drag continues even if the mouse moves slightly outside the chart while held.
+
+Do NOT interfere with:
+
+- Price-axis dragging
+- Time-axis dragging
+- Crosshair
+- Drawing mode
+- Buttons
+- Other Markets controls
+
+==================================================
+2. FIX BLUE TEXT SELECTION
+==================================================
+
+When dragging:
+
+- Main chart
+- Right price scale
+- Bottom time scale
+
+the browser currently highlights surrounding text blue.
+
+Prevent text selection ONLY within the chart and its interactive areas while dragging.
+
+Do NOT disable text selection across the entire website.
+
+Do NOT affect:
+
+- Inputs
+- Buttons
+- Dropdowns
+- Normal page text
+
+Desired behaviour:
+
+CLICK + DRAG CHART
+→ chart moves
+→ NO blue text selection
+
+CLICK + DRAG PRICE SCALE
+→ price scale moves
+→ NO blue text selection
+
+CLICK + DRAG TIME SCALE
+→ time scale moves
+→ NO blue text selection
+
+==================================================
+3. IMPORTANT — CHECK EVENT CONFLICTS
+==================================================
+
+Inspect the current chart implementation before changing it.
+
+There are several different interaction zones:
+
+MAIN CHART
+→ Left drag = pan
+
+RIGHT PRICE AXIS
+→ Left drag = vertical price scaling
+
+BOTTOM TIME AXIS
+→ Left drag = horizontal/time scaling
+
+CHART WHEEL
+→ zoom
+
+MOUSE MOVE
+→ crosshair
+
+DRAWING MODE
+→ click to place a level
+
+Make sure these do not conflict with each other.
+
+A normal left drag on the MAIN CHART must NOT:
+
+- Select text
+- Trigger drawing
+- Trigger a button
+- Drag the price axis
+- Drag the time axis
+
+==================================================
+4. DO NOT REPLACE THE CHART
+==================================================
+
+Use the existing chart library and implementation.
+
+Do not rebuild the chart from scratch.
+
+Do not create fake controls to compensate for the broken interaction.
+
+Fix the underlying pointer/mouse event handling.
+
+==================================================
+5. TEST THE ACTUAL RUNNING APP
+==================================================
+
+After implementing the fix, physically test in the browser:
+
+A. Main chart:
+- Left click + drag left
+- Left click + drag right
+- Confirm candles move
+
+B. Price axis:
+- Left click + drag up/down
+- Confirm vertical scaling still works
+
+C. Time axis:
+- Left click + drag left/right
+- Confirm horizontal scaling still works
+
+D. Mouse wheel:
+- Zoom in/out
+- Confirm the page does NOT scroll
+
+E. Crosshair:
+- Still works
+
+F. Drawing mode:
+- Still works
+
+G. Text selection:
+- No blue highlighting occurs during chart dragging
+
+Test at:
+
+1440px
+768px
+402px
+375px
+
+Test multiple timeframes:
+
+1m
+5m
+15m
+30m
+1h
+4h
+1d
+
+Run the existing frontend tests, typecheck and production build.
+
+IMPORTANT:
+
+Do not report this as fixed just because the code compiles.
+
+Actually test LEFT CLICK + DRAG on the MAIN CHART in the running browser and confirm that the candles visibly pan through the market.
+
+The exact desired interaction is:
+
+MAIN CHART
+LEFT CLICK + DRAG
+= PAN THROUGH CANDLES
+
+RIGHT PRICE SCALE
+LEFT CLICK + DRAG UP/DOWN
+= STRETCH/SQUISH PRICE SCALE
+
+BOTTOM TIME SCALE
+LEFT CLICK + DRAG
+= CHANGE HORIZONTAL CANDLE DENSITY
+
+NO BLUE TEXT SELECTION.

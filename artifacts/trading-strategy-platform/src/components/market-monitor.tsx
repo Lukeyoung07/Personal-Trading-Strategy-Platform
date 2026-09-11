@@ -971,6 +971,7 @@ function CandleSvg({
     const point = getLocalPoint(event, rect);
     const drag = dragRef.current;
     if (drag) {
+      event.preventDefault();
       const deltaX = point.x - drag.startX;
       const deltaY = point.y - drag.startY;
       if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) drag.didMove = true;
@@ -994,6 +995,7 @@ function CandleSvg({
     });
   };
   const handlePointerDown = (event: PointerEvent<SVGSVGElement>) => {
+    if (event.button !== 0) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const point = getLocalPoint(event, rect);
     const mode = point.y >= height - pad.bottom
@@ -1073,7 +1075,7 @@ function CandleSvg({
         </div>
       </div>
       <div className="overflow-x-auto">
-       <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[680px] h-[300px] md:h-[360px]" role="img" aria-label="BiQuote candlestick chart" style={{ touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} onPointerLeave={() => { if (!dragRef.current) { setHoveredIndex(null); setHoverPoint(null); } }} onWheel={handleWheel} onClick={handleChartClick}>
+       <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[680px] h-[300px] md:h-[360px] chart-interaction-surface" role="img" aria-label="BiQuote candlestick chart" style={{ touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }} onDragStart={event => event.preventDefault()} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} onPointerLeave={() => { if (!dragRef.current) { setHoveredIndex(null); setHoverPoint(null); } }} onWheel={handleWheel} onClick={handleChartClick}>
         {[0, 1, 2, 3, 4].map(index => {
           const gridY = pad.top + (chartHeight / 4) * index;
           return <line key={index} x1={pad.left} x2={width - pad.right} y1={gridY} y2={gridY} stroke="hsl(var(--border) / .55)" strokeDasharray="2 5" />;
