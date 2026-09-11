@@ -1,0 +1,202 @@
+TRADEX — FIX CHART MOUSE INTERACTION BUGS
+
+The new mouse-controlled chart is currently buggy.
+
+DO NOT redesign the Markets page.
+DO NOT change the visual design.
+DO NOT change the candle colours.
+DO NOT change the BiQuote data.
+DO NOT add new features.
+
+ONLY fix the existing chart mouse interactions.
+
+CURRENT BUGS:
+
+1. When I use my mouse wheel over the chart to zoom in/out, the WEB PAGE scrolls instead of the chart zooming.
+
+2. I cannot reliably click and drag the chart with my mouse to move backwards/forwards through the market candles.
+
+3. The chart interaction needs to behave like a proper trading chart.
+
+==================================================
+1. FIX MOUSE-WHEEL ZOOM
+==================================================
+
+When the mouse cursor is over the chart:
+
+- Mouse wheel should zoom the chart in/out.
+- The page itself must NOT vertically scroll while the cursor is over the chart.
+- Prevent the chart's wheel event from propagating to the page when appropriate.
+- Do not break normal page scrolling when the cursor is outside the chart.
+
+Zoom should control candle density/horizontal scale.
+
+==================================================
+2. FIX CLICK + DRAG PANNING
+==================================================
+
+When I press and hold the LEFT mouse button on the chart body and move the mouse:
+
+- The chart must move left/right through the candles.
+- Historical candles must become accessible.
+- The movement should be smooth.
+- Releasing the mouse should stop panning.
+
+Do NOT interpret a normal drag as a drawing action.
+
+Drawing mode must remain separate.
+
+==================================================
+3. IMPORTANT — DON'T CONFLICT WITH OTHER CONTROLS
+==================================================
+
+The following areas should retain their own behaviour:
+
+CHART BODY:
+- Left drag = pan
+- Wheel = zoom
+
+RIGHT PRICE AXIS:
+- Drag = vertical price scaling
+
+BOTTOM TIME AXIS:
+- Drag = horizontal/time scaling
+
+CROSSHAIR:
+- Mouse movement = crosshair
+
+DRAWING MODE:
+- Click = place horizontal level
+- Dragging should NOT accidentally place a level
+
+Do not allow these interactions to interfere with each other.
+
+==================================================
+4. PREVENT EVENT CONFLICTS
+==================================================
+
+Inspect the current chart implementation carefully.
+
+Make sure:
+
+- Wheel events are handled by the chart when the cursor is over it.
+- Wheel events do not unnecessarily bubble to the page.
+- Pointer/mouse down events correctly start chart panning.
+- Pointer/mouse move events continue tracking even if the cursor moves slightly outside the chart while dragging.
+- Pointer/mouse up correctly ends the interaction.
+- Chart panning does not accidentally trigger buttons or drawing tools.
+- React event handlers and native chart event handlers do not fight each other.
+
+Use pointer capture where appropriate.
+
+Do not introduce global document-level mouse handlers unless necessary.
+
+==================================================
+5. PRESERVE CURRENT FEATURES
+==================================================
+
+Do NOT break:
+
+- Live quotes
+- Historical candles
+- Timeframes
+- Current price
+- Crosshair
+- OHLC
+- SMA
+- EMA
+- Horizontal price levels
+- Price alerts
+- Latest
+- Fit
+- Reset
+- Mobile touch interaction
+
+==================================================
+6. TIMEFRAME TEST
+==================================================
+
+Test:
+
+1m
+5m
+15m
+30m
+1h
+4h
+1d
+
+For every timeframe verify:
+
+- Wheel zoom works
+- Page does not scroll while zooming over chart
+- Left mouse drag pans the chart
+- Candles remain readable
+- Latest works
+- Fit works
+- Reset works
+
+==================================================
+7. DESKTOP TEST
+==================================================
+
+Test at:
+
+1440px
+768px
+
+Specifically test:
+
+- Mouse wheel
+- Left click + drag
+- Price-axis drag
+- Time-axis drag
+- Crosshair
+- Drawing mode
+
+==================================================
+8. MOBILE TEST
+==================================================
+
+Make sure the desktop mouse fixes do not break existing touch interaction.
+
+Test:
+
+402px
+375px
+
+==================================================
+9. IMPORTANT
+==================================================
+
+Do not simply add more buttons to compensate for broken mouse interaction.
+
+Fix the underlying pointer/wheel event handling.
+
+The desired behaviour is:
+
+MOUSE OVER CHART
+↓
+Wheel = zoom chart, NOT page
+
+LEFT CLICK + DRAG CHART
+↓
+Pan through candles
+
+DRAG PRICE AXIS
+↓
+Stretch/squish vertical price scale
+
+DRAG TIME AXIS
+↓
+Adjust horizontal candle density
+
+MOUSE MOVE
+↓
+Crosshair
+
+This should feel like a normal professional trading chart.
+
+After fixing it, run the existing frontend tests, typecheck and production build.
+
+Then verify the behaviour in the running browser and report exactly what was tested.
