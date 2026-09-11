@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   collectHistoricalCandles,
   historicalCandleCoverage,
+  missingHistoricalRanges,
   type NormalizedCandle,
 } from "./market-data";
 
@@ -133,6 +134,55 @@ describe("historical market-data retrieval", () => {
     expect(calls).toBe(2);
   });
 
+  it("advances across empty provider periods when the adapter exposes a page step", async () => {
+    const start = new Date("2026-01-03T00:00:00.000Z");
+    const firstAvailable = candle(24 * 2, start.toISOString());
+    let calls = 0;
+    const result = await collectHistoricalCandles({
+      adapter: {
+        historicalEmptyPageAdvanceSeconds: 86_400,
+        candles: async request => {
+          calls += 1;
+          if (calls < 3) return [];
+          return [firstAvailable];
+        },
+      },
+      providerSymbol: "TEST",
+      timeframeCode: "1d",
+      timeframeDurationSeconds: 86_400,
+      from: start,
+      to: firstAvailable.openTime,
+    });
+
+    expect(result).toEqual([firstAvailable]);
+    expect(calls).toBe(3);
+  });
+
+  it("emits each successful page for durable cache persistence", async () => {
+    const allCandles = [candle(0), candle(1), candle(2)];
+    const batches: NormalizedCandle[][] = [];
+    await collectHistoricalCandles({
+      adapter: {
+        candles: async request => {
+          const from = request.from?.getTime() ?? allCandles[0].openTime.getTime();
+          const start = allCandles.findIndex(item => item.openTime.getTime() >= from);
+          return allCandles.slice(Math.max(start, 0), Math.max(start, 0) + 2);
+        },
+      },
+      providerSymbol: "TEST",
+      timeframeCode: "1h",
+      timeframeDurationSeconds: 3_600,
+      from: allCandles[0].openTime,
+      to: allCandles.at(-1)!.openTime,
+      onBatch: async batch => {
+        batches.push(batch);
+      },
+    });
+
+    expect(batches.flat()).toHaveLength(3);
+    expect(batches.length).toBeGreaterThan(1);
+  });
+
   it("rejects a provider response that does not cover the requested range", () => {
     expect(() => historicalCandleCoverage(
       [candle(998), candle(999)],
@@ -166,5 +216,48 @@ describe("historical market-data retrieval", () => {
       from: candle(0).openTime,
       to: candle(2).openTime,
     })).toThrow(/contains no candles/i);
+  });
+
+  it("requests the full range when the reusable cache is empty", () => {
+    const from = new Date("2026-01-01T00:00:00.000Z");
+    const to = new Date("2026-01-11T00:00:00.000Z");
+    expect(missingHistoricalRanges([], {
+      from,
+      to,
+      timeframeDurationSeconds: 3_600,
+    })).toEqual([{ from, to }]);
+  });
+
+  it("reuses complete cached coverage without a provider request", () => {
+    const from = new Date("2026-01-01T00:00:00.000Z");
+    const to = new Date("2026-01-11T00:00:00.000Z");
+    expect(missingHistoricalRanges([candle(0, from.toISOString()), candle(24 * 10, from.toISOString())], {
+      from,
+      to,
+      timeframeDurationSeconds: 3_600,
+    })).toEqual([]);
+  });
+
+  it("retrieves only leading and trailing periods around cached history", () => {
+    const from = new Date("2026-01-01T00:00:00.000Z");
+    const to = new Date("2026-01-21T00:00:00.000Z");
+    const cachedStart = new Date("2026-01-08T00:00:00.000Z");
+    expect(missingHistoricalRanges([
+      candle(0, cachedStart.toISOString()),
+      candle(24 * 6, cachedStart.toISOString()),
+    ], {
+      from,
+      to,
+      timeframeDurationSeconds: 3_600,
+    })).toEqual([
+      {
+        from,
+        to: new Date("2026-01-07T23:00:00.000Z"),
+      },
+      {
+        from: new Date("2026-01-14T01:00:00.000Z"),
+        to,
+      },
+    ]);
   });
 });

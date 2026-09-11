@@ -12,6 +12,7 @@ import type {
   NormalizedCandle,
   ProviderCandleRequest,
 } from "./market-data";
+import { HistoricalDataError } from "./historical-errors";
 
 export const DUKASCOPY_KEY = "dukascopy";
 export const DUKASCOPY_BASE_URL = "https://jetta.dukascopy.com/v1";
@@ -41,6 +42,8 @@ const DUKASCOPY_TIMEFRAMES = [
   { code: "5m", label: "5 minutes", durationSeconds: 300 },
   { code: "1h", label: "1 hour", durationSeconds: 3_600 },
 ] as const;
+const DUKASCOPY_MIN_REQUEST_INTERVAL_MS = 1_000;
+const DUKASCOPY_MAX_ATTEMPTS = 5;
 
 type DukascopyHistoryPayload = {
   timestamp?: unknown;
@@ -207,6 +210,7 @@ function toNormalizedCandle(candle: DecodedDukascopyCandle, durationSeconds: num
 class DukascopyAdapter implements MarketDataProviderAdapter {
   readonly key = DUKASCOPY_KEY;
   readonly capabilities = ["candles", "historical"] as const;
+  readonly historicalEmptyPageAdvanceSeconds = 86_400;
 
   private state: MarketDataConnectionState = "disconnected";
   private statusMessage = "Dukascopy historical connection is disconnected.";
@@ -251,32 +255,63 @@ class DukascopyAdapter implements MarketDataProviderAdapter {
 
   private async requestJson(path: string): Promise<DukascopyHistoryPayload> {
     const request = this.requestChain.then(async () => {
-      const waitMs = Math.max(0, 250 - (Date.now() - this.lastRequestAt));
+      const waitMs = Math.max(0, DUKASCOPY_MIN_REQUEST_INTERVAL_MS - (Date.now() - this.lastRequestAt));
       if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
 
-      for (let attempt = 0; attempt < 4; attempt += 1) {
-        const response = await fetch(`${DUKASCOPY_BASE_URL}${path}`, {
-          headers: { accept: "application/json" },
-        });
-        this.lastRequestAt = Date.now();
-        const body = await response.text();
+      for (let attempt = 0; attempt < DUKASCOPY_MAX_ATTEMPTS; attempt += 1) {
+        let response: Response;
+        let body = "";
+        try {
+          response = await fetch(`${DUKASCOPY_BASE_URL}${path}`, {
+            headers: { accept: "application/json" },
+          });
+          this.lastRequestAt = Date.now();
+          body = await response.text();
+        } catch (error) {
+          if (attempt === DUKASCOPY_MAX_ATTEMPTS - 1) {
+            throw new HistoricalDataError(
+              "provider_failure",
+              "Dukascopy could not be reached after retrying the historical request.",
+              { cause: error },
+            );
+          }
+          await new Promise(resolve => setTimeout(resolve, 250 * 2 ** attempt));
+          continue;
+        }
         if (response.ok) {
           try {
             return JSON.parse(body) as DukascopyHistoryPayload;
           } catch {
-            throw new Error("Dukascopy returned invalid JSON.");
+            throw new HistoricalDataError("provider_failure", "Dukascopy returned invalid JSON.");
           }
         }
-        if (response.status !== 429 || attempt === 3) {
-          throw new Error(`Dukascopy request failed (${response.status}): ${body.slice(0, 240)}`);
+        if (response.status === 429) {
+          if (attempt === DUKASCOPY_MAX_ATTEMPTS - 1) {
+            throw new HistoricalDataError(
+              "rate_limited",
+              "Dukascopy rate-limited the historical request after retries.",
+            );
+          }
+        } else if (response.status >= 500) {
+          if (attempt === DUKASCOPY_MAX_ATTEMPTS - 1) {
+            throw new HistoricalDataError(
+              "provider_failure",
+              `Dukascopy failed the historical request (${response.status}) after retries.`,
+            );
+          }
+        } else {
+          throw new HistoricalDataError(
+            "unavailable",
+            `Dukascopy has no historical data for this request (${response.status}).`,
+          );
         }
         const retryAfter = Number(response.headers.get("retry-after"));
         const backoffMs = Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter * 1_000
-          : 1_000 * 2 ** attempt;
+          ? Math.max(DUKASCOPY_MIN_REQUEST_INTERVAL_MS, retryAfter * 1_000)
+          : 2_000 * 2 ** attempt;
         await new Promise(resolve => setTimeout(resolve, backoffMs));
       }
-      throw new Error("Dukascopy request retry limit reached.");
+      throw new HistoricalDataError("provider_failure", "Dukascopy request retry limit reached.");
     });
     this.requestChain = request.then(() => undefined, () => undefined);
     return request;

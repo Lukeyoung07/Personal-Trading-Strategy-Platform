@@ -7,4 +7,4 @@ The official Dukascopy Jetta API is a JSON endpoint at `https://jetta.dukascopy.
 
 **Why:** Dukascopy's public endpoint rate-limits concurrent historical requests with HTTP 429, even though individual older-date requests return genuine data. Treat long-range verification and retrieval as a throttled operation, not as parallel fan-out.
 
-**How to apply:** Keep the provider request queue sequential with retry/backoff for 429 responses. Preserve actual coverage validation; never treat a rate-limited, empty, or partial response as complete history.
+**How to apply:** Keep the provider request queue sequential with retry/backoff for 429 responses. Persist each successful page before requesting the next one so a later 429 can resume from cached coverage. Dukascopy empty daily pages need a provider-specific one-day cursor advance; never treat a rate-limited, empty, or partial response as complete history.

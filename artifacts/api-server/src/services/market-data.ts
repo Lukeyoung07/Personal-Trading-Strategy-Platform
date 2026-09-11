@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, count, eq, gte, lte, max, min, sql } from "drizzle-orm";
 import {
   candlesTable,
   db,
@@ -8,6 +8,7 @@ import {
   sourceInstrumentMappingsTable,
   timeframesTable,
 } from "@workspace/db";
+import { HistoricalDataError } from "./historical-errors";
 
 export type MarketDataCapability = "realtime" | "candles" | "historical" | "sessions";
 export type MarketDataConnectionState = "disconnected" | "connecting" | "connected" | "degraded" | "error";
@@ -68,6 +69,7 @@ export interface MarketSession {
 export interface MarketDataProviderAdapter {
   readonly key: string;
   readonly capabilities: readonly MarketDataCapability[];
+  readonly historicalEmptyPageAdvanceSeconds?: number;
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   connectionState(): Promise<{ state: MarketDataConnectionState; message?: string }>;
@@ -77,19 +79,35 @@ export interface MarketDataProviderAdapter {
 }
 
 export interface HistoricalCandleCollectionRequest {
-  adapter: Pick<MarketDataProviderAdapter, "candles">;
+  adapter: Pick<MarketDataProviderAdapter, "candles" | "historicalEmptyPageAdvanceSeconds">;
   providerSymbol: string;
   timeframeCode: string;
   timeframeDurationSeconds: number;
   from?: Date;
   to?: Date;
   limit?: number;
+  onBatch?: (candles: NormalizedCandle[]) => Promise<void>;
 }
 
 export interface HistoricalCandleCoverage {
   candlesProcessed: number;
   earliestCandle: Date;
   latestCandle: Date;
+}
+
+export type HistoricalAvailabilityState = "complete" | "partial" | "unavailable";
+
+export interface HistoricalDataAvailability {
+  sourceId: number;
+  instrumentId: number;
+  timeframeId: number;
+  timeframeCode: string;
+  requestedFrom: Date;
+  requestedTo: Date;
+  storedCount: number;
+  earliestCandle: Date | null;
+  latestCandle: Date | null;
+  coverageState: HistoricalAvailabilityState;
 }
 
 export interface CanonicalCandleRequest {
@@ -133,11 +151,63 @@ function validateQuote(quote: NormalizedProviderQuote) {
 const PROVIDER_PAGE_SIZE = 1_000;
 const MAX_HISTORICAL_PAGES = 100_000;
 const MARKET_CLOSURE_BOUNDARY_TOLERANCE_MS = 4 * 24 * 60 * 60 * 1_000;
+const CANDLE_WRITE_BATCH_SIZE = 500;
+
+function coverageToleranceMs(timeframeDurationSeconds: number) {
+  return Math.max(
+    MARKET_CLOSURE_BOUNDARY_TOLERANCE_MS,
+    timeframeDurationSeconds * 2 * 1_000,
+  );
+}
+
+function isCoveredByBoundaries(
+  earliestCandle: Date | null,
+  latestCandle: Date | null,
+  request: Pick<HistoricalCandleCollectionRequest, "from" | "to" | "timeframeDurationSeconds">,
+) {
+  if (!earliestCandle || !latestCandle) return false;
+  const tolerance = coverageToleranceMs(request.timeframeDurationSeconds);
+  return (!request.from || earliestCandle.getTime() - request.from.getTime() <= tolerance)
+    && (!request.to || request.to.getTime() - latestCandle.getTime() <= tolerance);
+}
+
+export interface HistoricalMissingRange {
+  from: Date;
+  to: Date;
+}
+
+/**
+ * Finds only the leading and trailing portions not represented by the cache.
+ * Gaps inside a market-closed period are intentionally not treated as missing:
+ * provider candle series do not contain weekend or holiday candles.
+ */
+export function missingHistoricalRanges(
+  cachedCandles: NormalizedCandle[],
+  request: Pick<HistoricalCandleCollectionRequest, "from" | "to" | "timeframeDurationSeconds">,
+): HistoricalMissingRange[] {
+  if (!request.from || !request.to || request.from >= request.to) return [];
+  const ordered = [...cachedCandles].sort((left, right) => left.openTime.getTime() - right.openTime.getTime());
+  if (!ordered.length) return [{ from: request.from, to: request.to }];
+
+  const ranges: HistoricalMissingRange[] = [];
+  const tolerance = coverageToleranceMs(request.timeframeDurationSeconds);
+  const earliest = ordered[0].openTime;
+  const latest = ordered.at(-1)!.openTime;
+  if (earliest.getTime() - request.from.getTime() > tolerance) {
+    const to = new Date(earliest.getTime() - request.timeframeDurationSeconds * 1_000);
+    if (request.from <= to) ranges.push({ from: request.from, to });
+  }
+  if (request.to.getTime() - latest.getTime() > tolerance) {
+    const from = new Date(latest.getTime() + request.timeframeDurationSeconds * 1_000);
+    if (from <= request.to) ranges.push({ from, to: request.to });
+  }
+  return ranges;
+}
 
 /**
  * Providers may return fewer than the requested page size even when more
  * history exists. Pagination therefore stops only when the requested end is
- * reached, a page is empty, or the provider stops moving forward.
+ * reached, an empty page cannot advance, or the provider stops moving forward.
  */
 export async function collectHistoricalCandles(request: HistoricalCandleCollectionRequest) {
   const totalLimit = request.limit ?? (request.to ? Number.POSITIVE_INFINITY : 200_000);
@@ -180,8 +250,17 @@ export async function collectHistoricalCandles(request: HistoricalCandleCollecti
       // is equivalent data, so retain one normalized candle per open time.
       collected.set(candle.openTime.getTime(), candle);
     }
+    if (request.onBatch && filteredBatch.length) await request.onBatch(filteredBatch);
 
-    if (!batch.length || !latest) break;
+     if (!batch.length) {
+       const emptyPageAdvanceSeconds = request.adapter.historicalEmptyPageAdvanceSeconds;
+       if (!emptyPageAdvanceSeconds || !fromCursor) break;
+       const nextCursor = new Date(fromCursor.getTime() + emptyPageAdvanceSeconds * 1_000);
+       if (nextCursor <= fromCursor || (request.to && nextCursor > request.to)) break;
+       fromCursor = nextCursor;
+       continue;
+     }
+     if (!latest) break;
     if (!earliest) break;
 
     if (direction == null) {
@@ -229,10 +308,7 @@ export function historicalCandleCoverage(
   }
 
   if (request.from && request.to) {
-    const boundaryTolerance = Math.max(
-      MARKET_CLOSURE_BOUNDARY_TOLERANCE_MS,
-      request.timeframeDurationSeconds * 2 * 1_000,
-    );
+    const boundaryTolerance = coverageToleranceMs(request.timeframeDurationSeconds);
     const startsTooLate = earliestCandle.getTime() - request.from.getTime() > boundaryTolerance;
     const endsTooEarly = request.to.getTime() - latestCandle.getTime() > boundaryTolerance;
     if (startsTooLate || endsTooEarly) {
@@ -355,15 +431,100 @@ export class MarketDataService {
       throw new Error("The selected market-data provider does not support historical candles");
     }
 
-    return collectHistoricalCandles({
+    const collect = (from?: Date, to?: Date) => collectHistoricalCandles({
       adapter,
       providerSymbol: mapping.providerSymbol,
       timeframeCode: timeframe.code,
       timeframeDurationSeconds: timeframe.durationSeconds,
+      from,
+      to,
+      limit: request.limit,
+      onBatch: async candles => {
+        await this.ingestCandles({
+          sourceId: request.sourceId,
+          instrumentId: request.instrumentId,
+          timeframeId: request.timeframeId,
+          candles,
+        });
+      },
+    });
+
+    if (!request.from || !request.to) {
+      return collect(request.from, request.to);
+    }
+
+    const cached = await this.cachedCandles(request);
+    const missingRanges = missingHistoricalRanges(cached, {
       from: request.from,
       to: request.to,
-      limit: request.limit,
+      timeframeDurationSeconds: timeframe.durationSeconds,
     });
+
+    // The ranges are deliberately fetched in order. The Dukascopy adapter also
+    // serializes its HTTP queue, but keeping this boundary sequential prevents
+    // future historical adapters from being fan-out called by a backtest.
+    for (const range of missingRanges) {
+      await collect(range.from, range.to);
+    }
+
+    const refreshed = (await this.cachedCandles(request)).filter(candle => candle.isClosed);
+    try {
+      historicalCandleCoverage(refreshed, {
+        from: request.from,
+        to: request.to,
+        timeframeCode: timeframe.code,
+        timeframeDurationSeconds: timeframe.durationSeconds,
+      });
+    } catch (error) {
+      throw new HistoricalDataError(
+        "unavailable",
+        error instanceof Error ? error.message : `Historical data for ${timeframe.code} is unavailable for the requested period.`,
+        { cause: error },
+      );
+    }
+    return refreshed;
+  }
+
+  async historicalDataAvailability(request: CanonicalCandleRequest & { from: Date; to: Date }): Promise<HistoricalDataAvailability> {
+    const [[source], [timeframe], [summary]] = await Promise.all([
+      db.select({ id: marketDataSourcesTable.id }).from(marketDataSourcesTable).where(eq(marketDataSourcesTable.id, request.sourceId)),
+      db.select({ id: timeframesTable.id, code: timeframesTable.code, durationSeconds: timeframesTable.durationSeconds })
+        .from(timeframesTable).where(eq(timeframesTable.id, request.timeframeId)),
+      db.select({
+        storedCount: count(candlesTable.id),
+        earliestCandle: min(candlesTable.openTime),
+        latestCandle: max(candlesTable.openTime),
+      }).from(candlesTable).where(and(
+        eq(candlesTable.sourceId, request.sourceId),
+        eq(candlesTable.instrumentId, request.instrumentId),
+        eq(candlesTable.timeframeId, request.timeframeId),
+        gte(candlesTable.openTime, request.from),
+        lte(candlesTable.openTime, request.to),
+        eq(candlesTable.isClosed, true),
+      )),
+    ]);
+    if (!source) throw new Error("Market-data source not found");
+    if (!timeframe) throw new Error("Timeframe not found");
+    const earliestCandle = summary?.earliestCandle ?? null;
+    const latestCandle = summary?.latestCandle ?? null;
+    return {
+      sourceId: source.id,
+      instrumentId: request.instrumentId,
+      timeframeId: timeframe.id,
+      timeframeCode: timeframe.code,
+      requestedFrom: request.from,
+      requestedTo: request.to,
+      storedCount: Number(summary?.storedCount ?? 0),
+      earliestCandle,
+      latestCandle,
+      coverageState: !earliestCandle || !latestCandle
+        ? "unavailable"
+        : isCoveredByBoundaries(earliestCandle, latestCandle, {
+          from: request.from,
+          to: request.to,
+          timeframeDurationSeconds: timeframe.durationSeconds,
+        }) ? "complete" : "partial",
+    };
   }
 
   async *streamQuotes(request: CanonicalQuoteRequest): AsyncIterable<CanonicalQuote> {
@@ -407,8 +568,9 @@ export class MarketDataService {
 
     const latestReceivedAt = new Date(Math.max(...batch.candles.map(candle => candle.receivedAt.getTime())));
     await db.transaction(async tx => {
-      for (const candle of batch.candles) {
-        await tx.insert(candlesTable).values({
+      for (let offset = 0; offset < batch.candles.length; offset += CANDLE_WRITE_BATCH_SIZE) {
+        const candles = batch.candles.slice(offset, offset + CANDLE_WRITE_BATCH_SIZE);
+        await tx.insert(candlesTable).values(candles.map(candle => ({
           sourceId: batch.sourceId,
           instrumentId: batch.instrumentId,
           timeframeId: batch.timeframeId,
@@ -421,17 +583,17 @@ export class MarketDataService {
           volume: candle.volume?.toString() ?? null,
           isClosed: candle.isClosed,
           receivedAt: candle.receivedAt,
-        }).onConflictDoUpdate({
+        }))).onConflictDoUpdate({
           target: [candlesTable.instrumentId, candlesTable.sourceId, candlesTable.timeframeId, candlesTable.openTime],
           set: {
-            closeTime: candle.closeTime,
-            open: candle.open.toString(),
-            high: candle.high.toString(),
-            low: candle.low.toString(),
-            close: candle.close.toString(),
-            volume: candle.volume?.toString() ?? null,
-            isClosed: candle.isClosed,
-            receivedAt: candle.receivedAt,
+            closeTime: sql`excluded.close_time`,
+            open: sql`excluded.open`,
+            high: sql`excluded.high`,
+            low: sql`excluded.low`,
+            close: sql`excluded.close`,
+            volume: sql`excluded.volume`,
+            isClosed: sql`excluded.is_closed`,
+            receivedAt: sql`excluded.received_at`,
           },
         });
       }
@@ -441,6 +603,33 @@ export class MarketDataService {
       }).where(eq(marketDataConnectionsTable.sourceId, batch.sourceId));
     });
     return batch.candles.length;
+  }
+
+  private async cachedCandles(request: CanonicalCandleRequest) {
+    const filters = [
+      eq(candlesTable.sourceId, request.sourceId),
+      eq(candlesTable.instrumentId, request.instrumentId),
+      eq(candlesTable.timeframeId, request.timeframeId),
+    ];
+    if (request.from) filters.push(gte(candlesTable.openTime, request.from));
+    if (request.to) filters.push(lte(candlesTable.openTime, request.to));
+    const query = db.select().from(candlesTable)
+      .where(and(...filters))
+      .orderBy(asc(candlesTable.openTime));
+    const rows = request.limit == null
+      ? await query
+      : await query.limit(request.limit);
+    return rows.map(candle => ({
+      openTime: candle.openTime,
+      closeTime: candle.closeTime,
+      open: Number(candle.open),
+      high: Number(candle.high),
+      low: Number(candle.low),
+      close: Number(candle.close),
+      volume: candle.volume == null ? null : Number(candle.volume),
+      isClosed: candle.isClosed,
+      receivedAt: candle.receivedAt,
+    }));
   }
 
   private async resolveSourceAdapter(sourceId: number) {

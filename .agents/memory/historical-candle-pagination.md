@@ -7,4 +7,4 @@ Historical candle retrieval must not treat a short provider response as the end 
 
 **Why:** BiQuote currently returns bounded recent windows and can return fewer candles than the requested page size. Stopping on page length produced completed backtests with only recent candles while displaying the user’s longer requested range.
 
-**How to apply:** Keep provider-specific cursor handling behind the market-data service, avoid arbitrary long-range truncation, preserve closed-candle metadata, and fail with the actual available range when the requested period is not covered.
+**How to apply:** Keep provider-specific cursor handling behind the market-data service, allow adapters to advance across known empty periods, persist successful pages incrementally, avoid arbitrary long-range truncation, preserve closed-candle metadata, and fail with the actual available range when the requested period is not covered.

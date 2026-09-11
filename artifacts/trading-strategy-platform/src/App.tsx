@@ -433,7 +433,9 @@ function formatDateInput(value: Date) {
 }
 function backtestErrorCopy(value: unknown) {
   const message = typeof value === "string" ? value : value instanceof Error ? value.message : "";
-  if (/historical|insufficient|candle|provider data/i.test(message)) return "Historical data is not available for this market and timeframe during the selected period.";
+  if (/rate.?limit|rate limit/i.test(message)) return "The historical provider is rate-limited right now. Try again later; candles already cached locally remain available.";
+  if (/could not be reached|provider failure|after retry/i.test(message)) return "The historical provider could not be reached after retries. No new backtest result was saved; try again later.";
+  if (/only covers|contains no candles|unavailable|insufficient|historical|candle|provider data/i.test(message)) return "Historical data does not cover the selected market, timeframe, and period. Choose a range inside the available history or try again later.";
   if (/unsupported|condition|entry rule|risk rule/i.test(message)) return "This strategy contains a condition that the current backtester cannot evaluate.";
   return "This backtest could not run. Check the selected setup and try again.";
 }

@@ -19,6 +19,7 @@ import {
 import { historicalCandleCoverage, marketDataService } from "../services/market-data";
 import { runHistoricalBacktest, validateHistoricalBacktestStrategy, type BacktestCondition, type HistoricalBacktestInput } from "../services/backtest-engine";
 import { calculateBacktestStatistics } from "../services/backtest-results";
+import { HistoricalDataError } from "../services/historical-errors";
 
 const router: IRouter = Router();
 const activeBacktests = new Set<number>();
@@ -91,6 +92,15 @@ async function timeframeSummariesForBacktest(id: number) {
 }
 
 function publicBacktestError(error: unknown) {
+  if (error instanceof HistoricalDataError) {
+    if (error.code === "rate_limited") {
+      return "Historical provider rate limit reached after retries. Try again later; any candles already cached remain available.";
+    }
+    if (error.code === "provider_failure") {
+      return "Historical provider could not be reached after retries. No new backtest result was saved; try again later.";
+    }
+    return error.message;
+  }
   const message = error instanceof Error ? error.message : "";
   if (/not compatible|insufficient historical data|historical data for|pagination did not reach|not configured|no longer exists|no executable|not supported|risk rules mention/i.test(message)) {
     return message;

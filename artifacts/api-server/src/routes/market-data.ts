@@ -406,6 +406,34 @@ router.post("/market-data/candles/refresh", async (req, res): Promise<void> => {
   }
 });
 
+router.get("/market-data/historical-availability", async (req, res): Promise<void> => {
+  const numberParam = (value: unknown) => typeof value === "string" ? Number(value) : NaN;
+  const instrumentId = numberParam(req.query.instrumentId);
+  const timeframeId = numberParam(req.query.timeframeId);
+  const requestedSourceId = req.query.sourceId == null ? null : numberParam(req.query.sourceId);
+  const from = typeof req.query.from === "string" ? new Date(req.query.from) : null;
+  const to = typeof req.query.to === "string" ? new Date(req.query.to) : null;
+  if (![instrumentId, timeframeId].every(value => Number.isInteger(value) && value > 0)
+    || (requestedSourceId != null && (!Number.isInteger(requestedSourceId) || requestedSourceId < 1))
+    || !from || !to || Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())
+    || from >= to) {
+    res.status(400).json({ error: "instrumentId, timeframeId, from, and to are required; sourceId is optional." });
+    return;
+  }
+  try {
+    const sourceId = requestedSourceId ?? (await marketDataService.historicalSourceForInstrument(instrumentId)).id;
+    res.json(await marketDataService.historicalDataAvailability({
+      sourceId,
+      instrumentId,
+      timeframeId,
+      from,
+      to,
+    }));
+  } catch (error) {
+    res.status(404).json({ error: error instanceof Error ? error.message : "Historical availability is not available." });
+  }
+});
+
 router.get("/market-data/connections", async (_req, res): Promise<void> => {
   const rows = await db.select({
     connection: marketDataConnectionsTable,

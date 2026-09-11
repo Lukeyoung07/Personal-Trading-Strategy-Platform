@@ -9,10 +9,10 @@ import { MarketDataService } from "./market-data";
 
 const receivedAt = new Date("2026-09-11T00:00:00.000Z");
 
-function response(payload: unknown, status = 200) {
+function response(payload: unknown, status = 200, headers?: Record<string, string>) {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
   });
 }
 
@@ -36,6 +36,7 @@ function payload() {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("Dukascopy historical provider", () => {
@@ -145,5 +146,34 @@ describe("Dukascopy historical provider", () => {
       from: new Date("2026-09-10T00:00:00.000Z"),
       to: new Date("2026-09-10T01:00:00.000Z"),
     })).resolves.toEqual([]);
+  });
+
+  it("retries a rate-limited request sequentially before returning data", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(response({ error: "busy" }, 429, { "retry-after": "0" }))
+      .mockResolvedValueOnce(response(payload()));
+
+    const candles = await dukascopyAdapter.candles({
+      providerSymbol: "XAU-USD",
+      timeframeCode: "1h",
+      from: new Date("2026-09-10T10:00:00.000Z"),
+      to: new Date("2026-09-10T11:00:00.000Z"),
+    });
+
+    expect(candles).toHaveLength(5);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("classifies an exhausted rate limit separately from unavailable history", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => response({ error: "busy" }, 429, { "retry-after": "0" }));
+    vi.useFakeTimers();
+    const assertion = expect(dukascopyAdapter.candles({
+      providerSymbol: "XAU-USD",
+      timeframeCode: "1h",
+      from: new Date("2026-09-10T10:00:00.000Z"),
+      to: new Date("2026-09-10T11:00:00.000Z"),
+    })).rejects.toMatchObject({ name: "HistoricalDataError", code: "rate_limited" });
+    await vi.runAllTimersAsync();
+    await assertion;
   });
 });
