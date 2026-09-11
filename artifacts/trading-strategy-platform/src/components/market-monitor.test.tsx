@@ -190,6 +190,45 @@ describe("Market Monitor live state", () => {
     ));
   });
 
+  it("routes price-axis and time-axis drags to visual scaling instead of chart panning", async () => {
+    candleData.current = Array.from({ length: 80 }, (_, index) => {
+      const close = 1.1 + index * 0.01;
+      return {
+        id: index + 1,
+        openTime: new Date(Date.UTC(2026, 8, 10, index)).toISOString(),
+        open: close - 0.004,
+        high: close + 0.006,
+        low: close - 0.008,
+        close,
+        isClosed: true,
+      };
+    });
+    render(<MarketMonitor />);
+    const chart = await screen.findByRole("img", { name: "BiQuote candlestick chart" });
+    Object.defineProperty(chart, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ left: 0, top: 0, width: 900, height: 360, right: 900, bottom: 360 }),
+    });
+
+    const initialHigh = screen.getByTestId("chart-price-high").textContent;
+    const initialLow = screen.getByTestId("chart-price-low").textContent;
+    fireEvent.pointerDown(screen.getByTestId("chart-price-axis"), { pointerId: 1, clientX: 870, clientY: 120 });
+    fireEvent.pointerMove(chart, { pointerId: 1, clientX: 870, clientY: 60 });
+    fireEvent.pointerUp(chart, { pointerId: 1, clientX: 870, clientY: 60 });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("chart-price-high").textContent).not.toBe(initialHigh);
+      expect(screen.getByTestId("chart-price-low").textContent).not.toBe(initialLow);
+    });
+    expect(screen.getByText("26–80")).toBeInTheDocument();
+
+    fireEvent.pointerDown(screen.getByTestId("chart-time-axis"), { pointerId: 2, clientX: 450, clientY: 350 });
+    fireEvent.pointerMove(chart, { pointerId: 2, clientX: 300, clientY: 350 });
+    fireEvent.pointerUp(chart, { pointerId: 2, clientX: 300, clientY: 350 });
+
+    await waitFor(() => expect(screen.getByText("1–80")).toBeInTheDocument());
+  });
+
   it("searches by human name or provider symbol and submits the selected timeframe", async () => {
     const onAdded = vi.fn();
     render(<AddMarketTab onAdded={onAdded} />);
