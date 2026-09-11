@@ -1,0 +1,117 @@
+TRADEX — FULL MOUSE-CONTROLLED TRADING CHART
+
+I want the existing TradeX candlestick chart to behave like a professional trading platform.
+
+The entire chart viewing experience should be controllable with my mouse.
+
+DO NOT redesign the Markets page.
+DO NOT change the existing UI.
+DO NOT change the colours.
+DO NOT change the red/green candlesticks.
+DO NOT change the BiQuote data.
+
+Only improve the chart's mouse interaction and scaling.
+
+I want:
+
+1. LEFT/RIGHT CHART MOVEMENT
+- Click and drag anywhere on the chart to move backwards/forwards through candles.
+- Dragging should smoothly pan through historical data.
+- I should be able to move back through historical candles and then return to the latest candles.
+
+2. HORIZONTAL ZOOM
+- Use the mouse wheel over the chart to zoom in and out.
+- Zooming should change how many candles are visible and therefore how wide the candles appear.
+- I need to be able to make candles much larger when switching to a timeframe where they currently look tiny.
+- Keep the existing Latest/Fit/Reset controls.
+
+3. VERTICAL PRICE SCALING
+- Allow the price scale on the right side of the chart to be controlled with the mouse.
+- Dragging the price scale should increase/decrease the vertical spacing of the price action.
+- I want to be able to "stretch" or "squish" the candles vertically.
+- Do not change the actual market prices; this is purely visual scaling.
+
+4. TIME-AXIS SCALING
+- Allow the time axis at the bottom of the chart to be manipulated with the mouse where supported.
+- Make it possible to control how compressed/spread out the candles are horizontally.
+
+5. CROSSHAIR
+- Moving the mouse over the chart should provide a clear crosshair.
+- Show useful candle information such as OHLC where already supported.
+
+6. PROFESSIONAL CHART BEHAVIOUR
+The interaction should feel natural and similar to TradingView/professional trading platforms:
+
+- Drag chart = pan
+- Mouse wheel = zoom
+- Price-axis interaction = vertical scale
+- Time-axis interaction = horizontal scale
+- Mouse movement = crosshair
+
+Do not make normal page scrolling interfere with chart interaction while the mouse is over the chart.
+
+7. TIMEFRAME CHANGES
+
+When switching between:
+
+1m
+5m
+15m
+30m
+1h
+4h
+1d
+
+automatically choose a sensible initial zoom so the candles are readable.
+
+I must still be able to manually zoom and scale the chart afterwards.
+
+8. KEEP EXISTING FEATURES
+
+Do not break:
+
+- Live quotes
+- Historical candles
+- Current price
+- Crosshair
+- OHLC
+- SMA
+- EMA
+- Horizontal price levels
+- Price alerts
+- Latest
+- Fit
+- Reset
+- Mobile interaction
+
+9. MOBILE
+
+Preserve touch interaction on:
+
+375px
+402px
+768px
+
+Mouse controls are the priority for desktop, but mobile touch gestures must continue working.
+
+10. IMPORTANT
+
+Before implementing anything, inspect the current chart library and determine what mouse interactions it already supports.
+
+Use its native capabilities where possible rather than replacing the chart unnecessarily.
+
+Do not add fake buttons or controls.
+
+The finished chart should let me control the view almost entirely with my mouse:
+
+PAN
+ZOOM
+VERTICAL SCALE
+HORIZONTAL SCALE
+CROSSHAIR
+
+Test every timeframe and make sure the candles remain readable.
+
+Run the existing frontend tests and production build after the change.
+
+Only make changes necessary for this chart interaction improvement.

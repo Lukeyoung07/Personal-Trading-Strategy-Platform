@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent, type WheelEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
@@ -547,7 +547,7 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
             </button>
             <div className="text-[11px] text-muted-foreground sm:ml-auto sm:pb-2">{source?.name ?? "No source selected"} · {selectedTimeframe?.code ?? "—"}</div>
           </div>
-          {candles.isError ? <ErrorBlock retry={() => candles.refetch()} /> : !ready ? <div className="p-10 text-center text-sm text-muted-foreground">Select an instrument, source, and timeframe to view genuine market data.</div> : candles.isLoading || refresh.isPending ? <LoadingBlock /> : !chartBars.length ? <EmptyState icon={CandlestickChart} title="No candle data yet" text="BiQuote did not return OHLC data for this instrument and timeframe. No substitute candles are shown." action={<button className="btn btn-primary" onClick={refreshCandles} disabled={refresh.isPending}>Request BiQuote candles</button>} /> : <CandleSvg bars={chartBars} currentPrice={currentPrice} indicators={indicators} drawingPrice={drawingPrice} drawingMode={workspaceTab === "drawings"} onChartClickPrice={setDrawingPrice} />}
+          {candles.isError ? <ErrorBlock retry={() => candles.refetch()} /> : !ready ? <div className="p-10 text-center text-sm text-muted-foreground">Select an instrument, source, and timeframe to view genuine market data.</div> : candles.isLoading || refresh.isPending ? <LoadingBlock /> : !chartBars.length ? <EmptyState icon={CandlestickChart} title="No candle data yet" text="BiQuote did not return OHLC data for this instrument and timeframe. No substitute candles are shown." action={<button className="btn btn-primary" onClick={refreshCandles} disabled={refresh.isPending}>Request BiQuote candles</button>} /> : <CandleSvg bars={chartBars} currentPrice={currentPrice} indicators={indicators} drawingPrice={drawingPrice} drawingMode={workspaceTab === "drawings"} timeframeCode={selectedTimeframe?.code} onChartClickPrice={setDrawingPrice} />}
         </div>
 
         <aside className="space-y-4">
@@ -839,6 +839,7 @@ function CandleSvg({
   indicators,
   drawingPrice,
   drawingMode,
+  timeframeCode,
   onChartClickPrice,
 }: {
   bars: ChartBar[];
@@ -846,39 +847,69 @@ function CandleSvg({
   indicators: IndicatorKind[];
   drawingPrice: number | null;
   drawingMode: boolean;
+  timeframeCode?: string;
   onChartClickPrice: (value: number) => void;
 }) {
-  const [windowSize, setWindowSize] = useState(() => Math.min(60, bars.length));
-  const [start, setStart] = useState(() => Math.max(0, bars.length - Math.min(60, bars.length)));
+  const initialWindowSize = (code?: string) => {
+    const preferred = code === "1m" || code === "5m" ? 70 : code === "15m" || code === "30m" ? 60 : code === "4h" ? 45 : code === "1d" ? 40 : 55;
+    return Math.min(preferred, bars.length);
+  };
+  const [windowSize, setWindowSize] = useState(() => initialWindowSize(timeframeCode));
+  const [start, setStart] = useState(() => Math.max(0, bars.length - initialWindowSize(timeframeCode)));
+  const [verticalScale, setVerticalScale] = useState(1);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
+  const lastPointerWasDrag = useRef(false);
+  const dragRef = useRef<{
+    mode: "pan" | "price-axis" | "time-axis";
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originalStart: number;
+    originalWindow: number;
+    originalVerticalScale: number;
+    didMove: boolean;
+  } | null>(null);
   useEffect(() => {
-    const nextWindow = Math.min(Math.max(20, windowSize || 20), bars.length);
+    const nextWindow = initialWindowSize(timeframeCode);
     setWindowSize(nextWindow);
     setStart(Math.max(0, bars.length - nextWindow));
     setHoveredIndex(null);
-  }, [bars.length]);
+    setHoverPoint(null);
+    setVerticalScale(1);
+  }, [bars.length, timeframeCode]);
   const effectiveWindowSize = Math.min(bars.length, Math.max(windowSize, Math.min(20, bars.length)));
   const maxStart = Math.max(0, bars.length - effectiveWindowSize);
   const effectiveStart = Math.min(start, maxStart);
   const visibleBars = bars.slice(effectiveStart, effectiveStart + effectiveWindowSize);
+  const clampWindow = (value: number) => Math.max(20, Math.min(bars.length, Math.round(value)));
+  const clampStart = (value: number, nextWindow = effectiveWindowSize) => Math.max(0, Math.min(Math.max(0, bars.length - nextWindow), Math.round(value)));
   const zoomIn = () => {
-    const nextWindow = Math.max(20, Math.floor(windowSize * 0.75));
+    const nextWindow = clampWindow(windowSize * 0.75);
     const delta = Math.max(1, windowSize - nextWindow);
     setWindowSize(nextWindow);
-    setStart(current => Math.min(Math.max(0, bars.length - nextWindow), current + Math.floor(delta / 2)));
+    setStart(current => clampStart(current + Math.floor(delta / 2), nextWindow));
   };
   const zoomOut = () => {
-    const nextWindow = Math.min(bars.length, Math.ceil(windowSize * 1.25));
+    const nextWindow = clampWindow(windowSize * 1.25);
     const delta = Math.max(1, nextWindow - windowSize);
     setWindowSize(nextWindow);
-    setStart(current => Math.max(0, current - Math.floor(delta / 2)));
+    setStart(current => clampStart(current - Math.floor(delta / 2), nextWindow));
   };
-  const pan = (direction: number) => setStart(current => Math.min(maxStart, Math.max(0, current + direction * Math.max(5, Math.floor(windowSize / 3)))));
+  const pan = (direction: number) => setStart(current => clampStart(current + direction * Math.max(5, Math.floor(windowSize / 3))));
   const fit = () => {
     setWindowSize(bars.length);
     setStart(0);
   };
   const latest = () => setStart(maxStart);
+  const reset = () => {
+    const nextWindow = initialWindowSize(timeframeCode);
+    setWindowSize(nextWindow);
+    setStart(Math.max(0, bars.length - nextWindow));
+    setVerticalScale(1);
+    setHoveredIndex(null);
+    setHoverPoint(null);
+  };
   const width = 900;
   const height = 360;
   const pad = { top: 20, right: 20, bottom: 30, left: 20 };
@@ -887,10 +918,14 @@ function CandleSvg({
   const high = Math.max(...highs);
   const low = Math.min(...lows);
   const range = high - low || Math.max(Math.abs(high) * 0.01, 1);
+  const center = (high + low) / 2;
+  const scaledRange = range / verticalScale;
+  const displayHigh = center + scaledRange / 2;
+  const displayLow = center - scaledRange / 2;
   const chartHeight = height - pad.top - pad.bottom;
   const chartWidth = width - pad.left - pad.right;
   const xStep = chartWidth / Math.max(visibleBars.length, 1);
-  const y = (value: number) => pad.top + ((high - value) / range) * chartHeight;
+  const y = (value: number) => pad.top + ((displayHigh - value) / scaledRange) * chartHeight;
   const indicatorSeries = useMemo(() => ({
     sma20: movingAverage(bars, 20, false),
     ema20: movingAverage(bars, 20, true),
@@ -902,17 +937,85 @@ function CandleSvg({
     const x = pad.left + xStep * index + xStep / 2;
     return `${x},${y(value)}`;
   }).filter(Boolean).join(" ");
+  const getLocalPoint = (event: { clientX: number; clientY: number }, rect: DOMRect) => ({
+    x: ((event.clientX - rect.left) / rect.width) * width,
+    y: ((event.clientY - rect.top) / rect.height) * height,
+  });
   const handlePointerMove = (event: PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const localX = ((event.clientX - rect.left) / rect.width) * width;
-    const nextIndex = Math.max(0, Math.min(visibleBars.length - 1, Math.floor((localX - pad.left) / xStep)));
+    const point = getLocalPoint(event, rect);
+    const drag = dragRef.current;
+    if (drag) {
+      const deltaX = point.x - drag.startX;
+      const deltaY = point.y - drag.startY;
+      if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) drag.didMove = true;
+      if (drag.mode === "pan") {
+        setStart(clampStart(drag.originalStart - deltaX / xStep, drag.originalWindow));
+      } else if (drag.mode === "price-axis") {
+        setVerticalScale(Math.max(0.25, Math.min(4, drag.originalVerticalScale * Math.exp(-deltaY * 0.01))));
+      } else {
+        const nextWindow = clampWindow(drag.originalWindow - deltaX * 0.35);
+        const anchor = drag.originalStart + drag.originalWindow / 2;
+        setWindowSize(nextWindow);
+        setStart(clampStart(anchor - nextWindow / 2, nextWindow));
+      }
+      return;
+    }
+    const nextIndex = Math.max(0, Math.min(visibleBars.length - 1, Math.floor((point.x - pad.left) / xStep)));
     setHoveredIndex(nextIndex);
+    setHoverPoint({
+      x: Math.max(pad.left, Math.min(width - pad.right, point.x)),
+      y: Math.max(pad.top, Math.min(height - pad.bottom, point.y)),
+    });
+  };
+  const handlePointerDown = (event: PointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const point = getLocalPoint(event, rect);
+    const mode = point.y >= height - pad.bottom
+      ? "time-axis"
+      : point.x >= width - pad.right - 55
+        ? "price-axis"
+        : "pan";
+    dragRef.current = {
+      mode,
+      pointerId: event.pointerId,
+      startX: point.x,
+      startY: point.y,
+      originalStart: effectiveStart,
+      originalWindow: effectiveWindowSize,
+      originalVerticalScale: verticalScale,
+      didMove: false,
+    };
+    lastPointerWasDrag.current = false;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const handlePointerUp = (event: PointerEvent<SVGSVGElement>) => {
+    if (dragRef.current?.pointerId === event.pointerId) {
+      lastPointerWasDrag.current = dragRef.current.didMove;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      dragRef.current = null;
+    }
+  };
+  const handleWheel = (event: WheelEvent<SVGSVGElement>) => {
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const point = getLocalPoint(event, rect);
+    const direction = event.deltaY < 0 ? 0.82 : 1.22;
+    const nextWindow = clampWindow(effectiveWindowSize * direction);
+    if (nextWindow === effectiveWindowSize) return;
+    const anchor = effectiveStart + Math.max(0, Math.min(visibleBars.length - 1, (point.x - pad.left) / xStep));
+    const relative = anchor - effectiveStart;
+    setWindowSize(nextWindow);
+    setStart(clampStart(anchor - relative * (nextWindow / effectiveWindowSize), nextWindow));
   };
   const handleChartClick = (event: PointerEvent<SVGSVGElement>) => {
-    if (!drawingMode) return;
+    if (!drawingMode || lastPointerWasDrag.current) {
+      lastPointerWasDrag.current = false;
+      return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
-    const localY = ((event.clientY - rect.top) / rect.height) * height;
-    const value = high - ((localY - pad.top) / chartHeight) * range;
+    const { y: localY } = getLocalPoint(event, rect);
+    const value = displayHigh - ((localY - pad.top) / chartHeight) * scaledRange;
     if (Number.isFinite(value)) onChartClickPrice(value);
   };
   const markerY = currentPrice == null ? null : Math.max(pad.top, Math.min(height - pad.bottom, y(currentPrice)));
@@ -931,10 +1034,11 @@ function CandleSvg({
           <button className="btn btn-ghost chart-control" type="button" onClick={() => pan(1)} disabled={start >= maxStart} aria-label="Pan chart forwards"><ChevronRight size={14}/></button>
           <button className="btn btn-secondary chart-control-wide" type="button" onClick={latest} disabled={start >= maxStart}><Maximize2 size={13}/> Latest</button>
           <button className="btn btn-secondary chart-control-wide" type="button" onClick={fit} disabled={windowSize >= bars.length}><Maximize2 size={13}/> Fit</button>
+           <button className="btn btn-ghost chart-control-wide" type="button" onClick={reset} aria-label="Reset chart view">Reset</button>
         </div>
       </div>
       <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[680px] h-[300px] md:h-[360px]" role="img" aria-label="BiQuote candlestick chart" onPointerMove={handlePointerMove} onPointerLeave={() => setHoveredIndex(null)} onClick={handleChartClick}>
+       <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[680px] h-[300px] md:h-[360px]" role="img" aria-label="BiQuote candlestick chart" style={{ touchAction: "none" }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} onPointerLeave={() => { if (!dragRef.current) { setHoveredIndex(null); setHoverPoint(null); } }} onWheel={handleWheel} onClick={handleChartClick}>
         {[0, 1, 2, 3, 4].map(index => {
           const gridY = pad.top + (chartHeight / 4) * index;
           return <line key={index} x1={pad.left} x2={width - pad.right} y1={gridY} y2={gridY} stroke="hsl(var(--border) / .55)" strokeDasharray="2 5" />;
@@ -950,12 +1054,15 @@ function CandleSvg({
           return <g key={`${bar.openTime}-${index}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}><title>{`${new Date(bar.openTime).toLocaleString()} · O ${bar.open.toFixed(5)} · H ${bar.high.toFixed(5)} · L ${bar.low.toFixed(5)} · C ${bar.close.toFixed(5)}`}</title>{hoveredIndex === index && <line x1={x} x2={x} y1={pad.top} y2={height - pad.bottom} stroke="hsl(var(--accent))" strokeDasharray="3 4" />}<line x1={x} x2={x} y1={y(bar.high)} y2={y(bar.low)} stroke={color} strokeWidth="1.5" /><rect x={x - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={color} rx="1" /></g>;
         })}
         {indicators.map(kind => <polyline key={kind} points={pathPoints(kind)} fill="none" stroke={indicatorColor[kind]} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />)}
-        {markerY != null && <g><line x1={pad.left} x2={width - pad.right} y1={markerY} y2={markerY} stroke="hsl(var(--primary))" strokeDasharray="5 4" /><text x={width - pad.right} y={markerY - 4} textAnchor="end" fill="hsl(var(--primary))" fontSize="10">{formatPrice(currentPrice)}</text></g>}
+         {hoverPoint && <g pointerEvents="none"><line x1={hoverPoint.x} x2={hoverPoint.x} y1={pad.top} y2={height - pad.bottom} stroke="hsl(var(--accent))" strokeDasharray="3 4" /><line x1={pad.left} x2={width - pad.right} y1={hoverPoint.y} y2={hoverPoint.y} stroke="hsl(var(--accent))" strokeDasharray="3 4" /></g>}
+         {markerY != null && <g><line x1={pad.left} x2={width - pad.right} y1={markerY} y2={markerY} stroke="hsl(var(--primary))" strokeDasharray="5 4" /><text x={width - pad.right} y={markerY - 4} textAnchor="end" fill="hsl(var(--primary))" fontSize="10">{formatPrice(currentPrice)}</text></g>}
         {levelY != null && <g><line x1={pad.left} x2={width - pad.right} y1={levelY} y2={levelY} stroke="hsl(var(--accent))" strokeDasharray="7 4" /><text x={pad.left + 5} y={levelY - 4} fill="hsl(var(--accent))" fontSize="10">{formatPrice(drawingPrice)}</text></g>}
         <text x={pad.left} y={height - 8} fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(visibleBars[0].openTime).toLocaleString()}</text>
         <text x={width - pad.right} y={height - 8} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(visibleBars[visibleBars.length - 1].openTime).toLocaleString()}</text>
-        <text x={width - pad.right} y={pad.top + 10} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{high.toFixed(5)}</text>
-        <text x={width - pad.right} y={height - pad.bottom - 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{low.toFixed(5)}</text>
+         <text x={width - pad.right} y={pad.top + 10} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{displayHigh.toFixed(5)}</text>
+         <text x={width - pad.right} y={height - pad.bottom - 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{displayLow.toFixed(5)}</text>
+         <path d={`M ${width - pad.right - 55} ${pad.top} H ${width - pad.right} V ${height - pad.bottom} H ${width - pad.right - 55} Z`} fill="transparent" pointerEvents="all" aria-label="Drag to scale price axis" />
+         <path d={`M ${pad.left} ${height - pad.bottom - 22} H ${width - pad.right} V ${height - pad.bottom} H ${pad.left} Z`} fill="transparent" pointerEvents="all" aria-label="Drag to scale time axis" />
        </svg>
       </div>
       {hoveredIndex != null && visibleBars[hoveredIndex] && <div className="chart-hover-readout" role="status">
