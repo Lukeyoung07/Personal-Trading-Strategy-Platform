@@ -1,0 +1,574 @@
+TRADEX — MATCH THE REFERENCE DESIGN EXACTLY
+
+I want to make the existing TradeX application UI match the attached reference image as closely as possible.
+
+IMPORTANT:
+This is a VISUAL/UI implementation task.
+
+Do NOT redesign the functionality.
+Do NOT change the trading logic.
+Do NOT change the backend architecture.
+Do NOT change the existing market-data provider.
+Do NOT replace the existing candlestick chart with another chart system unless absolutely required.
+
+The reference image shows the exact visual direction I want.
+
+==================================================
+1. OVERALL VISUAL DIRECTION
+==================================================
+
+Make TradeX look like a clean, professional dark trading terminal.
+
+The reference uses:
+
+- Very dark navy/black background
+- Dark navy panels
+- Subtle borders
+- Clean white/light-grey text
+- Purple as the primary accent
+- Minimal visual noise
+- Strong spacing and hierarchy
+- Thin borders rather than huge cards
+- Compact controls
+- Professional trading-platform appearance
+
+IMPORTANT:
+
+REMOVE the current grainy/noisy texture completely.
+
+There should be:
+
+NO grain
+NO noise
+NO paper texture
+NO speckles
+NO visual static
+NO textured backgrounds
+
+Use completely clean, smooth surfaces.
+
+==================================================
+2. COLOUR PALETTE
+==================================================
+
+Use a restrained dark palette.
+
+Main background:
+Very dark navy/black.
+
+Panels:
+Slightly lighter dark navy.
+
+Borders:
+Subtle dark blue/grey.
+
+Primary text:
+White / very light grey.
+
+Secondary text:
+Muted grey.
+
+Accent:
+Purple.
+
+Purple should mainly be used for:
+
+- Active navigation
+- Selected tabs
+- Primary buttons
+- Important highlights
+- Selected timeframe
+- Small status accents
+- Interactive elements
+
+DO NOT make the entire interface purple.
+
+DO NOT use large purple gradients.
+
+DO NOT use neon/glowing purple everywhere.
+
+The overall interface should remain mostly dark.
+
+==================================================
+3. CANDLESTICK CHART
+==================================================
+
+KEEP THE EXISTING CANDLESTICK CHART.
+
+Do NOT turn the chart into a purple chart.
+
+Candles MUST remain standard:
+
+GREEN = bullish/up candle
+RED = bearish/down candle
+
+Use normal trading-chart colours.
+
+The chart should have:
+
+- Green bullish candles
+- Red bearish candles
+- Clean dark chart background
+- Subtle gridlines
+- Clear price axis
+- Clear time axis
+- Current price indicator
+- OHLC information where currently supported
+
+The chart itself should look like a normal professional trading chart.
+
+Purple can be used for chart controls or selected settings, but NOT as the candle colour.
+
+==================================================
+4. MARKETS PAGE — MATCH REFERENCE
+==================================================
+
+The Markets page is one of the most important pages.
+
+The reference image should be treated as the visual target.
+
+When opening Markets, the user should immediately see:
+
+TOP:
+Instrument information
+
+Then:
+Price / market status / timeframe controls
+
+Then:
+LARGE CANDLESTICK CHART
+
+Then:
+Secondary information below the chart.
+
+The chart should dominate the page.
+
+Do NOT put huge amounts of configuration above it.
+
+Do NOT make the user scroll excessively before reaching the chart.
+
+==================================================
+5. MARKET HEADER
+==================================================
+
+Create a clean horizontal market header similar to the reference.
+
+It should contain:
+
+- Instrument name
+- Instrument description where available
+- Current price
+- Price change
+- Live/market status
+- Timeframe selector
+
+Keep this compact.
+
+Use the existing real market data.
+
+Do not fabricate any values.
+
+==================================================
+6. CHART CONTROLS
+==================================================
+
+Make the chart controls clean and compact.
+
+Keep/improve:
+
+- Zoom in
+- Zoom out
+- Pan
+- Reset
+- Latest
+- Fit/auto view
+- Timeframe selection
+
+Controls should feel like a professional charting application.
+
+Do not create huge buttons.
+
+Use small clean controls.
+
+==================================================
+7. MARKET OVERVIEW
+==================================================
+
+Add/use a compact Market Overview area similar to the reference.
+
+Display useful existing information such as:
+
+- Current price
+- Change
+- Today's high
+- Today's low
+- Open
+- Volume where available
+- Market status
+
+Do NOT fabricate missing values.
+
+If a value is unavailable, clearly show an appropriate unavailable state.
+
+==================================================
+8. QUICK ACTIONS
+==================================================
+
+Keep quick actions visually separate and compact.
+
+For example:
+
+Record Trade
+Add to Watchlist
+
+Use the existing functionality.
+
+Do not create fake functionality.
+
+==================================================
+9. BELOW-CHART CONTENT
+==================================================
+
+Secondary information should appear below the chart.
+
+Use clean tabs or sections similar to the reference.
+
+For example:
+
+Overview
+Indicators
+Drawing Tools
+Price Alerts
+
+Only show these if the corresponding functionality already exists.
+
+Do not create fake controls that do nothing.
+
+==================================================
+10. JOURNAL
+==================================================
+
+Apply the SAME design language to Journal.
+
+The Journal should feel like the same application.
+
+Use:
+
+- Dark clean surfaces
+- Purple accents
+- Minimal borders
+- Clean typography
+- Compact controls
+
+Keep the monthly calendar as the main feature.
+
+Do NOT turn the Journal into a giant vertically scrolling page.
+
+The calendar should be immediately visible.
+
+Daily P/L should be easy to read.
+
+Positive:
+Green
+
+Negative:
+Red
+
+Zero/empty:
+Muted
+
+Clicking a day should open the detailed information cleanly rather than expanding a massive section down the page.
+
+==================================================
+11. STRATEGIES
+==================================================
+
+Use the same visual system.
+
+The main Strategies page should be clean and compact.
+
+Show the important information first.
+
+Avoid giant cards containing every strategy detail.
+
+Clicking a strategy should open its details.
+
+==================================================
+12. STRATEGY BUILDER
+==================================================
+
+Keep the existing Strategy Builder functionality.
+
+Visually redesign it to match the reference.
+
+Use compact sections and clear hierarchy.
+
+Do not put every field into one giant wall.
+
+Keep:
+
+- Strategy creation
+- Editing
+- Versioning
+- AI Review Strategy
+- Save as New Version
+
+working exactly as they currently do.
+
+==================================================
+13. AI ASSISTANT
+==================================================
+
+Make the AI Assistant visually match the same TradeX design.
+
+Use:
+
+- Clean dark chat area
+- Compact message bubbles/containers
+- Purple accents
+- Clear action buttons
+- Clean strategy draft cards
+
+Do not change the existing AI functionality.
+
+==================================================
+14. MONITORING
+==================================================
+
+Keep the existing monitoring logic.
+
+Redesign only the presentation.
+
+Make:
+
+MET
+NOT MET
+WAITING
+INVALID
+
+immediately understandable.
+
+Use appropriate subtle status colours while maintaining the TradeX dark/purple design.
+
+==================================================
+15. PERFORMANCE
+==================================================
+
+Keep the existing performance calculations.
+
+Present the information cleanly.
+
+Use compact cards and charts.
+
+Do not create a huge wall of statistics.
+
+Prioritise the most important information first.
+
+==================================================
+16. BACKTESTING
+==================================================
+
+Keep all existing backtesting functionality.
+
+Make the setup flow cleaner and more compact.
+
+The user should immediately understand:
+
+Strategy
+Version
+Market
+Date range
+Run Backtest
+
+==================================================
+17. NAVIGATION
+==================================================
+
+Make the sidebar look like the reference image.
+
+Dark sidebar.
+
+Clean icons.
+
+Clear active state using purple.
+
+Group navigation logically.
+
+The current page should be immediately obvious.
+
+Do not make the sidebar visually huge.
+
+==================================================
+18. MOBILE
+==================================================
+
+The same visual identity must work on mobile.
+
+Do NOT simply squash the desktop layout.
+
+Maintain:
+
+- Clean navigation
+- Large usable chart
+- Easy timeframe controls
+- Readable Journal calendar
+- Compact cards
+- Easy-to-use buttons
+
+Test:
+
+375px
+402px
+768px
+1440px
+
+==================================================
+19. REMOVE THE CURRENT GRAINY EFFECT
+==================================================
+
+THIS IS VERY IMPORTANT.
+
+Search the existing frontend styling for whatever is creating the grain/noise effect.
+
+Remove it completely.
+
+The background should be smooth and clean.
+
+Do not replace the grain with another texture.
+
+No noise overlay.
+No SVG noise filter.
+No CSS noise.
+No pseudo-element texture.
+No animated background noise.
+
+==================================================
+20. IMPORTANT — DON'T OVERDESIGN
+==================================================
+
+The reference image is clean because it is restrained.
+
+Do NOT add:
+
+- Excessive gradients
+- Excessive glow
+- Neon effects
+- Huge shadows
+- Excessive animations
+- Excessive rounded cards
+- Random decorative graphics
+- Unnecessary visual effects
+
+Keep it professional.
+
+==================================================
+21. IMPORTANT — PRESERVE FUNCTIONALITY
+==================================================
+
+Do not break:
+
+- BiQuote
+- Live market data
+- Candlestick data
+- Market selection
+- Timeframes
+- Strategy Builder
+- Strategy versioning
+- AI Assistant
+- AI strategy drafts
+- Review Strategy
+- Save as New Version
+- Trading concepts
+- Monitoring
+- Alerts
+- News
+- Backtesting
+- Journal
+- Daily P/L
+- Monthly Journal
+- Performance
+- Settings
+
+Do not fabricate:
+
+- Market data
+- Trades
+- Performance
+- Backtest results
+- News
+- Trading signals
+
+==================================================
+22. IMPLEMENTATION METHOD
+==================================================
+
+First inspect the existing frontend.
+
+Identify:
+
+- Global layout
+- Theme
+- Sidebar
+- Page layouts
+- Shared components
+- Chart component
+- Market page
+- Journal
+- Strategy pages
+- AI Assistant
+
+Then implement the visual changes consistently.
+
+Do not rebuild the backend unnecessarily.
+
+Do not rewrite working functionality just to change appearance.
+
+The goal is:
+
+EXISTING TRADEX FUNCTIONALITY
++
+REFERENCE IMAGE'S VISUAL DESIGN
+
+==================================================
+23. FINAL VISUAL CHECK
+==================================================
+
+Before declaring completion, compare the running application against the reference image.
+
+Ask:
+
+- Does it actually look like the reference?
+- Is the background clean and smooth?
+- Is the colour palette dark navy/black with restrained purple?
+- Is the grain completely gone?
+- Are candlesticks normal red and green?
+- Is the chart the main focus of Markets?
+- Is the sidebar clean?
+- Are panels compact?
+- Is there much less unnecessary scrolling?
+- Does everything feel like one cohesive trading platform?
+
+If the answer is no, continue refining the UI.
+
+Do not declare the redesign complete just because the application builds.
+
+The visual result is the primary requirement.
+
+==================================================
+
+FINAL TARGET
+
+I want TradeX to look like a polished professional dark trading terminal based directly on the attached reference image.
+
+Clean.
+Dark.
+Minimal.
+Purple accents.
+NO grain.
+NORMAL RED/GREEN CANDLESTICKS.
+Large professional chart.
+Compact information panels.
+Clear navigation.
+Minimal scrolling.
+
+Match the reference's visual hierarchy and overall layout as closely as practical while preserving all existing TradeX functionality.

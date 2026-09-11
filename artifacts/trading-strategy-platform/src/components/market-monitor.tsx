@@ -372,60 +372,75 @@ function LiveChartTab({ onAddMarket }: { onAddMarket: () => void }) {
 
   return (
     <div className="space-y-5">
-      <div className="panel p-4 md:p-5">
-        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-          <div className="flex-1 min-w-[180px]">
+      <div className="panel market-terminal-header p-4 md:p-5">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="eyebrow mb-2">BiQuote market data</div>
+            <h2 className="display text-2xl md:text-3xl font-bold truncate">{selectedInstrument?.symbol ?? "Select an instrument"}</h2>
+            <p className="text-xs text-muted-foreground mt-2 truncate">{selectedInstrument?.displayName || selectedInstrument?.description || selectedInstrument?.assetClass || "Choose a configured market to inspect its provider record."}</p>
+          </div>
+          <div className="market-quote flex flex-wrap items-start gap-5 lg:min-w-[310px] lg:justify-end">
+            <div>
+              <div className="eyebrow">Last price</div>
+              <div className="metric-value text-2xl mt-2">{quote?.last?.toFixed(5) ?? "—"}</div>
+            </div>
+            <div className="pt-0.5">
+              <span className={`tag ${isLive ? "tag-open" : connectionLabel === "MARKET CLOSED" || connectionLabel === "STALE" ? "tag-draft" : "tag-archived"}`}>
+                {isLive ? <Radio size={11} className="mr-1" /> : <WifiOff size={11} className="mr-1" />}
+                {connectionLabel}
+              </span>
+              <div className="text-[11px] text-muted-foreground mt-2">{streamStatus.message}</div>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 mt-5 pt-4 border-t border-border">
+          <div className="flex-1 min-w-0">
             <span className="label">Instrument</span>
-            <select className="select" value={instrumentId} onChange={event => setInstrumentId(event.target.value ? Number(event.target.value) : "")}>
+            <select className="select" value={instrumentId} onChange={event => setInstrumentId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-instrument">
               <option value="">Select instrument…</option>
               {(instruments.data ?? []).map(instrument => <option key={instrument.id} value={instrument.id}>{instrument.symbol} — {instrument.displayName || instrument.assetClass}</option>)}
             </select>
           </div>
-          <div className="w-full lg:w-56">
-            <span className="label">Data source</span>
-            <select className="select" value={sourceId} onChange={event => setSourceId(event.target.value ? Number(event.target.value) : "")}>
-              <option value="">Select source…</option>
-              {(sources.data ?? []).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-          </div>
-          <div className="w-full lg:w-44">
+          <div className="sm:w-36">
             <span className="label">Timeframe</span>
-            <select className="select" value={timeframeId} onChange={event => setTimeframeId(event.target.value ? Number(event.target.value) : "")}>
+            <select className="select" value={timeframeId} onChange={event => setTimeframeId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-timeframe">
               <option value="">Select timeframe…</option>
               {(timeframes.data ?? []).map(timeframe => <option key={timeframe.id} value={timeframe.id}>{timeframe.code}</option>)}
             </select>
           </div>
-          <button className="btn btn-secondary" onClick={refreshCandles} disabled={!ready || refresh.isPending}>
-            <RefreshCw size={14} className={refresh.isPending ? "animate-spin" : ""} />
-            {refresh.isPending ? "Refreshing…" : "Refresh candles"}
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-5 pt-4 border-t border-border text-xs text-muted-foreground">
-           <span className={`tag ${isLive ? "tag-open" : connectionLabel === "MARKET CLOSED" || connectionLabel === "STALE" ? "tag-draft" : "tag-archived"}`}>
-            {isLive ? <Radio size={11} className="mr-1" /> : <WifiOff size={11} className="mr-1" />}
-            {connectionLabel}
-          </span>
-          <span>{source?.name ?? "No source selected"}</span>
-          <span>{selectedTimeframe?.code ?? "—"}</span>
-          <span>{streamStatus.message}</span>
         </div>
       </div>
 
       {refresh.isError && <div className="panel p-4 text-sm text-destructive">Candles could not be refreshed: {refresh.error instanceof Error ? refresh.error.message : "provider error"}</div>}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="panel p-4"><div className="eyebrow">Current price</div><div className="metric-value mt-3 mono">{quote?.last?.toFixed(5) ?? "—"}</div><div className="text-[11px] text-muted-foreground mt-2">{isLive ? "Genuine live mid price" : quote ? "Last provider price" : "No quote received"}</div></div>
-        <div className="panel p-4"><div className="eyebrow">Bid / ask</div><div className="mt-3 mono text-sm">{quote?.bid?.toFixed(5) ?? "—"} <span className="text-muted-foreground">/</span> {quote?.ask?.toFixed(5) ?? "—"}</div><div className="text-[11px] text-muted-foreground mt-2">Provider quote</div></div>
-        <div className="panel p-4"><div className="eyebrow">Last update</div><div className="mt-3 mono text-sm">{quote?.receivedAt ? new Date(quote.receivedAt).toLocaleTimeString() : "—"}</div><div className="text-[11px] text-muted-foreground mt-2">{quote?.quoteAgeSeconds != null ? `${quote.quoteAgeSeconds}s quote age` : "No timestamp yet"}</div></div>
-        <div className="panel p-4"><div className="eyebrow">Candles</div><div className="metric-value mt-3">{chartBars.length}</div><div className="text-[11px] text-muted-foreground mt-2">{formingCandle ? "Includes live forming bar" : "Stored provider bars"}</div></div>
-      </div>
-
-      <div className="panel p-4 md:p-6">
-        <div className="flex items-start justify-between gap-4 mb-5">
-          <div><h2 className="font-semibold">BiQuote candlestick chart</h2><p className="text-xs text-muted-foreground mt-1">Stored OHLC bars plus a forming bar built only from received provider ticks.</p></div>
-          <CandlestickChart size={18} className="text-primary shrink-0" />
+      <div className="panel market-chart-panel p-4 md:p-6">
+        <div className="flex flex-col gap-4 mb-5">
+          <div className="flex items-start justify-between gap-4">
+            <div><h2 className="font-semibold">BiQuote candlestick chart</h2><p className="text-xs text-muted-foreground mt-1">Stored OHLC bars plus a forming bar built only from received provider ticks.</p></div>
+            <CandlestickChart size={18} className="text-primary shrink-0" />
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 pt-3 border-t border-border">
+            <div className="sm:w-56">
+              <span className="label">Data source</span>
+              <select className="select" value={sourceId} onChange={event => setSourceId(event.target.value ? Number(event.target.value) : "")} data-testid="select-market-source">
+                <option value="">Select source…</option>
+                {(sources.data ?? []).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </div>
+            <button className="btn btn-secondary" onClick={refreshCandles} disabled={!ready || refresh.isPending} data-testid="button-refresh-market-candles">
+              <RefreshCw size={14} className={refresh.isPending ? "animate-spin" : ""} />
+              {refresh.isPending ? "Refreshing…" : "Refresh candles"}
+            </button>
+            <div className="text-[11px] text-muted-foreground sm:ml-auto pb-2">{source?.name ?? "No source selected"} · {selectedTimeframe?.code ?? "—"}</div>
+          </div>
         </div>
         {candles.isError ? <ErrorBlock retry={() => candles.refetch()} /> : !ready ? <div className="p-10 text-center text-sm text-muted-foreground">Select an instrument, source, and timeframe to view genuine market data.</div> : candles.isLoading || refresh.isPending ? <LoadingBlock /> : !chartBars.length ? <EmptyState icon={CandlestickChart} title="No candle data yet" text="BiQuote did not return OHLC data for this instrument and timeframe. No substitute candles are shown." action={<button className="btn btn-primary" onClick={refreshCandles} disabled={refresh.isPending}>Request BiQuote candles</button>} /> : <CandleSvg bars={chartBars} />}
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="panel p-4"><div className="eyebrow">Bid / ask</div><div className="mt-3 mono text-sm">{quote?.bid?.toFixed(5) ?? "—"} <span className="text-muted-foreground">/</span> {quote?.ask?.toFixed(5) ?? "—"}</div><div className="text-[11px] text-muted-foreground mt-2">Provider quote</div></div>
+        <div className="panel p-4"><div className="eyebrow">Last update</div><div className="mt-3 mono text-sm">{quote?.receivedAt ? new Date(quote.receivedAt).toLocaleTimeString() : "—"}</div><div className="text-[11px] text-muted-foreground mt-2">{quote?.quoteAgeSeconds != null ? `${quote.quoteAgeSeconds}s quote age` : "No timestamp yet"}</div></div>
+        <div className="panel p-4 col-span-2 lg:col-span-1"><div className="eyebrow">Candles loaded</div><div className="metric-value mt-3">{chartBars.length}</div><div className="text-[11px] text-muted-foreground mt-2">{formingCandle ? "Includes live forming bar" : "Stored provider bars"}</div></div>
       </div>
 
       {selectedInstrument && <MarketEconomicEvents instrument={selectedInstrument} />}
@@ -657,7 +672,7 @@ function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; hig
           const x = pad.left + xStep * index + xStep / 2;
           const candleWidth = Math.max(3, Math.min(12, xStep * 0.55));
           const rising = bar.close >= bar.open;
-          const color = bar.isClosed ? (rising ? "hsl(var(--primary))" : "hsl(var(--destructive))") : "hsl(var(--accent))";
+           const color = bar.isClosed ? (rising ? "#35c98b" : "#ef6b73") : "#d6a85d";
           const bodyTop = y(Math.max(bar.open, bar.close));
           const bodyHeight = Math.max(2, Math.abs(y(bar.open) - y(bar.close)));
           return <g key={`${bar.openTime}-${index}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}><title>{`${new Date(bar.openTime).toLocaleString()} · O ${bar.open.toFixed(5)} · H ${bar.high.toFixed(5)} · L ${bar.low.toFixed(5)} · C ${bar.close.toFixed(5)}`}</title>{hoveredIndex === index && <line x1={x} x2={x} y1={pad.top} y2={height - pad.bottom} stroke="hsl(var(--accent))" strokeDasharray="3 4" />}<line x1={x} x2={x} y1={y(bar.high)} y2={y(bar.low)} stroke={color} strokeWidth="1.5" /><rect x={x - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={color} rx="1" /></g>;
@@ -675,7 +690,7 @@ function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; hig
         <span>L {visibleBars[hoveredIndex].low.toFixed(5)}</span>
         <span>C {visibleBars[hoveredIndex].close.toFixed(5)}</span>
       </div>}
-      <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground mt-2"><span><i className="inline-block w-2 h-2 rounded-sm bg-primary mr-1" />up</span><span><i className="inline-block w-2 h-2 rounded-sm bg-destructive mr-1" />down</span><span><i className="inline-block w-2 h-2 rounded-sm bg-accent mr-1" />forming from genuine ticks</span></div>
+      <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground mt-2"><span><i className="inline-block w-2 h-2 rounded-sm mr-1" style={{ backgroundColor: "#35c98b" }} />bullish close</span><span><i className="inline-block w-2 h-2 rounded-sm mr-1" style={{ backgroundColor: "#ef6b73" }} />bearish close</span><span><i className="inline-block w-2 h-2 rounded-sm mr-1" style={{ backgroundColor: "#d6a85d" }} />forming from genuine ticks</span></div>
     </div>
   );
 }
