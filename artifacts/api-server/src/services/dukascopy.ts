@@ -16,6 +16,7 @@ import { HistoricalDataError } from "./historical-errors";
 
 export const DUKASCOPY_KEY = "dukascopy";
 export const DUKASCOPY_BASE_URL = "https://jetta.dukascopy.com/v1";
+const DUKASCOPY_USER_AGENT = "TradeX/1.0";
 
 export const DUKASCOPY_INSTRUMENT_MAPPINGS = {
   XAUUSD: {
@@ -263,7 +264,10 @@ class DukascopyAdapter implements MarketDataProviderAdapter {
         let body = "";
         try {
           response = await fetch(`${DUKASCOPY_BASE_URL}${path}`, {
-            headers: { accept: "application/json" },
+            headers: {
+              accept: "application/json",
+              "user-agent": DUKASCOPY_USER_AGENT,
+            },
           });
           this.lastRequestAt = Date.now();
           body = await response.text();

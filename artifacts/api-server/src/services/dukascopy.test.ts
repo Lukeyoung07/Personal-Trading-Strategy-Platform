@@ -39,6 +39,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+function resetAdapterRequestState() {
+  Reflect.set(dukascopyAdapter, "requestChain", Promise.resolve());
+  Reflect.set(dukascopyAdapter, "lastRequestAt", 0);
+}
+
 describe("Dukascopy historical provider", () => {
   it("exposes only the verified XAUUSD and USTEC mappings", () => {
     expect(DUKASCOPY_INSTRUMENT_MAPPINGS.XAUUSD.providerSymbol).toBe("XAU-USD");
@@ -98,7 +103,12 @@ describe("Dukascopy historical provider", () => {
     expect(candles[0].closeTime).toEqual(new Date("2026-09-10T10:05:00.000Z"));
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining("/candles/minute/XAU-USD/BID/2026/9/10"),
-      expect.anything(),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          accept: "application/json",
+          "user-agent": "TradeX/1.0",
+        }),
+      }),
     );
   });
 
@@ -166,6 +176,8 @@ describe("Dukascopy historical provider", () => {
 
   it("honors Retry-After without issuing a concurrent retry", async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.now() + 60_000));
+    resetAdapterRequestState();
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(response({ error: "busy" }, 429, { "retry-after": "3" }))
       .mockResolvedValueOnce(response(payload()));
@@ -177,7 +189,6 @@ describe("Dukascopy historical provider", () => {
     });
 
     await vi.advanceTimersByTimeAsync(0);
-    await vi.advanceTimersByTimeAsync(1_000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(2_999);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -188,6 +199,8 @@ describe("Dukascopy historical provider", () => {
 
   it("uses exponential backoff for transient provider failures", async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.now() + 60_000));
+    resetAdapterRequestState();
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(response({ error: "busy" }, 503))
       .mockResolvedValueOnce(response({ error: "busy" }, 503))
@@ -200,7 +213,6 @@ describe("Dukascopy historical provider", () => {
     });
 
     await vi.advanceTimersByTimeAsync(0);
-    await vi.advanceTimersByTimeAsync(1_000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1_999);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -216,6 +228,8 @@ describe("Dukascopy historical provider", () => {
   it("classifies an exhausted rate limit separately from unavailable history", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => response({ error: "busy" }, 429, { "retry-after": "0" }));
     vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.now() + 60_000));
+    resetAdapterRequestState();
     const assertion = expect(dukascopyAdapter.candles({
       providerSymbol: "XAU-USD",
       timeframeCode: "1h",

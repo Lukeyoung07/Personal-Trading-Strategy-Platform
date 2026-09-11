@@ -394,12 +394,18 @@ router.post("/market-data/candles/refresh", async (req, res): Promise<void> => {
   const instrumentId = Number(req.body?.instrumentId);
   const timeframeId = Number(req.body?.timeframeId);
   const limit = req.body?.limit == null ? undefined : Number(req.body.limit);
+  const from = req.body?.from == null ? undefined : new Date(String(req.body.from));
+  const to = req.body?.to == null ? undefined : new Date(String(req.body.to));
   if (![sourceId, instrumentId, timeframeId].every(Number.isInteger) || [sourceId, instrumentId, timeframeId].some(value => value < 1) || (limit != null && (!Number.isInteger(limit) || limit < 1 || limit > 1000))) {
     res.status(400).json({ error: "sourceId, instrumentId, and timeframeId must be positive integers; limit must be between 1 and 1000." });
     return;
   }
+  if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime())) || (from && to && from >= to)) {
+    res.status(400).json({ error: "from and to must be valid dates, with from earlier than to." });
+    return;
+  }
   try {
-    const ingested = await marketDataService.refreshCandles({ sourceId, instrumentId, timeframeId, limit });
+    const ingested = await marketDataService.refreshCandles({ sourceId, instrumentId, timeframeId, from, to, limit });
     res.json({ sourceId, instrumentId, timeframeId, ingested });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Could not refresh candles." });

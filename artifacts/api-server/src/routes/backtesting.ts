@@ -24,6 +24,7 @@ import { HistoricalDataError } from "../services/historical-errors";
 const router: IRouter = Router();
 const activeBacktests = new Set<number>();
 const inFlightBacktestRequests = new Map<string, Promise<any>>();
+const BACKTEST_CANDLE_WRITE_BATCH_SIZE = 500;
 
 function engineCondition(condition: typeof strategyVersionConditionsTable.$inferSelect): BacktestCondition {
   return {
@@ -284,7 +285,10 @@ async function executeBacktestInternal(backtestId: number) {
           volume: candle.volume?.toString() ?? null,
           isClosed: candle.isClosed,
         })));
-      if (candleRows.length) await tx.insert(backtestCandlesTable).values(candleRows);
+      for (let offset = 0; offset < candleRows.length; offset += BACKTEST_CANDLE_WRITE_BATCH_SIZE) {
+        await tx.insert(backtestCandlesTable)
+          .values(candleRows.slice(offset, offset + BACKTEST_CANDLE_WRITE_BATCH_SIZE));
+      }
       if (result.trades.length) {
         await tx.insert(backtestTradesTable).values(result.trades.map(trade => ({
           backtestId,
