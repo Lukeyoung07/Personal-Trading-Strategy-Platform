@@ -7,6 +7,7 @@
  */
 import type { StrategyMonitorCondition } from './strategyMonitorCondition';
 import type { StrategyMonitorMonitoringStatus } from './strategyMonitorMonitoringStatus';
+import type { StrategyMonitorMarketDataState } from './strategyMonitorMarketDataState';
 import type { StrategyMonitorOverallStatus } from './strategyMonitorOverallStatus';
 import type { StrategyMonitorResetStatus } from './strategyMonitorResetStatus';
 
@@ -23,6 +24,7 @@ export interface StrategyMonitor {
   instrumentSymbol: string | null;
   /** @nullable */
   sourceId: number | null;
+  marketDataState: StrategyMonitorMarketDataState;
   monitoringStatus: StrategyMonitorMonitoringStatus;
   overallStatus: StrategyMonitorOverallStatus;
   /** @nullable */

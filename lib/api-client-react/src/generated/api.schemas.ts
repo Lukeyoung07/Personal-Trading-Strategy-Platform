@@ -293,6 +293,8 @@ export interface StrategyMonitorCondition {
   lastEvaluationAt: string | null;
   /** @nullable */
   lastMarketDataAt: string | null;
+  /** @nullable */
+  lastCandleOpenTime: string | null;
 }
 
 export type StrategyMonitorMonitoringStatus = typeof StrategyMonitorMonitoringStatus[keyof typeof StrategyMonitorMonitoringStatus];
@@ -304,6 +306,18 @@ export const StrategyMonitorMonitoringStatus = {
   monitoring: 'monitoring',
   paused: 'paused',
   error: 'error',
+} as const;
+
+export type StrategyMonitorMarketDataState = typeof StrategyMonitorMarketDataState[keyof typeof StrategyMonitorMarketDataState];
+
+export const StrategyMonitorMarketDataState = {
+  live: 'live',
+  stale: 'stale',
+  market_closed: 'market_closed',
+  disconnected: 'disconnected',
+  missing: 'missing',
+  error: 'error',
+  ambiguous: 'ambiguous',
 } as const;
 
 export type StrategyMonitorOverallStatus = typeof StrategyMonitorOverallStatus[keyof typeof StrategyMonitorOverallStatus];
@@ -338,6 +352,7 @@ export interface StrategyMonitor {
   instrumentSymbol: string | null;
   /** @nullable */
   sourceId: number | null;
+  marketDataState: StrategyMonitorMarketDataState;
   monitoringStatus: StrategyMonitorMonitoringStatus;
   overallStatus: StrategyMonitorOverallStatus;
   /** @nullable */

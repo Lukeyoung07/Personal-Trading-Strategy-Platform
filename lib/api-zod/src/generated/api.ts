@@ -556,6 +556,7 @@ export const ListStrategyMonitorsResponseItem = zod.object({
   "instrumentId": zod.number().int().nullable(),
   "instrumentSymbol": zod.string().nullable(),
   "sourceId": zod.number().int().nullable(),
+  "marketDataState": zod.enum(['live', 'stale', 'market_closed', 'disconnected', 'missing', 'error', 'ambiguous']),
   "monitoringStatus": zod.enum(['not_started', 'waiting', 'monitoring', 'paused', 'error']),
   "overallStatus": zod.enum(['not_met', 'met', 'waiting', 'invalid']),
   "statusReason": zod.string().nullable(),
@@ -584,6 +585,7 @@ export const ListStrategyMonitorsResponseItem = zod.object({
   "reason": zod.string().nullable(),
   "lastEvaluationAt": zod.coerce.date().nullable(),
   "lastMarketDataAt": zod.coerce.date().nullable()
+  ,"lastCandleOpenTime": zod.coerce.date().nullable()
 }))
 })
 export const ListStrategyMonitorsResponse = zod.array(ListStrategyMonitorsResponseItem)
@@ -615,6 +617,7 @@ export const EvaluateActiveStrategiesResponseItem = zod.object({
   "instrumentId": zod.number().int().nullable(),
   "instrumentSymbol": zod.string().nullable(),
   "sourceId": zod.number().int().nullable(),
+  "marketDataState": zod.enum(['live', 'stale', 'market_closed', 'disconnected', 'missing', 'error', 'ambiguous']),
   "monitoringStatus": zod.enum(['not_started', 'waiting', 'monitoring', 'paused', 'error']),
   "overallStatus": zod.enum(['not_met', 'met', 'waiting', 'invalid']),
   "statusReason": zod.string().nullable(),
@@ -642,7 +645,8 @@ export const EvaluateActiveStrategiesResponseItem = zod.object({
   "reasonCode": zod.string().nullable(),
   "reason": zod.string().nullable(),
   "lastEvaluationAt": zod.coerce.date().nullable(),
-  "lastMarketDataAt": zod.coerce.date().nullable()
+  "lastMarketDataAt": zod.coerce.date().nullable(),
+  "lastCandleOpenTime": zod.coerce.date().nullable()
 }))
 })
 export const EvaluateActiveStrategiesResponse = zod.array(EvaluateActiveStrategiesResponseItem)

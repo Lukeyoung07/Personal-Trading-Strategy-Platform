@@ -3,6 +3,7 @@ import {
   candlesTable,
   db,
   marketDataSourcesTable,
+  marketDataConnectionsTable,
   marketsTable,
   sourceInstrumentMappingsTable,
   strategiesTable,
@@ -26,6 +27,26 @@ import {
 
 export type ConditionEvaluationStatus = "not_met" | "met" | "waiting" | "invalid";
 export type MonitoringStatus = "not_started" | "waiting" | "monitoring" | "paused" | "error";
+export type MarketDataState = "live" | "stale" | "market_closed" | "disconnected" | "missing" | "error" | "ambiguous";
+
+export function classifyMarketDataState(input: {
+  sourceId: number | null;
+  connectionStatus?: string | null;
+  lastDataAt?: Date | null;
+  latestCandleAt?: Date | null;
+  now?: Date;
+  staleAfterMs?: number;
+}): MarketDataState {
+  if (!input.sourceId) return "ambiguous";
+  const status = input.connectionStatus?.trim().toLowerCase();
+  if (status === "error" || status === "failed") return "error";
+  if (status === "market_closed" || status === "closed") return "market_closed";
+  if (status && status !== "connected") return "disconnected";
+  const latest = input.lastDataAt ?? input.latestCandleAt ?? null;
+  if (!latest) return "missing";
+  const staleAfterMs = input.staleAfterMs ?? 15 * 60 * 1000;
+  return (input.now ?? new Date()).getTime() - latest.getTime() > staleAfterMs ? "stale" : "live";
+}
 
 export interface EvaluationCandle {
   id: number;
@@ -99,6 +120,7 @@ export interface StrategyMonitorSnapshot {
   instrumentId: number | null;
   instrumentSymbol: string | null;
   sourceId: number | null;
+  marketDataState: MarketDataState;
   monitoringStatus: MonitoringStatus;
   overallStatus: ConditionEvaluationStatus;
   statusReason: string | null;
@@ -127,6 +149,7 @@ export interface StrategyMonitorSnapshot {
     reason: string | null;
     lastEvaluationAt: Date | null;
     lastMarketDataAt: Date | null;
+    lastCandleOpenTime: Date | null;
   }>;
 }
 
@@ -215,6 +238,15 @@ export class StrategyMonitoringEngine {
     const states = await db.select().from(strategyMonitorConditionStatesTable)
       .where(eq(strategyMonitorConditionStatesTable.monitorSessionId, session.id));
     const byCondition = new Map(states.map(state => [state.strategyVersionConditionId, state]));
+    const candleOpenTimeFor = (state: typeof states[number] | undefined) => {
+      if (!state?.evidence) return null;
+      try {
+        const evidence = JSON.parse(state.evidence) as { candleOpenTime?: string };
+        return evidence.candleOpenTime ? new Date(evidence.candleOpenTime) : null;
+      } catch {
+        return null;
+      }
+    };
     return {
       monitorSessionId: session.id,
       strategyId: item.strategy.id,
@@ -224,6 +256,7 @@ export class StrategyMonitoringEngine {
       instrumentId: item.version.marketId,
       instrumentSymbol: item.version.marketSymbol,
       sourceId: session.sourceId,
+      marketDataState: session.marketDataState as MarketDataState,
       monitoringStatus: session.monitoringStatus as MonitoringStatus,
       overallStatus: session.overallStatus as ConditionEvaluationStatus,
       statusReason: session.statusReason,
@@ -254,6 +287,7 @@ export class StrategyMonitoringEngine {
           reason: state?.reason ?? "This condition has not been evaluated yet.",
           lastEvaluationAt: state?.lastEvaluationAt ?? null,
           lastMarketDataAt: state?.lastMarketDataAt ?? null,
+          lastCandleOpenTime: candleOpenTimeFor(state),
         };
       }),
     };
@@ -269,6 +303,7 @@ export class StrategyMonitoringEngine {
       instrumentId: item.version.marketId,
       instrumentSymbol: item.version.marketSymbol,
       sourceId: null,
+      marketDataState: "missing",
       monitoringStatus: "not_started",
       overallStatus: "waiting",
       statusReason: "Evaluation has not run for this active strategy version.",
@@ -299,6 +334,7 @@ export class StrategyMonitoringEngine {
         reason: "This condition has not been evaluated yet.",
         lastEvaluationAt: null,
         lastMarketDataAt: null,
+        lastCandleOpenTime: null,
       })),
     };
   }
@@ -321,7 +357,9 @@ export class StrategyMonitoringEngine {
       timeframeByName.set(timeframe.code.trim().toLowerCase(), timeframe);
       timeframeByName.set(timeframe.label.trim().toLowerCase(), timeframe);
     }
-    const sourceId = await this.resolveSource(item.version.marketId, requestedSourceId);
+    const sourceResolution = await this.resolveSource(item.version.marketId, requestedSourceId);
+    const sourceId = sourceResolution.sourceId;
+    let marketDataState = sourceResolution.marketDataState;
     const orderCounts = new Map<number, number>();
     for (const condition of conditions) orderCounts.set(condition.conditionOrder, (orderCounts.get(condition.conditionOrder) ?? 0) + 1);
     const dependenciesByCondition = new Map<number, number[]>();
@@ -394,7 +432,7 @@ export class StrategyMonitoringEngine {
       } else if (invalidDependencyByCondition.has(condition.id)) {
         result = this.conditionResult(condition, timeframe.id, "invalid", "DEPENDENCY_INVALID", invalidDependencyByCondition.get(condition.id)!);
       } else if (!sourceId) {
-        result = this.conditionResult(condition, timeframe.id, "waiting", "MARKET_DATA_SOURCE_UNAVAILABLE", "No single configured source with stored data is available for this instrument.");
+        result = this.conditionResult(condition, timeframe.id, "waiting", sourceResolution.reasonCode, sourceResolution.reason);
       } else {
         const detector = this.detectors.find(candidate => candidate.conceptId === condition.conceptId);
         const detectorCondition = {
@@ -426,6 +464,7 @@ export class StrategyMonitoringEngine {
         const lastMarketDataAt = lastCandle?.receivedAt ?? null;
         const lastCandleOpenTime = lastCandle?.openTime ?? null;
         if (candles.length < requiredCount) {
+          if (!candles.length && marketDataState === "live") marketDataState = "missing";
           result = this.conditionResult(condition, timeframe.id, "waiting", "INSUFFICIENT_MARKET_DATA", `This condition needs ${requiredCount} closed candle${requiredCount === 1 ? "" : "s"} on ${condition.timeframe}; ${candles.length} are available.`, null, lastMarketDataAt, null, null, null, lastCandleOpenTime);
         } else if (!detector) {
           result = this.conditionResult(condition, timeframe.id, "waiting", "EVALUATOR_UNAVAILABLE", "The saved concept and rules are descriptive; no executable detector is registered.", null, lastMarketDataAt, null, null, null, lastCandleOpenTime);
@@ -436,27 +475,43 @@ export class StrategyMonitoringEngine {
             result = this.conditionResult(condition, timeframe.id, "waiting", "DEPENDENCY_WAITING", `Waiting for condition ${waitingDependency} to be met first.`, null, lastMarketDataAt);
           } else {
             const previous = previousByCondition.get(condition.id);
-            const detectorResult = await detector.evaluate({
-                condition: detectorCondition,
-              candles,
-              dependencyStates,
-              previousStatus: (previous?.status as ConditionEvaluationStatus | undefined) ?? null,
-              previousState: this.parseState(previous?.evaluatorState),
-              evaluatedAt,
-            });
-            result = this.conditionResult(
-              condition,
-              timeframe.id,
-              transitionConditionStatus((previous?.status as ConditionEvaluationStatus | undefined) ?? null, detectorResult.status),
-              detectorResult.reasonCode,
-              detectorResult.reason,
-              detectorResult.evidence ?? null,
-              lastMarketDataAt,
-              detector.id,
-              detector.version,
-              detectorResult.state ?? null,
-              lastCandleOpenTime,
-            );
+            try {
+              const detectorResult = await detector.evaluate({
+                  condition: detectorCondition,
+                candles,
+                dependencyStates,
+                previousStatus: (previous?.status as ConditionEvaluationStatus | undefined) ?? null,
+                previousState: this.parseState(previous?.evaluatorState),
+                evaluatedAt,
+              });
+              result = this.conditionResult(
+                condition,
+                timeframe.id,
+                transitionConditionStatus((previous?.status as ConditionEvaluationStatus | undefined) ?? null, detectorResult.status),
+                detectorResult.reasonCode,
+                detectorResult.reason,
+                detectorResult.evidence ?? null,
+                lastMarketDataAt,
+                detector.id,
+                detector.version,
+                detectorResult.state ?? null,
+                lastCandleOpenTime,
+              );
+            } catch (error) {
+              result = this.conditionResult(
+                condition,
+                timeframe.id,
+                "invalid",
+                "EVALUATOR_ERROR",
+                error instanceof Error ? `The registered evaluator failed: ${error.message}` : "The registered evaluator failed.",
+                null,
+                lastMarketDataAt,
+                detector.id,
+                detector.version,
+                null,
+                lastCandleOpenTime,
+              );
+            }
           }
         }
       }
@@ -533,6 +588,7 @@ export class StrategyMonitoringEngine {
         || currentSession.invalidCount !== summary.invalidCount
         || currentSession.progressPercent !== summary.progressPercent
         || currentSession.lastMarketDataAt?.getTime() !== summary.lastMarketDataAt?.getTime()
+        || currentSession.marketDataState !== marketDataState
         || currentSession.resetStatus !== resetStatus
         || currentSession.resetReason !== resetReason;
       let session = currentSession;
@@ -553,6 +609,7 @@ export class StrategyMonitoringEngine {
           progressPercent: summary.progressPercent,
           lastEvaluationAt: evaluatedAt,
           lastMarketDataAt: summary.lastMarketDataAt,
+          marketDataState,
           resetStatus,
           resetReason,
           evaluationRevision: 1,
@@ -572,6 +629,7 @@ export class StrategyMonitoringEngine {
           progressPercent: summary.progressPercent,
           lastEvaluationAt: evaluatedAt,
           lastMarketDataAt: summary.lastMarketDataAt,
+          marketDataState,
           resetStatus,
           resetReason,
           evaluationRevision: currentSession.evaluationRevision + 1,
@@ -687,8 +745,41 @@ export class StrategyMonitoringEngine {
     return snapshot;
   }
 
-  private async resolveSource(instrumentId: number | null, requestedSourceId: number | null) {
-    if (!instrumentId) return null;
+  private async resolveSource(instrumentId: number | null, requestedSourceId: number | null): Promise<{
+    sourceId: number | null;
+    marketDataState: MarketDataState;
+    reasonCode: string;
+    reason: string;
+  }> {
+    if (!instrumentId) {
+      return {
+        sourceId: null,
+        marketDataState: "missing",
+        reasonCode: "INSTRUMENT_MISSING",
+        reason: "The active version does not reference an instrument.",
+      };
+    }
+    const connectionFor = async (sourceId: number) => {
+      const [connection] = await db.select({
+        status: marketDataConnectionsTable.status,
+        lastDataAt: marketDataConnectionsTable.lastDataAt,
+      }).from(marketDataConnectionsTable).where(eq(marketDataConnectionsTable.sourceId, sourceId));
+      const marketDataState = classifyMarketDataState({
+        sourceId,
+        connectionStatus: connection?.status,
+        lastDataAt: connection?.lastDataAt,
+      });
+      return {
+        sourceId,
+        marketDataState,
+        reasonCode: marketDataState === "error" ? "MARKET_DATA_PROVIDER_ERROR" : marketDataState === "disconnected" ? "MARKET_DATA_PROVIDER_DISCONNECTED" : "MARKET_DATA_SOURCE_SELECTED",
+        reason: marketDataState === "error"
+          ? "The selected market-data provider reported an error."
+          : marketDataState === "disconnected"
+            ? "The selected market-data provider is disconnected."
+            : "A configured market-data source is selected.",
+      };
+    };
     if (requestedSourceId) {
       const [mapping] = await db.select({ sourceId: sourceInstrumentMappingsTable.sourceId })
         .from(sourceInstrumentMappingsTable)
@@ -698,7 +789,14 @@ export class StrategyMonitoringEngine {
           eq(sourceInstrumentMappingsTable.sourceId, requestedSourceId),
           eq(marketDataSourcesTable.isEnabled, true),
         ));
-      return mapping?.sourceId ?? null;
+      return mapping
+        ? connectionFor(mapping.sourceId)
+        : {
+          sourceId: null,
+          marketDataState: "disconnected",
+          reasonCode: "MARKET_DATA_SOURCE_UNAVAILABLE",
+          reason: "The requested market-data source is not enabled for this instrument.",
+        };
     }
     const mappings = await db.select({ sourceId: sourceInstrumentMappingsTable.sourceId })
       .from(sourceInstrumentMappingsTable)
@@ -707,7 +805,21 @@ export class StrategyMonitoringEngine {
         eq(sourceInstrumentMappingsTable.instrumentId, instrumentId),
         eq(marketDataSourcesTable.isEnabled, true),
       ));
-    return mappings.length === 1 ? mappings[0].sourceId : null;
+    if (mappings.length === 1) return connectionFor(mappings[0].sourceId);
+    if (!mappings.length) {
+      return {
+        sourceId: null,
+        marketDataState: "disconnected",
+        reasonCode: "MARKET_DATA_SOURCE_UNAVAILABLE",
+        reason: "No enabled market-data source is configured for this instrument.",
+      };
+    }
+    return {
+      sourceId: null,
+      marketDataState: "ambiguous",
+      reasonCode: "MARKET_DATA_SOURCE_AMBIGUOUS",
+      reason: "Multiple enabled market-data sources are configured; choose one explicitly before evaluating.",
+    };
   }
 
   private conditionResult(
@@ -723,7 +835,19 @@ export class StrategyMonitoringEngine {
     evaluatorState: unknown = null,
     lastCandleOpenTime: Date | null = null,
   ): EvaluatedCondition {
-    return { condition, timeframeId, status, reasonCode, reason, evidence, detectorId, detectorVersion, evaluatorState, lastMarketDataAt, lastCandleOpenTime };
+    return {
+      condition,
+      timeframeId,
+      status,
+      reasonCode,
+      reason,
+      evidence: evidence ?? (lastCandleOpenTime ? { candleOpenTime: lastCandleOpenTime } : null),
+      detectorId,
+      detectorVersion,
+      evaluatorState,
+      lastMarketDataAt,
+      lastCandleOpenTime,
+    };
   }
 
   private parseState(value: string | null | undefined): unknown {

@@ -26,4 +26,6 @@ export interface StrategyMonitorCondition {
   lastEvaluationAt: Date | null;
   /** @nullable */
   lastMarketDataAt: Date | null;
+  /** @nullable */
+  lastCandleOpenTime: Date | null;
 }

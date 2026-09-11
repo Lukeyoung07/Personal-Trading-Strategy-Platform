@@ -1641,9 +1641,12 @@ components:
       properties:
         strategyId: { type: integer, minimum: 1 }
         sourceId: { type: ["integer", "null"], minimum: 1 }
+    StrategyMonitorMarketDataState:
+      type: string
+      enum: [live, stale, market_closed, disconnected, missing, error, ambiguous]
     StrategyMonitorCondition:
       type: object
-      required: [strategyVersionConditionId, conceptId, conceptName, conditionOrder, name, stage, requirement, timeframe, status, reasonCode, reason, lastEvaluationAt, lastMarketDataAt]
+      required: [strategyVersionConditionId, conceptId, conceptName, conditionOrder, name, stage, requirement, timeframe, status, reasonCode, reason, lastEvaluationAt, lastMarketDataAt, lastCandleOpenTime]
       properties:
         strategyVersionConditionId: { type: integer }
         conceptId: { type: integer }
@@ -1662,9 +1665,10 @@ components:
         reason: { type: ["string", "null"] }
         lastEvaluationAt: { type: ["string", "null"], format: date-time }
         lastMarketDataAt: { type: ["string", "null"], format: date-time }
+        lastCandleOpenTime: { type: ["string", "null"], format: date-time }
     StrategyMonitor:
       type: object
-      required: [monitorSessionId, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, sourceId, monitoringStatus, overallStatus, statusReason, conditionCount, metCount, notMetCount, waitingCount, invalidCount, remainingCount, progressPercent, lastEvaluationAt, lastMarketDataAt, resetStatus, resetReason, conditions]
+      required: [monitorSessionId, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, sourceId, marketDataState, monitoringStatus, overallStatus, statusReason, conditionCount, metCount, notMetCount, waitingCount, invalidCount, remainingCount, progressPercent, lastEvaluationAt, lastMarketDataAt, resetStatus, resetReason, conditions]
       properties:
         monitorSessionId: { type: ["integer", "null"] }
         strategyId: { type: integer }
@@ -1674,6 +1678,8 @@ components:
         instrumentId: { type: ["integer", "null"] }
         instrumentSymbol: { type: ["string", "null"] }
         sourceId: { type: ["integer", "null"] }
+        marketDataState:
+          $ref: "#/components/schemas/StrategyMonitorMarketDataState"
         monitoringStatus:
           type: string
           enum: [not_started, waiting, monitoring, paused, error]

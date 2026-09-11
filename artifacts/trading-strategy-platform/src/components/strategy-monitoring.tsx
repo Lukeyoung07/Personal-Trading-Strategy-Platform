@@ -20,16 +20,17 @@ function StatusBadge({ status }: { status: string }) {
       case 'monitoring': return 'text-primary bg-primary/10 border-primary/20';
       case 'paused': return 'text-muted-foreground bg-secondary border-border';
       case 'error': return 'text-destructive bg-destructive/10 border-destructive/20';
+      case 'stale': return 'text-accent bg-accent/10 border-accent/20';
+      case 'market_closed': return 'text-muted-foreground bg-secondary border-border';
+      case 'disconnected': return 'text-destructive bg-destructive/10 border-destructive/20';
+      case 'missing': return 'text-accent bg-accent/10 border-accent/20';
+      case 'ambiguous': return 'text-accent bg-accent/10 border-accent/20';
       case 'ready': return 'text-primary bg-primary/10 border-primary/20';
       case 'not_configured': return 'text-muted-foreground bg-secondary border-border';
       default: return 'text-muted-foreground bg-secondary border-border';
     }
   };
-  const label = status.toLowerCase() === 'not_met'
-    ? 'Not met'
-    : status.toLowerCase() === 'not_configured'
-      ? 'Not configured'
-      : status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+  const label = status.toLowerCase().replaceAll('_', ' ').replace(/\b\w/g, character => character.toUpperCase());
   return (
     <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-widest border ${getStyle(status)}`}>
       {label}
@@ -135,7 +136,8 @@ export function StrategyMonitoringPage() {
                     <div className="flex items-center gap-1.5"><Layers size={13} /> {monitor.instrumentSymbol || 'No Market'}</div>
                     <div className="flex items-center gap-1.5"><Database size={13} /> {monitor.sourceId ? `Source ${monitor.sourceId}` : 'No Source'}</div>
                     <div className="flex items-center gap-1.5"><Clock size={13} /> Evaluated: {formatDate(monitor.lastEvaluationAt)}</div>
-                     <div className="flex items-center gap-1.5"><Database size={13} /> Market data: {formatDate(monitor.lastMarketDataAt)}</div>
+                      <div className="flex items-center gap-1.5"><Database size={13} /> Market data: <StatusBadge status={monitor.marketDataState} /></div>
+                      <div className="flex items-center gap-1.5"><Clock size={13} /> Last received: {formatDate(monitor.lastMarketDataAt)}</div>
                     {monitor.resetStatus !== 'not_configured' && (
                       <div className="flex items-center gap-1.5 border-l border-border pl-4">
                         Reset: {monitor.resetStatus} {monitor.resetReason ? `(${monitor.resetReason})` : ''}
@@ -230,10 +232,15 @@ export function StrategyMonitoringPage() {
                           <td><StatusBadge status={c.status} /></td>
                           <td className="text-muted-foreground">
                             {c.reasonCode ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono text-[10px] bg-secondary px-1 py-0.5 rounded">{c.reasonCode}</span>
-                                {c.reason && <span className="truncate max-w-[200px]" title={c.reason}>{c.reason}</span>}
-                              </div>
+                              <>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-[10px] bg-secondary px-1 py-0.5 rounded">{c.reasonCode}</span>
+                                  {c.reason && <span className="truncate max-w-[200px]" title={c.reason}>{c.reason}</span>}
+                                </div>
+                                <div className="mt-1 text-[10px]">
+                                  Evaluated {formatDate(c.lastEvaluationAt)} · Closed candle {formatDate(c.lastCandleOpenTime)}
+                                </div>
+                              </>
                             ) : (
                               <span className="truncate max-w-[250px] block" title={c.reason || ''}>{c.reason || '—'}</span>
                             )}
@@ -264,7 +271,10 @@ export function StrategyMonitoringPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-3 mt-4 text-xs">
                       <div><div className="eyebrow">Timeframe</div><div className="mono mt-1">{c.timeframe}</div></div>
-                      <div><div className="eyebrow">Details</div><div className="text-muted-foreground mt-1">{c.reason || 'No additional detail'}</div></div>
+                       <div><div className="eyebrow">Details</div><div className="text-muted-foreground mt-1">{c.reason || 'No additional detail'}</div></div>
+                    </div>
+                    <div className="mt-3 text-[10px] text-muted-foreground">
+                      Evaluated {formatDate(c.lastEvaluationAt)} · Closed candle {formatDate(c.lastCandleOpenTime)}
                     </div>
                   </article>
                 )) : <div className="text-center py-6 text-sm text-muted-foreground">No conditions defined for this version.</div>}

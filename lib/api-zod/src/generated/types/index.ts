@@ -155,6 +155,7 @@ export * from './strategyMonitorConditionRequirement';
 export * from './strategyMonitorConditionStatus';
 export * from './strategyMonitoringEvaluationRequest';
 export * from './strategyMonitorMonitoringStatus';
+export * from './strategyMonitorMarketDataState';
 export * from './strategyMonitorOverallStatus';
 export * from './strategyMonitorResetStatus';
 export * from './strategyStatus';
