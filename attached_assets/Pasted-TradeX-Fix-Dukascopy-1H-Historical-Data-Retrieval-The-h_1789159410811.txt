@@ -1,0 +1,182 @@
+TradeX — Fix Dukascopy 1H Historical Data Retrieval
+
+The historical backtest pipeline is now cache-first and working correctly for XAUUSD 5m data, but the current Gold 1H/5M strategy still cannot backtest because the required 1h Dukascopy request is receiving HTTP 429 rate-limit responses.
+
+Do NOT replace Dukascopy.
+Do NOT add a paid provider.
+Do NOT change the strategy.
+Do NOT change the backtest engine or multi-timeframe logic.
+Do NOT fabricate or interpolate missing market data.
+
+The goal of this task is to make the existing Dukascopy historical integration reliably retrieve and cache the required 1h historical candles.
+
+1. Diagnose the 1h problem
+
+Trace the existing flow for:
+
+XAUUSD → Dukascopy XAU-USD → 1h → historical availability → cache → backtest
+
+Determine why the existing 1h request is being rate-limited or failing even though direct Dukascopy historical data verification has already confirmed that genuine XAU/USD 1h candles exist.
+
+2. Make 1h retrieval reliable
+
+Use the existing Dukascopy adapter and cache architecture.
+
+Implement:
+
+- Sequential requests only.
+- Conservative throttling between requests.
+- Exponential backoff for HTTP 429.
+- Respect Retry-After when provided.
+- Retry transient HTTP/network failures.
+- No concurrent Dukascopy requests.
+- Correct monthly endpoint handling.
+- Correct date boundaries.
+- Correct chronological ordering.
+- Duplicate removal.
+- Immediate persistence of successfully retrieved pages.
+- Resume from cached coverage after a failed/rate-limited request.
+
+Do not repeatedly request data that is already stored.
+
+3. Verify XAUUSD 1h specifically
+
+Perform a real provider test for:
+
+Instrument:
+XAUUSD
+
+Provider:
+Dukascopy
+
+Provider symbol:
+XAU-USD
+
+Timeframe:
+1h
+
+Use an older historical period that has already been independently verified to exist, such as September 2025.
+
+Confirm that genuine 1h candles are retrieved and persisted.
+
+Then test a longer bounded range, preferably 90 days, using slow sequential retrieval.
+
+Do NOT claim success unless the requested range is actually covered.
+
+4. Make the availability check accurate
+
+The existing:
+
+GET /api/market-data/historical-availability
+
+must correctly report:
+
+- requested start
+- requested end
+- stored candle count
+- earliest stored candle
+- latest stored candle
+- complete / partial / unavailable
+- provider errors separately from genuine data unavailability
+
+A 429/rate-limit failure must never be reported as “historical data unavailable.”
+
+5. Test the actual Gold strategy
+
+After fixing the 1h retrieval, use the existing Backtesting UI with:
+
+Strategy:
+Gold Reversal Strategy (1H Bias + 5M FVG Retest)
+
+Exact version:
+v1
+
+Instrument:
+XAUUSD
+
+Execution timeframe:
+5m
+
+Higher timeframe:
+1h
+
+Date range:
+90 days
+
+The system must:
+
+- retrieve missing 1h data
+- retrieve/use missing 5m data
+- cache the candles
+- verify complete coverage
+- then run the existing backtest engine
+
+Do not run a partial backtest.
+
+6. Verify USTEC as well
+
+After XAUUSD 1h is working, perform a non-destructive historical retrieval test for:
+
+USTEC → USATECH.IDX-USD → 1h
+
+Do not hard-code the implementation specifically to XAUUSD.
+
+7. Preserve everything else
+
+Do not break:
+
+- BiQuote live data
+- Strategy Builder
+- Build with AI
+- Strategy Library
+- Versioning
+- Multi-timeframe backtesting
+- Monitoring
+- Alerts
+- Journal
+- Existing cached candles
+- Existing strategies
+- Existing saved backtests
+
+Do not delete or modify existing backtest results.
+
+8. Testing
+
+Add/update tests for:
+
+- 1h Dukascopy retrieval
+- 429 handling
+- Retry-After
+- exponential backoff
+- sequential throttling
+- cache reuse
+- partial retrieval
+- resuming after rate limits
+- monthly boundaries
+- duplicate removal
+- chronological ordering
+- complete coverage
+- XAUUSD 1h
+- USTEC 1h
+- 90-day historical ranges
+
+Run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- API production build
+- Frontend production build
+- git diff --check
+
+Finally, report separately:
+
+1. Whether XAUUSD 1h retrieval succeeded.
+2. How many genuine candles were retrieved.
+3. The actual earliest/latest candle.
+4. Whether 90-day coverage was complete.
+5. Whether the Gold 1H/5M backtest actually ran.
+6. Whether USTEC 1h retrieval succeeded.
+
+Only call the task successful if the actual 1h historical data can be retrieved and the existing Gold 1H/5M backtest can use it.

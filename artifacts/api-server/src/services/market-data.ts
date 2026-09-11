@@ -108,6 +108,11 @@ export interface HistoricalDataAvailability {
   earliestCandle: Date | null;
   latestCandle: Date | null;
   coverageState: HistoricalAvailabilityState;
+  providerStatus: MarketDataConnectionState | null;
+  providerError: {
+    code: HistoricalDataError["code"] | "unknown";
+    message: string;
+  } | null;
 }
 
 export interface CanonicalCandleRequest {
@@ -449,44 +454,55 @@ export class MarketDataService {
       },
     });
 
-    if (!request.from || !request.to) {
-      return collect(request.from, request.to);
-    }
-
-    const cached = await this.cachedCandles(request);
-    const missingRanges = missingHistoricalRanges(cached, {
-      from: request.from,
-      to: request.to,
-      timeframeDurationSeconds: timeframe.durationSeconds,
-    });
-
-    // The ranges are deliberately fetched in order. The Dukascopy adapter also
-    // serializes its HTTP queue, but keeping this boundary sequential prevents
-    // future historical adapters from being fan-out called by a backtest.
-    for (const range of missingRanges) {
-      await collect(range.from, range.to);
-    }
-
-    const refreshed = (await this.cachedCandles(request)).filter(candle => candle.isClosed);
     try {
+      if (!request.from || !request.to) {
+        const fetched = await collect(request.from, request.to);
+        await this.recordConnection(request.sourceId, "connected", "Historical data is available.");
+        return fetched;
+      }
+
+      const cached = await this.cachedCandles(request);
+      const missingRanges = missingHistoricalRanges(cached, {
+        from: request.from,
+        to: request.to,
+        timeframeDurationSeconds: timeframe.durationSeconds,
+      });
+
+      // The ranges are deliberately fetched in order. The Dukascopy adapter also
+      // serializes its HTTP queue, but keeping this boundary sequential prevents
+      // future historical adapters from being fan-out called by a backtest.
+      for (const range of missingRanges) {
+        await collect(range.from, range.to);
+      }
+
+      const refreshed = (await this.cachedCandles(request)).filter(candle => candle.isClosed);
       historicalCandleCoverage(refreshed, {
         from: request.from,
         to: request.to,
         timeframeCode: timeframe.code,
         timeframeDurationSeconds: timeframe.durationSeconds,
       });
+      await this.recordConnection(request.sourceId, "connected", "Historical data is available.");
+      return refreshed;
     } catch (error) {
-      throw new HistoricalDataError(
-        "unavailable",
-        error instanceof Error ? error.message : `Historical data for ${timeframe.code} is unavailable for the requested period.`,
-        { cause: error },
+      const historicalError = error instanceof HistoricalDataError
+        ? error
+        : new HistoricalDataError(
+          "unavailable",
+          error instanceof Error ? error.message : `Historical data for ${timeframe.code} is unavailable for the requested period.`,
+          { cause: error },
+        );
+      await this.recordConnection(
+        request.sourceId,
+        "error",
+        `Historical provider ${historicalError.code}: ${historicalError.message}`,
       );
+      throw historicalError;
     }
-    return refreshed;
   }
 
   async historicalDataAvailability(request: CanonicalCandleRequest & { from: Date; to: Date }): Promise<HistoricalDataAvailability> {
-    const [[source], [timeframe], [summary]] = await Promise.all([
+    const [[source], [timeframe], [summary], [connection]] = await Promise.all([
       db.select({ id: marketDataSourcesTable.id }).from(marketDataSourcesTable).where(eq(marketDataSourcesTable.id, request.sourceId)),
       db.select({ id: timeframesTable.id, code: timeframesTable.code, durationSeconds: timeframesTable.durationSeconds })
         .from(timeframesTable).where(eq(timeframesTable.id, request.timeframeId)),
@@ -502,11 +518,18 @@ export class MarketDataService {
         lte(candlesTable.openTime, request.to),
         eq(candlesTable.isClosed, true),
       )),
+      db.select({
+        status: marketDataConnectionsTable.status,
+        statusMessage: marketDataConnectionsTable.statusMessage,
+      }).from(marketDataConnectionsTable).where(eq(marketDataConnectionsTable.sourceId, request.sourceId)),
     ]);
     if (!source) throw new Error("Market-data source not found");
     if (!timeframe) throw new Error("Timeframe not found");
     const earliestCandle = summary?.earliestCandle ?? null;
     const latestCandle = summary?.latestCandle ?? null;
+    const providerErrorMatch = connection?.status === "error"
+      ? connection.statusMessage?.match(/^Historical provider (rate_limited|provider_failure|unavailable|unknown): (.*)$/i)
+      : null;
     return {
       sourceId: source.id,
       instrumentId: request.instrumentId,
@@ -524,6 +547,14 @@ export class MarketDataService {
           to: request.to,
           timeframeDurationSeconds: timeframe.durationSeconds,
         }) ? "complete" : "partial",
+      providerStatus: connection?.status ?? null,
+      providerError: providerErrorMatch ? {
+        code: providerErrorMatch[1].toLowerCase() as HistoricalDataError["code"],
+        message: providerErrorMatch[2],
+      } : connection?.status === "error" ? {
+        code: "unknown",
+        message: connection.statusMessage ?? "Historical provider failed.",
+      } : null,
     };
   }
 
