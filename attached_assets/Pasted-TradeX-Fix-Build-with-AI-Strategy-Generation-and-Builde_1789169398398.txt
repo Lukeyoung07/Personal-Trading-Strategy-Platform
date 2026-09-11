@@ -1,0 +1,306 @@
+TradeX — Fix Build with AI Strategy Generation and Builder Mapping
+
+Audit and fix the existing “Build a Strategy with AI” pipeline.
+
+The problem to fix is generic, not specific to one strategy:
+
+When the user explicitly requests a simple executable strategy, the AI draft can incorrectly add unrelated unsupported concepts or risk rules.
+
+For example, a request for:
+
+- XAUUSD
+- 5m
+- Both directions
+- EMA 20 cross only
+
+incorrectly produced review-required items such as:
+- Higher-timeframe bias
+- SMT Divergence
+- AMD / Power of 3
+- Stop Loss
+- Take Profit
+- Generic risk rules
+
+This must be fixed at the AI-to-Builder mapping/normalization layer so future strategies behave correctly.
+
+IMPORTANT:
+
+- Do NOT hard-code a fix specifically for XAUUSD.
+- Do NOT hard-code a fix specifically for EMA.
+- Do NOT hard-code a fix for this exact prompt.
+- Do NOT rebuild the Strategy Builder.
+- Preserve all existing executable concepts.
+- Preserve all existing AI strategy-generation functionality.
+- Preserve unsupported/review-only concept handling.
+- Preserve existing Strategy → Version → Backtesting behaviour.
+- Do not invent conditions the user did not request.
+- Do not automatically add stop loss, take profit, risk rules, higher-timeframe bias, SMT, AMD/PO3, or other conditions unless the user's request explicitly asks for them.
+
+1. AUDIT AI STRATEGY GENERATION
+
+Trace the complete pipeline:
+
+User prompt
+→ AI interpretation
+→ generated strategy draft
+→ concept normalization
+→ Builder condition mapping
+→ strategy creation
+→ immutable version
+
+Identify where unintended conditions are being introduced.
+
+2. USER INTENT MUST BE PRESERVED
+
+The AI should only create conditions that are actually requested or clearly required to express the requested strategy.
+
+If the user says:
+
+“Use EMA 20 crossing only”
+
+the generated strategy must not add:
+- HTF bias
+- SMT
+- AMD/PO3
+- FVG
+- liquidity
+- stop loss
+- take profit
+- confirmation conditions
+- other concepts
+
+unless explicitly requested.
+
+3. SUPPORTED CONCEPTS
+
+Use the existing canonical executable concept registry/normalization system.
+
+Do not create a second hardcoded list.
+
+If a requested concept is executable:
+- map it to its canonical concept
+- preserve its parameters
+- assign the correct stage
+- assign the correct direction
+- assign the requested timeframe
+
+If a requested concept is unsupported:
+- preserve it as explicitly review-required
+- explain why
+- do not silently replace it with another concept.
+
+4. RISK RULES
+
+Do not invent risk rules.
+
+If the user does not request:
+- stop loss
+- take profit
+- trailing stop
+- risk/reward
+- position sizing
+
+then leave risk-management rules unset.
+
+Do not allow generic AI-generated text such as “risk rules” to create actual risk conditions.
+
+5. DIRECTION
+
+Correctly map:
+
+Long
+Short
+Both
+
+For “Both”, create the appropriate long and short executable conditions only when the requested rule supports directional mapping.
+
+Do not invent additional directional filters.
+
+6. TIMEFRAMES
+
+Only use timeframes explicitly requested by the user.
+
+For example:
+
+“5m EMA strategy”
+
+must remain 5m.
+
+Do not introduce 1H, 4H, or other higher/lower timeframes unless requested.
+
+7. STAGES
+
+Correctly distinguish:
+
+- Entry
+- Confirmation
+- Exit
+
+Do not automatically convert a single requested entry rule into multiple conditions.
+
+If the user asks for one entry condition, create one entry condition.
+
+8. PARAMETERS
+
+Ensure structured parameters survive:
+
+AI interpretation
+→ normalized draft
+→ Builder
+→ strategy creation
+→ immutable v1
+→ backtesting
+→ monitoring
+
+Do not lose or invent:
+- EMA period
+- SMA period
+- RSI parameters
+- MACD parameters
+- lookbacks
+- thresholds
+- FVG parameters
+- structure parameters
+- other concept-specific settings.
+
+9. CANONICAL NORMALIZATION
+
+Audit aliases such as:
+
+EMA 20
+20 EMA
+EMA(20)
+EMA period 20
+Price crosses above EMA 20
+Price crosses below EMA 20
+
+Ensure they normalize consistently into the existing executable EMA/crossing representation.
+
+Do the equivalent generic normalization for other supported concepts.
+
+10. BUILD WITH AI DRAFT
+
+The draft shown to the user must accurately represent what the AI actually generated.
+
+Do not display a clean-looking draft while hidden conditions are being added later.
+
+Before the draft is presented:
+
+- normalize conditions
+- validate compatibility
+- identify unsupported concepts
+- remove accidental/unrequested conditions
+- preserve genuinely requested unsupported concepts as review-required
+
+11. TEST CASES
+
+Add regression tests for prompts representing:
+
+A.
+“Create a 5m XAUUSD strategy using EMA 20 crosses, both directions.”
+
+Expected:
+- XAUUSD
+- 5m
+- Both
+- EMA 20
+- Long cross above
+- Short cross below
+- No HTF bias
+- No SMT
+- No AMD/PO3
+- No FVG
+- No SL
+- No TP
+- No unrelated conditions
+
+B.
+“Create a 15m long strategy using RSI below 30.”
+
+Expected:
+- 15m
+- Long
+- RSI condition
+- No unrelated conditions.
+
+C.
+“Create a 5m strategy using a bullish FVG retest with 1H bullish structure.”
+
+Expected:
+- 5m + 1H
+- FVG retest
+- 1H structure
+- Correct multi-timeframe mapping.
+
+D.
+“Create a strategy using SMT divergence.”
+
+Expected:
+- SMT remains review-required/unsupported.
+- It must not be silently replaced by another concept.
+
+E.
+“Create a strategy with a 2% stop loss and 4% take profit.”
+
+Expected:
+- Requested risk rules are preserved.
+
+F.
+“Create a strategy using EMA 20. Do not add risk management.”
+
+Expected:
+- EMA 20 only.
+- No stop loss.
+- No take profit.
+
+12. VERIFY THE COMPLETE PIPELINE
+
+For at least one temporary test strategy, verify:
+
+AI prompt
+→ generated draft
+→ Builder review
+→ Create strategy
+→ immutable v1
+→ Backtesting compatibility
+→ Monitoring compatibility
+
+Confirm the exact intended conditions and structured parameters survive every boundary.
+
+Do not modify the user's existing strategies, versions, trades, or completed backtests.
+
+13. AUTOMATED VERIFICATION
+
+Run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- API production build
+- Frontend production build
+- git diff --check
+
+Also check:
+
+- browser console
+- API logs
+- Builder behaviour
+- strategy creation
+- version creation
+
+14. FINAL REPORT
+
+Report:
+
+- Where the unintended conditions were coming from.
+- What generic fix was implemented.
+- How user intent is now preserved.
+- How unsupported concepts are handled.
+- How risk rules are handled.
+- How timeframes and stages are handled.
+- Exact test counts.
+- Build/typecheck results.
+- Whether the test strategy produces exactly the requested conditions.
+
+Do not claim the issue is fixed unless the AI → Draft → Builder → Strategy → Version pipeline has been tested end-to-end.
