@@ -12,6 +12,7 @@ export type MarketDataSourceUpdateSourceType = typeof MarketDataSourceUpdateSour
 export const MarketDataSourceUpdateSourceType = {
   rest: 'rest',
   websocket: 'websocket',
+  historical: 'historical',
   file: 'file',
   other: 'other',
 } as const;

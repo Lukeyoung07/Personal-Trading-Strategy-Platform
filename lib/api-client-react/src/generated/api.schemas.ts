@@ -1186,6 +1186,7 @@ export type MarketDataSourceSourceType = typeof MarketDataSourceSourceType[keyof
 export const MarketDataSourceSourceType = {
   rest: 'rest',
   websocket: 'websocket',
+  historical: 'historical',
   file: 'file',
   other: 'other',
 } as const;
@@ -1230,6 +1231,7 @@ export type MarketDataSourceInputSourceType = typeof MarketDataSourceInputSource
 export const MarketDataSourceInputSourceType = {
   rest: 'rest',
   websocket: 'websocket',
+  historical: 'historical',
   file: 'file',
   other: 'other',
 } as const;
@@ -1272,6 +1274,7 @@ export type MarketDataSourceUpdateSourceType = typeof MarketDataSourceUpdateSour
 export const MarketDataSourceUpdateSourceType = {
   rest: 'rest',
   websocket: 'websocket',
+  historical: 'historical',
   file: 'file',
   other: 'other',
 } as const;

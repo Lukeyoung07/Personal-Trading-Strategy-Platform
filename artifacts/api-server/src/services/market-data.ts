@@ -185,6 +185,16 @@ export async function collectHistoricalCandles(request: HistoricalCandleCollecti
     if (!earliest) break;
 
     if (direction == null) {
+      const firstOpenTime = batch[0]?.openTime.getTime();
+      const lastOpenTime = batch.at(-1)?.openTime.getTime();
+      if (firstOpenTime != null && lastOpenTime != null && firstOpenTime < lastOpenTime) {
+        direction = "forward";
+      } else if (firstOpenTime != null && lastOpenTime != null && firstOpenTime > lastOpenTime) {
+        direction = "backward";
+      }
+    }
+
+    if (direction == null) {
       const durationMs = request.timeframeDurationSeconds * 1_000;
       const providerStartedAtRequestedBoundary = !request.from
         || earliest.getTime() <= request.from.getTime() + durationMs * 2;

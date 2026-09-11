@@ -12,6 +12,7 @@ export type MarketDataSourceInputSourceType = typeof MarketDataSourceInputSource
 export const MarketDataSourceInputSourceType = {
   rest: 'rest',
   websocket: 'websocket',
+  historical: 'historical',
   file: 'file',
   other: 'other',
 } as const;

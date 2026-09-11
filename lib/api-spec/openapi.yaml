@@ -2086,7 +2086,7 @@ components:
         providerKey: { type: ["string", "null"] }
         sourceType:
           type: string
-          enum: [rest, websocket, file, other]
+          enum: [rest, websocket, historical, file, other]
         description: { type: ["string", "null"] }
         capabilities:
           type: array
@@ -2107,7 +2107,7 @@ components:
         providerKey: { type: ["string", "null"] }
         sourceType:
           type: string
-          enum: [rest, websocket, file, other]
+          enum: [rest, websocket, historical, file, other]
         description: { type: ["string", "null"] }
         capabilities:
           type: array
@@ -2125,7 +2125,7 @@ components:
         providerKey: { type: ["string", "null"] }
         sourceType:
           type: string
-          enum: [rest, websocket, file, other]
+          enum: [rest, websocket, historical, file, other]
         description: { type: ["string", "null"] }
         capabilities:
           type: array

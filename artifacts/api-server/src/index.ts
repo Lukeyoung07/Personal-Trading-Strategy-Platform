@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { biQuoteAdapter, ensureBiQuoteCatalog } from "./services/biquote";
+import { dukascopyAdapter, ensureDukascopyCatalog } from "./services/dukascopy";
 import { marketDataService } from "./services/market-data";
 
 const rawPort = process.env["PORT"];
@@ -18,7 +19,9 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 await ensureBiQuoteCatalog();
+await ensureDukascopyCatalog();
 marketDataService.register(biQuoteAdapter);
+marketDataService.register(dukascopyAdapter);
 
 app.listen(port, (err) => {
   if (err) {

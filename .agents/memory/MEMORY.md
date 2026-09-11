@@ -19,3 +19,4 @@
 - [Multi-timeframe backtesting](multi-timeframe-backtesting.md) — evaluate each condition on its own closed-candle series and align only candles completed at the execution decision time.
 - [Initial version snapshots](initial-version-snapshots.md) — strategy creation must persist initial conditions and the immutable v1 snapshot atomically.
 - [Historical candle pagination](historical-candle-pagination.md) — provider pages may be newest-first windows; paginate by actual boundaries and reject incomplete coverage.
+- [Dukascopy historical API](dukascopy-historical-api.md) — Jetta returns delta-compressed daily 1m/monthly 1h data and rate-limits concurrent requests.
