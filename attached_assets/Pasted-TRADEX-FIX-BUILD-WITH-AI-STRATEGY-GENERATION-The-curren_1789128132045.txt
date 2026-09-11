@@ -1,0 +1,463 @@
+TRADEX — FIX BUILD WITH AI STRATEGY GENERATION
+
+The current Build with AI feature is not behaving correctly.
+
+When I ask it to create a strategy, it generates a strategy description but then returns "Review required" for concepts such as Liquidity Sweep, Fair Value Gap, Market Structure Shift, Stop Loss and Take Profit.
+
+I do NOT want Build with AI to simply describe a strategy.
+
+I want it to actually BUILD the strategy inside the existing Strategy Builder.
+
+IMPORTANT:
+
+Do not redesign the TradeX UI.
+
+Do not change Markets, Journal, Alerts, Backtesting, Historical Data, Monitoring or any unrelated functionality.
+
+Do not remove the existing Trading Concept Library.
+
+Do not change the existing Strategy Builder layout.
+
+Only fix/improve the Build with AI functionality and its integration with the existing Strategy Builder.
+
+==================================================
+1. CORE BEHAVIOUR
+==================================================
+
+The user should be able to click:
+
+Build with AI
+
+and enter:
+
+"Create me a Gold reversal strategy using a liquidity sweep followed by FVG confirmation on the 15 minute timeframe."
+
+The AI must then create a REAL strategy draft using the existing Strategy Builder's data structure.
+
+It must populate:
+
+- Strategy name
+- Market
+- Direction
+- Timeframes
+- Entry conditions
+- Confirmation conditions
+- Exit conditions
+- Risk settings
+
+The generated result must appear directly inside the existing Builder.
+
+The user should NOT have to manually recreate the strategy from the AI's description.
+
+==================================================
+2. IMPORTANT DISTINCTION
+==================================================
+
+Do not confuse:
+
+TRADING CONCEPT
+
+with:
+
+EXECUTABLE BUILDER CONDITION.
+
+A concept such as:
+
+Liquidity Sweep
+
+or:
+
+Fair Value Gap
+
+can be selected as the trading concept while the condition still needs an actual Builder rule/definition.
+
+The AI must correctly map the user's request into the fields the existing Builder expects.
+
+Do not simply output the concept name and then mark the entire strategy as unresolved.
+
+==================================================
+3. USE THE EXISTING BUILDER SCHEMA
+==================================================
+
+Inspect the current Strategy Builder implementation and use its actual condition schema.
+
+Do not invent a second schema.
+
+Do not create AI-specific condition objects.
+
+AI-generated conditions must be identical in structure to conditions created manually through the Builder.
+
+If the Builder stores something such as:
+
+concept
+rule
+timeframe
+direction
+stage
+parameters
+
+then AI generation must populate those exact fields.
+
+==================================================
+4. USE THE EXISTING TRADING CONCEPT CATALOG
+==================================================
+
+Use the live TradeX Trading Concept Library.
+
+Do not invent concepts.
+
+Use existing aliases.
+
+Examples:
+
+FVG → Fair Value Gap
+IFVG → Inverse Fair Value Gap
+BOS → Break of Structure
+CHoCH → Change of Character
+MSS → Market Structure Shift
+SMT → SMT Divergence
+OB → Order Block
+HTF → Higher Timeframe
+LTF → Lower Timeframe
+
+If a requested concept exists, use its actual catalog entry.
+
+==================================================
+5. USE ACTUAL SUPPORTED BUILDER RULES
+==================================================
+
+The AI must inspect and use the actual rules available in the current Strategy Builder.
+
+Do not invent a rule.
+
+For example, if the Builder currently supports:
+
+Candle is bullish
+Candle is bearish
+Price is above the candle open
+Price is below the candle open
+Price crosses above the previous high
+Price crosses below the previous low
+Always true
+
+then generated conditions must use those actual rules where appropriate.
+
+==================================================
+6. DO NOT CLAIM THAT A CONCEPT IS BACKTESTABLE IF IT ISN'T
+==================================================
+
+Do not falsely label a concept or condition as Backtest supported.
+
+However, do NOT use this as a reason to prevent the AI from correctly constructing the strategy draft.
+
+The Builder should preserve the actual concept requested by the user.
+
+If an existing concept cannot currently be executed by Backtesting, clearly show that as a compatibility limitation.
+
+Do not silently replace the concept.
+
+==================================================
+7. DO NOT TURN EVERYTHING INTO "REVIEW REQUIRED"
+==================================================
+
+The current behaviour is too broad.
+
+For example, the generated response currently says:
+
+Review required:
+
+15-minute price structure
+Liquidity sweep confirmation
+Fair Value Gap confirmation
+Invalidation
+Exit
+Market Structure Shift
+Liquidity Sweep
+Fair Value Gap
+Candle Direction
+Stop Loss
+Take Profit
+
+This is not useful.
+
+Instead, each generated condition should be represented individually inside the Builder.
+
+For example:
+
+ENTRY
+
+Liquidity Sweep
+Timeframe: 15M
+Direction: Long
+
+Rule:
+[actual supported Builder rule]
+
+CONFIRMATION
+
+Fair Value Gap
+Timeframe: 15M
+Direction: Long
+
+Rule:
+[actual supported Builder rule]
+
+If the exact concept cannot be represented by an executable rule, clearly identify ONLY that specific condition as needing review.
+
+Do not mark the entire strategy as unresolved.
+
+==================================================
+8. STOP LOSS AND TAKE PROFIT
+==================================================
+
+Do not invent exact prices.
+
+If the user says:
+
+"Put the stop beyond the liquidity sweep and target 2R"
+
+represent this using the existing risk/exit fields if those fields exist.
+
+If the current Builder cannot represent a particular risk rule, clearly tell the user what information is unavailable.
+
+Do not fabricate numerical stop-loss or take-profit values.
+
+==================================================
+9. NATURAL LANGUAGE UNDERSTANDING
+==================================================
+
+The AI should understand requests such as:
+
+"Make me a Gold reversal strategy using liquidity sweeps and FVG."
+
+"Create a US Tech 100 strategy using BOS and FVG confirmation."
+
+"Build me a 15 minute reversal strategy for XAUUSD."
+
+"Make a long and short strategy using HTF bias and LTF confirmation."
+
+Interpret the request and map it into the existing Builder.
+
+==================================================
+10. GENERATION SUMMARY
+==================================================
+
+After generation, show a concise summary:
+
+STRATEGY GENERATED
+
+Gold 15m Liquidity Sweep Reversal
+
+Market:
+XAUUSD
+
+Direction:
+Both
+
+Timeframe:
+15M
+
+Entry:
+Liquidity Sweep
+
+Confirmation:
+Fair Value Gap
+
+Exit:
+Take Profit
+
+Then:
+
+[Review Strategy]
+
+When the user clicks Review Strategy, the existing Builder should contain the actual generated conditions.
+
+==================================================
+11. DO NOT AUTOMATICALLY SAVE
+==================================================
+
+Keep the existing behaviour:
+
+AI generation creates a draft.
+
+It does NOT automatically:
+
+- Save
+- Activate
+- Create a version
+- Run a backtest
+- Create alerts
+- Create monitoring records
+
+The user reviews it first.
+
+==================================================
+12. STRUCTURED PROMPT SUPPORT
+==================================================
+
+Continue supporting structured prompts such as:
+
+TRADEX STRATEGY
+
+Name: Gold Liquidity Reversal
+
+Market: XAUUSD
+
+Direction: Both
+
+Timeframes:
+15M
+5M
+
+ENTRY
+
+1. Concept: Liquidity Sweep
+   Direction: Long
+   Timeframe: 15M
+
+CONFIRMATION
+
+1. Concept: Fair Value Gap
+   Direction: Long
+   Timeframe: 5M
+
+RISK
+
+Risk per trade: 1%
+Risk/Reward: 2:1
+
+Parse these directly into the existing Builder.
+
+==================================================
+13. DO NOT INVENT MISSING INFORMATION
+==================================================
+
+If the user hasn't specified something important, do not randomly invent it.
+
+For example, if they ask:
+
+"Make me a Gold reversal strategy."
+
+Do not randomly decide:
+
+- exact entry price
+- exact stop price
+- exact take profit
+- arbitrary indicator values
+
+Use the available information and leave genuinely unspecified fields for the user to choose.
+
+==================================================
+14. VALIDATION
+==================================================
+
+Before handing the draft into the Builder, validate:
+
+- Market
+- Direction
+- Timeframe
+- Concepts
+- Rules
+- Stages
+- Condition structure
+
+If a specific field cannot be mapped, identify that specific field.
+
+Do not reject the entire strategy unnecessarily.
+
+==================================================
+15. TEST THIS EXACT REQUEST
+==================================================
+
+Use this exact test:
+
+"Create me a Gold reversal strategy using a liquidity sweep followed by Fair Value Gap confirmation on the 15 minute timeframe."
+
+Verify that:
+
+1. AI understands Gold = XAUUSD.
+2. AI understands 15 minute = 15M.
+3. AI identifies the reversal strategy.
+4. AI identifies Liquidity Sweep.
+5. AI identifies Fair Value Gap.
+6. The generated strategy is passed into the existing Builder.
+7. Entry conditions are actually created.
+8. Confirmation conditions are actually created.
+9. The concepts appear correctly.
+10. Timeframes are correct.
+11. Direction is handled correctly.
+12. The user can edit the generated conditions.
+13. The user can save the draft manually.
+
+==================================================
+16. TEST STRUCTURED INPUT
+==================================================
+
+Also test the structured TRADEX STRATEGY format.
+
+Verify every field is correctly transferred into the Builder.
+
+==================================================
+17. IMPORTANT — DO NOT BREAK EXISTING FUNCTIONALITY
+==================================================
+
+Preserve:
+
+- Manual Strategy Builder
+- Trading Concept Library
+- Strategy Library
+- Versioning
+- Backtesting
+- Markets
+- Journal
+- Alerts
+- Monitoring
+- BiQuote
+- Existing navigation
+- Existing UI
+
+Run the existing test suite and typechecks after the change.
+
+==================================================
+FINAL GOAL
+==================================================
+
+The user experience should be:
+
+I click:
+
+✨ Build with AI
+
+↓
+
+I type:
+
+"Create me a Gold reversal strategy using a liquidity sweep followed by FVG confirmation on the 15 minute timeframe."
+
+↓
+
+TradeX understands the request.
+
+↓
+
+TradeX maps the request to the EXISTING TradeX concepts and Builder fields.
+
+↓
+
+The EXISTING Strategy Builder is populated with the actual conditions.
+
+↓
+
+I can edit everything.
+
+↓
+
+I save the strategy normally.
+
+The AI should be a shortcut for BUILDING a strategy — not a tool that simply writes a description of one.
+
+Do not redesign the application.
+
+Do not rebuild the Backtesting system.
+
+Fix the AI → Strategy Builder handoff and make the generated strategy genuinely usable inside the existing Builder.
