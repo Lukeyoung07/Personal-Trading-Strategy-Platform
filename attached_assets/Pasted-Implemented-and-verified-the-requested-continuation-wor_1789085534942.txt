@@ -1,0 +1,59 @@
+Implemented and verified the requested continuation work.
+
+### AI taxonomy completeness
+- Added deterministic server-side aliases for:
+  - HH, HL, LH, LL
+  - Liquidity families and equal highs/lows
+  - Previous day/week liquidity
+  - Break/retest, rejection, displacement, breakout, pullback
+  - Supply/demand reactions and retests
+  - FVG, FVG fill/retest, IFVG
+  - Bullish/bearish order blocks and retests
+  - Premium, discount, equilibrium
+  - HTF/LTF and multi-timeframe concepts
+  - IRL, ERL, SMT, AMD, Power of 3
+  - EMA/SMA variants
+  - Risk/reward, percentage risk, position sizing, maximum risk
+- Model-provided `supported: true` can no longer override server-side unsupported classifications.
+- Unsupported concepts remain visible in reviewable AI drafts.
+- Added natural-language regression coverage.
+
+### Production hardening
+- Added JSON and URL-encoded request size limits.
+- Added configurable CORS allowlisting.
+- Added route-specific request throttling for AI, backtests, candle refresh, and monitoring evaluation.
+- Added centralized safe error handling.
+- Added explicit assistant responses for:
+  - Validation errors
+  - Provider rate limits
+  - Temporary provider failures
+  - Timeouts
+  - Missing backtest context
+- Removed raw upstream provider response bodies from logs and UI-facing errors.
+- Added positive integer validation for backtest IDs.
+- Added concurrent backtest protection and in-flight duplicate submission handling.
+- Sanitized failed backtest error messages.
+- Added draft storage validation, expiry, legacy compatibility, and size limits.
+- Improved frontend API error normalization and production error-boundary logging.
+- Authentication and ownership scoping were not introduced.
+
+### Browser and mobile coverage
+- Added session-storage draft regression tests.
+- Existing assistant, strategy builder, backtest results, market monitor, and calendar tests remain passing.
+- Verified the live proxied UI at mobile width for:
+  - Dashboard
+  - Strategy Builder
+  - Backtesting
+- No new browser console errors were observed.
+
+### Verification
+- API tests: **53 passed**
+- Frontend tests: **23 passed**
+- API typecheck: passed
+- Frontend typecheck: passed
+- API production build: passed
+- Frontend production build: passed
+- `git diff --check`: passed
+- API and web workflows restarted successfully and are running cleanly
+
+The app is ready to publish.
