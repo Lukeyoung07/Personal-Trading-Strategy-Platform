@@ -502,7 +502,6 @@ Risk/Reward: 2:1`,
     ]));
     expect(response.strategyDraft?.compatibility.unsupportedConditions).toEqual(expect.arrayContaining([
       "Higher-timeframe bias",
-      "Multi-timeframe analysis",
     ]));
      expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Fair Value Gap");
   });
@@ -512,7 +511,7 @@ Risk/Reward: 2:1`,
      const requests = [
        { message: "Build me a liquidity sweep strategy.", expected: ["Liquidity Sweep"], unsupported: [] },
        { message: "Create an XAUUSD strategy using an FVG.", expected: ["Fair Value Gap"], unsupported: [] },
-       { message: "Use a 4H bullish bias and 15M entry.", expected: ["Higher-timeframe bias", "Multi-timeframe analysis"], unsupported: ["Higher-timeframe bias", "Multi-timeframe analysis"] },
+       { message: "Use a 4H bullish bias and 15M entry.", expected: ["Higher-timeframe bias", "Multi-timeframe analysis"], unsupported: ["Higher-timeframe bias"] },
         { message: "Build an SMC strategy using BOS and an order block.", expected: ["Break of Structure", "Order Block"], unsupported: ["Order Block"] },
         { message: "Use the 20 EMA as confirmation.", expected: ["EMA"], unsupported: [] },
         { message: "Create a strategy using premium and discount.", expected: ["Premium", "Discount"], unsupported: [] },

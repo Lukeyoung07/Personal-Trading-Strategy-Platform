@@ -165,6 +165,7 @@ const UNSUPPORTED_CONCEPTS: UnsupportedConceptDefinition[] = [
 ];
 
 function unsupportedConceptForText(value: string): UnsupportedConceptDefinition | null {
+  if (catalogKey(value) === "multi timeframe analysis") return null;
   if (executableConceptKind(value)) return null;
   return UNSUPPORTED_CONCEPTS.find(concept => concept.pattern.test(value)) || null;
 }
@@ -204,7 +205,8 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
   const addConcept = (raw: any, fallbackName?: string) => {
     const rawName = String(typeof raw === "string" ? raw : raw?.name || fallbackName || "").trim().slice(0, 120);
     if (!rawName) return;
-    const unsupportedConcept = unsupportedConceptForText(rawName);
+    const isMultiTimeframe = catalogKey(rawName) === "multi timeframe analysis";
+    const unsupportedConcept = isMultiTimeframe ? null : unsupportedConceptForText(rawName);
     const name = unsupportedConcept?.name || executableConceptLabel(rawName) || rawName;
     const matchingConditions = conditions.filter(condition =>
       condition.conceptName.toLowerCase() === rawName.toLowerCase() ||
@@ -213,7 +215,9 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
     const executable = executableConceptKind(rawName) !== null || matchingConditions.some(condition => executableConceptKind(condition.conceptName) !== null);
     const supported = unsupportedConcept
       ? false
-      : executable
+      : isMultiTimeframe
+        ? true
+        : executable
         ? matchingConditions.length === 0 || matchingConditions.every(condition => condition.supported)
       : matchingConditions.length > 0
         ? matchingConditions.every(condition => condition.supported) && raw?.supported !== false
@@ -258,17 +262,17 @@ function conceptsRequestedInMessage(message: string) {
     seen.add(concept.name);
     requested.push({
       name: concept.name,
-      supported: false,
+      supported: concept.name === "Multi-timeframe analysis",
       explanation: concept.name === "Multi-timeframe analysis"
-        ? "The engine backtests one timeframe at a time and cannot combine higher-timeframe bias with lower-timeframe entries."
+        ? "The engine evaluates each executable condition on its configured timeframe and aligns completed candles without look-ahead."
         : concept.explanation || "Understood by the assistant, but not currently executable by historical backtesting.",
     });
   }
   if (/\bhigher[- ]timeframe\b|\blower[- ]timeframe\b|\b\d+\s*h\b.*\b\d+\s*m\b|\bmulti[- ]timeframe\b/i.test(message) && !seen.has("Multi-timeframe analysis")) {
     requested.push({
       name: "Multi-timeframe analysis",
-      supported: false,
-      explanation: "The engine backtests one timeframe at a time and cannot combine higher-timeframe bias with lower-timeframe entries.",
+      supported: true,
+      explanation: "The engine evaluates each executable condition on its configured timeframe and aligns completed candles without look-ahead.",
     });
   }
   return requested;
@@ -712,12 +716,12 @@ Trading concept recognition:
 - Price action: displacement, strong bullish/bearish candles, rejection candles, breakouts, pullbacks, retests.
 - Order blocks: bullish/bearish order blocks, order block retest, breaker block.
 - Premium/discount: premium, discount, equilibrium, range-based premium/discount.
-- Multi-timeframe analysis: higher-timeframe bias, lower-timeframe confirmation, 4H → 1H → 15M → 5M flows, and higher-timeframe levels affecting lower-timeframe entries.
+- Multi-timeframe analysis: executable conditions may use different configured timeframes, including higher-timeframe conditions combined with lower-timeframe entries. Historical evaluation uses only candles that had closed at each lower-timeframe decision point.
 - ICT/SMC: IRL, ERL, SMT divergence, AMD, Power of 3, and session concepts only when the supplied data supports them.
 - Moving averages: EMA, SMA, price above/below EMA, EMA crossover, EMA rejection, EMA trend confirmation.
 - Risk management: stop loss, take profit, risk/reward, percentage-based SL/TP, position sizing, and maximum risk per trade.
 
-For every strategy draft, identify the concepts used in conceptsUsed as {name, supported, explanation}. The current historical engine can execute only always, bullish, bearish, exact OHLC comparisons, and previous-candle crossings. Treat all other concepts, including EMA/SMA and ICT/SMC concepts, as understood but unsupported unless they are represented by one of those exact rules. Keep unsupported concepts in the draft, mark them unsupported, and explain what engine capability would be needed. Never silently replace an unsupported concept with another rule.
+For every strategy draft, identify the concepts used in conceptsUsed as {name, supported, explanation}. The historical engine can execute the canonical structured OHLC concepts supplied by the Builder, and it can combine executable conditions across different configured timeframes without look-ahead. Keep subjective or unsupported concepts in the draft, mark them unsupported, and explain what engine capability would be needed. Never silently replace an unsupported concept with another rule.
 If the user asks to build or create a strategy, always return a non-null strategyDraft. Never respond with only a refusal because one requested concept is unsupported; preserve that concept as an unsupported condition and explain the limitation in reply.
 `;
 

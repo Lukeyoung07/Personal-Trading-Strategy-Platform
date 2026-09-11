@@ -21,6 +21,7 @@ export interface HistoricalCandle {
 export interface BacktestCondition {
   name: string;
   conceptName?: string | null;
+  timeframe?: string | null;
   stage: "entry" | "confirmation" | "invalidation" | "exit";
   direction: "long" | "short" | "both";
   requirement: "required" | "optional";
@@ -36,6 +37,16 @@ export interface BacktestStrategy {
   exitRules: string | null;
   riskRules: string | null;
   conditions: BacktestCondition[];
+}
+
+export interface HistoricalCandleSeries {
+  code: string;
+  candles: HistoricalCandle[];
+}
+
+export interface HistoricalBacktestInput {
+  executionTimeframe: string;
+  series: HistoricalCandleSeries[];
 }
 
 export interface SimulatedTrade {
@@ -469,16 +480,65 @@ function conditionMatches(condition: BacktestCondition, side: BacktestSide) {
   return condition.direction === "both" || condition.direction === side;
 }
 
-function evaluateConditions(conditions: BacktestCondition[], side: BacktestSide, candles: HistoricalCandle[], index: number) {
+function timeframeKey(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function candleCompletionTime(candle: HistoricalCandle) {
+  return (candle.closeTime ?? candle.openTime).getTime();
+}
+
+function latestCompletedIndex(candles: HistoricalCandle[], at: Date) {
+  let low = 0;
+  let high = candles.length - 1;
+  let result = -1;
+  const target = at.getTime();
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    if (candles[middle].isClosed && candleCompletionTime(candles[middle]) <= target) {
+      result = middle;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return result;
+}
+
+interface MultiTimeframeEvaluationContext {
+  seriesByTimeframe: Map<string, HistoricalCandle[]>;
+  executionTimeframe: string;
+}
+
+function evaluateConditions(
+  conditions: BacktestCondition[],
+  side: BacktestSide,
+  candles: HistoricalCandle[],
+  index: number,
+  context?: MultiTimeframeEvaluationContext,
+) {
   const candle = candles[index];
   const previous = index > 0 ? candles[index - 1] : undefined;
   const selected = conditions.filter(condition => conditionMatches(condition, side));
   const required = selected.filter(condition => condition.requirement === "required");
   const optional = selected.filter(condition => condition.requirement === "optional");
   if (!required.length && !optional.length) return { matched: false, reasons: [] as string[] };
-  const evaluate = (condition: BacktestCondition) =>
-    evaluateExecutableCondition(condition, side, candles, index)
-    ?? evaluateRule(ruleForCondition(condition), candle, previous);
+  const evaluate = (condition: BacktestCondition) => {
+    if (!context) {
+      return evaluateExecutableCondition(condition, side, candles, index)
+        ?? evaluateRule(ruleForCondition(condition), candle, previous);
+    }
+    const series = context.seriesByTimeframe.get(timeframeKey(condition.timeframe || context.executionTimeframe));
+    if (!series) return false;
+    const conditionIndex = latestCompletedIndex(series, candle.closeTime ?? candle.openTime);
+    if (conditionIndex < 0) return false;
+    const conditionCandle = series[conditionIndex];
+    const conditionPrevious = conditionIndex > 0 ? series[conditionIndex - 1] : undefined;
+    const rule = ruleForCondition(condition);
+    if (!conditionPrevious && /\bprevious[_ ](open|high|low|close)\b/i.test(rule)) return false;
+    return evaluateExecutableCondition(condition, side, series, conditionIndex)
+      ?? evaluateRule(rule, conditionCandle, conditionPrevious);
+  };
   const requiredResults = required.map(condition => ({ condition, matched: evaluate(condition) }));
   const optionalResults = optional.map(condition => ({ condition, matched: evaluate(condition) }));
   return {
@@ -487,15 +547,21 @@ function evaluateConditions(conditions: BacktestCondition[], side: BacktestSide,
   };
 }
 
-function inferSide(strategy: BacktestStrategy, entryConditions: BacktestCondition[], candles: HistoricalCandle[], index: number): BacktestSide | null {
+function inferSide(
+  strategy: BacktestStrategy,
+  entryConditions: BacktestCondition[],
+  candles: HistoricalCandle[],
+  index: number,
+  context?: MultiTimeframeEvaluationContext,
+): BacktestSide | null {
   const candle = candles[index];
   const previous = index > 0 ? candles[index - 1] : undefined;
   if (strategy.direction === "long") return "long";
   if (strategy.direction === "short") return "short";
   const explicit = entryConditions.filter(condition => condition.direction !== "both");
   if (explicit.length) {
-    const long = evaluateConditions(entryConditions, "long", candles, index).matched;
-    const short = evaluateConditions(entryConditions, "short", candles, index).matched;
+    const long = evaluateConditions(entryConditions, "long", candles, index, context).matched;
+    const short = evaluateConditions(entryConditions, "short", candles, index, context).matched;
     if (long === short) return null;
     return long ? "long" : "short";
   }
@@ -506,8 +572,25 @@ function inferSide(strategy: BacktestStrategy, entryConditions: BacktestConditio
   return null;
 }
 
-export function runHistoricalBacktest(strategy: BacktestStrategy, inputCandles: HistoricalCandle[]): BacktestEngineResult {
-  const candles = [...inputCandles];
+export function runHistoricalBacktest(
+  strategy: BacktestStrategy,
+  input: HistoricalCandle[] | HistoricalBacktestInput,
+): BacktestEngineResult {
+  const isMultiTimeframe = !Array.isArray(input);
+  const candles = isMultiTimeframe
+    ? [...input.series.find(series => timeframeKey(series.code) === timeframeKey(input.executionTimeframe))?.candles || []]
+      .filter(candle => candle.isClosed)
+      .sort((left, right) => left.openTime.getTime() - right.openTime.getTime())
+    : [...input].filter(candle => candle.isClosed).sort((left, right) => left.openTime.getTime() - right.openTime.getTime());
+  const context = isMultiTimeframe
+    ? {
+      executionTimeframe: input.executionTimeframe,
+      seriesByTimeframe: new Map(input.series.map(series => [
+        timeframeKey(series.code),
+        [...series.candles].filter(candle => candle.isClosed).sort((left, right) => left.openTime.getTime() - right.openTime.getTime()),
+      ])),
+    }
+    : undefined;
   if (!candles.length) throw new BacktestEngineError("Insufficient historical data for the selected instrument and period.");
   for (let index = 0; index < candles.length; index += 1) {
     const candle = candles[index];
@@ -596,7 +679,7 @@ export function runHistoricalBacktest(strategy: BacktestStrategy, inputCandles: 
 
     if (position) {
       const exitMatched = exitConditions.length
-        ? evaluateConditions(exitConditions, position.side, candles, index).matched
+      ? evaluateConditions(exitConditions, position.side, candles, index, context).matched
         : exitRule ? evaluateRule(exitRule, candle, previous) : false;
       if (exitMatched) pendingExitReason = exitConditions.length
         ? `exit_condition:${exitConditions.filter(condition => conditionMatches(condition, position!.side)).map(condition => condition.name).join(",")}`
@@ -604,9 +687,9 @@ export function runHistoricalBacktest(strategy: BacktestStrategy, inputCandles: 
     }
 
     if (!position && !pendingEntry && !exitedThisCandle && index < candles.length - 1) {
-      const side = inferSide(strategy, entryConditions, candles, index);
+      const side = inferSide(strategy, entryConditions, candles, index, context);
       const entryMatched = entryConditions.length
-        ? side != null && evaluateConditions(entryConditions, side, candles, index).matched
+        ? side != null && evaluateConditions(entryConditions, side, candles, index, context).matched
         : entryRule ? evaluateRule(entryRule, candle, previous) : false;
       if (entryMatched && side) {
         pendingEntry = {

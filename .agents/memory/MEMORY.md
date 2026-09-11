@@ -16,3 +16,4 @@
 - [Responsive navigation override](responsive-navigation-override.md) — mobile sidebar rules must explicitly replace legacy horizontal-scroll navigation with a fixed grid.
 - [Backtest rule contract](backtest-rule-contract.md) — Builder compatibility and server evaluation must consume the same historical-rule definitions.
 - [Builder end-to-end cleanup](builder-e2e-cleanup.md) — temporary no-trade strategies can be tested with provider candles and removed cleanly through Strategy Library.
+- [Multi-timeframe backtesting](multi-timeframe-backtesting.md) — evaluate each condition on its own closed-candle series and align only candles completed at the execution decision time.

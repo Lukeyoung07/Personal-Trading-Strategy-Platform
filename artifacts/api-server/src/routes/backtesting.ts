@@ -18,12 +18,58 @@ import {
   ListBacktestsResponse,
 } from "@workspace/api-zod";
 import { marketDataService } from "../services/market-data";
-import { runHistoricalBacktest, validateHistoricalBacktestStrategy } from "../services/backtest-engine";
+import { runHistoricalBacktest, validateHistoricalBacktestStrategy, type BacktestCondition, type HistoricalBacktestInput } from "../services/backtest-engine";
 import { calculateBacktestStatistics } from "../services/backtest-results";
 
 const router: IRouter = Router();
 const activeBacktests = new Set<number>();
 const inFlightBacktestRequests = new Map<string, Promise<any>>();
+
+function engineCondition(condition: typeof strategyVersionConditionsTable.$inferSelect): BacktestCondition {
+  return {
+    name: condition.name,
+    conceptName: condition.conceptName,
+    timeframe: condition.timeframe,
+    stage: condition.stage as BacktestCondition["stage"],
+    direction: condition.direction as BacktestCondition["direction"],
+    requirement: condition.requirement as BacktestCondition["requirement"],
+    triggerRules: condition.triggerRules,
+    parameters: condition.parameters,
+    invalidationRules: condition.invalidationRules,
+    conceptDetectionRules: condition.conceptDetectionRules,
+  };
+}
+
+function timeframeKey(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
+async function timeframeSummariesForBacktest(id: number) {
+  const rows = await db.select({
+    timeframeId: timeframesTable.id,
+    code: timeframesTable.code,
+    label: timeframesTable.label,
+    durationSeconds: timeframesTable.durationSeconds,
+    candles: backtestCandlesTable.id,
+  }).from(backtestCandlesTable)
+    .innerJoin(timeframesTable, eq(backtestCandlesTable.timeframeId, timeframesTable.id))
+    .where(eq(backtestCandlesTable.backtestId, id));
+  const summaries = new Map<string, { timeframeId: number; code: string; label: string; durationSeconds: number; candlesProcessed: number }>();
+  for (const row of rows) {
+    const key = timeframeKey(row.code);
+    const summary = summaries.get(key) || { timeframeId: row.timeframeId, code: row.code, label: row.label, durationSeconds: row.durationSeconds, candlesProcessed: 0 };
+    summary.candlesProcessed += 1;
+    summaries.set(key, summary);
+  }
+  const ordered = [...summaries.values()].sort((left, right) => left.durationSeconds - right.durationSeconds);
+  return ordered.map((summary, index) => ({
+    timeframeId: summary.timeframeId,
+    code: summary.code,
+    label: summary.label,
+    candlesProcessed: summary.candlesProcessed,
+    isExecutionTimeframe: index === 0,
+  }));
+}
 
 function publicBacktestError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
@@ -39,6 +85,7 @@ function backtestView(row: {
   versionNumber: number;
   instrumentSymbol: string;
   timeframeLabel: string;
+  timeframeSummaries?: Array<{ code: string; label: string; candlesProcessed: number }>;
   statistics?: ReturnType<typeof calculateBacktestStatistics>;
 }) {
   const statistics = row.statistics;
@@ -48,6 +95,7 @@ function backtestView(row: {
     versionNumber: row.versionNumber,
     instrumentSymbol: row.instrumentSymbol,
     timeframeLabel: row.timeframeLabel,
+    timeframeSummaries: row.timeframeSummaries,
     winningTrades: statistics?.winningTrades ?? 0,
     losingTrades: statistics?.losingTrades ?? 0,
     winRate: statistics?.winRate ?? null,
@@ -86,7 +134,11 @@ async function findBacktest(id: number) {
     .innerJoin(marketsTable, eq(backtestConfigurationsTable.instrumentId, marketsTable.id))
     .innerJoin(timeframesTable, eq(backtestConfigurationsTable.timeframeId, timeframesTable.id))
     .where(eq(backtestConfigurationsTable.id, id));
-  return row ? backtestView({ ...row, statistics: await statisticsForBacktest(id) }) : null;
+  return row ? backtestView({
+    ...row,
+    statistics: await statisticsForBacktest(id),
+    timeframeSummaries: await timeframeSummariesForBacktest(id),
+  }) : null;
 }
 
 async function executeBacktestInternal(backtestId: number) {
@@ -109,7 +161,7 @@ async function executeBacktestInternal(backtestId: number) {
   await db.delete(backtestCandlesTable).where(eq(backtestCandlesTable.backtestId, backtestId));
 
   try {
-    const [[version], conditions, [source]] = await Promise.all([
+    const [[version], conditions, [source], timeframes] = await Promise.all([
       db.select().from(strategyVersionsTable).where(and(
         eq(strategyVersionsTable.id, configuration.strategyVersionId),
         eq(strategyVersionsTable.strategyId, configuration.strategyId),
@@ -119,36 +171,46 @@ async function executeBacktestInternal(backtestId: number) {
         .orderBy(asc(strategyVersionConditionsTable.conditionOrder)),
       db.select().from(marketDataSourcesTable)
         .where(eq(marketDataSourcesTable.providerKey, "biquote")),
+      db.select().from(timeframesTable).where(eq(timeframesTable.isActive, true)),
     ]);
     if (!version) throw new Error("The exact strategy version for this backtest no longer exists.");
+    const engineConditions = conditions.map(engineCondition);
     const compatibilityErrors = validateHistoricalBacktestStrategy({
       direction: version.direction as "long" | "short" | "both",
       entryRules: version.entryRules,
       exitRules: version.exitRules,
       riskRules: version.riskRules ?? version.riskManagementRules,
-      conditions: conditions.map(condition => ({
-        name: condition.name,
-        conceptName: condition.conceptName,
-        stage: condition.stage as "entry" | "confirmation" | "invalidation" | "exit",
-        direction: condition.direction as "long" | "short" | "both",
-        requirement: condition.requirement as "required" | "optional",
-        triggerRules: condition.triggerRules,
-        parameters: condition.parameters,
-        invalidationRules: condition.invalidationRules,
-        conceptDetectionRules: condition.conceptDetectionRules,
-      })),
+      conditions: engineConditions,
     });
     if (compatibilityErrors.length) throw new Error(`This strategy version is not compatible with the historical engine: ${compatibilityErrors.join(" ")}`);
     if (!source) throw new Error("BiQuote is not configured as a historical market-data source.");
 
-    const candles = await marketDataService.historicalCandles({
-      sourceId: source.id,
-      instrumentId: configuration.instrumentId,
-      timeframeId: configuration.timeframeId,
-      from: configuration.startDate,
-      to: configuration.endDate,
+    const configuredTimeframe = timeframes.find(timeframe => timeframe.id === configuration.timeframeId);
+    if (!configuredTimeframe) throw new Error("The selected backtest timeframe no longer exists.");
+    const requestedCodes = [...new Set([
+      configuredTimeframe.code,
+      ...engineConditions.map(condition => condition.timeframe).filter((value): value is string => Boolean(value?.trim())),
+    ])];
+    const requestedTimeframes = requestedCodes.map(code => {
+      const match = timeframes.find(timeframe =>
+        timeframeKey(timeframe.code) === timeframeKey(code) || timeframeKey(timeframe.label) === timeframeKey(code),
+      );
+      if (!match) throw new Error(`The strategy references an unavailable timeframe: ${code}.`);
+      return match;
     });
-    if (!candles.length) {
+    const series = await Promise.all(requestedTimeframes.map(async timeframe => ({
+      code: timeframe.code,
+      durationSeconds: timeframe.durationSeconds,
+      candles: (await marketDataService.historicalCandles({
+        sourceId: source.id,
+        instrumentId: configuration.instrumentId,
+        timeframeId: timeframe.id,
+        from: configuration.startDate,
+        to: configuration.endDate,
+      })).filter(candle => candle.isClosed),
+    })));
+    const executionTimeframe = [...series].sort((left, right) => left.durationSeconds - right.durationSeconds)[0];
+    if (!executionTimeframe?.candles.length) {
       throw new Error("Insufficient historical data for the selected instrument and period.");
     }
 
@@ -157,27 +219,19 @@ async function executeBacktestInternal(backtestId: number) {
       entryRules: version.entryRules,
       exitRules: version.exitRules,
       riskRules: version.riskRules ?? version.riskManagementRules,
-      conditions: conditions.map(condition => ({
-        name: condition.name,
-        conceptName: condition.conceptName,
-        stage: condition.stage as "entry" | "confirmation" | "invalidation" | "exit",
-        direction: condition.direction as "long" | "short" | "both",
-        requirement: condition.requirement as "required" | "optional",
-        triggerRules: condition.triggerRules,
-        parameters: condition.parameters,
-        invalidationRules: condition.invalidationRules,
-        conceptDetectionRules: condition.conceptDetectionRules,
-      })),
-    }, candles);
+      conditions: engineConditions,
+    }, {
+      executionTimeframe: executionTimeframe.code,
+      series: series.map(({ code, candles: seriesCandles }) => ({ code, candles: seriesCandles })),
+    } satisfies HistoricalBacktestInput);
     const completedAt = new Date();
 
     await db.transaction(async tx => {
-      if (candles.length) {
-        await tx.insert(backtestCandlesTable).values(candles.map(candle => ({
+      const candleRows = series.flatMap(timeframe => timeframe.candles.map(candle => ({
           backtestId,
           sourceId: source.id,
           instrumentId: configuration.instrumentId,
-          timeframeId: configuration.timeframeId,
+          timeframeId: requestedTimeframes.find(candidate => candidate.code === timeframe.code)!.id,
           openTime: candle.openTime,
           closeTime: candle.closeTime,
           open: candle.open.toString(),
@@ -187,14 +241,14 @@ async function executeBacktestInternal(backtestId: number) {
           volume: candle.volume?.toString() ?? null,
           isClosed: candle.isClosed,
         })));
-      }
+      if (candleRows.length) await tx.insert(backtestCandlesTable).values(candleRows);
       if (result.trades.length) {
         await tx.insert(backtestTradesTable).values(result.trades.map(trade => ({
           backtestId,
           strategyId: configuration.strategyId,
           strategyVersionId: configuration.strategyVersionId,
           instrumentId: configuration.instrumentId,
-          timeframeId: configuration.timeframeId,
+          timeframeId: requestedTimeframes.find(candidate => candidate.id === configuration.timeframeId)!.id,
           side: trade.side,
           entryTime: trade.entryTime,
           entryPrice: trade.entryPrice.toString(),
@@ -256,6 +310,7 @@ router.get("/backtests", async (_req, res): Promise<void> => {
   res.json(ListBacktestsResponse.parse(await Promise.all(rows.map(async row => backtestView({
     ...row,
     statistics: await statisticsForBacktest(row.configuration.id),
+    timeframeSummaries: await timeframeSummariesForBacktest(row.configuration.id),
   })))));
 });
 
@@ -305,17 +360,7 @@ router.post("/backtests", async (req, res): Promise<void> => {
     entryRules: version.entryRules,
     exitRules: version.exitRules,
     riskRules: version.riskRules ?? version.riskManagementRules,
-    conditions: conditions.map(condition => ({
-      name: condition.name,
-      conceptName: condition.conceptName,
-      stage: condition.stage as "entry" | "confirmation" | "invalidation" | "exit",
-      direction: condition.direction as "long" | "short" | "both",
-      requirement: condition.requirement as "required" | "optional",
-      triggerRules: condition.triggerRules,
-      parameters: condition.parameters,
-      invalidationRules: condition.invalidationRules,
-      conceptDetectionRules: condition.conceptDetectionRules,
-    })),
+    conditions: conditions.map(engineCondition),
   });
   if (compatibilityErrors.length) {
     res.status(400).json({ error: `This strategy version is not compatible with the historical engine: ${compatibilityErrors.join(" ")}` });

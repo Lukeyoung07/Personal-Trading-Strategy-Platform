@@ -448,6 +448,13 @@ export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRun
   const hasTrades = trades.length > 0;
   const isFailed = backtest.status === "failed";
   const isCompleted = backtest.status === "completed";
+  const timeframeSummaries = backtest.timeframeSummaries || [];
+  const executionTimeframeId = timeframeSummaries.find(timeframe => timeframe.isExecutionTimeframe)?.timeframeId ?? backtest.timeframeId;
+  const executionCandles = candles.filter(candle => candle.timeframeId === executionTimeframeId);
+  const replayCandles = executionCandles.length ? executionCandles : candles;
+  const timeframeSummaryLabel = timeframeSummaries.length
+    ? timeframeSummaries.map(timeframe => `${timeframe.label} · ${timeframe.candlesProcessed} candles`).join("  /  ")
+    : `${backtest.timeframeLabel} · ${candles.length} candles`;
 
   return (
     <div className="space-y-5" data-testid="backtest-results-panel">
@@ -490,16 +497,25 @@ export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRun
        <section id="backtest-result-metadata" className="panel p-5 md:p-6" data-testid="backtest-metadata">
         <div className="flex items-center gap-2 mb-5"><CheckCircle2 size={15} className={isCompleted ? "text-primary" : "text-muted-foreground"} /><div className="eyebrow">Recorded metadata</div></div>
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-x-5 gap-y-5">
-          {[
+           {[
             ["Instrument", backtest.instrumentSymbol],
-            ["Timeframe", backtest.timeframeLabel],
+             ["Timeframe", timeframeSummaries.length ? timeframeSummaries.map(timeframe => timeframe.label).join(" + ") : backtest.timeframeLabel],
             ["Period", `${dateOnly(backtest.startDate)} – ${dateOnly(backtest.endDate)}`],
-            ["Candles", String(backtest.candlesProcessed)],
+             ["Candles", timeframeSummaryLabel],
             ["Trades", String(backtest.tradeCount)],
             ["Started", dateTime(backtest.startedAt)],
             ["Completed", dateTime(backtest.completedAt)],
           ].map(([label, value]) => <div key={label} data-testid={`metadata-${label.toLowerCase()}`}><div className="eyebrow">{label}</div><div className="text-xs font-semibold mt-2 leading-relaxed">{value}</div></div>)}
         </div>
+         {timeframeSummaries.length > 1 && <div className="border-t border-border mt-5 pt-4" data-testid="backtest-timeframe-breakdown">
+           <div className="eyebrow mb-3">Causal timeframe coverage</div>
+           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+             {timeframeSummaries.map(timeframe => <div key={timeframe.timeframeId} className="rounded-md bg-secondary/60 px-3 py-2">
+               <div className="text-xs font-semibold">{timeframe.label}{timeframe.isExecutionTimeframe ? " · execution series" : " · condition series"}</div>
+               <div className="text-[11px] text-muted-foreground mt-1">{timeframe.candlesProcessed} completed candles loaded</div>
+             </div>)}
+           </div>
+         </div>}
         {backtest.resultMessage && <div className="border-t border-border mt-5 pt-4 text-xs text-muted-foreground">{backtest.resultMessage}</div>}
       </section>
 
@@ -539,8 +555,8 @@ export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRun
       )}
 
        <section id="backtest-result-replay">
-        <SectionHeading eyebrow="Historical record" title="The candle series behind this run" icon={LineChart} detail={`${candles.length} stored ${candles.length === 1 ? "candle" : "candles"} · entries, exits, and levels are overlaid from the stored trades`} />
-        <HistoricalChart candles={candles} trades={trades} selectedTrade={selectedTrade} />
+         <SectionHeading eyebrow="Historical record" title="The execution candle series behind this run" icon={LineChart} detail={`${replayCandles.length} stored ${replayCandles.length === 1 ? "candle" : "candles"} · condition timeframes are shown in the coverage above`} />
+         <HistoricalChart candles={replayCandles} trades={trades} selectedTrade={selectedTrade} />
       </section>
 
        <div id="backtest-result-assumptions"><Assumptions backtest={backtest} /></div>

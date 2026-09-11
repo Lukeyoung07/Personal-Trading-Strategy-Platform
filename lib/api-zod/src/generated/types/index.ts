@@ -40,6 +40,7 @@ export * from './backtestResults';
 export * from './backtestStatistics';
 export * from './backtestStatisticsEquityCurveItem';
 export * from './backtestStatus';
+export * from './backtestTimeframeSummary';
 export * from './backtestTrade';
 export * from './backtestTradeSide';
 export * from './biQuoteCatalogItem';

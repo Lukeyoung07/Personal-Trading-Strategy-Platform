@@ -446,6 +446,14 @@ function historicalRuleSupported(rule: string | null | undefined) {
   return /^(open|high|low|close|previous[_ ](?:open|high|low|close))\s*(>=|<=|>|<|=|==)\s*(open|high|low|close|previous[_ ](?:open|high|low|close)|\d+(?:\.\d+)?)$/.test(normalized);
 }
 
+function historicalConditionSupported(condition: { triggerRules?: string | null; conceptDetectionRules?: string | null; parameters?: unknown }) {
+  if (historicalRuleSupported(condition.triggerRules || condition.conceptDetectionRules)) return true;
+  const kind = typeof condition.parameters === "object" && condition.parameters !== null && "kind" in condition.parameters
+    ? String((condition.parameters as { kind?: unknown }).kind || "")
+    : "";
+  return ["liquidity_sweep", "fair_value_gap", "market_structure", "liquidity_level", "indicator", "price_action", "range_location"].includes(kind);
+}
+
 function presetRange(preset: string) {
   const end = new Date();
   const days = preset === "last_30_days" ? 30 : preset === "last_90_days" ? 90 : 7;
@@ -539,7 +547,7 @@ function Backtesting() {
   const chosenInstrument = markets.data?.find(market => market.id === instrumentId);
   const chosenTimeframe = timeframes.data?.find(timeframe => timeframe.id === timeframeId);
   const unsupportedVersionConditions = (versionConditions.data || [])
-    .filter(condition => !historicalRuleSupported(condition.triggerRules || condition.conceptDetectionRules))
+    .filter(condition => !historicalConditionSupported(condition))
     .map(condition => condition.name || "Unnamed condition");
   const hasEntryRule = Boolean((versionConditions.data || []).some(condition => condition.stage === "entry" || condition.stage === "confirmation") || chosenVersion?.entryRules?.trim());
   const compatibilityLoading = versionId != null && versionConditions.isLoading;

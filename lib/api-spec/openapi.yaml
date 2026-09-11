@@ -2460,6 +2460,8 @@ components:
         marketSymbol: { type: ["string", "null"] }
         monitorSessionId: { type: ["integer", "null"] }
         strategyVersionId: { type: ["integer", "null"] }
+        strategyName: { type: ["string", "null"] }
+        versionNumber: { type: ["integer", "null"] }
         sourceType:
           type: string
           enum: [manual, monitoring]
@@ -2522,12 +2524,26 @@ components:
         losingTrades: { type: integer }
         winRate: { type: ["number", "null"] }
         totalPnl: { type: ["number", "null"] }
+        timeframeSummaries:
+          type: array
+          description: Actual provider candle series loaded for this run, including each condition timeframe.
+          items:
+            $ref: "#/components/schemas/BacktestTimeframeSummary"
         resultMessage: { type: ["string", "null"] }
         executionAssumptions: { type: ["string", "null"] }
         errorMessage: { type: ["string", "null"] }
         startedAt: { type: ["string", "null"], format: date-time }
         completedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
+    BacktestTimeframeSummary:
+      type: object
+      required: [timeframeId, code, label, candlesProcessed, isExecutionTimeframe]
+      properties:
+        timeframeId: { type: integer }
+        code: { type: string }
+        label: { type: string }
+        candlesProcessed: { type: integer }
+        isExecutionTimeframe: { type: boolean }
     BacktestTrade:
       type: object
       required: [id, backtestId, strategyId, strategyVersionId, instrumentId, timeframeId, side, entryTime, entryPrice, stopLoss, takeProfit, exitTime, exitPrice, pnl, entryReason, exitReason, createdAt]

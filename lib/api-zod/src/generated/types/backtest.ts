@@ -7,6 +7,7 @@
  */
 import type { BacktestPreset } from './backtestPreset';
 import type { BacktestStatus } from './backtestStatus';
+import type { BacktestTimeframeSummary } from './backtestTimeframeSummary';
 
 export interface Backtest {
   id: number;
@@ -30,6 +31,8 @@ export interface Backtest {
   winRate: number | null;
   /** @nullable */
   totalPnl: number | null;
+  /** Actual provider candle series loaded for this run, including each condition timeframe. */
+  timeframeSummaries?: BacktestTimeframeSummary[];
   /** @nullable */
   resultMessage: string | null;
   /** @nullable */

@@ -1786,9 +1786,9 @@ export interface Alert {
   /** @nullable */
   strategyVersionId: number | null;
   /** @nullable */
-  strategyName: string | null;
+  strategyName?: string | null;
   /** @nullable */
-  versionNumber: number | null;
+  versionNumber?: number | null;
   sourceType: AlertSourceType;
   condition: string;
   /** @nullable */
@@ -1867,6 +1867,14 @@ export const BacktestStatus = {
   failed: 'failed',
 } as const;
 
+export interface BacktestTimeframeSummary {
+  timeframeId: number;
+  code: string;
+  label: string;
+  candlesProcessed: number;
+  isExecutionTimeframe: boolean;
+}
+
 export interface Backtest {
   id: number;
   strategyId: number;
@@ -1889,6 +1897,8 @@ export interface Backtest {
   winRate: number | null;
   /** @nullable */
   totalPnl: number | null;
+  /** Actual provider candle series loaded for this run, including each condition timeframe. */
+  timeframeSummaries?: BacktestTimeframeSummary[];
   /** @nullable */
   resultMessage: string | null;
   /** @nullable */

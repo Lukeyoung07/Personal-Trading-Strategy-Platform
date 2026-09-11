@@ -425,4 +425,98 @@ describe("historical backtest engine", () => {
     expect(result.trades).toHaveLength(1);
     expect(result.trades[0]).toMatchObject({ side: "short", entryPrice: 103 });
   });
+
+  it("does not expose an HTF close to an earlier LTF candle", () => {
+    const htf: HistoricalCandle[] = [
+      { openTime: new Date("2026-01-01T09:00:00.000Z"), closeTime: new Date("2026-01-01T10:00:00.000Z"), open: 100, high: 101, low: 99, close: 100, volume: 1, isClosed: true },
+      { openTime: new Date("2026-01-01T10:00:00.000Z"), closeTime: new Date("2026-01-01T11:00:00.000Z"), open: 100, high: 121, low: 99, close: 120, volume: 1, isClosed: true },
+    ];
+    const ltf: HistoricalCandle[] = [
+      { openTime: new Date("2026-01-01T10:50:00.000Z"), closeTime: new Date("2026-01-01T10:55:00.000Z"), open: 100, high: 101, low: 99, close: 100, volume: 1, isClosed: true },
+      { openTime: new Date("2026-01-01T10:55:00.000Z"), closeTime: new Date("2026-01-01T11:00:00.000Z"), open: 100, high: 121, low: 99, close: 120, volume: 1, isClosed: true },
+      { openTime: new Date("2026-01-01T11:00:00.000Z"), closeTime: new Date("2026-01-01T11:05:00.000Z"), open: 121, high: 122, low: 120, close: 121, volume: 1, isClosed: true },
+    ];
+    const result = runHistoricalBacktest({
+      direction: "long",
+      entryRules: null,
+      exitRules: null,
+      riskRules: null,
+      conditions: [{
+        name: "HTF break",
+        conceptName: null,
+        timeframe: "1H",
+        stage: "entry",
+        direction: "long",
+        requirement: "required",
+        triggerRules: "close > previous close",
+        parameters: null,
+        invalidationRules: null,
+        conceptDetectionRules: null,
+      }],
+    }, {
+      executionTimeframe: "5m",
+      series: [{ code: "5m", candles: ltf }, { code: "1H", candles: htf }],
+    });
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].entryTime).toEqual(new Date("2026-01-01T11:00:00.000Z"));
+    expect(result.trades[0].entryPrice).toBe(121);
+  });
+
+  it("supports valid zero-trade multi-timeframe results", () => {
+    const result = runHistoricalBacktest({
+      direction: "both",
+      entryRules: null,
+      exitRules: null,
+      riskRules: null,
+      conditions: [{
+        name: "Never met",
+        conceptName: null,
+        timeframe: "1H",
+        stage: "entry",
+        direction: "long",
+        requirement: "required",
+        triggerRules: "close > 999999",
+        parameters: null,
+        invalidationRules: null,
+        conceptDetectionRules: null,
+      }],
+    }, {
+      executionTimeframe: "5m",
+      series: [{ code: "5m", candles: [candle(0), candle(1)] }, { code: "1H", candles: [candle(0), candle(1)] }],
+    });
+
+    expect(result.trades).toEqual([]);
+    expect(result.candlesProcessed).toBe(2);
+  });
+
+  it("evaluates short-side conditions against their own timeframe", () => {
+    const result = runHistoricalBacktest({
+      direction: "short",
+      entryRules: null,
+      exitRules: null,
+      riskRules: null,
+      conditions: [{
+        name: "HTF breakdown",
+        conceptName: null,
+        timeframe: "1H",
+        stage: "entry",
+        direction: "short",
+        requirement: "required",
+        triggerRules: "close < previous close",
+        parameters: null,
+        invalidationRules: null,
+        conceptDetectionRules: null,
+      }],
+    }, {
+      executionTimeframe: "5m",
+      series: [
+        { code: "5m", candles: [candle(0), candle(1, { open: 90, close: 90 }), candle(2, { open: 89, close: 89 })] },
+        { code: "1H", candles: [candle(0, { close: 100 }), candle(1, { open: 100, close: 80 })] },
+      ],
+    });
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0].side).toBe("short");
+  });
 });
