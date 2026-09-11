@@ -1,0 +1,432 @@
+TRADEX — ADD FREE DUKASCOPY HISTORICAL DATA FOR GOLD + US TECH 100
+
+We have manually verified that Dukascopy's Historical Data Export can provide real historical data for:
+
+XAU/USD (Gold)
+
+We have also confirmed that Dukascopy lists the US 100 Tech Index.
+
+The goal is to add Dukascopy as a FREE historical-data source for TradeX Backtesting while keeping BiQuote as the live-data provider.
+
+IMPORTANT:
+Do NOT replace BiQuote.
+Do NOT change the existing Backtesting engine unnecessarily.
+Do NOT fabricate data.
+Do NOT scrape the Dukascopy website.
+Do NOT integrate a paid provider.
+
+==================================================
+1. VERIFY BOTH INSTRUMENTS FIRST
+==================================================
+
+Before implementing the integration, verify programmatic historical-data access for BOTH:
+
+1. XAU/USD
+2. US 100 Tech Index / USATECH.IDX/USD
+
+For BOTH instruments verify:
+
+- 5-minute historical candles
+- 1-hour historical candles
+- Older historical dates
+- OHLC data
+- Timestamp
+- Volume if available
+- Bid/Ask availability if applicable
+- Ability to retrieve data in chunks for long date ranges
+
+We have already manually verified XAU/USD 5m and 1h historical downloads.
+
+The US 100 Tech Index must be independently verified before being treated as supported.
+
+If programmatic access cannot be established for either instrument, report the exact limitation before making the integration.
+
+==================================================
+2. CREATE A DUKASCOPY HISTORICAL PROVIDER
+==================================================
+
+If programmatic access is viable, create a Dukascopy historical-data adapter behind the existing provider-neutral MarketDataService.
+
+Architecture:
+
+BiQuote
+→ live/current market data
+
+Dukascopy
+→ historical/backtesting data
+
+The Backtest engine should continue requesting candles through MarketDataService.
+
+Do NOT hard-code Dukascopy directly into the Backtest engine.
+
+==================================================
+3. INSTRUMENT MAPPING
+==================================================
+
+Create verified mappings for:
+
+TradeX:
+XAUUSD
+→ Dukascopy XAU/USD
+
+TradeX:
+USTEC
+→ Dukascopy US 100 Tech Index / USATECH.IDX/USD
+
+Do not guess instrument identifiers.
+
+Verify the actual Dukascopy identifiers before enabling each mapping.
+
+Keep the mapping architecture extensible so additional instruments can be added later.
+
+==================================================
+4. TIMEFRAMES
+==================================================
+
+Support only timeframes that have actually been verified.
+
+TradeX timeframes include:
+
+1m
+5m
+15m
+30m
+1h
+4h
+1d
+
+At minimum verify:
+
+5m
+1h
+
+for BOTH:
+
+XAUUSD
+USTEC
+
+Do not mark a timeframe as supported if Dukascopy cannot provide it.
+
+==================================================
+5. LONG HISTORICAL RANGES
+==================================================
+
+Use the existing historical-range system.
+
+Support:
+
+- Last 7 Days
+- Last 30 Days
+- Last 90 Days
+- 6 Months
+- 1 Year
+- Longer ranges where genuinely available
+- Custom date ranges
+
+Use safe chunking/pagination when necessary.
+
+Never silently truncate the requested range.
+
+Never fabricate candles.
+
+==================================================
+6. NORMALIZE DATA
+==================================================
+
+Convert Dukascopy data into TradeX's existing normalized candle format.
+
+Preserve:
+
+- timestamp
+- open
+- high
+- low
+- close
+- volume where available
+- instrument
+- timeframe
+- provider
+- candle completion state where available
+
+Remove duplicate candles.
+
+Sort chronologically.
+
+Do not modify the actual market prices.
+
+==================================================
+7. MULTI-TIMEFRAME BACKTESTING
+==================================================
+
+Preserve the existing multi-timeframe architecture.
+
+For example:
+
+USTEC:
+5m execution
++
+1h HTF condition
+
+or:
+
+XAUUSD:
+5m execution
++
+1h HTF condition
+
+Retrieve the complete requested historical range for every required timeframe.
+
+Preserve:
+
+- closed candles only
+- HTF/LTF alignment
+- no look-ahead bias
+- smallest timeframe as execution series
+
+==================================================
+8. PROVIDER SELECTION
+==================================================
+
+Use the existing provider capability system.
+
+Dukascopy should advertise:
+
+historical data capability
+
+BiQuote should remain:
+
+live data capability
+
+Historical requests should select Dukascopy when:
+
+- Dukascopy is enabled
+- The instrument has a verified mapping
+- The requested timeframe is verified
+- Historical data is actually available
+
+Do not change existing BiQuote live-data behaviour.
+
+==================================================
+9. PARTIAL DATA PROTECTION
+==================================================
+
+Keep the existing historical-range validation.
+
+If the user requests:
+
+90 days
+
+but the provider only returns:
+
+20 days
+
+DO NOT run the backtest.
+
+Show the actual available range.
+
+Likewise for:
+
+1 year
+3 years
+5 years
+
+Never label a partial dataset as a completed long-range backtest.
+
+==================================================
+10. REAL END-TO-END TESTS
+==================================================
+
+After implementation, test through the actual TradeX Backtesting UI.
+
+TEST 1 — GOLD
+
+Strategy:
+Gold Reversal Strategy (1H Bias + 5M FVG Retest)
+
+Version:
+v1
+
+Instrument:
+XAUUSD
+
+Execution timeframe:
+5m
+
+Period:
+90 days
+
+Verify:
+
+- Real Dukascopy candles were retrieved
+- 5m data covers the requested range
+- 1h data covers the requested range
+- Actual earliest candle
+- Actual latest candle
+- Candle counts
+- Backtest completes using the retrieved data
+
+Then test:
+
+1 year
+
+if the verified provider data supports it.
+
+TEST 2 — US TECH 100
+
+Use a TradeX strategy compatible with USTEC.
+
+Instrument:
+USTEC
+
+Execution timeframe:
+5m
+
+Period:
+90 days
+
+Verify the same historical coverage requirements.
+
+Then test:
+
+1 year
+
+if available.
+
+==================================================
+11. HISTORICAL DATA SOURCE METADATA
+==================================================
+
+Backtest results must clearly show:
+
+Historical provider:
+Dukascopy
+
+Instrument:
+XAUUSD or USTEC
+
+Execution timeframe
+
+Condition timeframes
+
+Requested date range
+
+Actual earliest candle
+
+Actual latest candle
+
+Candle count per timeframe
+
+This must make it obvious what data was actually used.
+
+==================================================
+12. FREE REQUIREMENT
+==================================================
+
+The historical-data solution must remain FREE.
+
+Do not add:
+
+- Twelve Data paid plans
+- OANDA paid services
+- Databento
+- Polygon/Massive paid services
+- Any other paid historical-data provider
+
+Dukascopy should be the historical provider if it can be verified as suitable.
+
+==================================================
+13. PRESERVE EVERYTHING
+==================================================
+
+Do not break:
+
+- Strategy Builder
+- Build with AI
+- Trading Concept Library
+- Strategy Versioning
+- Backtesting
+- Multi-timeframe evaluation
+- Liquidity Sweep
+- FVG
+- FVG Retest
+- BOS
+- CHoCH
+- MSS
+- Indicators
+- Alerts
+- Monitoring
+- Journal
+- BiQuote live data
+- Existing saved strategies
+- Existing saved backtests
+
+Do not modify existing backtest results.
+
+==================================================
+14. TESTING
+==================================================
+
+Add automated tests for:
+
+- Dukascopy provider registration
+- XAUUSD mapping
+- USTEC mapping
+- 5m retrieval
+- 1h retrieval
+- Historical pagination
+- Long-range retrieval
+- Duplicate removal
+- Chronological ordering
+- Partial-data rejection
+- Empty responses
+- Multi-timeframe retrieval
+- Provider selection
+- Instrument mapping failures
+
+Then run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+- git diff --check
+
+Check browser and API logs for errors.
+
+==================================================
+FINAL REQUIREMENT
+==================================================
+
+Do not claim Dukascopy is fully integrated until TradeX has successfully retrieved REAL Dukascopy historical candles programmatically.
+
+At minimum, prove:
+
+XAUUSD
+→ 5m
+→ 1h
+
+and
+
+USTEC
+→ 5m
+→ 1h
+
+with genuine historical dates.
+
+Then prove a real 90-day backtest for both instruments if the provider supports the requested range.
+
+If 1-year history is available, test that as well.
+
+Do not fabricate data.
+Do not scrape the website.
+Do not weaken historical-range validation.
+Do not change strategy logic to create more trades.
+
+The goal is:
+
+BiQuote = live data
+
+Dukascopy = FREE historical/backtesting data
+
+with the existing TradeX Backtesting engine consuming both through the provider-neutral MarketDataService.
