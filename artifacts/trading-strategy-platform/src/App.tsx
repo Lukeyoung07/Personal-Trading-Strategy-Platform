@@ -14,7 +14,7 @@ import {
   getListMarketsQueryKey, getListStrategiesQueryKey, getListStrategyVersionsQueryKey, getListTradesQueryKey,
   useCreateAlert, useCreateConcept, useCreateCondition, useCreateMarket, useCreateStrategy, useCreateStrategyVersion,
   useCreateTrade, useDeleteAlert, useDeleteConcept, useDeleteCondition, useDeleteMarket, useDeleteStrategy,
-  useDeleteTrade, useGetDashboardSummary, useGetPerformanceSummary, useGetSettings, useGetStrategy, useListAlerts,
+  useCancelBacktest, useDeleteTrade, useGetDashboardSummary, useGetPerformanceSummary, useGetSettings, useGetStrategy, useListAlerts,
   useListConcepts, useListConditions, useListMarkets, useListStrategies, useListStrategyMonitors, useListStrategyVersionConditions, useListStrategyVersions, useListTimeframes, useListTrades,
   useUpdateAlert, useUpdateConcept, useUpdateCondition, useUpdateMarket, useUpdateSettings, useUpdateStrategy,
   useUpdateTrade, type Alert, type AssistantStrategyDraft, type Backtest, type Condition, type Market, type Strategy, type StrategyMonitor, type Trade, type TradingConcept
@@ -461,12 +461,25 @@ function presetRange(preset: string) {
   return { start: formatDateInput(start), end: formatDateInput(end) };
 }
 
+function isActiveBacktest(status: Backtest["status"]) {
+  return ["queued", "downloading_data", "processing", "pending", "running"].includes(status);
+}
+
+function backtestStatusLabel(status: Backtest["status"]) {
+  if (status === "downloading_data") return "Downloading data";
+  if (status === "processing") return "Processing";
+  if (status === "queued") return "Queued";
+  if (status === "cancelled") return "Cancelled";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
 function Backtesting() {
   const strategies = useListStrategies();
   const markets = useListMarkets();
   const timeframes = useListTimeframes();
-  const saved = useListBacktests();
+  const saved = useListBacktests({ query: { queryKey: getListBacktestsQueryKey(), refetchInterval: 2000 } });
   const create = useCreateBacktest();
+  const cancel = useCancelBacktest();
   const params = new URLSearchParams(window.location.search);
   const requestedStrategyId = Number(params.get("strategyId")) || null;
   const requestedVersionId = Number(params.get("strategyVersionId")) || null;
@@ -552,12 +565,33 @@ function Backtesting() {
   const compatibilityLoading = versionId != null && versionConditions.isLoading;
   const backtestReady = Boolean(chosenVersion && !compatibilityLoading && hasEntryRule && unsupportedVersionConditions.length === 0);
   const periodLabel = preset === "custom" ? `${startDate || "Start"} – ${endDate || "End"}` : preset === "last_30_days" ? "Last 30 days" : preset === "last_90_days" ? "Last 90 days" : "Last 7 days";
+  const activeRuns = (saved.data || []).filter(backtest => isActiveBacktest(backtest.status));
 
   return <Page eyebrow="Utilities" title="Backtesting" description="Run a historical review from your saved strategy versions using genuine provider candles.">
     <div className="backtest-workflow-tabs panel p-1 flex flex-wrap gap-1 mb-6 max-w-xl" role="tablist" aria-label="Backtesting sections">
       <button type="button" role="tab" aria-selected={backtestSection === "setup"} className={`btn flex-1 min-w-[150px] ${backtestSection === "setup" ? "bg-secondary text-foreground" : "btn-ghost"}`} onClick={() => { setBacktestSection("setup"); document.getElementById("backtest-setup")?.scrollIntoView({ behavior: "smooth" }); }} data-testid="button-backtest-setup-tab"><SlidersHorizontal size={14} /> Setup</button>
       <button type="button" role="tab" aria-selected={backtestSection === "runs"} className={`btn flex-1 min-w-[150px] ${backtestSection === "runs" ? "bg-secondary text-foreground" : "btn-ghost"}`} onClick={() => { setBacktestSection("runs"); document.getElementById("backtest-runs")?.scrollIntoView({ behavior: "smooth" }); }} data-testid="button-backtest-runs-tab"><ClipboardList size={14} /> Saved Runs</button>
     </div>
+    {activeRuns.length > 0 && <div className="panel p-5 mb-5" data-testid="backtest-active-jobs">
+      <div className="flex items-start justify-between gap-4">
+        <div><div className="eyebrow">Background jobs</div><h2 className="font-semibold mt-2">Backtests running independently</h2><p className="text-sm text-muted-foreground mt-1">You can leave this page or close the browser. Progress is saved on the server.</p></div>
+        <span className="tag tag-warn">{activeRuns.length} active</span>
+      </div>
+      <div className="mt-4 space-y-3">
+        {activeRuns.map(backtest => <div className="rounded-md border border-border bg-secondary/40 p-4" key={backtest.id} data-testid={`active-backtest-${backtest.id}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="font-semibold text-sm">{backtest.strategyName} · v{backtest.versionNumber}</div>
+              <div className="text-xs text-muted-foreground mt-1">{backtest.instrumentSymbol} · {backtest.timeframeLabel} · {formatDate(backtest.startDate)} – {formatDate(backtest.endDate)}</div>
+            </div>
+            <div className="flex items-center gap-2"><span className="tag tag-warn">{backtestStatusLabel(backtest.status)}</span><button type="button" className="btn btn-secondary text-xs" onClick={() => cancel.mutate({ backtestId: backtest.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListBacktestsQueryKey() }) })} disabled={cancel.isPending} data-testid={`button-cancel-backtest-${backtest.id}`}>{cancel.isPending ? "Cancelling…" : "Cancel"}</button></div>
+          </div>
+          <p className="text-sm text-foreground mt-3">{backtest.progress.message}</p>
+          {backtest.progress.timeframes.length > 0 && <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">{backtest.progress.timeframes.map(timeframe => <div className="rounded-md bg-background/60 px-3 py-2" key={timeframe.timeframeId}><div className="flex justify-between gap-3 text-xs"><span className="font-medium">{timeframe.label}</span><span className={timeframe.status === "complete" ? "text-primary" : "text-muted-foreground"}>{timeframe.status === "complete" ? "Complete" : timeframe.status}</span></div><div className="text-[11px] text-muted-foreground mt-1">{timeframe.candlesProcessed.toLocaleString()} candles{timeframe.coverageState === "complete" ? " · complete coverage" : ""}</div></div>)}</div>}
+          {backtest.status === "processing" && <div className="text-xs text-muted-foreground mt-3">Processing {backtest.progress.candlesDownloaded.toLocaleString()} candles.</div>}
+        </div>)}
+      </div>
+    </div>}
     <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5">
       <form id="backtest-setup" className="panel p-6 md:p-8 space-y-6" onSubmit={save}>
         <div>
@@ -618,16 +652,16 @@ function Backtesting() {
           </section>
         <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
           <p className="text-xs text-muted-foreground">The server evaluates completed candles chronologically and saves simulated trades separately from the journal.</p>
-           <button className="btn btn-primary whitespace-nowrap" type="submit" disabled={create.isPending || strategies.isLoading || markets.isLoading || timeframes.isLoading || compatibilityLoading || !backtestReady}>{create.isPending ? "Saving…" : "Run Backtest"}</button>
+           <button className="btn btn-primary whitespace-nowrap" type="submit" disabled={create.isPending || strategies.isLoading || markets.isLoading || timeframes.isLoading || compatibilityLoading || !backtestReady}>{create.isPending ? "Starting…" : "Run Backtest"}</button>
         </div>
-        {create.isSuccess && create.data?.status === "completed" && <p className="text-sm text-primary">Backtest completed: {create.data.candlesProcessed} candles processed and {create.data.tradeCount} simulated trades saved. {create.data.resultMessage}</p>}
+        {create.isSuccess && create.data && <p className="text-sm text-primary">Backtest job created. It will continue in the background and appear in Active jobs while it runs.</p>}
         {create.isSuccess && create.data?.status === "failed" && <p className="text-sm text-destructive">Backtest failed: {backtestErrorCopy(create.data.errorMessage)}</p>}
          {create.isError && <p className="text-sm text-destructive">{backtestErrorCopy(create.error)}</p>}
       </form>
        <div className="space-y-5" id="backtest-runs">
          <div className="panel p-6">
           <div className="flex items-center justify-between gap-3"><div><div className="eyebrow">Saved runs</div><h2 className="font-semibold mt-2">Recent Results</h2></div><button type="button" className="text-xs text-primary hover:underline" onClick={() => setBacktestSection("runs")}>View all</button></div>
-          {saved.isLoading ? <LoadingBlock /> : saved.data?.length ? <div className="mt-4 space-y-3">{saved.data.slice(0, 5).map((backtest: Backtest) => <div className="rounded-md bg-secondary/60 p-3" key={backtest.id} data-testid={`row-backtest-${backtest.id}`}><div className="flex items-center justify-between gap-3"><span className="font-semibold text-sm">{backtest.strategyName} · v{backtest.versionNumber}</span><span className={`tag ${backtest.status === "completed" ? "tag-active" : backtest.status === "failed" ? "tag-archived" : "tag-draft"}`}>{backtest.status}</span></div><div className="text-xs text-muted-foreground mt-2">{backtest.instrumentSymbol} · {backtest.timeframeLabel}</div><div className="text-xs text-muted-foreground mt-1">{formatDate(backtest.startDate)} – {formatDate(backtest.endDate)}</div><div className="text-xs text-muted-foreground mt-1">{backtest.candlesProcessed} candles · {backtest.tradeCount} simulated trades</div>{backtest.status === "completed" && backtest.tradeCount > 0 && <div className="text-xs text-muted-foreground mt-1">{backtest.winRate === null ? "—" : `${backtest.winRate.toFixed(1)}%`} win rate · {formatMoney(backtest.totalPnl)} total P/L</div>}{backtest.status === "failed" && backtest.errorMessage && <div className="text-xs text-destructive mt-2">{backtest.errorMessage}</div>}{backtest.status === "completed" && backtest.resultMessage && <div className="text-xs text-muted-foreground mt-2">{backtest.resultMessage}</div>}<Link href={`/backtesting/${backtest.id}`} className="text-xs text-primary inline-flex items-center gap-1 mt-3 hover:underline" data-testid={`link-view-backtest-${backtest.id}`}>Review result <ChevronRight size={13}/></Link></div>)}</div> : <p className="text-sm text-muted-foreground mt-4">No backtests run yet.</p>}
+          {saved.isLoading ? <LoadingBlock /> : saved.data?.length ? <div className="mt-4 space-y-3">{saved.data.slice(0, 5).map((backtest: Backtest) => <div className="rounded-md bg-secondary/60 p-3" key={backtest.id} data-testid={`row-backtest-${backtest.id}`}><div className="flex items-center justify-between gap-3"><span className="font-semibold text-sm">{backtest.strategyName} · v{backtest.versionNumber}</span><span className={`tag ${backtest.status === "completed" ? "tag-active" : backtest.status === "failed" || backtest.status === "cancelled" ? "tag-archived" : "tag-warn"}`}>{backtestStatusLabel(backtest.status)}</span></div><div className="text-xs text-muted-foreground mt-2">{backtest.instrumentSymbol} · {backtest.timeframeLabel}</div><div className="text-xs text-muted-foreground mt-1">{formatDate(backtest.startDate)} – {formatDate(backtest.endDate)}</div><div className="text-xs text-muted-foreground mt-1">{backtest.candlesProcessed.toLocaleString()} candles · {backtest.tradeCount} simulated trades</div>{backtest.status === "completed" && backtest.tradeCount > 0 && <div className="text-xs text-muted-foreground mt-1">{backtest.winRate === null ? "—" : `${backtest.winRate.toFixed(1)}%`} win rate · {formatMoney(backtest.totalPnl)} total P/L</div>}{backtest.status === "failed" && backtest.errorMessage && <div className="text-xs text-destructive mt-2">{backtest.errorMessage}</div>}{backtest.status === "cancelled" && <div className="text-xs text-muted-foreground mt-2">{backtest.progress.message}</div>}{backtest.status === "completed" && backtest.resultMessage && <div className="text-xs text-muted-foreground mt-2">{backtest.resultMessage}</div>}{backtest.status === "completed" ? <Link href={`/backtesting/${backtest.id}`} className="text-xs text-primary inline-flex items-center gap-1 mt-3 hover:underline" data-testid={`link-view-backtest-${backtest.id}`}>Review result <ChevronRight size={13}/></Link> : <div className="text-xs text-muted-foreground mt-3">{isActiveBacktest(backtest.status) ? "Running in background…" : "No completed result available."}</div>}</div>)}</div> : <p className="text-sm text-muted-foreground mt-4">No backtests run yet.</p>}
         </div>
          <div className="panel p-6">
           <div className="eyebrow">What happens next</div>

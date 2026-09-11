@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { biQuoteAdapter, ensureBiQuoteCatalog } from "./services/biquote";
 import { dukascopyAdapter, ensureDukascopyCatalog } from "./services/dukascopy";
 import { marketDataService } from "./services/market-data";
+import { resumeBacktestJobs } from "./routes/backtesting";
 
 const rawPort = process.env["PORT"];
 
@@ -22,6 +23,7 @@ await ensureBiQuoteCatalog();
 await ensureDukascopyCatalog();
 marketDataService.register(biQuoteAdapter);
 marketDataService.register(dukascopyAdapter);
+await resumeBacktestJobs();
 
 app.listen(port, (err) => {
   if (err) {

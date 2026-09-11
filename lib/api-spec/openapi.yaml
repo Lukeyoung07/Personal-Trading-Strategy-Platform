@@ -1221,8 +1221,8 @@ paths:
             schema:
               $ref: "#/components/schemas/BacktestInput"
       responses:
-        "201":
-          description: Saved backtest configuration
+        "202":
+          description: Backtest job queued
           content:
             application/json:
               schema:
@@ -1253,6 +1253,22 @@ paths:
       responses:
         "200":
           description: Completed or failed backtest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Backtest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /backtests/{backtestId}/cancel:
+    post:
+      operationId: cancelBacktest
+      tags: [backtesting]
+      summary: Cancel a queued or running backtest
+      parameters:
+        - $ref: "#/components/parameters/BacktestId"
+      responses:
+        "200":
+          description: Cancelled or already terminal backtest job
           content:
             application/json:
               schema:
@@ -2503,7 +2519,7 @@ components:
           enum: [active, paused, triggered, acknowledged]
     Backtest:
       type: object
-      required: [id, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, timeframeId, timeframeLabel, preset, startDate, endDate, status, candlesProcessed, tradeCount, winningTrades, losingTrades, winRate, totalPnl, resultMessage, executionAssumptions, errorMessage, startedAt, completedAt, createdAt]
+      required: [id, strategyId, strategyName, strategyVersionId, versionNumber, instrumentId, instrumentSymbol, timeframeId, timeframeLabel, preset, startDate, endDate, status, candlesProcessed, tradeCount, progress, winningTrades, losingTrades, winRate, totalPnl, resultMessage, executionAssumptions, errorMessage, startedAt, completedAt, createdAt]
       properties:
         id: { type: integer }
         strategyId: { type: integer }
@@ -2521,9 +2537,11 @@ components:
         endDate: { type: string, format: date-time }
         status:
           type: string
-          enum: [configured, pending, running, completed, failed]
+          enum: [configured, pending, queued, downloading_data, processing, running, completed, failed, cancelled]
         candlesProcessed: { type: integer }
         tradeCount: { type: integer }
+        progress:
+          $ref: "#/components/schemas/BacktestProgress"
         winningTrades: { type: integer }
         losingTrades: { type: integer }
         winRate: { type: ["number", "null"] }
@@ -2539,6 +2557,36 @@ components:
         startedAt: { type: ["string", "null"], format: date-time }
         completedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
+    BacktestProgress:
+      type: object
+      required: [phase, message, timeframes, candlesDownloaded, candlesTotal, processingIndex, processingTotal]
+      properties:
+        phase:
+          type: string
+          enum: [queued, downloading_data, processing, completed, failed, cancelled]
+        message: { type: string }
+        timeframes:
+          type: array
+          items:
+            $ref: "#/components/schemas/BacktestProgressTimeframe"
+        candlesDownloaded: { type: integer }
+        candlesTotal: { type: ["integer", "null"] }
+        processingIndex: { type: ["integer", "null"] }
+        processingTotal: { type: ["integer", "null"] }
+    BacktestProgressTimeframe:
+      type: object
+      required: [timeframeId, code, label, status, candlesProcessed, earliestCandle, latestCandle, coverageState]
+      properties:
+        timeframeId: { type: integer }
+        code: { type: string }
+        label: { type: string }
+        status:
+          type: string
+          enum: [queued, downloading, complete, failed]
+        candlesProcessed: { type: integer }
+        earliestCandle: { type: ["string", "null"], format: date-time }
+        latestCandle: { type: ["string", "null"], format: date-time }
+        coverageState: { type: string }
     BacktestTimeframeSummary:
       type: object
       required: [timeframeId, code, label, candlesProcessed, earliestCandle, latestCandle, isExecutionTimeframe]

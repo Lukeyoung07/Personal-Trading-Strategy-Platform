@@ -334,6 +334,7 @@ export const backtestConfigurationsTable = pgTable("backtest_configurations", {
   status: text("status").notNull().default("configured"),
   candlesProcessed: integer("candles_processed").notNull().default(0),
   tradeCount: integer("trade_count").notNull().default(0),
+  progress: jsonb("progress").notNull().default(sql`'{}'::jsonb`),
   resultMessage: text("result_message"),
   executionAssumptions: text("execution_assumptions"),
   errorMessage: text("error_message"),

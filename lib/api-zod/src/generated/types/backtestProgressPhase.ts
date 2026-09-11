@@ -6,16 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BacktestStatus = typeof BacktestStatus[keyof typeof BacktestStatus];
+export type BacktestProgressPhase = typeof BacktestProgressPhase[keyof typeof BacktestProgressPhase];
 
 
-export const BacktestStatus = {
-  configured: 'configured',
-  pending: 'pending',
+export const BacktestProgressPhase = {
   queued: 'queued',
   downloading_data: 'downloading_data',
   processing: 'processing',
-  running: 'running',
   completed: 'completed',
   failed: 'failed',
   cancelled: 'cancelled',

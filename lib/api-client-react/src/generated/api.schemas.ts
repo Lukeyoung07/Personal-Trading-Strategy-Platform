@@ -1866,10 +1866,62 @@ export type BacktestStatus = typeof BacktestStatus[keyof typeof BacktestStatus];
 export const BacktestStatus = {
   configured: 'configured',
   pending: 'pending',
+  queued: 'queued',
+  downloading_data: 'downloading_data',
+  processing: 'processing',
   running: 'running',
   completed: 'completed',
   failed: 'failed',
+  cancelled: 'cancelled',
 } as const;
+
+export type BacktestProgressPhase = typeof BacktestProgressPhase[keyof typeof BacktestProgressPhase];
+
+
+export const BacktestProgressPhase = {
+  queued: 'queued',
+  downloading_data: 'downloading_data',
+  processing: 'processing',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const;
+
+export type BacktestProgressTimeframeStatus = typeof BacktestProgressTimeframeStatus[keyof typeof BacktestProgressTimeframeStatus];
+
+
+export const BacktestProgressTimeframeStatus = {
+  queued: 'queued',
+  downloading: 'downloading',
+  complete: 'complete',
+  failed: 'failed',
+} as const;
+
+export interface BacktestProgressTimeframe {
+  timeframeId: number;
+  code: string;
+  label: string;
+  status: BacktestProgressTimeframeStatus;
+  candlesProcessed: number;
+  /** @nullable */
+  earliestCandle: string | null;
+  /** @nullable */
+  latestCandle: string | null;
+  coverageState: string;
+}
+
+export interface BacktestProgress {
+  phase: BacktestProgressPhase;
+  message: string;
+  timeframes: BacktestProgressTimeframe[];
+  candlesDownloaded: number;
+  /** @nullable */
+  candlesTotal: number | null;
+  /** @nullable */
+  processingIndex: number | null;
+  /** @nullable */
+  processingTotal: number | null;
+}
 
 export interface BacktestTimeframeSummary {
   timeframeId: number;
@@ -1897,6 +1949,7 @@ export interface Backtest {
   status: BacktestStatus;
   candlesProcessed: number;
   tradeCount: number;
+  progress: BacktestProgress;
   winningTrades: number;
   losingTrades: number;
   /** @nullable */

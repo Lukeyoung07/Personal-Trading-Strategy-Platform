@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BacktestPreset } from './backtestPreset';
+import type { BacktestProgress } from './backtestProgress';
 import type { BacktestStatus } from './backtestStatus';
 import type { BacktestTimeframeSummary } from './backtestTimeframeSummary';
 
@@ -25,6 +26,7 @@ export interface Backtest {
   status: BacktestStatus;
   candlesProcessed: number;
   tradeCount: number;
+  progress: BacktestProgress;
   winningTrades: number;
   losingTrades: number;
   /** @nullable */

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, asc, count, desc, eq, max, min } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, max, min, ne } from "drizzle-orm";
 import {
   backtestCandlesTable,
   backtestConfigurationsTable,
@@ -23,8 +23,69 @@ import { HistoricalDataError } from "../services/historical-errors";
 
 const router: IRouter = Router();
 const activeBacktests = new Set<number>();
-const inFlightBacktestRequests = new Map<string, Promise<any>>();
+const queuedBacktests = new Set<number>();
+const backtestQueue: number[] = [];
+const inFlightBacktestRequests = new Map<string, number>();
+let backtestWorkerRunning = false;
 const BACKTEST_CANDLE_WRITE_BATCH_SIZE = 500;
+const ACTIVE_BACKTEST_STATUSES = ["queued", "downloading_data", "processing", "pending", "running"] as const;
+
+type BacktestProgressTimeframe = {
+  timeframeId: number;
+  code: string;
+  label: string;
+  status: "queued" | "downloading" | "complete" | "failed";
+  candlesProcessed: number;
+  earliestCandle: string | null;
+  latestCandle: string | null;
+  coverageState: string;
+};
+
+type BacktestProgress = {
+  phase: "queued" | "downloading_data" | "processing" | "completed" | "failed" | "cancelled";
+  message: string;
+  timeframes: BacktestProgressTimeframe[];
+  candlesDownloaded: number;
+  candlesTotal: number | null;
+  processingIndex: number | null;
+  processingTotal: number | null;
+};
+
+class BacktestCancelledError extends Error {
+  constructor() {
+    super("Backtest cancelled by the user.");
+    this.name = "BacktestCancelledError";
+  }
+}
+
+function queuedProgress(message = "Waiting for a worker to start this backtest."): BacktestProgress {
+  return {
+    phase: "queued",
+    message,
+    timeframes: [],
+    candlesDownloaded: 0,
+    candlesTotal: null,
+    processingIndex: null,
+    processingTotal: null,
+  };
+}
+
+async function setBacktestProgress(backtestId: number, progress: BacktestProgress, status?: string) {
+  await db.update(backtestConfigurationsTable).set({
+    ...(status ? { status } : {}),
+    progress,
+  }).where(and(
+    eq(backtestConfigurationsTable.id, backtestId),
+    ne(backtestConfigurationsTable.status, "cancelled"),
+  ));
+}
+
+async function assertBacktestNotCancelled(backtestId: number) {
+  const [row] = await db.select({ status: backtestConfigurationsTable.status })
+    .from(backtestConfigurationsTable)
+    .where(eq(backtestConfigurationsTable.id, backtestId));
+  if (!row || row.status === "cancelled") throw new BacktestCancelledError();
+}
 
 function engineCondition(condition: typeof strategyVersionConditionsTable.$inferSelect): BacktestCondition {
   return {
@@ -116,6 +177,7 @@ function backtestView(row: {
   instrumentSymbol: string;
   timeframeLabel: string;
   timeframeSummaries?: Array<{
+    timeframeId: number;
     code: string;
     label: string;
     candlesProcessed: number;
@@ -125,8 +187,33 @@ function backtestView(row: {
   statistics?: ReturnType<typeof calculateBacktestStatistics>;
 }) {
   const statistics = row.statistics;
+  const persistedProgress = row.configuration.progress;
+  const progress = persistedProgress && typeof persistedProgress === "object"
+    && "phase" in persistedProgress && "message" in persistedProgress && "timeframes" in persistedProgress
+    ? persistedProgress as BacktestProgress
+    : {
+      phase: row.configuration.status === "completed" ? "completed" : row.configuration.status === "failed" ? "failed" : "queued",
+      message: row.configuration.status === "completed"
+        ? "Backtest completed."
+        : row.configuration.errorMessage || "Backtest is waiting to run.",
+      timeframes: (row.timeframeSummaries || []).map(summary => ({
+        timeframeId: summary.timeframeId,
+        code: summary.code,
+        label: summary.label,
+        status: "complete" as const,
+        candlesProcessed: summary.candlesProcessed,
+        earliestCandle: summary.earliestCandle.toISOString(),
+        latestCandle: summary.latestCandle.toISOString(),
+        coverageState: "complete",
+      })),
+      candlesDownloaded: row.configuration.candlesProcessed,
+      candlesTotal: row.configuration.candlesProcessed,
+      processingIndex: row.configuration.status === "completed" ? row.configuration.candlesProcessed : null,
+      processingTotal: row.configuration.status === "completed" ? row.configuration.candlesProcessed : null,
+    } satisfies BacktestProgress;
   return {
     ...row.configuration,
+    progress,
     strategyName: row.strategyName,
     versionNumber: row.versionNumber,
     instrumentSymbol: row.instrumentSymbol,
@@ -183,20 +270,24 @@ async function executeBacktestInternal(backtestId: number) {
     .from(backtestConfigurationsTable)
     .where(eq(backtestConfigurationsTable.id, backtestId));
   if (!configuration) return null;
+  if (configuration.status === "cancelled") return findBacktest(backtestId);
 
   const startedAt = new Date();
   await db.update(backtestConfigurationsTable).set({
-    status: "running",
+    status: "downloading_data",
     startedAt,
     completedAt: null,
     errorMessage: null,
     candlesProcessed: 0,
     tradeCount: 0,
+    resultMessage: null,
+    progress: queuedProgress("Preparing historical data retrieval."),
   }).where(eq(backtestConfigurationsTable.id, backtestId));
   await db.delete(backtestTradesTable).where(eq(backtestTradesTable.backtestId, backtestId));
   await db.delete(backtestCandlesTable).where(eq(backtestCandlesTable.backtestId, backtestId));
 
   try {
+    await assertBacktestNotCancelled(backtestId);
     const [[version], conditions, timeframes] = await Promise.all([
       db.select().from(strategyVersionsTable).where(and(
         eq(strategyVersionsTable.id, configuration.strategyVersionId),
@@ -232,7 +323,34 @@ async function executeBacktestInternal(backtestId: number) {
       if (!match) throw new Error(`The strategy references an unavailable timeframe: ${code}.`);
       return match;
     });
-    const loadedSeries = await Promise.all(requestedTimeframes.map(async timeframe => {
+    const progressTimeframes: BacktestProgressTimeframe[] = requestedTimeframes.map(timeframe => ({
+      timeframeId: timeframe.id,
+      code: timeframe.code,
+      label: timeframe.label,
+      status: "queued",
+      candlesProcessed: 0,
+      earliestCandle: null,
+      latestCandle: null,
+      coverageState: "pending",
+    }));
+    const loadedSeries: Array<{
+      code: string;
+      durationSeconds: number;
+      candles: Awaited<ReturnType<typeof marketDataService.historicalCandles>>;
+      coverage: ReturnType<typeof historicalCandleCoverage>;
+    }> = [];
+    for (const [index, timeframe] of requestedTimeframes.entries()) {
+      await assertBacktestNotCancelled(backtestId);
+      progressTimeframes[index] = { ...progressTimeframes[index], status: "downloading" };
+      await setBacktestProgress(backtestId, {
+        phase: "downloading_data",
+        message: `Downloading ${timeframe.label} historical data.`,
+        timeframes: progressTimeframes,
+        candlesDownloaded: progressTimeframes.reduce((total, item) => total + item.candlesProcessed, 0),
+        candlesTotal: null,
+        processingIndex: null,
+        processingTotal: null,
+      }, "downloading_data");
       const candles = (await marketDataService.historicalCandles({
         sourceId: source.id,
         instrumentId: configuration.instrumentId,
@@ -246,18 +364,46 @@ async function executeBacktestInternal(backtestId: number) {
         timeframeCode: timeframe.code,
         timeframeDurationSeconds: timeframe.durationSeconds,
       });
-      return {
+      progressTimeframes[index] = {
+        ...progressTimeframes[index],
+        status: "complete",
+        candlesProcessed: candles.length,
+        earliestCandle: coverage.earliestCandle.toISOString(),
+        latestCandle: coverage.latestCandle.toISOString(),
+        coverageState: "complete",
+      };
+      loadedSeries.push({
         code: timeframe.code,
         durationSeconds: timeframe.durationSeconds,
         candles,
         coverage,
-      };
-    }));
+      });
+      await setBacktestProgress(backtestId, {
+        phase: "downloading_data",
+        message: `${timeframe.label} historical data is complete.`,
+        timeframes: progressTimeframes,
+        candlesDownloaded: progressTimeframes.reduce((total, item) => total + item.candlesProcessed, 0),
+        candlesTotal: progressTimeframes.reduce((total, item) => total + item.candlesProcessed, 0),
+        processingIndex: null,
+        processingTotal: null,
+      }, "downloading_data");
+    }
+    await assertBacktestNotCancelled(backtestId);
     const executionTimeframe = [...loadedSeries].sort((left, right) => left.durationSeconds - right.durationSeconds)[0];
     if (!executionTimeframe?.candles.length) {
       throw new Error("Insufficient historical data for the selected instrument and period.");
     }
 
+    const totalCandles = loadedSeries.reduce((total, series) => total + series.candles.length, 0);
+    await setBacktestProgress(backtestId, {
+      phase: "processing",
+      message: "Processing the completed historical candle series.",
+      timeframes: progressTimeframes,
+      candlesDownloaded: totalCandles,
+      candlesTotal: totalCandles,
+      processingIndex: 0,
+      processingTotal: totalCandles,
+    }, "processing");
     const result = runHistoricalBacktest({
       direction: version.direction as "long" | "short" | "both",
       entryRules: version.entryRules,
@@ -268,6 +414,7 @@ async function executeBacktestInternal(backtestId: number) {
       executionTimeframe: executionTimeframe.code,
       series: loadedSeries.map(({ code, candles: seriesCandles }) => ({ code, candles: seriesCandles })),
     } satisfies HistoricalBacktestInput);
+    await assertBacktestNotCancelled(backtestId);
     const completedAt = new Date();
 
     await db.transaction(async tx => {
@@ -308,7 +455,7 @@ async function executeBacktestInternal(backtestId: number) {
           exitReason: trade.exitReason,
         })));
       }
-      await tx.update(backtestConfigurationsTable).set({
+      const [savedConfiguration] = await tx.update(backtestConfigurationsTable).set({
         status: "completed",
         candlesProcessed: result.candlesProcessed,
         tradeCount: result.trades.length,
@@ -316,17 +463,60 @@ async function executeBacktestInternal(backtestId: number) {
         executionAssumptions: result.assumptions.join("\n"),
         errorMessage: null,
         completedAt,
-      }).where(eq(backtestConfigurationsTable.id, backtestId));
+        progress: {
+          phase: "completed",
+          message: "Backtest completed.",
+          timeframes: progressTimeframes,
+          candlesDownloaded: candleRows.length,
+          candlesTotal: candleRows.length,
+          processingIndex: candleRows.length,
+          processingTotal: candleRows.length,
+        } satisfies BacktestProgress,
+      }).where(and(
+        eq(backtestConfigurationsTable.id, backtestId),
+        eq(backtestConfigurationsTable.status, "processing"),
+      )).returning({ id: backtestConfigurationsTable.id });
+      if (!savedConfiguration) throw new BacktestCancelledError();
     });
   } catch (error) {
+    if (error instanceof BacktestCancelledError) {
+      await setBacktestProgress(backtestId, {
+        phase: "cancelled",
+        message: error.message,
+        timeframes: [],
+        candlesDownloaded: 0,
+        candlesTotal: null,
+        processingIndex: null,
+        processingTotal: null,
+      }, "cancelled");
+      return findBacktest(backtestId);
+    }
     await db.update(backtestConfigurationsTable).set({
       status: "failed",
       resultMessage: null,
       errorMessage: publicBacktestError(error),
       completedAt: new Date(),
-    }).where(eq(backtestConfigurationsTable.id, backtestId));
+      progress: {
+        phase: "failed",
+        message: publicBacktestError(error),
+        timeframes: [],
+        candlesDownloaded: 0,
+        candlesTotal: null,
+        processingIndex: null,
+        processingTotal: null,
+      } satisfies BacktestProgress,
+    }).where(and(
+      eq(backtestConfigurationsTable.id, backtestId),
+      ne(backtestConfigurationsTable.status, "cancelled"),
+    ));
   }
   return findBacktest(backtestId);
+}
+
+function clearInFlightBacktest(backtestId: number) {
+  for (const [requestKey, id] of inFlightBacktestRequests.entries()) {
+    if (id === backtestId) inFlightBacktestRequests.delete(requestKey);
+  }
 }
 
 async function executeBacktest(backtestId: number) {
@@ -336,7 +526,44 @@ async function executeBacktest(backtestId: number) {
     return await executeBacktestInternal(backtestId);
   } finally {
     activeBacktests.delete(backtestId);
+    clearInFlightBacktest(backtestId);
   }
+}
+
+function drainBacktestQueue() {
+  if (backtestWorkerRunning) return;
+  backtestWorkerRunning = true;
+  void (async () => {
+    try {
+      while (backtestQueue.length) {
+        const backtestId = backtestQueue.shift();
+        if (backtestId == null) continue;
+        queuedBacktests.delete(backtestId);
+        await executeBacktest(backtestId);
+      }
+    } finally {
+      backtestWorkerRunning = false;
+      if (backtestQueue.length) drainBacktestQueue();
+    }
+  })();
+}
+
+function enqueueBacktest(backtestId: number) {
+  if (activeBacktests.has(backtestId) || queuedBacktests.has(backtestId)) return;
+  queuedBacktests.add(backtestId);
+  backtestQueue.push(backtestId);
+  drainBacktestQueue();
+}
+
+export async function resumeBacktestJobs() {
+  const rows = await db.select({ id: backtestConfigurationsTable.id })
+    .from(backtestConfigurationsTable)
+    .where(inArray(backtestConfigurationsTable.status, [...ACTIVE_BACKTEST_STATUSES]));
+  if (!rows.length) return;
+  await db.update(backtestConfigurationsTable)
+    .set({ status: "queued", progress: queuedProgress("Resuming this backtest after the server restarted.") })
+    .where(inArray(backtestConfigurationsTable.id, rows.map(row => row.id)));
+  rows.forEach(row => enqueueBacktest(row.id));
 }
 
 router.get("/backtests", async (_req, res): Promise<void> => {
@@ -415,32 +642,54 @@ router.post("/backtests", async (req, res): Promise<void> => {
   }
 
   const requestKey = JSON.stringify({ strategyId, strategyVersionId, instrumentId, timeframeId, preset: parsed.data.preset, startDate, endDate });
-  const existingRequest = inFlightBacktestRequests.get(requestKey);
-  if (existingRequest) {
-    const result = await existingRequest;
-    res.status(200).json(CreateBacktestResponse.parse(result));
-    return;
-  }
-  const request = (async () => {
-    const [created] = await db.insert(backtestConfigurationsTable).values({
-      strategyId,
-      strategyVersionId,
-      instrumentId,
-      timeframeId,
-      preset: parsed.data.preset,
-      startDate,
-      endDate,
-      status: "pending",
-    }).returning();
-    return executeBacktest(created.id);
-  })();
-  inFlightBacktestRequests.set(requestKey, request);
-  try {
-    const result = await request;
-    res.status(201).json(CreateBacktestResponse.parse(result));
-  } finally {
+  const existingInFlightId = inFlightBacktestRequests.get(requestKey);
+  if (existingInFlightId) {
+    const result = await findBacktest(existingInFlightId);
+    if (result) {
+      res.status(200).json(CreateBacktestResponse.parse(result));
+      return;
+    }
     inFlightBacktestRequests.delete(requestKey);
   }
+  const [existingJob] = await db.select({ id: backtestConfigurationsTable.id })
+    .from(backtestConfigurationsTable)
+    .where(and(
+      eq(backtestConfigurationsTable.strategyId, strategyId),
+      eq(backtestConfigurationsTable.strategyVersionId, strategyVersionId),
+      eq(backtestConfigurationsTable.instrumentId, instrumentId),
+      eq(backtestConfigurationsTable.timeframeId, timeframeId),
+      eq(backtestConfigurationsTable.preset, parsed.data.preset),
+      eq(backtestConfigurationsTable.startDate, startDate),
+      eq(backtestConfigurationsTable.endDate, endDate),
+      inArray(backtestConfigurationsTable.status, [...ACTIVE_BACKTEST_STATUSES]),
+    ));
+  if (existingJob) {
+    const result = await findBacktest(existingJob.id);
+    if (result) {
+      inFlightBacktestRequests.set(requestKey, existingJob.id);
+      res.status(200).json(CreateBacktestResponse.parse(result));
+      return;
+    }
+  }
+  const [created] = await db.insert(backtestConfigurationsTable).values({
+    strategyId,
+    strategyVersionId,
+    instrumentId,
+    timeframeId,
+    preset: parsed.data.preset,
+    startDate,
+    endDate,
+    status: "queued",
+    progress: queuedProgress(),
+  }).returning();
+  inFlightBacktestRequests.set(requestKey, created.id);
+  enqueueBacktest(created.id);
+  const result = await findBacktest(created.id);
+  if (!result) {
+    res.status(500).json({ error: "Backtest job could not be created." });
+    return;
+  }
+  res.status(202).json(CreateBacktestResponse.parse(result));
 });
 
 router.get("/backtests/:backtestId", async (req, res): Promise<void> => {
@@ -463,12 +712,53 @@ router.post("/backtests/:backtestId/run", async (req, res): Promise<void> => {
     res.status(400).json({ error: "backtestId must be a positive integer" });
     return;
   }
-  const result = await executeBacktest(id);
+  const result = await findBacktest(id);
   if (!result) {
     res.status(404).json({ error: "Backtest not found" });
     return;
   }
-  res.json(result);
+  if (result.status === "completed") {
+    res.json(result);
+    return;
+  }
+  if (result.status === "failed" || result.status === "cancelled" || result.status === "configured") {
+    await db.update(backtestConfigurationsTable).set({
+      status: "queued",
+      completedAt: null,
+      errorMessage: null,
+      progress: queuedProgress(),
+    }).where(eq(backtestConfigurationsTable.id, id));
+  }
+  enqueueBacktest(id);
+  res.json(await findBacktest(id));
+});
+
+router.post("/backtests/:backtestId/cancel", async (req, res): Promise<void> => {
+  const id = Number(req.params.backtestId);
+  if (!Number.isInteger(id) || id < 1) {
+    res.status(400).json({ error: "backtestId must be a positive integer" });
+    return;
+  }
+  const current = await findBacktest(id);
+  if (!current) {
+    res.status(404).json({ error: "Backtest not found" });
+    return;
+  }
+  if (current.status === "completed" || current.status === "failed" || current.status === "cancelled") {
+    res.json(current);
+    return;
+  }
+  const progress = (current.progress && typeof current.progress === "object" ? current.progress : queuedProgress()) as BacktestProgress;
+  await db.update(backtestConfigurationsTable).set({
+    status: "cancelled",
+    completedAt: new Date(),
+    progress: {
+      ...progress,
+      phase: "cancelled",
+      message: "Backtest cancelled by the user.",
+    } satisfies BacktestProgress,
+  }).where(eq(backtestConfigurationsTable.id, id));
+  res.json(await findBacktest(id));
 });
 
 router.get("/backtests/:backtestId/trades", async (req, res): Promise<void> => {
@@ -504,6 +794,10 @@ router.get("/backtests/:backtestId/results", async (req, res): Promise<void> => 
   const backtest = await findBacktest(id);
   if (!backtest) {
     res.status(404).json({ error: "Backtest not found" });
+    return;
+  }
+  if (backtest.status !== "completed") {
+    res.status(409).json({ error: `Backtest result is not available while this job is ${backtest.status}.` });
     return;
   }
   const [tradeRows, candleRows] = await Promise.all([

@@ -20,3 +20,4 @@
 - [Initial version snapshots](initial-version-snapshots.md) — strategy creation must persist initial conditions and the immutable v1 snapshot atomically.
 - [Historical candle pagination](historical-candle-pagination.md) — provider pages may be newest-first windows; paginate by actual boundaries and reject incomplete coverage.
 - [Dukascopy historical API](dukascopy-historical-api.md) — Jetta returns delta-compressed daily 1m/monthly 1h data and rate-limits concurrent requests.
+- [Background backtest jobs](background-backtest-jobs.md) — queued backtests persist progress and terminal state; only completed jobs expose results.

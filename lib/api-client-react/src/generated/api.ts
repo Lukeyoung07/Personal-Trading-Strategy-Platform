@@ -5532,6 +5532,77 @@ export const useRunBacktest = <TError = ErrorType<NotFoundResponse>,
       return useMutation(getRunBacktestMutationOptions(options));
     }
 
+export const getCancelBacktestUrl = (backtestId: number,) => {
+
+
+
+
+  return `/api/backtests/${backtestId}/cancel`
+}
+
+/**
+ * @summary Cancel a queued or running backtest
+ */
+export const cancelBacktest = async (backtestId: number, options?: Parameters<typeof customFetch>[1]): Promise<Backtest> => {
+
+  return customFetch<Backtest>(getCancelBacktestUrl(backtestId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCancelBacktestMutationOptions = <TError = ErrorType<NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelBacktest>>, TError,{backtestId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelBacktest>>, TError,{backtestId: number}, TContext> => {
+
+const mutationKey = ['cancelBacktest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelBacktest>>, {backtestId: number}> = (props) => {
+          const {backtestId} = props ?? {};
+
+          return  cancelBacktest(backtestId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelBacktestMutationResult = NonNullable<Awaited<ReturnType<typeof cancelBacktest>>>
+
+    export type CancelBacktestMutationError = ErrorType<NotFoundResponse>
+
+    /**
+ * @summary Cancel a queued or running backtest
+ */
+export const useCancelBacktest = <TError = ErrorType<NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelBacktest>>, TError,{backtestId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelBacktest>>,
+        TError,
+        {backtestId: number},
+        TContext
+      > => {
+      return useMutation(getCancelBacktestMutationOptions(options));
+    }
+
 export const getListBacktestTradesUrl = (backtestId: number,) => {
 
 

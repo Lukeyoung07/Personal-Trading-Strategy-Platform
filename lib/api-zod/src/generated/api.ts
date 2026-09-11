@@ -2351,9 +2351,27 @@ export const ListBacktestsResponseItem = zod.object({
   "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
-  "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
+  "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
   "candlesProcessed": zod.number().int(),
   "tradeCount": zod.number().int(),
+  "progress": zod.object({
+  "phase": zod.enum(['queued', 'downloading_data', 'processing', 'completed', 'failed', 'cancelled']),
+  "message": zod.string(),
+  "timeframes": zod.array(zod.object({
+  "timeframeId": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "status": zod.enum(['queued', 'downloading', 'complete', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date().nullable(),
+  "latestCandle": zod.coerce.date().nullable(),
+  "coverageState": zod.string()
+})),
+  "candlesDownloaded": zod.number().int(),
+  "candlesTotal": zod.number().int().nullable(),
+  "processingIndex": zod.number().int().nullable(),
+  "processingTotal": zod.number().int().nullable()
+}),
   "winningTrades": zod.number().int(),
   "losingTrades": zod.number().int(),
   "winRate": zod.number().nullable(),
@@ -2409,9 +2427,27 @@ export const CreateBacktestResponse = zod.object({
   "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
-  "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
+  "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
   "candlesProcessed": zod.number().int(),
   "tradeCount": zod.number().int(),
+  "progress": zod.object({
+  "phase": zod.enum(['queued', 'downloading_data', 'processing', 'completed', 'failed', 'cancelled']),
+  "message": zod.string(),
+  "timeframes": zod.array(zod.object({
+  "timeframeId": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "status": zod.enum(['queued', 'downloading', 'complete', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date().nullable(),
+  "latestCandle": zod.coerce.date().nullable(),
+  "coverageState": zod.string()
+})),
+  "candlesDownloaded": zod.number().int(),
+  "candlesTotal": zod.number().int().nullable(),
+  "processingIndex": zod.number().int().nullable(),
+  "processingTotal": zod.number().int().nullable()
+}),
   "winningTrades": zod.number().int(),
   "losingTrades": zod.number().int(),
   "winRate": zod.number().nullable(),
@@ -2457,9 +2493,27 @@ export const GetBacktestResponse = zod.object({
   "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
-  "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
+  "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
   "candlesProcessed": zod.number().int(),
   "tradeCount": zod.number().int(),
+  "progress": zod.object({
+  "phase": zod.enum(['queued', 'downloading_data', 'processing', 'completed', 'failed', 'cancelled']),
+  "message": zod.string(),
+  "timeframes": zod.array(zod.object({
+  "timeframeId": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "status": zod.enum(['queued', 'downloading', 'complete', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date().nullable(),
+  "latestCandle": zod.coerce.date().nullable(),
+  "coverageState": zod.string()
+})),
+  "candlesDownloaded": zod.number().int(),
+  "candlesTotal": zod.number().int().nullable(),
+  "processingIndex": zod.number().int().nullable(),
+  "processingTotal": zod.number().int().nullable()
+}),
   "winningTrades": zod.number().int(),
   "losingTrades": zod.number().int(),
   "winRate": zod.number().nullable(),
@@ -2505,9 +2559,93 @@ export const RunBacktestResponse = zod.object({
   "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
-  "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
+  "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
   "candlesProcessed": zod.number().int(),
   "tradeCount": zod.number().int(),
+  "progress": zod.object({
+  "phase": zod.enum(['queued', 'downloading_data', 'processing', 'completed', 'failed', 'cancelled']),
+  "message": zod.string(),
+  "timeframes": zod.array(zod.object({
+  "timeframeId": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "status": zod.enum(['queued', 'downloading', 'complete', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date().nullable(),
+  "latestCandle": zod.coerce.date().nullable(),
+  "coverageState": zod.string()
+})),
+  "candlesDownloaded": zod.number().int(),
+  "candlesTotal": zod.number().int().nullable(),
+  "processingIndex": zod.number().int().nullable(),
+  "processingTotal": zod.number().int().nullable()
+}),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "winRate": zod.number().nullable(),
+  "totalPnl": zod.number().nullable(),
+  "timeframeSummaries": zod.array(zod.object({
+  "timeframeId": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date(),
+  "latestCandle": zod.coerce.date(),
+  "isExecutionTimeframe": zod.boolean()
+})).optional().describe('Actual provider candle series loaded for this run, including each condition timeframe.'),
+  "resultMessage": zod.string().nullable(),
+  "executionAssumptions": zod.string().nullable(),
+  "errorMessage": zod.string().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Cancel a queued or running backtest
+ */
+
+
+
+export const CancelBacktestParams = zod.object({
+  "backtestId": zod.coerce.number().int().min(1)
+})
+
+export const CancelBacktestResponse = zod.object({
+  "id": zod.number().int(),
+  "strategyId": zod.number().int(),
+  "strategyName": zod.string(),
+  "strategyVersionId": zod.number().int(),
+  "versionNumber": zod.number().int(),
+  "instrumentId": zod.number().int(),
+  "instrumentSymbol": zod.string(),
+  "timeframeId": zod.number().int(),
+  "timeframeLabel": zod.string(),
+  "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date(),
+  "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
+  "candlesProcessed": zod.number().int(),
+  "tradeCount": zod.number().int(),
+  "progress": zod.object({
+  "phase": zod.enum(['queued', 'downloading_data', 'processing', 'completed', 'failed', 'cancelled']),
+  "message": zod.string(),
+  "timeframes": zod.array(zod.object({
+  "timeframeId": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "status": zod.enum(['queued', 'downloading', 'complete', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date().nullable(),
+  "latestCandle": zod.coerce.date().nullable(),
+  "coverageState": zod.string()
+})),
+  "candlesDownloaded": zod.number().int(),
+  "candlesTotal": zod.number().int().nullable(),
+  "processingIndex": zod.number().int().nullable(),
+  "processingTotal": zod.number().int().nullable()
+}),
   "winningTrades": zod.number().int(),
   "losingTrades": zod.number().int(),
   "winRate": zod.number().nullable(),
@@ -2586,9 +2724,27 @@ export const GetBacktestResultsResponse = zod.object({
   "preset": zod.enum(['last_7_days', 'last_30_days', 'last_90_days', 'custom']),
   "startDate": zod.coerce.date(),
   "endDate": zod.coerce.date(),
-  "status": zod.enum(['configured', 'pending', 'running', 'completed', 'failed']),
+  "status": zod.enum(['configured', 'pending', 'queued', 'downloading_data', 'processing', 'running', 'completed', 'failed', 'cancelled']),
   "candlesProcessed": zod.number().int(),
   "tradeCount": zod.number().int(),
+  "progress": zod.object({
+  "phase": zod.enum(['queued', 'downloading_data', 'processing', 'completed', 'failed', 'cancelled']),
+  "message": zod.string(),
+  "timeframes": zod.array(zod.object({
+  "timeframeId": zod.number().int(),
+  "code": zod.string(),
+  "label": zod.string(),
+  "status": zod.enum(['queued', 'downloading', 'complete', 'failed']),
+  "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date().nullable(),
+  "latestCandle": zod.coerce.date().nullable(),
+  "coverageState": zod.string()
+})),
+  "candlesDownloaded": zod.number().int(),
+  "candlesTotal": zod.number().int().nullable(),
+  "processingIndex": zod.number().int().nullable(),
+  "processingTotal": zod.number().int().nullable()
+}),
   "winningTrades": zod.number().int(),
   "losingTrades": zod.number().int(),
   "winRate": zod.number().nullable(),
