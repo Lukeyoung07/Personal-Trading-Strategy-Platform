@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   collectHistoricalCandles,
+  describeCachedCoverage,
   historicalCandleCoverage,
   missingHistoricalRanges,
   type NormalizedCandle,
@@ -216,6 +217,16 @@ describe("historical market-data retrieval", () => {
       from: candle(0).openTime,
       to: candle(2).openTime,
     })).toThrow(/contains no candles/i);
+  });
+
+  it("describes the actual cached range when a requested range is only partially available", () => {
+    const from = new Date("2026-06-13T00:00:00.000Z");
+    const to = new Date("2026-09-12T23:59:59.999Z");
+    expect(describeCachedCoverage([
+      candle(0, "2026-06-14T22:00:00.000Z"),
+      candle(1, "2026-06-14T22:00:00.000Z"),
+    ], { sourceId: 6, instrumentId: 25, timeframeId: 16, from, to }, "5m"))
+      .toContain("Available cached 5m candles cover 2026-06-14T22:00:00.000Z to 2026-06-14T23:00:00.000Z");
   });
 
   it("requests the full range when the reusable cache is empty", () => {

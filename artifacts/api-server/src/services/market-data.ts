@@ -154,6 +154,19 @@ function validateCandle(candle: NormalizedCandle) {
   if (candle.closeTime && candle.closeTime < candle.openTime) throw new Error("Candle close time is before open time");
 }
 
+export function describeCachedCoverage(candles: NormalizedCandle[], request: CanonicalCandleRequest, timeframeCode: string) {
+  const closed = candles
+    .filter(candle => candle.isClosed)
+    .sort((left, right) => left.openTime.getTime() - right.openTime.getTime());
+  const requestedRange = request.from && request.to
+    ? ` Requested range: ${request.from.toISOString()} to ${request.to.toISOString()}.`
+    : "";
+  if (!closed.length) {
+    return `No cached ${timeframeCode} candles are available for the requested range.${requestedRange}`;
+  }
+  return `Available cached ${timeframeCode} candles cover ${closed[0].openTime.toISOString()} to ${closed.at(-1)!.openTime.toISOString()}.${requestedRange} Complete coverage is unavailable.`;
+}
+
 function validateQuote(quote: NormalizedProviderQuote) {
   const values = [quote.bid, quote.ask, quote.bidSize, quote.askSize, quote.last, quote.lastSize];
   if (values.every(value => value == null)) throw new Error("Quote contains no price or size values");
@@ -500,12 +513,29 @@ export class MarketDataService {
           error instanceof Error ? error.message : `Historical data for ${timeframe.code} is unavailable for the requested period.`,
           { cause: error },
         );
+      let coverageMessage = "";
+      if (request.from && request.to) {
+        try {
+          coverageMessage = ` ${describeCachedCoverage(
+            await this.cachedCandles({ ...request, limit: undefined }),
+            request,
+            timeframe.code,
+          )}`;
+        } catch {
+          // Preserve the original provider error if the diagnostic cache read fails.
+        }
+      }
+      const diagnosticError = new HistoricalDataError(
+        historicalError.code,
+        `${historicalError.message}${coverageMessage}`,
+        { cause: historicalError },
+      );
       await this.recordConnection(
         request.sourceId,
         "error",
-        `Historical provider ${historicalError.code}: ${historicalError.message}`,
+        `Historical provider ${diagnosticError.code}: ${diagnosticError.message}`,
       );
-      throw historicalError;
+      throw diagnosticError;
     }
   }
 

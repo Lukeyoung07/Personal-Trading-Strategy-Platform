@@ -21,3 +21,4 @@
 - [Historical candle pagination](historical-candle-pagination.md) — provider pages may be newest-first windows; paginate by actual boundaries and reject incomplete coverage.
 - [Dukascopy historical API](dukascopy-historical-api.md) — Jetta returns delta-compressed daily 1m/monthly 1h data and rate-limits concurrent requests.
 - [Background backtest jobs](background-backtest-jobs.md) — queued backtests persist progress and terminal state; only completed jobs expose results.
+- [Dukascopy current-period boundary](dukascopy-current-period-boundary.md) — current/future requests can return 400 “From time is too late”; preserve provider reason and cached coverage instead of shortening.

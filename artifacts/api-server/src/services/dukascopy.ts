@@ -193,6 +193,17 @@ function pathDate(date: Date) {
   };
 }
 
+function providerResponseMessage(body: string) {
+  try {
+    const parsed = JSON.parse(body) as { error?: unknown; message?: unknown; details?: unknown };
+    const detail = [parsed.error, parsed.message, parsed.details]
+      .find(value => typeof value === "string" && value.trim());
+    return typeof detail === "string" ? detail : null;
+  } catch {
+    return null;
+  }
+}
+
 function toNormalizedCandle(candle: DecodedDukascopyCandle, durationSeconds: number, receivedAt: Date): NormalizedCandle {
   const openTime = new Date(candle.time);
   return {
@@ -304,9 +315,10 @@ class DukascopyAdapter implements MarketDataProviderAdapter {
             );
           }
         } else {
+          const providerMessage = providerResponseMessage(body);
           throw new HistoricalDataError(
             "unavailable",
-            `Dukascopy has no historical data for this request (${response.status}).`,
+            `Dukascopy rejected ${path} with HTTP ${response.status}${providerMessage ? `: ${providerMessage}` : "."}`,
           );
         }
         const retryAfter = Number(response.headers.get("retry-after"));

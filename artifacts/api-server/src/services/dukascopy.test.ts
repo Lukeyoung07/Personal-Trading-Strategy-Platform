@@ -239,4 +239,24 @@ describe("Dukascopy historical provider", () => {
     await vi.runAllTimersAsync();
     await assertion;
   });
+
+  it("preserves the exact provider endpoint and rejection reason for unavailable history", async () => {
+    resetAdapterRequestState();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+      data: null,
+      details: null,
+      error: "From time is too late",
+      message: null,
+      statusCode: 400,
+    }, 400));
+
+    await expect(dukascopyAdapter.candles({
+      providerSymbol: "XAU-USD",
+      timeframeCode: "1h",
+      from: new Date("2026-09-01T00:00:00.000Z"),
+      to: new Date("2026-09-12T23:59:59.999Z"),
+    })).rejects.toThrow(
+      /Dukascopy rejected \/candles\/trade\/hour\/XAU-USD\/BID\/2026\/9 with HTTP 400: From time is too late/i,
+    );
+  });
 });

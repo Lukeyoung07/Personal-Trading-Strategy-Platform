@@ -286,6 +286,13 @@ async function executeBacktestInternal(backtestId: number) {
   await db.delete(backtestTradesTable).where(eq(backtestTradesTable.backtestId, backtestId));
   await db.delete(backtestCandlesTable).where(eq(backtestCandlesTable.backtestId, backtestId));
 
+  let progressTimeframes: BacktestProgressTimeframe[] = [];
+  const loadedSeries: Array<{
+    code: string;
+    durationSeconds: number;
+    candles: Awaited<ReturnType<typeof marketDataService.historicalCandles>>;
+    coverage: ReturnType<typeof historicalCandleCoverage>;
+  }> = [];
   try {
     await assertBacktestNotCancelled(backtestId);
     const [[version], conditions, timeframes] = await Promise.all([
@@ -323,7 +330,7 @@ async function executeBacktestInternal(backtestId: number) {
       if (!match) throw new Error(`The strategy references an unavailable timeframe: ${code}.`);
       return match;
     });
-    const progressTimeframes: BacktestProgressTimeframe[] = requestedTimeframes.map(timeframe => ({
+    progressTimeframes = requestedTimeframes.map(timeframe => ({
       timeframeId: timeframe.id,
       code: timeframe.code,
       label: timeframe.label,
@@ -333,12 +340,6 @@ async function executeBacktestInternal(backtestId: number) {
       latestCandle: null,
       coverageState: "pending",
     }));
-    const loadedSeries: Array<{
-      code: string;
-      durationSeconds: number;
-      candles: Awaited<ReturnType<typeof marketDataService.historicalCandles>>;
-      coverage: ReturnType<typeof historicalCandleCoverage>;
-    }> = [];
     for (const [index, timeframe] of requestedTimeframes.entries()) {
       await assertBacktestNotCancelled(backtestId);
       progressTimeframes[index] = { ...progressTimeframes[index], status: "downloading" };
@@ -351,19 +352,30 @@ async function executeBacktestInternal(backtestId: number) {
         processingIndex: null,
         processingTotal: null,
       }, "downloading_data");
-      const candles = (await marketDataService.historicalCandles({
-        sourceId: source.id,
-        instrumentId: configuration.instrumentId,
-        timeframeId: timeframe.id,
-        from: configuration.startDate,
-        to: configuration.endDate,
-      })).filter(candle => candle.isClosed),
-      coverage = historicalCandleCoverage(candles, {
-        from: configuration.startDate,
-        to: configuration.endDate,
-        timeframeCode: timeframe.code,
-        timeframeDurationSeconds: timeframe.durationSeconds,
-      });
+      let candles: Awaited<ReturnType<typeof marketDataService.historicalCandles>>;
+      let coverage: ReturnType<typeof historicalCandleCoverage>;
+      try {
+        candles = (await marketDataService.historicalCandles({
+          sourceId: source.id,
+          instrumentId: configuration.instrumentId,
+          timeframeId: timeframe.id,
+          from: configuration.startDate,
+          to: configuration.endDate,
+        })).filter(candle => candle.isClosed);
+        coverage = historicalCandleCoverage(candles, {
+          from: configuration.startDate,
+          to: configuration.endDate,
+          timeframeCode: timeframe.code,
+          timeframeDurationSeconds: timeframe.durationSeconds,
+        });
+      } catch (error) {
+        progressTimeframes[index] = {
+          ...progressTimeframes[index],
+          status: "failed",
+          coverageState: "partial",
+        };
+        throw error;
+      }
       progressTimeframes[index] = {
         ...progressTimeframes[index],
         status: "complete",
@@ -483,8 +495,8 @@ async function executeBacktestInternal(backtestId: number) {
       await setBacktestProgress(backtestId, {
         phase: "cancelled",
         message: error.message,
-        timeframes: [],
-        candlesDownloaded: 0,
+        timeframes: progressTimeframes,
+        candlesDownloaded: loadedSeries.reduce((total, series) => total + series.candles.length, 0),
         candlesTotal: null,
         processingIndex: null,
         processingTotal: null,
@@ -499,8 +511,8 @@ async function executeBacktestInternal(backtestId: number) {
       progress: {
         phase: "failed",
         message: publicBacktestError(error),
-        timeframes: [],
-        candlesDownloaded: 0,
+        timeframes: progressTimeframes,
+        candlesDownloaded: loadedSeries.reduce((total, series) => total + series.candles.length, 0),
         candlesTotal: null,
         processingIndex: null,
         processingTotal: null,
