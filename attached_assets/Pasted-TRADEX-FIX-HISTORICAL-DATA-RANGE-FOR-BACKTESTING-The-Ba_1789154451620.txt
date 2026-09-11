@@ -1,0 +1,406 @@
+TRADEX — FIX HISTORICAL DATA RANGE FOR BACKTESTING
+
+The Backtesting system has a historical-data problem.
+
+When I select a longer backtest period, the Backtest result may only process a small number of recent candles instead of the complete requested historical range.
+
+For example, selecting:
+
+Last 90 Days
+
+previously resulted in only:
+
+289 × 5-minute candles
+132 × 1-hour candles
+
+This is far too little data for a genuine 90-day backtest.
+
+Fix the underlying historical-data retrieval system so the date range selected by the user is actually respected throughout the entire backtesting pipeline.
+
+IMPORTANT:
+
+This must be a GENERAL FIX.
+
+Do NOT hard-code:
+
+- XAUUSD
+- Gold
+- 90 days
+- 5 minutes
+- 1 hour
+- Any particular strategy
+
+The fix must work for EVERY instrument, timeframe, strategy and date range.
+
+==================================================
+1. TRACE THE COMPLETE DATA FLOW
+==================================================
+
+Trace:
+
+Backtesting UI
+→ selected date range
+→ API request
+→ Backtest service
+→ MarketDataService
+→ provider adapter
+→ historical candle retrieval
+→ Backtest engine
+→ saved result
+
+Find exactly where the requested date range is being lost, truncated, limited or ignored.
+
+Do not simply change the number displayed in the UI.
+
+Fix the actual historical-data retrieval.
+
+==================================================
+2. ALL DATE RANGES
+==================================================
+
+The system must correctly support:
+
+- Last 7 Days
+- Last 30 Days
+- Last 90 Days
+- Custom ranges
+- Longer ranges such as 6 months
+- 1 year
+- Multiple years
+
+Do NOT assume 90 days is the maximum.
+
+The system should request whatever date range the user selects.
+
+For example:
+
+Last 7 Days
+→ retrieve the requested 7-day period.
+
+Last 90 Days
+→ retrieve the requested 90-day period.
+
+1 Year
+→ retrieve the requested 1-year period.
+
+Custom:
+01/01/2025 → 01/01/2026
+→ retrieve that exact period.
+
+==================================================
+3. PROVIDER LIMITS / PAGINATION
+==================================================
+
+Investigate whether the historical-data provider has limits such as:
+
+- maximum candles per request
+- maximum date range per request
+- pagination
+- request limits
+- timeframe-specific limits
+
+If the provider limits the amount of historical data returned per request, implement safe pagination or chunked requests through the existing MarketDataService.
+
+For example:
+
+A 1-year 5-minute request may require many separate historical-data requests.
+
+The system must:
+
+1. Request the first chunk.
+2. Request the next chunk.
+3. Continue until the entire requested range has been retrieved.
+4. Combine all candles.
+5. Remove duplicates.
+6. Sort chronologically.
+7. Pass the complete series to the Backtest engine.
+
+Do NOT silently stop after the first provider response.
+
+==================================================
+4. MULTI-TIMEFRAME BACKTESTING
+==================================================
+
+Preserve the existing multi-timeframe architecture.
+
+If a strategy uses:
+
+5M execution
++
+1H HTF conditions
+
+and the user requests a 1-year backtest:
+
+Retrieve the full required historical period for BOTH:
+
+- 5M
+- 1H
+
+The Backtest engine must receive complete chronological datasets.
+
+Preserve:
+
+- HTF/LTF alignment
+- Closed-candle-only logic
+- No look-ahead bias
+- Smallest timeframe as execution series
+- Condition-specific timeframes
+
+==================================================
+5. DATE RANGE VALIDATION
+==================================================
+
+Before running the backtest, validate the actual data returned.
+
+Check:
+
+- Requested start date
+- Requested end date
+- Earliest returned candle
+- Latest returned candle
+- Instrument
+- Timeframe
+- Candle count
+
+The system must verify that the historical data actually spans the requested period where market data should exist.
+
+Do not require an exact candle count because:
+
+- weekends
+- holidays
+- market closures
+- trading sessions
+- provider availability
+
+can legitimately create gaps.
+
+The important requirement is that the data spans the requested period.
+
+==================================================
+6. NEVER RUN A SILENTLY PARTIAL BACKTEST
+==================================================
+
+This is critical.
+
+If the user requests:
+
+90 days
+
+but the provider only returns:
+
+2 days
+
+the system MUST NOT run the backtest and label it as a 90-day test.
+
+Instead display a clear message such as:
+
+"Historical data only covers [actual available range]. The requested backtest cannot be completed."
+
+Likewise for a 1-year request.
+
+If only 3 months of historical data exists, do not pretend that a 1-year backtest was performed.
+
+==================================================
+7. BACKTEST RESULT METADATA
+==================================================
+
+Store/display:
+
+- Requested start date
+- Requested end date
+- Actual earliest candle
+- Actual latest candle
+- Instrument
+- Execution timeframe
+- All condition timeframes
+- Candle count for each timeframe
+
+This allows the user to verify exactly what data was used.
+
+==================================================
+8. CACHE
+==================================================
+
+Inspect historical-data caching.
+
+Make sure a smaller previously cached dataset cannot incorrectly satisfy a larger request.
+
+For example:
+
+Previous request:
+Last 7 Days
+
+New request:
+Last 90 Days
+
+The 7-day cached data must NOT be returned as the 90-day dataset.
+
+Cache keys must correctly account for:
+
+- Instrument
+- Timeframe
+- Start date
+- End date
+- Provider
+
+A larger requested range must retrieve additional data when required.
+
+==================================================
+9. LONG-RANGE PERFORMANCE
+==================================================
+
+For very long ranges such as:
+
+1 year
+3 years
+5 years
+
+avoid creating a single oversized provider request.
+
+Use safe chunking/pagination where required.
+
+Do not load unnecessary data outside the requested range.
+
+Do not fabricate candles.
+
+Do not duplicate candles.
+
+Do not silently truncate the requested period.
+
+==================================================
+10. REGRESSION TESTS
+==================================================
+
+Add automated tests for:
+
+- 7-day request
+- 30-day request
+- 90-day request
+- Custom date range
+- 6-month request
+- 1-year request
+- Multi-year request
+- Multiple provider pages/chunks
+- Multi-timeframe historical retrieval
+- Partial provider response
+- Provider returning no data
+- Cache containing a smaller range than requested
+- Duplicate candle removal
+- Chronological ordering
+- Correct start/end timestamps
+
+Verify that the requested date range is passed correctly from the UI all the way to the provider.
+
+==================================================
+11. REAL END-TO-END TEST
+==================================================
+
+After implementing the fix, perform a real backtest through the UI.
+
+Use:
+
+Strategy:
+Gold Reversal Strategy (1H Bias + 5M FVG Retest)
+
+Version:
+v1
+
+Instrument:
+XAUUSD
+
+Execution timeframe:
+5M
+
+Period:
+Last 90 Days
+
+Verify the actual resulting metadata.
+
+The 5M candle series must genuinely span the requested 90-day period, subject to legitimate market closures/session gaps.
+
+The 1H candle series must also genuinely span the requested period.
+
+Then test a longer range if the provider supports it.
+
+Do NOT consider the task complete simply because the UI displays "Last 90 Days".
+
+Inspect the actual earliest and latest candle timestamps used by the Backtest engine.
+
+==================================================
+12. PRESERVE EXISTING FUNCTIONALITY
+==================================================
+
+Do not break:
+
+- Strategy Builder
+- Build with AI
+- Trading Concept Library
+- Strategy Versioning
+- Multi-timeframe Backtesting
+- Liquidity Sweep
+- FVG
+- FVG Retest
+- BOS
+- CHoCH
+- MSS
+- Indicators
+- Markets
+- Alerts
+- Monitoring
+- Journal
+
+Do not change strategy logic to increase trade count.
+
+Do not change entry/exit rules.
+
+Do not fabricate historical data.
+
+Do not hide partial-data problems.
+
+Fix the historical-data retrieval system itself.
+
+==================================================
+13. VALIDATION
+==================================================
+
+Run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- Production builds
+- git diff --check
+
+Check browser and API logs for errors.
+
+Then perform the real 90-day UI test described above.
+
+==================================================
+FINAL REQUIREMENT
+==================================================
+
+The date range selected by the user must be the date range actually used by the Backtest engine.
+
+Examples:
+
+7 days selected
+→ approximately 7 days of available historical data
+
+30 days selected
+→ approximately 30 days
+
+90 days selected
+→ approximately 90 days
+
+1 year selected
+→ approximately 1 year
+
+3 years selected
+→ approximately 3 years
+
+subject only to legitimate market closures and the actual historical data available from the provider.
+
+If the provider cannot supply the requested range, clearly tell the user instead of silently running a partial backtest.
+
+The fix must be generic and must support future longer historical ranges without requiring another code change just because the user selects a larger date range.
