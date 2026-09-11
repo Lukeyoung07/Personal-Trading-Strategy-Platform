@@ -1,0 +1,534 @@
+TRADEX — STRATEGY BUILDER UI SIMPLIFICATION PASS
+
+I want you to simplify and reorganise the Strategy Builder again.
+
+DO NOT add more features.
+
+The problem is now usability: there is too much information visible at once, the sections aren't visually clear enough, and the Builder is still confusing for a beginner.
+
+The goal is to make it immediately obvious:
+
+1. What section I am in
+2. What I am currently setting up
+3. What I need to select
+4. What I have already added
+5. What I need to do next
+
+Keep the existing Strategy Builder functionality and Backtesting integration. This is primarily a UX/UI restructuring and simplification task.
+
+==================================================
+1. MAKE THE BUILDER FEEL LIKE A STEP-BY-STEP PROCESS
+==================================================
+
+Do NOT put every option on the screen at once.
+
+Organise the Builder into clearly separated numbered sections:
+
+01 — STRATEGY
+02 — ENTRY
+03 — CONFIRMATION
+04 — EXIT
+05 — RISK MANAGEMENT
+06 — REVIEW
+
+Each section should look clearly different from the others.
+
+Use a large section number and title.
+
+Example:
+
+01
+STRATEGY
+Set up the basic information for your strategy.
+
+[section content]
+
+Then:
+
+02
+ENTRY
+Define what needs to happen before entering a trade.
+
+[section content]
+
+This should make it extremely obvious where one section ends and the next begins.
+
+==================================================
+2. USE COLLAPSIBLE / DROPDOWN SECTIONS
+==================================================
+
+Use dropdown/accordion behaviour heavily.
+
+Only the section currently being worked on should be expanded by default.
+
+For example:
+
+▼ 01 STRATEGY
+   Strategy information
+
+▶ 02 ENTRY
+▶ 03 CONFIRMATION
+▶ 04 EXIT
+▶ 05 RISK MANAGEMENT
+▶ 06 REVIEW
+
+When I finish Strategy and open Entry, the Strategy section can collapse.
+
+This dramatically reduces scrolling.
+
+The user should NOT be presented with the entire Builder expanded at once.
+
+==================================================
+3. STRATEGY SECTION
+==================================================
+
+Keep this extremely simple.
+
+Show:
+
+Strategy name
+[ input ]
+
+Description
+[ optional input ]
+
+Market
+[ dropdown ]
+
+Direction
+[ dropdown ]
+
+Timeframe
+[ dropdown ]
+
+Do not show unnecessary technical information here.
+
+==================================================
+4. ENTRY SECTION
+==================================================
+
+This should be one of the main sections.
+
+Show a short explanation:
+
+"Entry conditions decide when your strategy can enter a trade."
+
+Then:
+
++ Add Entry Condition
+
+When adding a condition, use a dropdown-based flow.
+
+DO NOT display every possible field immediately.
+
+Use:
+
+Condition name
+[ input ]
+
+Trading concept
+[ dropdown ▼ ]
+
+When
+[ dropdown ▼ ]
+
+Direction
+[ dropdown ▼ ]
+
+Timeframe
+[ dropdown ▼ ]
+
+Rule
+[ dropdown ▼ ]
+
+Only show additional fields AFTER a relevant option has been selected.
+
+==================================================
+5. MAKE CONDITION CREATION MUCH SIMPLER
+==================================================
+
+The condition creator should feel like answering a few simple questions.
+
+Question 1:
+
+WHAT ARE YOU LOOKING FOR?
+
+[ Select trading concept ▼ ]
+
+Question 2:
+
+WHEN SHOULD IT MATTER?
+
+[ Entry ▼ ]
+
+Question 3:
+
+WHICH DIRECTION?
+
+[ Long ▼ ]
+
+Question 4:
+
+WHICH TIMEFRAME?
+
+[ 15M ▼ ]
+
+Question 5:
+
+WHAT SHOULD BE TRUE?
+
+[ Candle is bullish ▼ ]
+
+Then:
+
+[ Add Condition ]
+
+Do not show technical/backend terminology.
+
+==================================================
+6. CONDITION CARDS
+==================================================
+
+After adding a condition, hide the detailed editor.
+
+Show a compact card:
+
+ENTRY CONDITION
+
+Bullish Reversal Candle
+
+Liquidity Sweep
+LONG · 15M
+
+Candle is bullish
+
+✓ Backtest supported
+
+[ Edit ] [ Remove ]
+
+Do not show unnecessary metadata.
+
+If a condition isn't executable:
+
+⚠ Review required
+
+"Backtesting cannot currently execute this concept."
+
+Keep that explanation short.
+
+==================================================
+7. ENTRY CONDITIONS SHOULD BE COLLAPSIBLE
+==================================================
+
+If multiple entry conditions exist:
+
+ENTRY CONDITIONS
+
+Condition 1
+[compact card]
+
+Condition 2
+[compact card]
+
+Condition 3
+[compact card]
+
++ Add Entry Condition
+
+Do not create huge cards.
+
+==================================================
+8. CONFIRMATION SECTION
+==================================================
+
+Clearly separate this from Entry.
+
+Title:
+
+03
+CONFIRMATION
+
+Subtitle:
+
+"Additional conditions that confirm your setup."
+
+Use the exact same simplified condition creator.
+
++ Add Confirmation Condition
+
+Conditions appear underneath as compact cards.
+
+==================================================
+9. EXIT SECTION
+==================================================
+
+Clearly separate this from Confirmation.
+
+Title:
+
+04
+EXIT
+
+Subtitle:
+
+"Conditions that tell TradeX when the trade should be closed."
+
+Use the same simplified condition creator.
+
++ Add Exit Condition
+
+==================================================
+10. RISK MANAGEMENT
+==================================================
+
+Make this a completely separate section.
+
+Do NOT mix risk settings with conditions.
+
+Show only:
+
+Risk per trade
+[ 1% ▼ ]
+
+Risk / Reward
+[ 2:1 ▼ ]
+
+Stop Loss
+[ dropdown ▼ ]
+
+Take Profit
+[ dropdown ▼ ]
+
+Each option should have a very short explanation.
+
+Example:
+
+Risk per trade
+"The maximum amount you are willing to risk on one trade."
+
+==================================================
+11. REVIEW SHOULD BE SIMPLE
+==================================================
+
+The Review section should NOT dump every piece of technical information onto the screen.
+
+Instead show a clean summary:
+
+STRATEGY
+
+Liquidity Sweep Reversal
+XAUUSD
+Both
+4H · 15M · 5M
+
+ENTRY
+
+1. Liquidity Sweep
+   Long · 15M
+   Candle is bullish
+
+2. ...
+
+CONFIRMATION
+
+1. ...
+
+EXIT
+
+1. ...
+
+RISK
+
+1% risk
+2:1 risk/reward
+
+BACKTEST STATUS
+
+✓ Ready to backtest
+
+OR
+
+⚠ Review required
+
+with a simple explanation.
+
+==================================================
+12. CLEAR SECTION NAVIGATION
+==================================================
+
+Add a small progress/navigation indicator at the top:
+
+● Strategy
+○ Entry
+○ Confirmation
+○ Exit
+○ Risk
+○ Review
+
+The current section should be visually obvious.
+
+Allow the user to click completed sections to go back and edit them.
+
+==================================================
+13. IMPORTANT — DO NOT OVERDESIGN
+==================================================
+
+Keep the TradeX dark/purple design.
+
+Do NOT introduce:
+
+Grain
+Heavy gradients
+Huge glowing effects
+Massive cards
+Excessive borders
+Unnecessary animations
+Large decorative graphics
+
+Use the purple accent sparingly.
+
+The interface should feel clean, professional and easy to read.
+
+==================================================
+14. REDUCE VERTICAL SCROLLING
+==================================================
+
+This is important.
+
+The Builder currently takes too much vertical space.
+
+Use:
+
+Dropdowns
+Accordions
+Compact condition cards
+Two-column layouts where appropriate on desktop
+Stacked layouts on mobile
+
+Do NOT put every field into a giant vertical list.
+
+==================================================
+15. MOBILE
+==================================================
+
+The Builder must remain easy to use at:
+
+375px
+402px
+768px
+1440px
+
+On mobile:
+
+Stack fields vertically.
+
+Make dropdowns large enough to tap.
+
+Keep section headings visible.
+
+Do not create horizontal scrolling.
+
+==================================================
+16. PRESERVE EXISTING FUNCTIONALITY
+==================================================
+
+DO NOT break or remove:
+
+Strategy saving
+Strategy editing
+Strategy duplication
+Strategy versioning
+Immutable versions
+Version activation
+AI strategy drafts
+Review Strategy
+Backtesting compatibility
+Backtesting
+Strategy monitoring
+
+Do not change the underlying trading calculations.
+
+Do not change the Trading Concept Library.
+
+Do not invent new concepts.
+
+Do not invent new Backtesting rules.
+
+==================================================
+17. BACKTESTING COMPATIBILITY
+==================================================
+
+Keep the existing compatibility system.
+
+Every condition should clearly show:
+
+✓ Backtest supported
+
+or:
+
+⚠ Review required
+
+The user should understand this without knowing how the backend works.
+
+==================================================
+18. FINAL TEST
+==================================================
+
+After the UI changes, actually use the Builder.
+
+Create a test strategy:
+
+Name:
+Liquidity Sweep Reversal — XAUUSD
+
+Market:
+XAUUSD
+
+Direction:
+Both
+
+Timeframes:
+4H
+15M
+5M
+
+Add multiple conditions.
+
+Verify:
+
+- The sections are clearly separated.
+- Only the current section needs to be expanded.
+- Dropdowns work.
+- Conditions can be added.
+- Conditions can be edited.
+- Conditions can be removed.
+- Conditions remain in the correct section.
+- Saving works.
+- Reloading works.
+- Review works.
+- Backtest compatibility is correctly displayed.
+- Existing versioning still works.
+
+Test at:
+
+375px
+402px
+768px
+1440px
+
+Run the existing tests, typechecks and production build.
+
+IMPORTANT:
+
+Do not report this as complete simply because the application builds.
+
+Actually inspect the Builder visually and make sure a beginner can immediately understand:
+
+"Where am I?"
+"What am I choosing?"
+"What have I already added?"
+"What do I do next?"
+
+The final Builder should feel SIMPLE, CLEAR and EASY TO NAVIGATE.
+
+Do not add complexity to solve a complexity problem.
