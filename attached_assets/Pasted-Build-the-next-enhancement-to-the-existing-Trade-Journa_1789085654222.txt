@@ -1,0 +1,530 @@
+Build the next enhancement to the existing Trade Journal: a complete, clean Daily & Monthly Performance system.
+
+IMPORTANT:
+The previous Trade Journal/calendar implementation must be completed before starting this task.
+
+First inspect the current Journal implementation and reuse what already exists.
+
+Do NOT rebuild the Trade Journal.
+Do NOT replace existing functionality.
+Do NOT change existing P/L calculations.
+Do NOT change Backtesting calculations.
+Do NOT change AI functionality.
+Do NOT change Strategy Builder.
+Do NOT change Strategy Monitoring.
+Do NOT change Market Data.
+Do NOT change the existing strategy/version architecture.
+
+This task is specifically about making the existing Trade Journal and performance view more useful, polished and easy to navigate.
+
+==================================================
+1. MAIN JOURNAL LAYOUT
+==================================================
+
+Create a clean, professional Journal experience.
+
+The main Journal should have a simple hierarchy:
+
+TRADE JOURNAL
+
+Monthly summary
+↓
+Daily P/L calendar
+↓
+Selected-day details
+↓
+Monthly performance
+↓
+Existing trade list/history
+
+Do not overcrowd the page.
+
+The user should be able to understand their performance immediately without having to navigate through multiple complicated screens.
+
+Use the existing application's design system.
+
+Prioritise:
+
+- Clean
+- Modern
+- Minimal
+- Easy to navigate
+- Clear typography
+- Good spacing
+- Strong visual hierarchy
+- Responsive design
+- Beginner friendly
+
+Do not introduce unnecessary decorative UI.
+
+==================================================
+2. MONTHLY SUMMARY
+==================================================
+
+At the top of the Journal, show a compact monthly summary.
+
+Include:
+
+- Monthly P/L
+- Total trades
+- Win rate
+- Best day
+
+Where useful, also show:
+
+- Worst day
+- Average trading day
+
+All values must be calculated from REAL persisted Journal trades.
+
+Do not use mock data.
+
+Do not include backtest trades in Journal statistics.
+
+==================================================
+3. DAILY P/L CALENDAR
+==================================================
+
+Make the calendar the main visual focus of the Journal.
+
+Display the complete selected month.
+
+Example:
+
+September 2026
+
+< Previous       September 2026       Next >
+
+Calendar:
+
+Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday
+
+Each day should show:
+
+- Day number
+- Daily P/L when trades exist
+
+Example:
+
+12
++£8.42
+
+or:
+
+13
+-£3.17
+
+Days without trades should remain clean and visually quiet.
+
+Future days must not be presented as trading days with £0 performance.
+
+Positive and negative performance must be easy to distinguish.
+
+Do not rely solely on colour.
+
+==================================================
+4. MONTH NAVIGATION
+==================================================
+
+Allow the user to:
+
+- Move to previous month
+- Move to next month
+- Return to the current month
+
+Month navigation should be simple and obvious.
+
+Do not reload the entire application unnecessarily when changing months.
+
+The selected month should determine the calendar and monthly statistics.
+
+==================================================
+5. CLICKING A DAY
+==================================================
+
+When the user clicks a day containing trades, show a clean day-detail section.
+
+Display:
+
+- Full date
+- Daily P/L
+- Number of trades
+- Winning trades
+- Losing trades
+- Win rate
+- Average winner
+- Average loser
+- Best trade
+- Worst trade
+
+Then show the individual trades from that day.
+
+Reuse the existing Journal trade display wherever possible.
+
+Do not create duplicate trade data.
+
+==================================================
+6. DAILY NOTES
+==================================================
+
+Allow the user to optionally add a note to a specific trading day.
+
+Example:
+
+"Overtraded today and took two setups outside my strategy."
+
+Daily notes are separate from individual trade notes.
+
+The note must be persisted so it remains when the user returns to that date.
+
+Do not automatically generate notes.
+
+The user controls the content.
+
+==================================================
+7. MONTHLY PERFORMANCE CHART
+==================================================
+
+Add a clean monthly performance chart below the calendar.
+
+Show cumulative Journal P/L throughout the selected month.
+
+The chart should use the actual persisted Journal trades.
+
+For example:
+
+Day 1 → +£5
+Day 2 → +£3
+Day 3 → -£2
+
+Cumulative:
+
+Day 1 → +£5
+Day 2 → +£8
+Day 3 → +£6
+
+Use a simple, readable line chart.
+
+The chart should update automatically when:
+
+- Month changes
+- Journal trades change
+- A trade is edited
+- A trade is deleted where deletion is supported
+
+Do not use backtest data.
+
+Do not invent values.
+
+==================================================
+8. TRADING STREAKS
+==================================================
+
+Add a small performance section showing real trading-day streaks.
+
+Include:
+
+- Current winning/losing streak
+- Best winning streak
+- Best losing streak
+
+Define a winning day as a day with positive realised Journal P/L.
+
+Define a losing day as a day with negative realised Journal P/L.
+
+A day with no trades should not count as a winning or losing day.
+
+Clearly document/use consistent logic.
+
+==================================================
+9. BEST AND WORST DAYS
+==================================================
+
+Show:
+
+- Best trading day
+- Worst trading day
+- Average trading day
+
+Use actual Journal data for the selected month.
+
+If there are no completed trading days, show an appropriate empty state instead of fake values.
+
+==================================================
+10. STRATEGY PERFORMANCE
+==================================================
+
+Add a clean strategy-performance section.
+
+Show actual Journal performance grouped by strategy.
+
+Include:
+
+- Strategy
+- Number of trades
+- Win rate
+- Total P/L
+
+Where possible, allow the user to see performance by exact immutable strategy version.
+
+Example:
+
+Strategy A
+v1 → 12 trades → 58% → +£42
+
+v2 → 18 trades → 67% → +£87
+
+Do not modify the existing versioning architecture.
+
+Do not combine different strategy versions when exact version data is available.
+
+==================================================
+11. FILTERS
+==================================================
+
+Add optional filters without cluttering the main Journal.
+
+Allow filtering performance by:
+
+- Strategy
+- Strategy version
+- Instrument
+- Direction
+- Date range
+
+The calendar and performance statistics should update according to the selected filters.
+
+Keep filters hidden behind a clean filter control if necessary so the main Journal remains simple.
+
+Do not make filters mandatory.
+
+==================================================
+12. EXISTING TRADE JOURNAL
+==================================================
+
+Preserve the existing Journal trade list/history.
+
+The user must still be able to:
+
+- Create trades
+- Edit trades
+- View trades
+- Record stop loss
+- Record take profit
+- Record risk information
+- Associate strategies
+- Associate exact strategy versions
+- Add trade notes
+- Record opened/closed times
+
+Do not remove existing functionality.
+
+The new performance system should sit alongside the existing Journal.
+
+==================================================
+13. DATE CONSISTENCY
+==================================================
+
+Be extremely careful with date handling.
+
+Use the existing Journal's intended date semantics consistently.
+
+Because Journal trades have editable opened/closed date-times:
+
+- Determine which existing date field should control daily performance grouping.
+- Use that same definition consistently throughout:
+  - Calendar
+  - Daily statistics
+  - Monthly statistics
+  - Performance chart
+  - Streaks
+  - Best/worst days
+
+Do not silently change the meaning of existing trade dates.
+
+Handle:
+
+- Multiple trades on one day
+- Trades across month boundaries
+- Year boundaries
+- Different time zones according to the existing application's date handling
+- Trades with missing optional dates
+
+==================================================
+14. MOBILE DESIGN
+==================================================
+
+The Journal must be excellent on mobile.
+
+The calendar must:
+
+- Fit the screen
+- Remain readable
+- Have usable day cells
+- Avoid horizontal page overflow
+- Keep month navigation accessible
+
+The day-detail view should work naturally on mobile.
+
+Charts should resize correctly.
+
+Trade tables should remain usable without destroying the desktop layout.
+
+==================================================
+15. PERFORMANCE / DATA
+==================================================
+
+Use the existing API/database architecture.
+
+Do not duplicate large amounts of data unnecessarily.
+
+Where possible:
+
+- Reuse existing Journal queries
+- Reuse existing performance calculations
+- Reuse existing types
+- Avoid unnecessary API requests
+- Avoid recalculating large datasets in the browser if the existing architecture provides a better server-side approach
+
+Do not introduce unnecessary architectural changes.
+
+==================================================
+16. EMPTY STATES
+==================================================
+
+Make empty states useful.
+
+For a month with no Journal trades, show something like:
+
+"No journal trades recorded for this month."
+
+Do not show:
+
+- £0 as if the user traded
+- Fake trades
+- Fake performance
+- Fake charts
+
+The UI should clearly distinguish:
+
+- No trades
+- Losing performance
+- Zero P/L from actual trades
+
+==================================================
+17. DATA ACCURACY
+==================================================
+
+This feature must use REAL persisted Journal data.
+
+Never:
+
+- Create mock trades
+- Invent P/L
+- Use backtest trades
+- Mix backtest and Journal data
+- Modify existing trade results
+- Fabricate performance
+
+All statistics must reconcile with the underlying Journal trades.
+
+==================================================
+18. TESTING
+==================================================
+
+Test with real persisted Journal data where available.
+
+Verify:
+
+1. One profitable trade on a day.
+2. One losing trade on a day.
+3. Multiple trades on one day.
+4. Winning and losing trades on the same day.
+5. Multiple trading days.
+6. Month with no trades.
+7. Switching months.
+8. Switching years.
+9. Clicking a day.
+10. Daily statistics.
+11. Daily notes.
+12. Monthly P/L.
+13. Cumulative P/L chart.
+14. Winning/losing streaks.
+15. Best/worst day.
+16. Strategy performance.
+17. Strategy-version performance.
+18. Filters.
+19. Editing a Journal trade and confirming performance updates.
+20. Existing Journal functionality.
+21. Desktop layout.
+22. Mobile layout.
+
+Confirm that every displayed number can be traced back to actual persisted Journal data.
+
+==================================================
+19. REGRESSION PROTECTION
+==================================================
+
+Before finishing, confirm that these remain unchanged and functional:
+
+- AI Assistant
+- Review Strategy
+- Strategy Builder
+- Strategy Library
+- Strategy Versioning
+- Market Data
+- Strategy Monitoring
+- Alerts
+- Backtesting
+- Backtest Results
+- Existing Trade Journal functionality
+
+Do not make unrelated changes.
+
+==================================================
+20. TESTS AND BUILD
+==================================================
+
+Run:
+
+- Frontend tests
+- API tests where applicable
+- Shared tests where applicable
+- Frontend typecheck
+- API typecheck
+- Shared typecheck where applicable
+- Production builds
+- git diff --check
+
+Use real browser verification for:
+
+- Journal
+- Calendar
+- Day selection
+- Monthly navigation
+- Performance chart
+- Mobile Journal
+
+==================================================
+FINAL REPORT
+==================================================
+
+Report:
+
+1. What Journal functionality was added.
+2. How daily P/L is calculated.
+3. Which date field controls daily grouping.
+4. How monthly P/L is calculated.
+5. How streaks are calculated.
+6. How strategy/version performance is calculated.
+7. What filters were added.
+8. What mobile improvements were made.
+9. What tests passed.
+10. What typechecks passed.
+11. Whether production builds passed.
+12. Any remaining limitations.
+
+IMPORTANT:
+Do not claim anything is implemented unless it actually exists and has been verified.
+
+Do not change unrelated parts of the application.
