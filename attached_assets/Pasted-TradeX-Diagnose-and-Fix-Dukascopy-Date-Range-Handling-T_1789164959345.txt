@@ -1,0 +1,176 @@
+TradeX — Diagnose and Fix Dukascopy Date-Range Handling
+
+The background backtest system is working, and Dukascopy historical data has already been successfully verified for XAUUSD and USTEC.
+
+A new real backtest failed:
+
+Strategy:
+Gold Reversal Strategy (1H Bias + 5M FVG Retest) v1
+
+Instrument:
+XAUUSD
+
+Execution timeframe:
+5m
+
+Requested period:
+13 Jun 2026 – 12 Sept 2026
+
+Result:
+0 candles
+Dukascopy has no historical data for this request (400).
+
+Do NOT replace Dukascopy.
+Do NOT add a paid provider.
+Do NOT change the backtest engine.
+Do NOT change the strategy.
+Do NOT fabricate data.
+
+The purpose of this task is to determine exactly why Dukascopy returns HTTP 400 for this requested date range.
+
+1. Reproduce the failure
+
+Run the exact same historical requests used by the real backtest for:
+
+XAUUSD → XAU-USD → 5m
+13 Jun 2026 → 12 Sept 2026
+
+Also test the required 1h timeframe.
+
+Record:
+
+- exact Dukascopy endpoint
+- exact request parameters
+- response status
+- response body/error
+- requested start/end
+- whether the request crosses monthly boundaries
+- whether the issue occurs on 5m, 1h, or both
+
+2. Compare against known-working historical requests
+
+Test the same adapter using dates already proven to work, including:
+
+- September 2025 XAUUSD 5m
+- September 2025 XAUUSD 1h
+
+Then compare the request construction between the working and failing ranges.
+
+3. Check date-range handling
+
+Inspect whether the adapter is incorrectly:
+
+- formatting timestamps
+- handling UTC/month boundaries
+- calculating `from`/`to`
+- requesting an invalid Dukascopy monthly endpoint range
+- requesting future/unavailable candles
+- interpreting the current date incorrectly
+- treating a partially available range as completely unavailable
+- making an invalid request when the range crosses multiple months
+
+Do not assume the provider lacks the data until the actual request has been diagnosed.
+
+4. IMPORTANT: test the individual months
+
+For the failing period, test the historical data month-by-month:
+
+June 2026
+July 2026
+August 2026
+September 2026
+
+Use the exact required timeframes.
+
+Determine which month/months actually return data and which return HTTP 400.
+
+If Dukascopy has no data for a particular period, report that exact fact.
+
+If the data exists but our request is malformed, fix the request.
+
+5. Handle partially available ranges correctly
+
+If the requested backtest period includes dates for which Dukascopy genuinely has no candles:
+
+- Do not silently shorten the backtest.
+- Do not fabricate missing candles.
+- Do not claim complete coverage.
+- Report the actual available range clearly.
+
+If the requested range is available, retrieve the complete range and cache it.
+
+6. Preserve existing cache behavior
+
+Continue using:
+
+- cache-first loading
+- missing-range detection
+- sequential retrieval
+- throttling
+- Retry-After
+- exponential backoff
+- incremental persistence
+- deduplication
+- chronological ordering
+- complete coverage validation
+
+Do not redownload data already stored.
+
+7. Test the exact failed range again
+
+After the fix/diagnosis, run the actual Backtesting UI using:
+
+Gold Reversal Strategy (1H Bias + 5M FVG Retest)
+v1
+XAUUSD
+5m execution
+1h higher timeframe
+13 Jun 2026 – 12 Sept 2026
+
+Only mark it successful if the requested historical coverage is genuinely available and the backtest actually runs.
+
+If Dukascopy genuinely does not provide this date range, do not force it to run. Instead make the UI clearly report the actual available historical range and why the requested range cannot be completed.
+
+8. Test a future-proof range
+
+Also test:
+
+- 90 days
+- 6 months
+- 1 year
+
+using dates that are actually historical relative to the current date.
+
+Do not hard-code a specific year or date range.
+
+9. USTEC regression
+
+Ensure the fix does not break:
+
+USTEC → USATECH.IDX-USD
+
+and its existing verified historical retrieval.
+
+10. Testing
+
+Run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- API production build
+- Frontend production build
+- git diff --check
+
+Finally report:
+
+- exact cause of the HTTP 400
+- whether the requested June–September 2026 range actually exists at Dukascopy
+- which months returned data
+- which timeframes returned data
+- what was changed
+- whether the exact backtest now runs
+- actual candle counts and coverage if successful
+
+Do not claim the issue is fixed unless the actual failing backtest has been reproduced and resolved.
