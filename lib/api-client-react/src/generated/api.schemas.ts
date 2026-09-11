@@ -1873,6 +1873,8 @@ export interface BacktestTimeframeSummary {
   code: string;
   label: string;
   candlesProcessed: number;
+  earliestCandle: string;
+  latestCandle: string;
   isExecutionTimeframe: boolean;
 }
 

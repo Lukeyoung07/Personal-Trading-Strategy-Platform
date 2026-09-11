@@ -11,5 +11,7 @@ export interface BacktestTimeframeSummary {
   code: string;
   label: string;
   candlesProcessed: number;
+  earliestCandle: Date;
+  latestCandle: Date;
   isExecutionTimeframe: boolean;
 }

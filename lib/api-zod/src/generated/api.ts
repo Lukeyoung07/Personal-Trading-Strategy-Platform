@@ -2363,6 +2363,8 @@ export const ListBacktestsResponseItem = zod.object({
   "code": zod.string(),
   "label": zod.string(),
   "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date(),
+  "latestCandle": zod.coerce.date(),
   "isExecutionTimeframe": zod.boolean()
 })).optional().describe('Actual provider candle series loaded for this run, including each condition timeframe.'),
   "resultMessage": zod.string().nullable(),
@@ -2419,6 +2421,8 @@ export const CreateBacktestResponse = zod.object({
   "code": zod.string(),
   "label": zod.string(),
   "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date(),
+  "latestCandle": zod.coerce.date(),
   "isExecutionTimeframe": zod.boolean()
 })).optional().describe('Actual provider candle series loaded for this run, including each condition timeframe.'),
   "resultMessage": zod.string().nullable(),
@@ -2465,6 +2469,8 @@ export const GetBacktestResponse = zod.object({
   "code": zod.string(),
   "label": zod.string(),
   "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date(),
+  "latestCandle": zod.coerce.date(),
   "isExecutionTimeframe": zod.boolean()
 })).optional().describe('Actual provider candle series loaded for this run, including each condition timeframe.'),
   "resultMessage": zod.string().nullable(),
@@ -2511,6 +2517,8 @@ export const RunBacktestResponse = zod.object({
   "code": zod.string(),
   "label": zod.string(),
   "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date(),
+  "latestCandle": zod.coerce.date(),
   "isExecutionTimeframe": zod.boolean()
 })).optional().describe('Actual provider candle series loaded for this run, including each condition timeframe.'),
   "resultMessage": zod.string().nullable(),
@@ -2590,6 +2598,8 @@ export const GetBacktestResultsResponse = zod.object({
   "code": zod.string(),
   "label": zod.string(),
   "candlesProcessed": zod.number().int(),
+  "earliestCandle": zod.coerce.date(),
+  "latestCandle": zod.coerce.date(),
   "isExecutionTimeframe": zod.boolean()
 })).optional().describe('Actual provider candle series loaded for this run, including each condition timeframe.'),
   "resultMessage": zod.string().nullable(),

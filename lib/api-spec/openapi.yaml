@@ -2541,12 +2541,14 @@ components:
         createdAt: { type: string, format: date-time }
     BacktestTimeframeSummary:
       type: object
-      required: [timeframeId, code, label, candlesProcessed, isExecutionTimeframe]
+      required: [timeframeId, code, label, candlesProcessed, earliestCandle, latestCandle, isExecutionTimeframe]
       properties:
         timeframeId: { type: integer }
         code: { type: string }
         label: { type: string }
         candlesProcessed: { type: integer }
+        earliestCandle: { type: string, format: date-time }
+        latestCandle: { type: string, format: date-time }
         isExecutionTimeframe: { type: boolean }
     BacktestTrade:
       type: object

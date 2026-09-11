@@ -507,12 +507,13 @@ export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRun
             ["Completed", dateTime(backtest.completedAt)],
           ].map(([label, value]) => <div key={label} data-testid={`metadata-${label.toLowerCase()}`}><div className="eyebrow">{label}</div><div className="text-xs font-semibold mt-2 leading-relaxed">{value}</div></div>)}
         </div>
-         {timeframeSummaries.length > 1 && <div className="border-t border-border mt-5 pt-4" data-testid="backtest-timeframe-breakdown">
-           <div className="eyebrow mb-3">Causal timeframe coverage</div>
+         {timeframeSummaries.length > 0 && <div className="border-t border-border mt-5 pt-4" data-testid="backtest-timeframe-breakdown">
+            <div className="eyebrow mb-3">Historical data coverage</div>
            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
              {timeframeSummaries.map(timeframe => <div key={timeframe.timeframeId} className="rounded-md bg-secondary/60 px-3 py-2">
                <div className="text-xs font-semibold">{timeframe.label}{timeframe.isExecutionTimeframe ? " · execution series" : " · condition series"}</div>
                <div className="text-[11px] text-muted-foreground mt-1">{timeframe.candlesProcessed} completed candles loaded</div>
+                <div className="text-[10px] text-muted-foreground mt-1">{dateTime(timeframe.earliestCandle)} → {dateTime(timeframe.latestCandle)}</div>
              </div>)}
            </div>
          </div>}

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, max, min } from "drizzle-orm";
 import {
   backtestCandlesTable,
   backtestConfigurationsTable,
@@ -17,7 +17,7 @@ import {
   CreateBacktestResponse,
   ListBacktestsResponse,
 } from "@workspace/api-zod";
-import { marketDataService } from "../services/market-data";
+import { historicalCandleCoverage, marketDataService } from "../services/market-data";
 import { runHistoricalBacktest, validateHistoricalBacktestStrategy, type BacktestCondition, type HistoricalBacktestInput } from "../services/backtest-engine";
 import { calculateBacktestStatistics } from "../services/backtest-results";
 
@@ -50,16 +50,34 @@ async function timeframeSummariesForBacktest(id: number) {
     code: timeframesTable.code,
     label: timeframesTable.label,
     durationSeconds: timeframesTable.durationSeconds,
-    candles: backtestCandlesTable.id,
+    candlesProcessed: count(backtestCandlesTable.id),
+    earliestCandle: min(backtestCandlesTable.openTime),
+    latestCandle: max(backtestCandlesTable.openTime),
   }).from(backtestCandlesTable)
     .innerJoin(timeframesTable, eq(backtestCandlesTable.timeframeId, timeframesTable.id))
-    .where(eq(backtestCandlesTable.backtestId, id));
-  const summaries = new Map<string, { timeframeId: number; code: string; label: string; durationSeconds: number; candlesProcessed: number }>();
+    .where(eq(backtestCandlesTable.backtestId, id))
+    .groupBy(timeframesTable.id, timeframesTable.code, timeframesTable.label, timeframesTable.durationSeconds);
+  const summaries = new Map<string, {
+    timeframeId: number;
+    code: string;
+    label: string;
+    durationSeconds: number;
+    candlesProcessed: number;
+    earliestCandle: Date;
+    latestCandle: Date;
+  }>();
   for (const row of rows) {
     const key = timeframeKey(row.code);
-    const summary = summaries.get(key) || { timeframeId: row.timeframeId, code: row.code, label: row.label, durationSeconds: row.durationSeconds, candlesProcessed: 0 };
-    summary.candlesProcessed += 1;
-    summaries.set(key, summary);
+    if (!row.earliestCandle || !row.latestCandle) continue;
+    summaries.set(key, {
+      timeframeId: row.timeframeId,
+      code: row.code,
+      label: row.label,
+      durationSeconds: row.durationSeconds,
+      candlesProcessed: Number(row.candlesProcessed),
+      earliestCandle: row.earliestCandle,
+      latestCandle: row.latestCandle,
+    });
   }
   const ordered = [...summaries.values()].sort((left, right) => left.durationSeconds - right.durationSeconds);
   return ordered.map((summary, index) => ({
@@ -67,13 +85,15 @@ async function timeframeSummariesForBacktest(id: number) {
     code: summary.code,
     label: summary.label,
     candlesProcessed: summary.candlesProcessed,
+    earliestCandle: summary.earliestCandle,
+    latestCandle: summary.latestCandle,
     isExecutionTimeframe: index === 0,
   }));
 }
 
 function publicBacktestError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
-  if (/not compatible|insufficient historical data|not configured|no longer exists|no executable|not supported|risk rules mention/i.test(message)) {
+  if (/not compatible|insufficient historical data|historical data for|pagination did not reach|not configured|no longer exists|no executable|not supported|risk rules mention/i.test(message)) {
     return message;
   }
   return "Historical backtest failed while retrieving market data or saving results.";
@@ -85,7 +105,13 @@ function backtestView(row: {
   versionNumber: number;
   instrumentSymbol: string;
   timeframeLabel: string;
-  timeframeSummaries?: Array<{ code: string; label: string; candlesProcessed: number }>;
+  timeframeSummaries?: Array<{
+    code: string;
+    label: string;
+    candlesProcessed: number;
+    earliestCandle: Date;
+    latestCandle: Date;
+  }>;
   statistics?: ReturnType<typeof calculateBacktestStatistics>;
 }) {
   const statistics = row.statistics;
@@ -198,18 +224,28 @@ async function executeBacktestInternal(backtestId: number) {
       if (!match) throw new Error(`The strategy references an unavailable timeframe: ${code}.`);
       return match;
     });
-    const series = await Promise.all(requestedTimeframes.map(async timeframe => ({
-      code: timeframe.code,
-      durationSeconds: timeframe.durationSeconds,
-      candles: (await marketDataService.historicalCandles({
+    const loadedSeries = await Promise.all(requestedTimeframes.map(async timeframe => {
+      const candles = (await marketDataService.historicalCandles({
         sourceId: source.id,
         instrumentId: configuration.instrumentId,
         timeframeId: timeframe.id,
         from: configuration.startDate,
         to: configuration.endDate,
       })).filter(candle => candle.isClosed),
-    })));
-    const executionTimeframe = [...series].sort((left, right) => left.durationSeconds - right.durationSeconds)[0];
+      coverage = historicalCandleCoverage(candles, {
+        from: configuration.startDate,
+        to: configuration.endDate,
+        timeframeCode: timeframe.code,
+        timeframeDurationSeconds: timeframe.durationSeconds,
+      });
+      return {
+        code: timeframe.code,
+        durationSeconds: timeframe.durationSeconds,
+        candles,
+        coverage,
+      };
+    }));
+    const executionTimeframe = [...loadedSeries].sort((left, right) => left.durationSeconds - right.durationSeconds)[0];
     if (!executionTimeframe?.candles.length) {
       throw new Error("Insufficient historical data for the selected instrument and period.");
     }
@@ -222,12 +258,12 @@ async function executeBacktestInternal(backtestId: number) {
       conditions: engineConditions,
     }, {
       executionTimeframe: executionTimeframe.code,
-      series: series.map(({ code, candles: seriesCandles }) => ({ code, candles: seriesCandles })),
+      series: loadedSeries.map(({ code, candles: seriesCandles }) => ({ code, candles: seriesCandles })),
     } satisfies HistoricalBacktestInput);
     const completedAt = new Date();
 
     await db.transaction(async tx => {
-      const candleRows = series.flatMap(timeframe => timeframe.candles.map(candle => ({
+       const candleRows = loadedSeries.flatMap(timeframe => timeframe.candles.map(candle => ({
           backtestId,
           sourceId: source.id,
           instrumentId: configuration.instrumentId,

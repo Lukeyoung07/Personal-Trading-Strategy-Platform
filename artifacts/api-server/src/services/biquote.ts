@@ -260,6 +260,7 @@ class BiQuoteAdapter implements MarketDataProviderAdapter {
         low?: unknown;
         close?: unknown;
         volume?: unknown;
+          isOpen?: unknown;
       }>;
     }>(`/api/${encodeURIComponent(request.providerSymbol)}/ohlc`, query);
 
@@ -282,7 +283,7 @@ class BiQuoteAdapter implements MarketDataProviderAdapter {
           low,
           close,
           volume: finiteNumber(bar.volume),
-          isClosed: true,
+          isClosed: bar.isOpen !== true,
           receivedAt,
         };
       })

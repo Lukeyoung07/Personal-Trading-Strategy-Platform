@@ -76,6 +76,22 @@ export interface MarketDataProviderAdapter {
   sessions?(providerSymbol: string, at: Date): Promise<MarketSession[]>;
 }
 
+export interface HistoricalCandleCollectionRequest {
+  adapter: Pick<MarketDataProviderAdapter, "candles">;
+  providerSymbol: string;
+  timeframeCode: string;
+  timeframeDurationSeconds: number;
+  from?: Date;
+  to?: Date;
+  limit?: number;
+}
+
+export interface HistoricalCandleCoverage {
+  candlesProcessed: number;
+  earliestCandle: Date;
+  latestCandle: Date;
+}
+
 export interface CanonicalCandleRequest {
   sourceId: number;
   instrumentId: number;
@@ -112,6 +128,116 @@ function validateQuote(quote: NormalizedProviderQuote) {
   if (values.every(value => value == null)) throw new Error("Quote contains no price or size values");
   if (values.some(value => value != null && !Number.isFinite(value))) throw new Error("Quote values must be finite numbers");
   if (quote.eventTime.getTime() > quote.receivedAt.getTime()) throw new Error("Quote event time is after its received time");
+}
+
+const PROVIDER_PAGE_SIZE = 1_000;
+const MAX_HISTORICAL_PAGES = 100_000;
+const MARKET_CLOSURE_BOUNDARY_TOLERANCE_MS = 4 * 24 * 60 * 60 * 1_000;
+
+/**
+ * Providers may return fewer than the requested page size even when more
+ * history exists. Pagination therefore stops only when the requested end is
+ * reached, a page is empty, or the provider stops moving forward.
+ */
+export async function collectHistoricalCandles(request: HistoricalCandleCollectionRequest) {
+  const totalLimit = request.limit ?? (request.to ? Number.POSITIVE_INFINITY : 200_000);
+  if (totalLimit <= 0) return [];
+
+  const collected = new Map<number, NormalizedCandle>();
+  let fromCursor = request.from;
+  let toCursor = request.to;
+  let direction: "forward" | "backward" | null = null;
+  let pages = 0;
+
+  while (collected.size < totalLimit) {
+    if (pages >= MAX_HISTORICAL_PAGES) {
+      throw new Error("Historical provider pagination did not reach the requested end date.");
+    }
+
+    const batch = await request.adapter.candles({
+      providerSymbol: request.providerSymbol,
+      timeframeCode: request.timeframeCode,
+      from: fromCursor,
+      to: toCursor,
+      limit: Math.min(PROVIDER_PAGE_SIZE, totalLimit - collected.size),
+    });
+    pages += 1;
+    batch.forEach(validateCandle);
+
+    const filteredBatch = batch.filter(candle => (!request.from || candle.openTime >= request.from)
+      && (!request.to || candle.openTime <= request.to));
+    const latest = filteredBatch.reduce<Date | null>(
+      (value, candle) => !value || candle.openTime > value ? candle.openTime : value,
+      null,
+    );
+    const earliest = filteredBatch.reduce<Date | null>(
+      (value, candle) => !value || candle.openTime < value ? candle.openTime : value,
+      null,
+    );
+
+    for (const candle of filteredBatch) {
+      // A provider page boundary can repeat its last candle. The later copy
+      // is equivalent data, so retain one normalized candle per open time.
+      collected.set(candle.openTime.getTime(), candle);
+    }
+
+    if (!batch.length || !latest) break;
+    if (!earliest) break;
+
+    if (direction == null) {
+      const durationMs = request.timeframeDurationSeconds * 1_000;
+      const providerStartedAtRequestedBoundary = !request.from
+        || earliest.getTime() <= request.from.getTime() + durationMs * 2;
+      direction = providerStartedAtRequestedBoundary ? "forward" : "backward";
+    }
+
+    if (direction === "forward") {
+      if (request.to && latest >= request.to) break;
+      const nextCursor = new Date(latest.getTime() + request.timeframeDurationSeconds * 1_000);
+      if (fromCursor && nextCursor <= fromCursor) break;
+      fromCursor = nextCursor;
+    } else {
+      if (request.from && earliest <= request.from) break;
+      const nextCursor = new Date(earliest.getTime() - request.timeframeDurationSeconds * 1_000);
+      if (toCursor && nextCursor >= toCursor) break;
+      toCursor = nextCursor;
+    }
+  }
+
+  return [...collected.values()].sort((left, right) => left.openTime.getTime() - right.openTime.getTime());
+}
+
+export function historicalCandleCoverage(
+  candles: NormalizedCandle[],
+  request: Pick<HistoricalCandleCollectionRequest, "from" | "to" | "timeframeCode" | "timeframeDurationSeconds">,
+): HistoricalCandleCoverage {
+  const ordered = [...candles].sort((left, right) => left.openTime.getTime() - right.openTime.getTime());
+  const earliestCandle = ordered[0]?.openTime;
+  const latestCandle = ordered.at(-1)?.openTime;
+  if (!earliestCandle || !latestCandle) {
+    throw new Error(`Historical data for ${request.timeframeCode} contains no candles in the requested period.`);
+  }
+
+  if (request.from && request.to) {
+    const boundaryTolerance = Math.max(
+      MARKET_CLOSURE_BOUNDARY_TOLERANCE_MS,
+      request.timeframeDurationSeconds * 2 * 1_000,
+    );
+    const startsTooLate = earliestCandle.getTime() - request.from.getTime() > boundaryTolerance;
+    const endsTooEarly = request.to.getTime() - latestCandle.getTime() > boundaryTolerance;
+    if (startsTooLate || endsTooEarly) {
+      throw new Error(
+        `Historical data for ${request.timeframeCode} only covers ${earliestCandle.toISOString()} to ${latestCandle.toISOString()}; `
+        + `the requested backtest range is ${request.from.toISOString()} to ${request.to.toISOString()}.`,
+      );
+    }
+  }
+
+  return {
+    candlesProcessed: ordered.length,
+    earliestCandle,
+    latestCandle,
+  };
 }
 
 /**
@@ -191,41 +317,15 @@ export class MarketDataService {
       throw new Error("The selected market-data provider does not support historical candles");
     }
 
-    const totalLimit = request.limit ?? 200_000;
-    const collected = new Map<number, NormalizedCandle>();
-    let cursor = request.from;
-    let batches = 0;
-    while (collected.size < totalLimit && batches < 2_000) {
-      const batch = await adapter.candles({
-        providerSymbol: mapping.providerSymbol,
-        timeframeCode: timeframe.code,
-        from: cursor,
-        to: request.to,
-        limit: Math.min(1_000, totalLimit - collected.size),
-      });
-      batch.forEach(validateCandle);
-      const filteredBatch = batch.filter(candle => (!request.from || candle.openTime >= request.from!)
-        && (!request.to || candle.openTime <= request.to!));
-      const before = collected.size;
-      filteredBatch.forEach(candle => {
-        const timestamp = candle.openTime.getTime();
-        if (collected.has(timestamp)) throw new Error("Historical provider data contains duplicate candle timestamps");
-        collected.set(timestamp, candle);
-      });
-      const latest = filteredBatch.reduce<Date | null>((value, candle) => !value || candle.openTime > value ? candle.openTime : value, null);
-      if (!latest || collected.size === before || !request.to || latest >= request.to || batch.length < 1_000) break;
-      cursor = new Date(latest.getTime() + timeframe.durationSeconds * 1_000);
-      batches += 1;
-    }
-    const filtered = [...collected.values()]
-      .sort((a, b) => a.openTime.getTime() - b.openTime.getTime());
-    const seen = new Set<number>();
-    for (const candle of filtered) {
-      const timestamp = candle.openTime.getTime();
-      if (seen.has(timestamp)) throw new Error("Historical provider data contains duplicate candle timestamps");
-      seen.add(timestamp);
-    }
-    return filtered;
+    return collectHistoricalCandles({
+      adapter,
+      providerSymbol: mapping.providerSymbol,
+      timeframeCode: timeframe.code,
+      timeframeDurationSeconds: timeframe.durationSeconds,
+      from: request.from,
+      to: request.to,
+      limit: request.limit,
+    });
   }
 
   async *streamQuotes(request: CanonicalQuoteRequest): AsyncIterable<CanonicalQuote> {
