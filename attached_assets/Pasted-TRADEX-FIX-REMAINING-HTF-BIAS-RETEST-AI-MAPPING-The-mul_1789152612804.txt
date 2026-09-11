@@ -1,0 +1,340 @@
+TRADEX — FIX REMAINING HTF BIAS + RETEST AI MAPPING
+
+The multi-timeframe backtesting engine has now been implemented and is working.
+
+Do NOT redesign the application.
+
+Do NOT undo the existing multi-timeframe implementation.
+
+Do NOT change the existing executable FVG/FVG Retest implementation.
+
+Do NOT fabricate support.
+
+The remaining issue is specifically the AI → Builder mapping shown by this request:
+
+"Create a reversal strategy for Gold using a 1H higher-timeframe bullish/bearish bias, followed by a 5M Fair Value Gap Retest confirmation. Trade both long and short."
+
+The generated draft currently says:
+
+- 1H HTF Structure is supported
+- 1H HTF Liquidity is supported
+- 5M Fair Value Gap Retest is supported
+- BUT "Retest" is marked Review required
+- AND "Higher-timeframe bias" is marked Review required
+- Entry contains 0 conditions
+- Confirmation contains 3 conditions
+
+This needs to be fixed.
+
+==================================================
+1. FIX "RETEST"
+==================================================
+
+The existing TradeX executable concept is:
+
+Fair Value Gap Retest
+
+The AI must not create a generic unsupported concept called:
+
+Retest
+
+when the user explicitly asks for:
+
+FVG Retest
+Fair Value Gap Retest
+Fair Value Gap retest
+
+Map all of these to the existing canonical executable FVG Retest definition.
+
+The resulting Builder condition must contain:
+
+Concept:
+Fair Value Gap
+
+Formation:
+Retest
+
+with the existing FVG Retest structured parameters.
+
+Do NOT create a new duplicate "Retest" concept.
+
+Do NOT mark the resulting FVG Retest condition as Review required if the existing FVG Retest implementation supports it.
+
+==================================================
+2. FIX "HIGHER-TIMEFRAME BIAS"
+==================================================
+
+The AI currently creates a conceptual "Higher-timeframe bias" requirement but the Builder does not have a properly mapped executable condition for it.
+
+Inspect the existing executable concepts and multi-timeframe architecture.
+
+If HTF bias can be deterministically represented using the existing executable market-structure concepts, map the user's request to those actual concepts.
+
+For example:
+
+Bullish HTF bias
+→ an executable bullish HTF structure condition
+
+Bearish HTF bias
+→ an executable bearish HTF structure condition
+
+Do NOT invent a new backtesting rule simply to remove the warning.
+
+Do NOT automatically convert HTF bias into a candle direction condition unless that is the actual intended TradeX definition.
+
+If "Higher Timeframe Structure" is already an executable concept in the current implementation, use that canonical definition.
+
+The important requirement is:
+
+AI request
+→ canonical executable HTF condition
+→ correct timeframe
+→ correct direction
+→ multi-timeframe backtest
+
+==================================================
+3. DIRECTION
+==================================================
+
+The request says:
+
+"Trade both long and short."
+
+The generated strategy must preserve both directions.
+
+For the bullish side:
+
+1H:
+Bullish HTF bias
+
+5M:
+Bullish FVG Retest
+
+→ Long setup
+
+For the bearish side:
+
+1H:
+Bearish HTF bias
+
+5M:
+Bearish FVG Retest
+
+→ Short setup
+
+Do not allow a bullish HTF condition to accidentally generate short trades.
+
+Do not allow a bearish HTF condition to accidentally generate long trades.
+
+==================================================
+4. BUILDER STRUCTURE
+==================================================
+
+The generated draft should be represented cleanly.
+
+Example:
+
+ENTRY / HTF
+
+Concept:
+Higher Timeframe Structure
+
+Timeframe:
+1H
+
+Direction:
+Long / Bullish
+
+Compatibility:
+Backtest supported
+
+CONFIRMATION / LTF
+
+Concept:
+Fair Value Gap
+
+Formation:
+Retest
+
+Timeframe:
+5M
+
+Direction:
+Bullish
+
+Compatibility:
+Backtest supported
+
+And equivalent bearish conditions where required.
+
+Do not create meaningless extra conditions.
+
+==================================================
+5. NO FALSE REVIEW WARNINGS
+==================================================
+
+For the exact request:
+
+"Create a reversal strategy for Gold using a 1H higher-timeframe bullish/bearish bias, followed by a 5M Fair Value Gap Retest confirmation. Trade both long and short."
+
+The draft should NOT show:
+
+Review required
+
+for:
+
+- Retest
+- Higher-timeframe bias
+
+provided the mapped underlying concepts are genuinely executable.
+
+==================================================
+6. DO NOT BREAK MULTI-TIMEFRAME BACKTESTING
+==================================================
+
+The existing multi-timeframe engine must remain unchanged unless a small integration change is genuinely required.
+
+Preserve:
+
+- Correct timeframe-specific historical candles
+- Closed candles only
+- No look-ahead bias
+- HTF/LTF candle alignment
+- Smallest-timeframe execution series
+- Multiple timeframe loading
+- Per-timeframe candle metadata
+- Version-specific conditions
+
+==================================================
+7. EXACT REGRESSION TEST
+
+Run the exact AI request:
+
+"Create a reversal strategy for Gold using a 1H higher-timeframe bullish/bearish bias, followed by a 5M Fair Value Gap Retest confirmation. Trade both long and short."
+
+Expected:
+
+Market:
+XAUUSD
+
+Direction:
+both
+
+Timeframes:
+1H
+5M
+
+HTF:
+1H executable bullish/bearish structure/bias condition
+
+LTF:
+5M executable FVG Retest condition
+
+No false review warnings for generic "Retest" or "Higher-timeframe bias".
+
+==================================================
+8. END-TO-END TEST
+
+Create a temporary strategy through the actual Builder UI.
+
+Verify:
+
+AI generation
+↓
+Review draft
+↓
+Builder
+↓
+Save
+↓
+Version
+↓
+Activate
+↓
+Backtest
+
+Run it with real historical data.
+
+Verify:
+
+- 1H candles are actually loaded
+- 5M candles are actually loaded
+- HTF condition uses 1H
+- FVG Retest uses 5M
+- Bullish conditions generate only long setups
+- Bearish conditions generate only short setups
+- No look-ahead bias
+- No fabricated data
+- Zero trades is valid if conditions never align
+
+Delete the temporary strategy after testing.
+
+==================================================
+9. REGRESSION
+
+Preserve all existing functionality:
+
+- Liquidity Sweep
+- FVG
+- FVG Retest
+- BOS
+- CHoCH
+- MSS
+- EMA
+- SMA
+- RSI
+- MACD
+- VWAP
+- ATR
+- Breakout
+- Price action concepts
+- Strategy Builder
+- Build with AI
+- Multi-timeframe Backtesting
+- Strategy Versioning
+- Markets
+- Alerts
+- Monitoring
+- Journal
+
+Run all existing:
+
+- Frontend tests
+- API tests
+- Typechecks
+- Production builds
+- git diff --check
+
+Check browser console.
+
+==================================================
+FINAL REQUIREMENT
+==================================================
+
+Do not simply remove the warning text.
+
+Fix the underlying mapping.
+
+The final flow must be:
+
+User request
+↓
+AI understands HTF bias + FVG Retest
+↓
+AI maps to canonical executable concepts
+↓
+Builder receives structured conditions
+↓
+Correct 1H + 5M timeframes
+↓
+Correct long/short directions
+↓
+Multi-timeframe Backtesting evaluates them
+↓
+Real historical results
+
+Do not create duplicate concepts.
+
+Do not create generic unsupported "Retest" rules.
+
+Do not falsely mark unsupported concepts as executable.
