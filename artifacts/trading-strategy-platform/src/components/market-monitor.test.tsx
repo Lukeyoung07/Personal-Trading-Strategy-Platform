@@ -205,6 +205,8 @@ describe("Market Monitor live state", () => {
     });
     render(<MarketMonitor />);
     const chart = await screen.findByRole("img", { name: "BiQuote candlestick chart" });
+    expect(chart.querySelectorAll('[data-testid="chart-price-high"], [data-testid^="chart-price-tick-"], [data-testid="chart-price-low"]').length).toBe(5);
+    expect(chart.querySelectorAll('[data-testid^="chart-time-tick-"]').length).toBe(6);
     Object.defineProperty(chart, "getBoundingClientRect", {
       configurable: true,
       value: () => ({ left: 0, top: 0, width: 900, height: 360, right: 900, bottom: 360 }),
