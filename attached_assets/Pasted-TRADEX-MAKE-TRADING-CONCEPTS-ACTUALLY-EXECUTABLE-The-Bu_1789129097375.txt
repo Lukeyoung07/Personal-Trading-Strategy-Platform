@@ -1,0 +1,387 @@
+TRADEX — MAKE TRADING CONCEPTS ACTUALLY EXECUTABLE
+
+The Build with AI feature is now correctly understanding strategy requests and handing them into the Strategy Builder.
+
+However, there is still a major problem.
+
+When I ask:
+
+"Create me a reversal strategy for Gold using liquidity sweeps and Fair Value Gaps. Use 15m for the main setup and 5m for confirmation. Trade both long and short."
+
+TradeX correctly creates:
+
+Market: XAUUSD
+Direction: Both
+Timeframes: 15m + 5m
+Entry: Liquidity Sweep
+Confirmation: Fair Value Gap Retest
+
+BUT it then says:
+
+"Liquidity sweeps and FVGs are not currently supported as exact historical rules"
+
+and marks them:
+
+Review required
+
+I do NOT want to fix this by making the AI hide the problem.
+
+I want the actual Strategy Builder / strategy-condition system to support these concepts properly so they can become genuine strategy conditions.
+
+==================================================
+IMPORTANT
+==================================================
+
+Do not redesign the existing TradeX UI.
+
+Do not remove the Trading Concept Library.
+
+Do not remove the existing concepts.
+
+Do not silently convert Liquidity Sweep or FVG into unrelated candle rules.
+
+Do not fake backtesting support.
+
+The goal is to make the requested concepts into genuine executable conditions.
+
+==================================================
+1. LIQUIDITY SWEEP
+==================================================
+
+Add proper structured support for Liquidity Sweep as a strategy condition.
+
+The condition needs to represent the actual concept rather than simply storing the words "Liquidity Sweep".
+
+A liquidity sweep should be configurable with the information required by the strategy engine, such as:
+
+- Direction
+- Timeframe
+- Relevant liquidity level
+- Sweep behaviour
+- Confirmation behaviour
+- Any required lookback/settings
+
+Use the existing TradeX architecture and data structures wherever possible.
+
+Do not invent arbitrary trading definitions.
+
+If the project already contains definitions for Liquidity Sweep, use those.
+
+If no executable definition exists yet, implement the minimum deterministic definition required for the concept to work consistently in Builder and Backtesting.
+
+==================================================
+2. FAIR VALUE GAP
+==================================================
+
+Add proper structured support for Fair Value Gap as a strategy condition.
+
+It must be represented as an actual pattern/condition, not merely descriptive text.
+
+Support:
+
+- Bullish FVG
+- Bearish FVG
+- Direction
+- Timeframe
+- Detection
+- Retest/interaction where requested
+
+The AI request:
+
+"Fair Value Gap confirmation"
+
+should produce an actual FVG condition.
+
+The AI request:
+
+"Fair Value Gap Retest"
+
+should produce an actual FVG retest condition.
+
+Do not convert FVG into:
+
+"Candle is bullish"
+
+or another unrelated candle rule.
+
+==================================================
+3. STRATEGY BUILDER
+==================================================
+
+The existing Builder should display these conditions normally.
+
+Example:
+
+ENTRY
+
+Concept:
+Liquidity Sweep
+
+Direction:
+Long
+
+Timeframe:
+15m
+
+Rule / Pattern:
+Liquidity Sweep
+
+Parameters:
+[actual required parameters]
+
+Compatibility:
+✓ Executable
+
+CONFIRMATION
+
+Concept:
+Fair Value Gap
+
+Direction:
+Long
+
+Timeframe:
+5m
+
+Rule / Pattern:
+Fair Value Gap Retest
+
+Parameters:
+[actual required parameters]
+
+Compatibility:
+✓ Executable
+
+The exact UI should follow the existing Builder design.
+
+==================================================
+4. BACKTEST ENGINE
+==================================================
+
+The Backtesting engine must understand these new conditions.
+
+When Backtesting encounters:
+
+Liquidity Sweep
+
+or:
+
+Fair Value Gap
+
+it must evaluate the actual condition against historical OHLC data.
+
+Do NOT treat them as descriptive text.
+
+Do NOT automatically mark them as successful.
+
+Do NOT generate fake signals.
+
+Use deterministic calculations based on the historical candles available to the engine.
+
+==================================================
+5. ONE SOURCE OF TRUTH
+==================================================
+
+The concept definition must be shared between:
+
+- Trading Concept Library
+- Strategy Builder
+- Build with AI
+- Strategy validation
+- Backtesting
+
+Do not create separate definitions that can disagree.
+
+The AI should map to the same executable concept definition used by the Builder and Backtester.
+
+==================================================
+6. AI HANDOFF
+==================================================
+
+After this change, the existing AI request:
+
+"Create me a reversal strategy for Gold using a liquidity sweep and Fair Value Gap confirmation on the 15 minute timeframe."
+
+should produce:
+
+Market:
+XAUUSD
+
+Direction:
+Both
+
+Timeframe:
+15m
+
+ENTRY
+
+Liquidity Sweep
+
+CONFIRMATION
+
+Fair Value Gap
+
+and these should be genuine structured conditions.
+
+The AI should no longer describe them as merely:
+
+"catalog concepts"
+
+if they are now executable.
+
+==================================================
+7. COMPATIBILITY STATUS
+==================================================
+
+If the implementation is successful, the generated conditions should show:
+
+✓ Backtest supported
+
+rather than:
+
+Review required
+
+ONLY display Backtest supported if the Backtesting engine genuinely knows how to execute the condition.
+
+==================================================
+8. DO NOT CHANGE OTHER CONCEPTS
+==================================================
+
+Do not break the existing supported rules.
+
+Keep all existing simple rules working:
+
+- Candle is bullish
+- Candle is bearish
+- Price is above candle open
+- Price is below candle open
+- Previous-high crossing
+- Previous-low crossing
+- Always true
+
+Existing strategies must continue to work.
+
+==================================================
+9. TESTING
+==================================================
+
+Test the exact AI request:
+
+"Create me a reversal strategy for Gold using a liquidity sweep followed by Fair Value Gap confirmation on the 15 minute timeframe."
+
+Verify:
+
+✓ Gold maps to XAUUSD
+✓ 15 minute maps to 15m
+✓ Liquidity Sweep is created as a structured condition
+✓ Fair Value Gap is created as a structured condition
+✓ Conditions appear in the correct Builder sections
+✓ Conditions are editable
+✓ Conditions show correct compatibility
+✓ Strategy can be saved
+✓ Strategy can be versioned
+✓ Strategy can be sent to Backtesting
+✓ Backtesting actually evaluates the conditions
+✓ No fake market data is created
+✓ No unsupported condition is silently accepted
+
+==================================================
+10. TEST LONG AND SHORT
+==================================================
+
+Test both:
+
+Long Liquidity Sweep → Bullish FVG confirmation
+
+and:
+
+Short Liquidity Sweep → Bearish FVG confirmation
+
+Make sure direction is handled correctly.
+
+==================================================
+11. REGRESSION
+==================================================
+
+Run:
+
+Frontend tests
+API tests
+Frontend typecheck
+API typecheck
+Production builds
+git diff --check
+
+Check browser console.
+
+Test:
+
+375px
+402px
+768px
+1440px
+
+Do not break:
+
+Markets
+Journal
+Alerts
+Strategy Library
+Strategy Versioning
+Monitoring
+Economic Calendar
+Trading Concept Library
+Build with AI
+Existing Backtesting
+
+==================================================
+FINAL GOAL
+==================================================
+
+I want this workflow:
+
+Build with AI
+
+↓
+
+"Create me a Gold reversal strategy using Liquidity Sweep + FVG."
+
+↓
+
+TradeX creates:
+
+Liquidity Sweep
++
+Fair Value Gap
+
+as REAL structured strategy conditions.
+
+↓
+
+Strategy Builder displays them.
+
+↓
+
+They show:
+
+✓ Backtest supported
+
+↓
+
+Save strategy
+
+↓
+
+Create version
+
+↓
+
+Backtest
+
+↓
+
+Backtesting evaluates the actual Liquidity Sweep and FVG conditions using real historical candles.
+
+Do NOT solve this by changing the AI's wording.
+
+Solve it by making the underlying strategy-condition system and Backtesting engine genuinely understand the concepts.
