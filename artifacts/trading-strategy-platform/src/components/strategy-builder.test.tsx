@@ -209,6 +209,38 @@ describe("StrategyBuilder", () => {
     expect(screen.getByTestId("select-builder-direction")).toHaveValue("long");
   });
 
+  it("renders paired HTF structure and FVG retest conditions with their review metadata", () => {
+    const draft = {
+      name: "Gold HTF Bias and FVG Retest Reversal",
+      description: "A 1H structure bias with 5M FVG retest confirmation.",
+      direction: "both",
+      marketSymbol: "XAUUSD",
+      timeframes: ["1h", "5m"],
+      conditions: [
+        { name: "Bullish higher-timeframe structure", stage: "entry", requirement: "required", conceptName: "Market Structure Shift", timeframe: "1h", direction: "long", triggerRules: "Market structure: mss", supported: true },
+        { name: "Bullish Fair Value Gap Retest", stage: "confirmation", requirement: "required", conceptName: "Fair Value Gap", timeframe: "5m", direction: "long", triggerRules: "Fair Value Gap retest", supported: true },
+        { name: "Bearish higher-timeframe structure", stage: "entry", requirement: "required", conceptName: "Market Structure Shift", timeframe: "1h", direction: "short", triggerRules: "Market structure: mss", supported: true },
+        { name: "Bearish Fair Value Gap Retest", stage: "confirmation", requirement: "required", conceptName: "Fair Value Gap", timeframe: "5m", direction: "short", triggerRules: "Fair Value Gap retest", supported: true },
+      ],
+      riskManagementRules: null,
+      compatibility: { compatible: true, unsupportedConditions: [] },
+    };
+    state.markets = [{ id: 25, symbol: "XAUUSD", assetClass: "metals" }];
+    window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=review");
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+
+    render(<StrategyBuilder />);
+
+    expect(screen.getByTestId("assistant-draft-builder-preview")).toHaveTextContent("both");
+    expect(screen.getByTestId("assistant-draft-builder-preview")).toHaveTextContent("XAUUSD");
+    expect(screen.getByTestId("assistant-draft-builder-preview")).toHaveTextContent("1h, 5m");
+    expect(screen.getByTestId("assistant-draft-entry-conditions")).toHaveTextContent("Bullish higher-timeframe structure");
+    expect(screen.getByTestId("assistant-draft-entry-conditions")).toHaveTextContent("Market Structure Shift · long");
+    expect(screen.getByTestId("assistant-draft-entry-conditions")).toHaveTextContent("Bearish Fair Value Gap Retest");
+    expect(screen.getByTestId("assistant-draft-entry-conditions")).toHaveTextContent("Fair Value Gap · short");
+    expect(screen.queryByTestId("assistant-draft-compatibility-warning")).not.toBeInTheDocument();
+  });
+
   it("reloads the pending draft when assistant query state arrives after the Builder mounted", async () => {
     const draft = {
       name: "XAUUSD live handoff",

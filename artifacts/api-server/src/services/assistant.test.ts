@@ -253,6 +253,88 @@ describe("AI Trading Assistant provider boundary", () => {
      expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
   });
 
+  it("maps the exact HTF bias plus FVG retest request to paired canonical executable conditions", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the requested multi-timeframe reversal draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "Gold HTF Bias and FVG Retest Reversal",
+              description: "A 1H structure bias with 5M FVG retest confirmation.",
+              direction: "both",
+              marketSymbol: "XAUUSD",
+              timeframes: ["1H", "5M"],
+              conditions: [
+                { name: "HTF Structure", stage: "confirmation", requirement: "required", conceptName: "HTF Structure", timeframe: "1H", direction: "both", triggerRules: "supported" },
+                { name: "HTF Liquidity", stage: "confirmation", requirement: "required", conceptName: "HTF Liquidity", timeframe: "1H", direction: "both", triggerRules: "supported" },
+                { name: "Fair Value Gap Retest", stage: "confirmation", requirement: "required", conceptName: "FVG Retest", timeframe: "5M", direction: "both", triggerRules: "retest" },
+              ],
+              conceptsUsed: [
+                { name: "HTF Structure", supported: true, explanation: "Supported." },
+                { name: "HTF Liquidity", supported: true, explanation: "Supported." },
+                { name: "Fair Value Gap Retest", supported: true, explanation: "Supported." },
+                { name: "Retest", supported: true, explanation: "Supported." },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: "Create a reversal strategy for Gold using a 1H higher-timeframe bullish/bearish bias, followed by a 5M Fair Value Gap Retest confirmation. Trade both long and short.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.marketSymbol).toBe("XAUUSD");
+    expect(response.strategyDraft?.direction).toBe("both");
+    expect(response.strategyDraft?.timeframes.map(timeframe => timeframe.toLowerCase())).toEqual(["1h", "5m"]);
+    expect(response.strategyDraft?.conditions.map(condition => ({
+      conceptName: condition.conceptName,
+      stage: condition.stage,
+      direction: condition.direction,
+      timeframe: condition.timeframe.toLowerCase(),
+      parameters: condition.parameters,
+    }))).toEqual([
+      {
+        conceptName: "Market Structure Shift",
+        stage: "entry",
+        direction: "long",
+        timeframe: "1h",
+        parameters: { kind: "market_structure", signal: "mss", polarity: "bullish", lookback: 10 },
+      },
+      {
+        conceptName: "Fair Value Gap",
+        stage: "confirmation",
+        direction: "long",
+        timeframe: "5m",
+        parameters: { kind: "fair_value_gap", polarity: "bullish", interaction: "retest", lookback: 20, minimumGap: 0 },
+      },
+      {
+        conceptName: "Market Structure Shift",
+        stage: "entry",
+        direction: "short",
+        timeframe: "1h",
+        parameters: { kind: "market_structure", signal: "mss", polarity: "bearish", lookback: 10 },
+      },
+      {
+        conceptName: "Fair Value Gap",
+        stage: "confirmation",
+        direction: "short",
+        timeframe: "5m",
+        parameters: { kind: "fair_value_gap", polarity: "bearish", interaction: "retest", lookback: 20, minimumGap: 0 },
+      },
+    ]);
+    expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
+    expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).not.toContain("Retest");
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Higher-timeframe bias");
+  });
+
   it("transfers structured TRADEX fields, directions, and requested risk settings", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({

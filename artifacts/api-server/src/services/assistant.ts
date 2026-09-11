@@ -206,8 +206,13 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
     const rawName = String(typeof raw === "string" ? raw : raw?.name || fallbackName || "").trim().slice(0, 120);
     if (!rawName) return;
     const isMultiTimeframe = catalogKey(rawName) === "multi timeframe analysis";
-    const unsupportedConcept = isMultiTimeframe ? null : unsupportedConceptForText(rawName);
-    const name = unsupportedConcept?.name || executableConceptLabel(rawName) || rawName;
+    const isMappedHtfBias = catalogKey(rawName) === "higher timeframe bias"
+      && conditions.some((condition: any) =>
+        executableConceptKind(condition?.conceptName) === "market_structure"
+        && /\b(?:htf|higher[- ]timeframe|bias|structure)\b/i.test(`${condition?.name || ""} ${condition?.timeframe || ""}`),
+      );
+    const unsupportedConcept = isMultiTimeframe || isMappedHtfBias ? null : unsupportedConceptForText(rawName);
+    const name = isMappedHtfBias ? "Market Structure Shift" : unsupportedConcept?.name || executableConceptLabel(rawName) || rawName;
     const matchingConditions = conditions.filter(condition =>
       condition.conceptName.toLowerCase() === rawName.toLowerCase() ||
       condition.conceptName.toLowerCase() === name.toLowerCase(),
@@ -215,13 +220,13 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
     const executable = executableConceptKind(rawName) !== null || matchingConditions.some(condition => executableConceptKind(condition.conceptName) !== null);
     const supported = unsupportedConcept
       ? false
-      : isMultiTimeframe
+      : isMultiTimeframe || isMappedHtfBias
         ? true
         : executable
         ? matchingConditions.length === 0 || matchingConditions.every(condition => condition.supported)
       : matchingConditions.length > 0
         ? matchingConditions.every(condition => condition.supported) && raw?.supported !== false
-        : raw?.supported === true;
+        : false;
     const explanation = String(
       typeof raw === "object" && raw?.explanation
         ? raw.explanation
@@ -246,6 +251,7 @@ function conceptsRequestedInMessage(message: string) {
   const requested: Array<{ name: string; supported: boolean; explanation: string }> = [];
   const seen = new Set<string>();
   for (const concept of UNSUPPORTED_CONCEPTS) {
+    if (concept.name === "Retest" && /(?:fvg|fair\s+value\s+gap)[^.!?]{0,60}\bretests?\b/i.test(message)) continue;
     if (!concept.pattern.test(message) || seen.has(concept.name)) continue;
     const executableKind = executableConceptKind(concept.name);
     if (executableKind) {
@@ -308,7 +314,73 @@ function requestedExecutableConcepts(message: string) {
   return requested;
 }
 
+function exactHtfBiasRetestRequest(message: string) {
+  const hasBothBiasDirections = /\b(?:higher[- ]timeframe|htf)\b[^.!?]{0,50}\bbullish\b[^.!?]{0,50}\bbearish\b[^.!?]{0,30}\bbias\b/i.test(message)
+    || /\b(?:higher[- ]timeframe|htf)\b[^.!?]{0,50}\bbearish\b[^.!?]{0,50}\bbullish\b[^.!?]{0,30}\bbias\b/i.test(message);
+  return hasBothBiasDirections
+    && /(?:fvg|fair\s+value\s+gap)[^.!?]{0,60}\bretests?\b/i.test(message);
+}
+
+function requestTimeframeValues(message: string) {
+  return [...message.matchAll(/\b\d+(?:\.\d+)?\s*(?:m|min|minute|h|hr|hour|d|day|w|week)s?\b/gi)]
+    .map(match => match[0].replace(/\s+/g, "").toUpperCase());
+}
+
+function mappedHtfBiasRetestConditions(conditions: any[], message: string) {
+  if (!exactHtfBiasRetestRequest(message)) return null;
+  const requestedTimeframes = requestTimeframeValues(message);
+  const htfCondition = conditions.find(condition => /\b(?:htf|higher[- ]timeframe|bias|structure)\b/i.test(`${condition?.name || ""} ${condition?.conceptName || ""}`));
+  const fvgCondition = conditions.find(condition => /\b(?:fvg|fair\s+value\s+gap|retest)\b/i.test(`${condition?.name || ""} ${condition?.conceptName || ""} ${condition?.triggerRules || ""}`));
+  const higherTimeframe = String(htfCondition?.timeframe || requestedTimeframes[0] || "1H");
+  const lowerTimeframe = String(fvgCondition?.timeframe || requestedTimeframes[1] || requestedTimeframes[0] || "5M");
+  const sides = [
+    { direction: "long", polarity: "bullish", label: "Bullish" },
+    { direction: "short", polarity: "bearish", label: "Bearish" },
+  ] as const;
+  return sides.flatMap(side => {
+    const structureParameters = normalizeExecutableParameters("Market Structure Shift", {
+      signal: "mss",
+      polarity: side.polarity,
+      lookback: 10,
+    });
+    const fvgParameters = normalizeExecutableParameters("Fair Value Gap", {
+      polarity: side.polarity,
+      interaction: "retest",
+      lookback: 20,
+      minimumGap: 0,
+    });
+    return [
+      {
+        name: `${side.label} higher-timeframe structure`,
+        stage: "entry",
+        requirement: "required",
+        conceptName: "Market Structure Shift",
+        timeframe: higherTimeframe,
+        direction: side.direction,
+        triggerRules: structureParameters ? executableConceptTriggerRules(structureParameters) : "",
+        parameters: structureParameters,
+        ruleSupported: Boolean(structureParameters),
+        supported: Boolean(structureParameters),
+      },
+      {
+        name: `${side.label} Fair Value Gap Retest`,
+        stage: "confirmation",
+        requirement: "required",
+        conceptName: "Fair Value Gap",
+        timeframe: lowerTimeframe,
+        direction: side.direction,
+        triggerRules: fvgParameters ? executableConceptTriggerRules(fvgParameters) : "",
+        parameters: fvgParameters,
+        ruleSupported: Boolean(fvgParameters),
+        supported: Boolean(fvgParameters),
+      },
+    ];
+  });
+}
+
 function mapRequestedExecutableConditions(conditions: any[], message: string) {
+  const mappedHtfRetest = mappedHtfBiasRetestConditions(conditions, message);
+  if (mappedHtfRetest) return mappedHtfRetest;
   const requested = requestedExecutableConcepts(message);
   if (!requested.length) return conditions;
   const hasRetest = /\b(?:fvg|fair\s+value\s+gap)(?:\s+\w+){0,2}\s+retests?\b|\bfvg\s+retests?\b/i.test(message);
@@ -339,6 +411,8 @@ function mapRequestedExecutableConditions(conditions: any[], message: string) {
 }
 
 function addMissingRequestedExecutableConditions(draft: any, message: string) {
+  const mappedHtfRetest = mappedHtfBiasRetestConditions(Array.isArray(draft.conditions) ? draft.conditions : [], message);
+  if (mappedHtfRetest) return { ...draft, conditions: mappedHtfRetest };
   const requested = requestedExecutableConcepts(message);
   if (!requested.length || (Array.isArray(draft.conditions) && draft.conditions.length > 0)) return draft;
   const timeframes = Array.isArray(draft.timeframes) ? draft.timeframes : [];
