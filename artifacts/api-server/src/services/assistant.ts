@@ -9,6 +9,7 @@ import {
   strategyVersionConditionsTable,
   strategyVersionsTable,
   timeframesTable,
+  tradingConceptsTable,
 } from "@workspace/db";
 import { ChatAssistantResponse, type ChatAssistantBody } from "@workspace/api-zod";
 import { calculateBacktestStatistics } from "./backtest-results";
@@ -255,6 +256,140 @@ function parseModelJson(content: string) {
   }
 }
 
+type BuilderCatalog = {
+  concepts: Array<{ name: string; category: string | null }>;
+  markets: string[];
+  timeframes: string[];
+};
+
+function catalogKey(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+const CONCEPT_ALIASES: Record<string, string[]> = {
+  "fair value gap": ["fvg", "imbalance"],
+  "inverse fair value gap": ["ifvg"],
+  "break of structure": ["bos"],
+  "change of character": ["choch"],
+  "market structure shift": ["mss"],
+  "higher timeframe bias": ["htf"],
+  "lower timeframe confirmation": ["ltf"],
+  "power of 3 / amd": ["amd", "power of 3", "power of three"],
+  "order block": ["ob"],
+  "smt divergence": ["smt"],
+};
+
+function matchCatalogConcept(value: string, catalog: BuilderCatalog): string | null {
+  const key = catalogKey(value);
+  if (!key) return null;
+  const exact = catalog.concepts.find(concept => catalogKey(concept.name) === key);
+  if (exact) return exact.name;
+  const aliasTarget = Object.entries(CONCEPT_ALIASES).find(([, aliases]) => aliases.some(alias => catalogKey(alias) === key))?.[0];
+  if (aliasTarget) {
+    const aliased = catalog.concepts.find(concept => catalogKey(concept.name) === catalogKey(aliasTarget));
+    if (aliased) return aliased.name;
+  }
+  const contained = catalog.concepts.find(concept => {
+    const conceptKey = catalogKey(concept.name);
+    return conceptKey.length > 5 && (key.includes(conceptKey) || conceptKey.includes(key));
+  });
+  return contained?.name || null;
+}
+
+function matchCatalogTimeframe(value: string, catalog: BuilderCatalog): string | null {
+  const key = catalogKey(value).replace(/\b(minutes?|mins?)\b/g, "m").replace(/\bhours?\b/g, "h").replace(/\bdays?\b/g, "d");
+  if (!key) return null;
+  const exact = catalog.timeframes.find(timeframe => catalogKey(timeframe) === key);
+  if (exact) return exact;
+  const compact = key.replace(/\s+/g, "");
+  return catalog.timeframes.find(timeframe => catalogKey(timeframe).replace(/\s+/g, "") === compact) || null;
+}
+
+function matchCatalogMarket(value: string | null | undefined, catalog: BuilderCatalog): string | null {
+  const key = catalogKey(String(value || ""));
+  if (!key) return null;
+  const exact = catalog.markets.find(market => catalogKey(market) === key);
+  if (exact) return exact;
+  const aliases: Record<string, string[]> = {
+    xauusd: ["gold", "spot gold", "xau"],
+    ustec: ["us tech 100", "nasdaq 100", "nasdaq"],
+    nas100: ["us tech 100", "nasdaq 100", "nasdaq"],
+    btcusd: ["bitcoin", "btc"],
+    ethusd: ["ethereum", "eth"],
+  };
+  const target = catalog.markets.find(market => aliases[catalogKey(market)]?.includes(key));
+  return target || null;
+}
+
+function normalizeRiskRules(value: string | null | undefined) {
+  if (!value?.trim()) return null;
+  return value
+    .replace(/risk\s*per\s*trade\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/gi, "risk: $1%")
+    .replace(/risk\s*\/\s*reward\s*[:=]\s*(\d+(?:\.\d+)?)\s*:\s*1/gi, "risk/reward: $1R")
+    .replace(/risk\s*reward\s*[:=]\s*(\d+(?:\.\d+)?)\s*:\s*1/gi, "risk/reward: $1R")
+    .slice(0, 400);
+}
+
+async function builderCatalog(): Promise<BuilderCatalog> {
+  const [concepts, markets, timeframes] = await Promise.all([
+    db.select({ name: tradingConceptsTable.name, category: tradingConceptsTable.category })
+      .from(tradingConceptsTable)
+      .orderBy(asc(tradingConceptsTable.name)),
+    db.select({ symbol: marketsTable.symbol }).from(marketsTable).orderBy(asc(marketsTable.symbol)),
+    db.select({ code: timeframesTable.code, label: timeframesTable.label })
+      .from(timeframesTable)
+      .where(eq(timeframesTable.isActive, true))
+      .orderBy(asc(timeframesTable.durationSeconds)),
+  ]);
+  return {
+    concepts,
+    markets: markets.map(market => market.symbol),
+    timeframes: timeframes.flatMap(timeframe => [timeframe.code, timeframe.label]),
+  };
+}
+
+function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog) {
+  if (!draft) return draft;
+  const warnings: string[] = [];
+  const conditions = (draft.conditions || []).map((condition: any) => {
+    const conceptName = matchCatalogConcept(String(condition.conceptName || ""), catalog);
+    const timeframe = matchCatalogTimeframe(String(condition.timeframe || ""), catalog);
+    if (!conceptName) warnings.push(`Concept “${String(condition.conceptName || "Unnamed concept")}” is not in the Trading Concept Library.`);
+    if (condition.timeframe && !timeframe) warnings.push(`Timeframe “${String(condition.timeframe)}” is not in the active Builder timeframes.`);
+    return {
+      ...condition,
+      conceptName: conceptName || String(condition.conceptName || "Unmapped concept").slice(0, 160),
+      timeframe: timeframe || String(condition.timeframe || "Not specified").slice(0, 40),
+      supported: Boolean(conceptName) && condition.supported === true,
+    };
+  });
+  const marketSymbol = matchCatalogMarket(draft.marketSymbol, catalog);
+  if (draft.marketSymbol && !marketSymbol) warnings.push(`Market “${String(draft.marketSymbol)}” is not in the active market catalog.`);
+  if (!String(draft.name || "").trim()) warnings.push("Strategy name needs review.");
+  if (!["long", "short", "both"].includes(draft.direction)) warnings.push("Strategy direction needs review.");
+  const conceptsUsed = normalizeConcepts(draft.conceptsUsed, conditions);
+  const next = {
+    ...draft,
+    marketSymbol,
+    conditions,
+    conceptsUsed,
+    riskManagementRules: normalizeRiskRules(draft.riskManagementRules),
+  };
+  const compatibility = compatibilityForDraft(next);
+  return {
+    ...next,
+    compatibility: {
+      ...compatibility,
+      unsupportedConditions: [...new Set([...compatibility.unsupportedConditions, ...warnings])],
+      compatible: compatibility.compatible && warnings.length === 0,
+    },
+  };
+}
+
 function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | "provider"> | null {
   if (!model || typeof model.reply !== "string" || !model.reply.trim()) return null;
   const draft = model.strategyDraft && typeof model.strategyDraft === "object" ? model.strategyDraft : null;
@@ -287,7 +422,7 @@ function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | 
     timeframes: Array.isArray(draft.timeframes) ? draft.timeframes.map(String).slice(0, 8) : [],
     conditions,
     conceptsUsed,
-    riskManagementRules: draft.riskManagementRules ? String(draft.riskManagementRules).slice(0, 400) : null,
+     riskManagementRules: draft.riskManagementRules ? String(draft.riskManagementRules).slice(0, 400) : null,
     compatibility,
   } : null;
   return {
@@ -378,6 +513,7 @@ If the user asks to build or create a strategy, always return a non-null strateg
 
 async function contextForRequest(context: AssistantContext, message: string) {
   const result: Record<string, unknown> = { page: context.page || "workspace" };
+  result.builderCatalog = await builderCatalog();
   if (context.strategyId) {
     const [strategy] = await db.select({
       id: strategiesTable.id,
@@ -524,6 +660,9 @@ Safety and product boundaries:
 - Use only the stored context supplied below for strategy and backtest facts. If a fact is absent, say it is unavailable.
 - Existing Backtesting supports only: always, bullish, bearish, OHLC comparisons, and previous-candle crossings. If a requested condition cannot be represented exactly, identify it as unsupported and never claim it is backtest-compatible.
 - Strategy directions must be exactly long, short, or both. Conditions must use the existing model fields.
+- For strategy drafts, use only concept names, market symbols, and timeframe codes/labels from builderCatalog. Common aliases such as FVG, BOS, CHoCH, MSS, SMT, HTF, LTF, AMD, OB, and Gold must be mapped to a matching catalog item only when one exists. If no match exists, preserve the requested wording and mark it for review; never invent a library item.
+- Recognise both normal-language requests and the structured TRADEX STRATEGY format with NAME, MARKET, DIRECTION, TIMEFRAMES, ENTRY, CONFIRMATION, EXIT, and RISK sections.
+- Use only the exact historical rules supported by the Builder: always, bullish, bearish, close > open, close < open, and close crosses above/below a previous OHLC value. Preserve other requested concepts as descriptive unsupported conditions.
 - Never silently save, overwrite, activate, or run anything. Prepare drafts and explain the user's next explicit action.
 - When setup context contains a strategy or version ID, copy those IDs unchanged. Never substitute a different strategy version.
 - Keep explanations beginner-friendly and concise.
@@ -547,7 +686,7 @@ Return JSON only with this shape:
 When proposing a strategy, include a draft even if one requested condition is unsupported; explain that limitation in reply. For result explanations, use only actual numbers from context.
 ${CONCEPT_GUIDE}
 
-Current workspace context:
+Builder catalog and current workspace context:
 ${JSON.stringify(context)}`;
 }
 
@@ -613,7 +752,7 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
           ...input.messages.slice(-10),
           { role: "user", content: input.message },
         ],
-        max_tokens: 1200,
+        max_tokens: 8192,
         reasoning: { effort: "none" },
         response_format: { type: "json_object" },
       }),
@@ -642,8 +781,15 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
       parsed.compatibility = fallbackDraft.compatibility;
     } else if (parsed.strategyDraft) {
       const enrichedDraft = enrichDraftConcepts(parsed.strategyDraft, input.message);
-      parsed.strategyDraft = enrichedDraft;
-      parsed.compatibility = enrichedDraft.compatibility;
+      const validatedDraft = validateDraftAgainstCatalog(
+        enrichedDraft,
+        (context.builderCatalog || { concepts: [], markets: [], timeframes: [] }) as BuilderCatalog,
+      );
+      parsed.strategyDraft = validatedDraft;
+      parsed.compatibility = validatedDraft.compatibility;
+      if (validatedDraft.compatibility.unsupportedConditions.length > enrichedDraft.compatibility.unsupportedConditions.length) {
+        parsed.reply = `${parsed.reply}\n\nNeeds review: ${validatedDraft.compatibility.unsupportedConditions.slice(enrichedDraft.compatibility.unsupportedConditions.length).join(" ")}`;
+      }
     }
     const backtestSetup = parsed.backtestSetup ? {
       ...parsed.backtestSetup,
