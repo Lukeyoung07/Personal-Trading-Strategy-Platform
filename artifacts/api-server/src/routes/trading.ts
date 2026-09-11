@@ -454,7 +454,7 @@ export function calculateJournalMonthPerformance(
 
   return {
     month: params.month,
-    dateField: "createdAtFallback" as const,
+    dateField: filtered.some(row => row.trade.closedAt == null) ? "createdAtFallback" as const : "closedAt" as const,
     hasData: pnlValues.length > 0,
     tradeCount: pnlValues.length,
     winningTrades: winners.length,

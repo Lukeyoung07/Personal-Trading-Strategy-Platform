@@ -600,8 +600,10 @@ function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; hig
     setStart(Math.max(0, bars.length - nextWindow));
     setHoveredIndex(null);
   }, [bars.length]);
-  const visibleBars = bars.slice(start, start + windowSize);
-  const maxStart = Math.max(0, bars.length - windowSize);
+  const effectiveWindowSize = Math.min(bars.length, Math.max(windowSize, Math.min(20, bars.length)));
+  const maxStart = Math.max(0, bars.length - effectiveWindowSize);
+  const effectiveStart = Math.min(start, maxStart);
+  const visibleBars = bars.slice(effectiveStart, effectiveStart + effectiveWindowSize);
   const zoomIn = () => {
     const nextWindow = Math.max(20, Math.floor(windowSize * 0.75));
     const delta = Math.max(1, windowSize - nextWindow);
@@ -636,7 +638,7 @@ function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; hig
     <div>
       <div className="chart-toolbar">
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-          <span className="mono">{start + 1}–{Math.min(start + visibleBars.length, bars.length)}</span>
+          <span className="mono">{effectiveStart + 1}–{Math.min(effectiveStart + visibleBars.length, bars.length)}</span>
           <span>of {bars.length} loaded candles</span>
         </div>
         <div className="flex flex-wrap items-center gap-1">

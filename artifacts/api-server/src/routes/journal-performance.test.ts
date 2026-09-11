@@ -119,6 +119,17 @@ describe("calculateJournalMonthPerformance", () => {
     expect(result.dateField).toBe("createdAtFallback");
   });
 
+  it("reports closedAt when all realized trades have a close timestamp", () => {
+    const result = calculateJournalMonthPerformance(
+      [row(30, "2026-09-02T12:00:00Z", { closedAt: new Date("2026-09-04T12:00:00Z") })],
+      new Map(),
+      params({ timezone: "Europe/London" }),
+    );
+
+    expect(result.dateField).toBe("closedAt");
+    expect(result.daily.map(day => day.date)).toEqual(["2026-09-04"]);
+  });
+
   it("applies strategy, exact version, instrument, direction, and date filters", () => {
     const result = calculateJournalMonthPerformance(
       [

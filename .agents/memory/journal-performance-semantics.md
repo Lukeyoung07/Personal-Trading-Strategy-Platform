@@ -7,4 +7,4 @@ Journal analytics must use the same realized-trade definition as the existing pe
 
 **Why:** Calendar grouping, summary totals, streaks, and individual-day details must not disagree, especially around timezone boundaries or incomplete timestamps.
 
-**How to apply:** Reuse the Journal performance endpoint and its date semantics for future Journal analytics. Do not include backtest trades, open/planned trades, invented fees, or synthetic empty-day P/L.
+**How to apply:** Reuse the Journal performance endpoint and its date semantics for future Journal analytics. Report `closedAt` when all included realized trades have close timestamps, and `createdAtFallback` when any included trade relies on creation time. Do not include backtest trades, open/planned trades, invented fees, or synthetic empty-day P/L.
