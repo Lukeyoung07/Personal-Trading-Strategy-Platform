@@ -79,7 +79,7 @@ function isBacktestCompatibleRiskRules(riskRules: string | null | undefined) {
 
 function BuilderPage({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return <div className="page-wrap">
-    <div className="flex items-start justify-between gap-5 mb-8">
+    <div className="page-heading flex items-start justify-between gap-5 mb-8">
       <div>
         <div className="eyebrow mb-3">Workbench</div>
         <h1 className="display text-3xl md:text-4xl font-bold">Strategy builder</h1>

@@ -255,7 +255,7 @@ export function StrategyLibraryPage() {
   const busy = update.isPending || duplicate.isPending || remove.isPending;
 
   return <div className="page-wrap">
-    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-8">
+     <div className="page-heading flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-8">
       <div>
         <div className="eyebrow mb-3">Strategy library</div>
         <h1 className="display text-3xl md:text-4xl font-bold">Saved strategies</h1>

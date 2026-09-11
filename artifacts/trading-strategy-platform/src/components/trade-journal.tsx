@@ -199,7 +199,7 @@ export function TradeJournalPage() {
     } });
   };
    return <div className="page-wrap">
-    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-8">
+     <div className="page-heading flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-8">
       <div><div className="eyebrow mb-3">Journal</div><h1 className="display text-3xl md:text-4xl font-bold">Trade journal</h1><p className="text-muted-foreground text-sm mt-3 max-w-2xl">Every trade is stored against the exact saved strategy version used.</p></div>
       <button className="btn btn-primary" onClick={() => setModal("new")} disabled={!strategies.data?.length} data-testid="button-create-trade"><Plus size={15} /> Record trade</button>
     </div>

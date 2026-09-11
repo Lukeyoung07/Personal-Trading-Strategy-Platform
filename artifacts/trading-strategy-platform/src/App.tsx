@@ -15,9 +15,9 @@ import {
   useCreateAlert, useCreateConcept, useCreateCondition, useCreateMarket, useCreateStrategy, useCreateStrategyVersion,
   useCreateTrade, useDeleteAlert, useDeleteConcept, useDeleteCondition, useDeleteMarket, useDeleteStrategy,
   useDeleteTrade, useGetDashboardSummary, useGetPerformanceSummary, useGetSettings, useGetStrategy, useListAlerts,
-  useListConcepts, useListConditions, useListMarkets, useListStrategies, useListStrategyVersions, useListTimeframes, useListTrades,
+  useListConcepts, useListConditions, useListMarkets, useListStrategies, useListStrategyMonitors, useListStrategyVersions, useListTimeframes, useListTrades,
   useUpdateAlert, useUpdateConcept, useUpdateCondition, useUpdateMarket, useUpdateSettings, useUpdateStrategy,
-  useUpdateTrade, type Alert, type AssistantStrategyDraft, type Backtest, type Condition, type Market, type Strategy, type Trade, type TradingConcept
+  useUpdateTrade, type Alert, type AssistantStrategyDraft, type Backtest, type Condition, type Market, type Strategy, type StrategyMonitor, type Trade, type TradingConcept
 } from '@workspace/api-client-react';
 import { MarketMonitor } from '@/components/market-monitor';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -82,17 +82,17 @@ function Shell({ children }: { children: ReactNode }) {
     setLocation(`/backtesting${query.toString() ? `?${query.toString()}` : ""}`);
   };
   return <div className="app-shell">
-    <aside className={`sidebar ${mobileOpen ? 'block' : ''}`}>
+    <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`} aria-label="Primary navigation">
       <div className="px-5 pt-6 pb-7 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center"><Target size={17}/></div>
+        <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-sm shadow-primary/20"><Target size={17}/></div>
         <div className="brand-copy"><div className="font-bold tracking-tight text-sm">Tandem</div><div className="mono text-[9px] text-muted-foreground mt-0.5">TRADING WORKSPACE</div></div>
       </div>
-      <div className="side-caption px-5 mb-2 eyebrow">Workspace</div>
+      <div className="side-caption px-5 mb-2 eyebrow">Core workspace</div>
       <nav className="flex-1">
-        {nav.map(({href,label,icon:Icon}) => <Link key={href} href={href} data-testid={`link-nav-${label.toLowerCase()}`} className={`nav-link ${location===href ? 'active' : ''}`} onClick={()=>setMobileOpen(false)}><Icon size={16}/><span className="nav-label">{label}</span>{location===href && <span className="ml-auto nav-label w-1.5 h-1.5 rounded-full bg-primary"/>}</Link>)}
+        {nav.map(({href,label,icon:Icon}) => <Link key={href} href={href} title={label} aria-current={isNavActive(href, location) ? 'page' : undefined} data-testid={`link-nav-${label.toLowerCase()}`} className={`nav-link ${isNavActive(href, location) ? 'active' : ''}`} onClick={()=>setMobileOpen(false)}><Icon size={16}/><span className="nav-label">{label}</span>{isNavActive(href, location) && <span className="ml-auto nav-label w-1.5 h-1.5 rounded-full bg-primary"/>}</Link>)}
         <div className="side-caption px-5 mt-7 mb-2 eyebrow">Utilities</div>
-        <Link href="/backtesting" data-testid="link-nav-backtesting" className={`nav-link ${location==='/backtesting' ? 'active' : ''}`}><Clock3 size={16}/><span className="nav-label">Backtesting</span></Link>
-        <Link href="/settings" data-testid="link-nav-settings" className={`nav-link ${location==='/settings' ? 'active' : ''}`}><Settings size={16}/><span className="nav-label">Settings</span></Link>
+        <Link href="/backtesting" title="Backtesting" aria-current={isNavActive('/backtesting', location) ? 'page' : undefined} data-testid="link-nav-backtesting" className={`nav-link ${isNavActive('/backtesting', location) ? 'active' : ''}`} onClick={()=>setMobileOpen(false)}><Clock3 size={16}/><span className="nav-label">Backtesting</span></Link>
+        <Link href="/settings" title="Settings" aria-current={isNavActive('/settings', location) ? 'page' : undefined} data-testid="link-nav-settings" className={`nav-link ${isNavActive('/settings', location) ? 'active' : ''}`} onClick={()=>setMobileOpen(false)}><Settings size={16}/><span className="nav-label">Settings</span></Link>
       </nav>
       <div className="side-footer-copy px-5 py-6 border-t border-sidebar-border">
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><span className="w-2 h-2 bg-primary rounded-full"/>Private workspace</div>
@@ -101,7 +101,8 @@ function Shell({ children }: { children: ReactNode }) {
     </aside>
     <main className="main-shell">
       <header className="topbar">
-        <button className="btn btn-ghost md:hidden" onClick={()=>setMobileOpen(!mobileOpen)} data-testid="button-toggle-menu"><Menu size={18}/></button>
+        <button className="btn btn-ghost md:hidden mobile-menu-toggle" onClick={()=>setMobileOpen(!mobileOpen)} aria-expanded={mobileOpen} aria-label="Toggle navigation" data-testid="button-toggle-menu"><Menu size={18}/></button>
+        <div className="mobile-page-title">{pageName(location)}</div>
         <div className="hidden md:flex items-center gap-2 text-[11px] text-muted-foreground"><span className="w-1.5 h-1.5 bg-primary rounded-full"/> Personal workspace <ChevronRight size={13}/><span className="text-foreground">{pageName(location)}</span></div>
         <div className="flex items-center gap-3 ml-auto"><span className="mono text-[10px] text-muted-foreground mobile-hide">LOCAL RECORDS / NO FEED</span><div className="w-7 h-7 rounded-full border border-primary/40 text-primary flex items-center justify-center text-[10px] font-bold">TR</div></div>
       </header>
@@ -125,9 +126,10 @@ function Shell({ children }: { children: ReactNode }) {
     </main>
   </div>;
 }
-function pageName(path:string) { return nav.find(n=>n.href===path)?.label || (path.startsWith('/backtesting')?'Backtesting':path==='/settings'?'Settings':'Workspace'); }
+function isNavActive(href:string, path:string) { return href === '/' ? path === '/' : path === href || path.startsWith(`${href}/`) || path.startsWith(`${href}?`); }
+function pageName(path:string) { return nav.find(n=>isNavActive(n.href, path))?.label || (path.startsWith('/backtesting')?'Backtesting':path==='/settings'?'Settings':'Workspace'); }
 export function Page({ eyebrow, title, description, action, children }: { eyebrow:string; title:string; description?:string; action?:ReactNode; children:ReactNode }) {
-  return <div className="page-wrap"><div className="flex items-start justify-between gap-5 mb-8"><div><div className="eyebrow mb-3">{eyebrow}</div><h1 className="display text-3xl md:text-4xl font-bold">{title}</h1>{description&&<p className="text-muted-foreground text-sm mt-3 max-w-2xl leading-relaxed">{description}</p>}</div>{action}</div>{children}</div>;
+  return <div className="page-wrap"><div className="page-heading flex items-start justify-between gap-5 mb-8"><div><div className="eyebrow mb-3">{eyebrow}</div><h1 className="display text-3xl md:text-4xl font-bold">{title}</h1>{description&&<p className="text-muted-foreground text-sm mt-3 max-w-2xl leading-relaxed">{description}</p>}</div>{action}</div>{children}</div>;
 }
 export function Skeleton({ className='' }: {className?:string}) { return <div className={`skeleton ${className}`}/>; }
 export function LoadingBlock() { return <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{[1,2,3].map(i=><div className="panel p-5" key={i}><Skeleton className="w-20 h-3 mb-4"/><Skeleton className="w-28 h-8"/></div>)}</div>; }
@@ -140,7 +142,9 @@ function Confirm({ title, onCancel, onConfirm, busy }: {title:string;onCancel:()
 
 function Dashboard() {
   const q=useGetDashboardSummary(); const summary=q.data;
-  const strategies=useListStrategies(); const trades=useListTrades(); const alerts=useListAlerts();
+  const strategies=useListStrategies(); const monitors=useListStrategyMonitors(); const trades=useListTrades(); const alerts=useListAlerts();
+  const activeStrategy=strategies.data?.find(strategy=>strategy.status==='active') ?? null;
+  const activeMonitor=activeStrategy ? monitors.data?.find(monitor=>monitor.strategyId===activeStrategy.id) : undefined;
   if(q.isLoading) return <Page eyebrow="Overview" title="Good to see you." description="Your workspace, kept deliberately close to the record."><LoadingBlock/></Page>;
   if(q.isError) return <Page eyebrow="Overview" title="Good to see you."><ErrorState retry={()=>q.refetch()}/></Page>;
   return <Page eyebrow="Overview" title="Good to see you." description="A quiet view of what you have built, recorded, and still need to examine.">
@@ -154,13 +158,25 @@ function Dashboard() {
       <div className="panel p-5 md:p-6"><div className="flex items-center justify-between mb-5"><div><div className="eyebrow">Latest record</div><h2 className="font-semibold mt-2">Your journal, at a glance</h2></div><Link href="/trade-journal" className="text-xs text-primary hover:underline">Open journal <ChevronRight size={13} className="inline"/></Link></div>
         {trades.isLoading?<><Skeleton className="h-12 w-full"/><Skeleton className="h-12 w-full mt-2"/></>:trades.data?.length?<div className="space-y-1">{trades.data.slice(0,4).map((t:Trade)=><TradeRow key={t.id} trade={t}/>)}</div>:<EmptyState icon={BookOpen} title="The record starts here" text="A trade journal is useful before it is impressive. Capture the next decision while it is still fresh." action={<Link href="/trade-journal" className="btn btn-primary" data-testid="link-start-journal">Record a trade <Plus size={14}/></Link>}/>}
       </div>
-      <div className="space-y-4"><div className="panel p-5"><div className="eyebrow">Workspace signal</div><div className="flex items-end justify-between mt-4"><div className="text-2xl font-bold">{summary?.conceptCount??0}</div><div className="text-xs text-muted-foreground">concepts saved</div></div><div className="h-1 bg-secondary mt-4 rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full" style={{width:`${Math.min(100,(summary?.conceptCount??0)*10)}%`}}/></div><Link href="/strategy-builder" className="text-xs text-primary inline-block mt-4">Shape the foundation <ChevronRight size={13} className="inline"/></Link></div>
+      <div className="space-y-4"><div className="panel p-5"><div className="eyebrow">Current focus</div><div className="mt-4"><div className="text-lg font-bold truncate">{activeStrategy?.name ?? 'No active strategy'}</div><div className="text-xs text-muted-foreground mt-1">{activeStrategy?.currentVersion ? `Version ${activeStrategy.currentVersion}` : 'Create or activate a strategy to monitor it.'}</div></div><div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4"><span className="text-xs text-muted-foreground">Monitoring</span><span className={`tag ${activeMonitor ? monitorTagClass(activeMonitor.overallStatus) : 'tag-archived'}`}>{activeMonitor ? monitorStatusLabel(activeMonitor.overallStatus) : 'Not configured'}</span></div><Link href={activeStrategy ? "/strategy-monitoring" : "/strategy-library"} className="text-xs text-primary inline-flex items-center gap-1 mt-4">{activeStrategy ? 'Open monitoring' : 'Open strategy library'} <ChevronRight size={13}/></Link></div>
       <div className="panel p-5"><div className="flex items-center justify-between"><div className="eyebrow">Active reminders</div><Link href="/alerts" className="text-xs text-primary">Manage</Link></div>{alerts.data?.length?<div className="mt-4 space-y-3">{alerts.data.slice(0,3).map((a:Alert)=><div key={a.id} className="flex gap-3 items-center"><div className="w-1.5 h-1.5 rounded-full bg-primary"/><div className="min-w-0"><div className="text-xs font-semibold truncate">{a.name}</div><div className="text-[11px] text-muted-foreground">{a.marketSymbol||'No market'} · {a.condition}</div></div></div>)}</div>:<p className="text-sm text-muted-foreground mt-4">No alerts are asking for your attention.</p>}</div></div>
     </div>
     <div className="mt-4 panel p-5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between"><div><div className="eyebrow">A deliberate pace</div><div className="font-semibold mt-2">Unfinished is a valid state.</div><p className="text-sm text-muted-foreground mt-1">Build your vocabulary before you force a strategy into existence.</p></div><Link href="/strategy-builder" className="btn btn-secondary whitespace-nowrap" data-testid="link-open-builder">Open builder <ArrowUpRight size={14}/></Link></div>
   </Page>;
 }
 function TradeRow({trade, onEdit, onDelete}:{trade:Trade;onEdit?:(t:Trade)=>void;onDelete?:(t:Trade)=>void}) { return <div className="flex items-center gap-3 p-3 rounded-md hover:bg-secondary/60 transition-colors" data-testid={`row-trade-${trade.id}`}><div className={`w-7 h-7 rounded-md flex items-center justify-center ${trade.side==='long'?'bg-primary/10 text-primary':'bg-accent/10 text-accent'}`}>{trade.side==='long'?<ArrowUpRight size={14}/>:<ArrowDownRight size={14}/>}</div><div className="min-w-0 flex-1"><div className="font-semibold text-xs">{trade.marketSymbol||'Unassigned market'}</div><div className="text-[11px] text-muted-foreground mt-1">{trade.side} · {formatDate(trade.createdAt)}</div></div><span className={`tag tag-${trade.status}`}>{trade.status}</span>{trade.pnl!==null&&trade.pnl!==undefined&&<span className={trade.pnl>=0?'text-primary':'text-destructive'}>{formatMoney(trade.pnl)}</span>}{onEdit&&<button className="btn btn-ghost" onClick={()=>onEdit(trade)} data-testid={`button-edit-trade-${trade.id}`}><Pencil size={13}/></button>}{onDelete&&<button className="btn btn-ghost" onClick={()=>onDelete(trade)} data-testid={`button-delete-trade-${trade.id}`}><Trash2 size={13}/></button>}</div>; }
+function monitorStatusLabel(status: StrategyMonitor["overallStatus"]) {
+  if (status === "met") return "Met";
+  if (status === "not_met") return "Not met";
+  if (status === "invalid") return "Invalid";
+  return "Waiting";
+}
+function monitorTagClass(status: StrategyMonitor["overallStatus"]) {
+  if (status === "met") return "tag-active";
+  if (status === "invalid") return "tag-danger";
+  if (status === "waiting") return "tag-warn";
+  return "tag-archived";
+}
 function formatDate(value?:string|null){return value?new Date(value).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'—'}
 function formatMoney(value?:number|null){return value===null||value===undefined?'—':`${value<0?'−':''}$${Math.abs(value).toFixed(2)}`}
 

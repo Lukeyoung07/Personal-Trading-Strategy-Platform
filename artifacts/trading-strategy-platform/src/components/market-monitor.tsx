@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3, Database, Globe, Network, Clock, DatabaseZap, Search, Plus, Check,
   Pencil, Trash2, X, Info, Activity, AlertTriangle, FileText, Settings2, ShieldAlert, Link2,
-  Radio, RefreshCw, WifiOff, CandlestickChart
+  Radio, RefreshCw, WifiOff, CandlestickChart, ChevronLeft, ChevronRight, Maximize2, ZoomIn, ZoomOut
 } from "lucide-react";
 import {
   useListInstruments, useCreateInstrument, useUpdateInstrument, useDeleteInstrument, getListInstrumentsQueryKey,
@@ -61,7 +61,7 @@ export function MarketMonitor() {
 
   return (
     <div className="page-wrap">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-8">
+      <div className="page-heading flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-8">
         <div>
           <div className="eyebrow mb-3">Coverage</div>
           <h1 className="display text-3xl md:text-4xl font-bold">Market Monitor</h1>
@@ -70,24 +70,6 @@ export function MarketMonitor() {
             Closed, stale, and unavailable data remain visibly distinct.
           </p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
-        <Stat label="Instruments" value={sumData?.instrumentCount ?? 0} icon={BarChart3} />
-        <Stat label="Data Sources" value={sumData?.sourceCount ?? 0} icon={Database} sub={`${sumData?.connectedSourceCount ?? 0} connected`} />
-        <Stat label="Timeframes" value={sumData?.timeframeCount ?? 0} icon={Clock} />
-        <Stat label="Stored Candles" value={sumData?.candleCount ?? 0} icon={DatabaseZap} sub={sumData?.latestDataAt ? `Latest: ${new Date(sumData.latestDataAt).toLocaleDateString()}` : "No data yet"} />
-      </div>
-      <div className="panel p-4 md:p-5 mb-5">
-        <div className="eyebrow mb-3">Provider-neutral data path</div>
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-          {["BiQuote adapter", "Market data service", "Normalized data", "Strategy engine"].map((step, index) => (
-            <div key={step} className="rounded-md bg-secondary/55 px-3 py-3 text-xs font-semibold flex items-center justify-between gap-2">
-              <span>{step}</span>{index < 3 && <span className="text-primary hidden sm:inline">→</span>}
-            </div>
-          ))}
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-3">BiQuote is enabled for this personal development workspace only. No trades are placed and no recommendations are generated.</p>
       </div>
 
       <div className="panel p-1 flex overflow-x-auto gap-1 mb-5">
@@ -100,6 +82,35 @@ export function MarketMonitor() {
         saveMarketSelection(result.instrument.id, result.timeframe.id);
         setTab("live-chart");
       }} />}
+
+      <details className="panel market-context-panel">
+        <summary className="market-context-summary">
+          <span>
+            <span className="eyebrow">Data coverage</span>
+            <span className="block text-sm font-semibold mt-1">Provider and storage context</span>
+          </span>
+          <span className="text-xs text-muted-foreground">View details</span>
+        </summary>
+        <div className="px-4 pb-4 md:px-5 md:pb-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Stat label="Instruments" value={sumData?.instrumentCount ?? 0} icon={BarChart3} />
+            <Stat label="Data Sources" value={sumData?.sourceCount ?? 0} icon={Database} sub={`${sumData?.connectedSourceCount ?? 0} connected`} />
+            <Stat label="Timeframes" value={sumData?.timeframeCount ?? 0} icon={Clock} />
+            <Stat label="Stored Candles" value={sumData?.candleCount ?? 0} icon={DatabaseZap} sub={sumData?.latestDataAt ? `Latest: ${new Date(sumData.latestDataAt).toLocaleDateString()}` : "No data yet"} />
+          </div>
+          <div className="rounded-md bg-secondary/45 p-4 mt-4">
+            <div className="eyebrow mb-3">Provider-neutral data path</div>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+              {["BiQuote adapter", "Market data service", "Normalized data", "Strategy engine"].map((step, index) => (
+                <div key={step} className="rounded-md bg-secondary/55 px-3 py-3 text-xs font-semibold flex items-center justify-between gap-2">
+                  <span>{step}</span>{index < 3 && <span className="text-primary hidden sm:inline">→</span>}
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-3">BiQuote is enabled for this personal development workspace only. No trades are placed and no recommendations are generated.</p>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }
@@ -580,36 +591,88 @@ function MarketEconomicEvents({ instrument }: { instrument: Instrument }) {
 }
 
 function CandleSvg({ bars }: { bars: Array<{ openTime: string; open: number; high: number; low: number; close: number; isClosed: boolean }> }) {
+  const [windowSize, setWindowSize] = useState(() => Math.min(60, bars.length));
+  const [start, setStart] = useState(() => Math.max(0, bars.length - Math.min(60, bars.length)));
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  useEffect(() => {
+    const nextWindow = Math.min(Math.max(20, windowSize || 20), bars.length);
+    setWindowSize(nextWindow);
+    setStart(Math.max(0, bars.length - nextWindow));
+    setHoveredIndex(null);
+  }, [bars.length]);
+  const visibleBars = bars.slice(start, start + windowSize);
+  const maxStart = Math.max(0, bars.length - windowSize);
+  const zoomIn = () => {
+    const nextWindow = Math.max(20, Math.floor(windowSize * 0.75));
+    const delta = Math.max(1, windowSize - nextWindow);
+    setWindowSize(nextWindow);
+    setStart(current => Math.min(Math.max(0, bars.length - nextWindow), current + Math.floor(delta / 2)));
+  };
+  const zoomOut = () => {
+    const nextWindow = Math.min(bars.length, Math.ceil(windowSize * 1.25));
+    const delta = Math.max(1, nextWindow - windowSize);
+    setWindowSize(nextWindow);
+    setStart(current => Math.max(0, current - Math.floor(delta / 2)));
+  };
+  const pan = (direction: number) => setStart(current => Math.min(maxStart, Math.max(0, current + direction * Math.max(5, Math.floor(windowSize / 3)))));
+  const fit = () => {
+    setWindowSize(bars.length);
+    setStart(0);
+  };
+  const latest = () => setStart(maxStart);
   const width = 900;
   const height = 360;
   const pad = { top: 20, right: 20, bottom: 30, left: 20 };
-  const highs = bars.map(bar => bar.high);
-  const lows = bars.map(bar => bar.low);
+  const highs = visibleBars.map(bar => bar.high);
+  const lows = visibleBars.map(bar => bar.low);
   const high = Math.max(...highs);
   const low = Math.min(...lows);
   const range = high - low || Math.max(Math.abs(high) * 0.01, 1);
   const chartHeight = height - pad.top - pad.bottom;
   const chartWidth = width - pad.left - pad.right;
-  const xStep = chartWidth / Math.max(bars.length, 1);
+  const xStep = chartWidth / Math.max(visibleBars.length, 1);
   const y = (value: number) => pad.top + ((high - value) / range) * chartHeight;
   return (
-    <div className="overflow-x-auto">
+    <div>
+      <div className="chart-toolbar">
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="mono">{start + 1}–{Math.min(start + visibleBars.length, bars.length)}</span>
+          <span>of {bars.length} loaded candles</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          <button className="btn btn-ghost chart-control" type="button" onClick={() => pan(-1)} disabled={start === 0} aria-label="Pan chart backwards"><ChevronLeft size={14}/></button>
+          <button className="btn btn-ghost chart-control" type="button" onClick={zoomOut} disabled={windowSize >= bars.length} aria-label="Zoom out"><ZoomOut size={14}/></button>
+          <button className="btn btn-ghost chart-control" type="button" onClick={zoomIn} disabled={windowSize <= 20} aria-label="Zoom in"><ZoomIn size={14}/></button>
+          <button className="btn btn-ghost chart-control" type="button" onClick={() => pan(1)} disabled={start >= maxStart} aria-label="Pan chart forwards"><ChevronRight size={14}/></button>
+          <button className="btn btn-secondary chart-control-wide" type="button" onClick={latest} disabled={start >= maxStart}><Maximize2 size={13}/> Latest</button>
+          <button className="btn btn-secondary chart-control-wide" type="button" onClick={fit} disabled={windowSize >= bars.length}><Maximize2 size={13}/> Fit</button>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[680px] h-[300px] md:h-[360px]" role="img" aria-label="BiQuote candlestick chart">
         <line x1={pad.left} x2={width - pad.right} y1={height - pad.bottom} y2={height - pad.bottom} stroke="hsl(var(--border))" />
-        {bars.map((bar, index) => {
+        {visibleBars.map((bar, index) => {
           const x = pad.left + xStep * index + xStep / 2;
           const candleWidth = Math.max(3, Math.min(12, xStep * 0.55));
           const rising = bar.close >= bar.open;
           const color = bar.isClosed ? (rising ? "hsl(var(--primary))" : "hsl(var(--destructive))") : "hsl(var(--accent))";
           const bodyTop = y(Math.max(bar.open, bar.close));
           const bodyHeight = Math.max(2, Math.abs(y(bar.open) - y(bar.close)));
-          return <g key={`${bar.openTime}-${index}`}><line x1={x} x2={x} y1={y(bar.high)} y2={y(bar.low)} stroke={color} strokeWidth="1.5" /><rect x={x - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={color} rx="1" /></g>;
+          return <g key={`${bar.openTime}-${index}`} onMouseEnter={() => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)}><title>{`${new Date(bar.openTime).toLocaleString()} · O ${bar.open.toFixed(5)} · H ${bar.high.toFixed(5)} · L ${bar.low.toFixed(5)} · C ${bar.close.toFixed(5)}`}</title>{hoveredIndex === index && <line x1={x} x2={x} y1={pad.top} y2={height - pad.bottom} stroke="hsl(var(--accent))" strokeDasharray="3 4" />}<line x1={x} x2={x} y1={y(bar.high)} y2={y(bar.low)} stroke={color} strokeWidth="1.5" /><rect x={x - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={color} rx="1" /></g>;
         })}
-        <text x={pad.left} y={height - 8} fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(bars[0].openTime).toLocaleString()}</text>
-        <text x={width - pad.right} y={height - 8} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(bars[bars.length - 1].openTime).toLocaleString()}</text>
+        <text x={pad.left} y={height - 8} fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(visibleBars[0].openTime).toLocaleString()}</text>
+        <text x={width - pad.right} y={height - 8} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{new Date(visibleBars[visibleBars.length - 1].openTime).toLocaleString()}</text>
         <text x={width - pad.right} y={pad.top + 10} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{high.toFixed(5)}</text>
         <text x={width - pad.right} y={height - pad.bottom - 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10">{low.toFixed(5)}</text>
       </svg>
+      </div>
+      {hoveredIndex != null && visibleBars[hoveredIndex] && <div className="chart-hover-readout" role="status">
+        <span className="mono">{new Date(visibleBars[hoveredIndex].openTime).toLocaleString()}</span>
+        <span>O {visibleBars[hoveredIndex].open.toFixed(5)}</span>
+        <span>H {visibleBars[hoveredIndex].high.toFixed(5)}</span>
+        <span>L {visibleBars[hoveredIndex].low.toFixed(5)}</span>
+        <span>C {visibleBars[hoveredIndex].close.toFixed(5)}</span>
+      </div>}
       <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground mt-2"><span><i className="inline-block w-2 h-2 rounded-sm bg-primary mr-1" />up</span><span><i className="inline-block w-2 h-2 rounded-sm bg-destructive mr-1" />down</span><span><i className="inline-block w-2 h-2 rounded-sm bg-accent mr-1" />forming from genuine ticks</span></div>
     </div>
   );
