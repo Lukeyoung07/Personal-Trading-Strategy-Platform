@@ -11,7 +11,9 @@ router.post("/assistant/chat", async (req, res): Promise<void> => {
     return;
   }
   const response = await answerAssistant(parsed.data);
-  res.json(ChatAssistantResponse.parse(response));
+  const statusCode = response.status === "rate_limited" ? 429 : response.status === "unavailable" ? 503 : 200;
+  if (response.status === "rate_limited") res.setHeader("Retry-After", "60");
+  res.status(statusCode).json(ChatAssistantResponse.parse(response));
 });
 
 export default router;

@@ -151,6 +151,10 @@ function truncate(text: string, maxLength = 300): string {
 function buildErrorMessage(response: Response, data: unknown): string {
   const prefix = `HTTP ${response.status} ${response.statusText}`;
 
+  if (response.status === 429) return `${prefix}: Too many requests. Please try again shortly.`;
+  if (response.status === 413) return `${prefix}: The request is too large.`;
+  if (response.status >= 500) return `${prefix}: The service is temporarily unavailable.`;
+
   if (typeof data === "string") {
     const text = data.trim();
     return text ? `${prefix}: ${truncate(text)}` : prefix;

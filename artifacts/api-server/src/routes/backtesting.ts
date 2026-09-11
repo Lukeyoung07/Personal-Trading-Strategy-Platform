@@ -22,6 +22,16 @@ import { runHistoricalBacktest, validateHistoricalBacktestStrategy } from "../se
 import { calculateBacktestStatistics } from "../services/backtest-results";
 
 const router: IRouter = Router();
+const activeBacktests = new Set<number>();
+const inFlightBacktestRequests = new Map<string, Promise<any>>();
+
+function publicBacktestError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (/not compatible|insufficient historical data|not configured|no longer exists|no executable|not supported|risk rules mention/i.test(message)) {
+    return message;
+  }
+  return "Historical backtest failed while retrieving market data or saving results.";
+}
 
 function backtestView(row: {
   configuration: typeof backtestConfigurationsTable.$inferSelect;
@@ -79,7 +89,7 @@ async function findBacktest(id: number) {
   return row ? backtestView({ ...row, statistics: await statisticsForBacktest(id) }) : null;
 }
 
-async function executeBacktest(backtestId: number) {
+async function executeBacktestInternal(backtestId: number) {
   const [configuration] = await db
     .select()
     .from(backtestConfigurationsTable)
@@ -207,11 +217,21 @@ async function executeBacktest(backtestId: number) {
     await db.update(backtestConfigurationsTable).set({
       status: "failed",
       resultMessage: null,
-      errorMessage: error instanceof Error ? error.message : "Historical backtest failed.",
+      errorMessage: publicBacktestError(error),
       completedAt: new Date(),
     }).where(eq(backtestConfigurationsTable.id, backtestId));
   }
   return findBacktest(backtestId);
+}
+
+async function executeBacktest(backtestId: number) {
+  if (activeBacktests.has(backtestId)) return findBacktest(backtestId);
+  activeBacktests.add(backtestId);
+  try {
+    return await executeBacktestInternal(backtestId);
+  } finally {
+    activeBacktests.delete(backtestId);
+  }
 }
 
 router.get("/backtests", async (_req, res): Promise<void> => {
@@ -242,6 +262,10 @@ router.post("/backtests", async (req, res): Promise<void> => {
     return;
   }
   const { strategyId, strategyVersionId, instrumentId, timeframeId, startDate, endDate } = parsed.data;
+  if (![strategyId, strategyVersionId, instrumentId, timeframeId].every(value => Number.isInteger(value) && value > 0)) {
+    res.status(400).json({ error: "Strategy, version, instrument, and timeframe IDs must be positive integers." });
+    return;
+  }
   if (startDate >= endDate) {
     res.status(400).json({ error: "Start date must be before end date." });
     return;
@@ -292,18 +316,33 @@ router.post("/backtests", async (req, res): Promise<void> => {
     return;
   }
 
-  const [created] = await db.insert(backtestConfigurationsTable).values({
-    strategyId,
-    strategyVersionId,
-    instrumentId,
-    timeframeId,
-    preset: parsed.data.preset,
-    startDate,
-    endDate,
-    status: "pending",
-  }).returning();
-  const result = await executeBacktest(created.id);
-  res.status(201).json(CreateBacktestResponse.parse(result));
+  const requestKey = JSON.stringify({ strategyId, strategyVersionId, instrumentId, timeframeId, preset: parsed.data.preset, startDate, endDate });
+  const existingRequest = inFlightBacktestRequests.get(requestKey);
+  if (existingRequest) {
+    const result = await existingRequest;
+    res.status(200).json(CreateBacktestResponse.parse(result));
+    return;
+  }
+  const request = (async () => {
+    const [created] = await db.insert(backtestConfigurationsTable).values({
+      strategyId,
+      strategyVersionId,
+      instrumentId,
+      timeframeId,
+      preset: parsed.data.preset,
+      startDate,
+      endDate,
+      status: "pending",
+    }).returning();
+    return executeBacktest(created.id);
+  })();
+  inFlightBacktestRequests.set(requestKey, request);
+  try {
+    const result = await request;
+    res.status(201).json(CreateBacktestResponse.parse(result));
+  } finally {
+    inFlightBacktestRequests.delete(requestKey);
+  }
 });
 
 router.get("/backtests/:backtestId", async (req, res): Promise<void> => {

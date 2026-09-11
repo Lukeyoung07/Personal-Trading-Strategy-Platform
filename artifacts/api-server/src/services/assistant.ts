@@ -19,6 +19,8 @@ const OPENROUTER_MODEL = "openrouter/free";
 const OPENROUTER_TIMEOUT_MS = 60000;
 const UNAVAILABLE_MESSAGE = "AI Assistant is currently unavailable.";
 const RATE_LIMIT_MESSAGE = "AI is temporarily unavailable because the free AI service has reached its current limit. Please try again later.";
+const PROVIDER_TEMPORARY_MESSAGE = "The AI provider is temporarily unavailable. Please try again shortly.";
+const TIMEOUT_MESSAGE = "The AI provider took too long to respond. Please try again shortly.";
 const NO_BACKTEST_MESSAGE = "I need a completed backtest to explain. Open a completed backtest result first, then ask me to explain it.";
 
 type AssistantInput = typeof ChatAssistantBody._output;
@@ -55,15 +57,96 @@ function normalizeConditionRule(condition: any) {
 
 function compatibleRiskRules(rules: string | null | undefined) {
   if (!rules?.trim() || !/(?:stop[- ]loss|sl|take[- ]profit|tp)/i.test(rules)) return true;
+  if (/(?:risk[\/ -]?reward|percentage risk|risk per trade|position siz(?:e|ing)|maximum risk|max(?:imum)? risk)/i.test(rules)) return false;
   const hasStopLoss = /(?:stop[- ]loss|sl)\s*[:=]?\s*\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%\s*(?:stop[- ]loss|sl)/i.test(rules);
   const hasTakeProfit = /(?:take[- ]profit|tp)\s*[:=]?\s*\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%\s*(?:take[- ]profit|tp)/i.test(rules);
   return hasStopLoss && hasTakeProfit;
 }
 
+type UnsupportedConceptDefinition = {
+  pattern: RegExp;
+  name: string;
+  explanation?: string;
+};
+
+const UNSUPPORTED_CONCEPTS: UnsupportedConceptDefinition[] = [
+  { pattern: /\b(?:hh|higher high)\b/i, name: "Higher High" },
+  { pattern: /\b(?:hl|higher low)\b/i, name: "Higher Low" },
+  { pattern: /\b(?:lh|lower high)\b/i, name: "Lower High" },
+  { pattern: /\b(?:ll|lower low)\b/i, name: "Lower Low" },
+  { pattern: /\b(?:bos|break of structure)\b/i, name: "Break of Structure" },
+  { pattern: /\b(?:choch|change of character)\b/i, name: "Change of Character" },
+  { pattern: /\bbuy[- ]?side liquidity\b|\bbuy[- ]?side\b/i, name: "Buy-side Liquidity" },
+  { pattern: /\bsell[- ]?side liquidity\b|\bsell[- ]?side\b/i, name: "Sell-side Liquidity" },
+  { pattern: /\bliquidity sweep\b/i, name: "Liquidity Sweep" },
+  { pattern: /\bliquidity grab\b/i, name: "Liquidity Grab" },
+  { pattern: /\bequal highs?\b/i, name: "Equal Highs" },
+  { pattern: /\bequal lows?\b/i, name: "Equal Lows" },
+  { pattern: /\bprevious high liquidity\b/i, name: "Previous High Liquidity" },
+  { pattern: /\bprevious low liquidity\b/i, name: "Previous Low Liquidity" },
+  { pattern: /\bsupport\b/i, name: "Support" },
+  { pattern: /\bresistance\b/i, name: "Resistance" },
+  { pattern: /\bbreak(?:\s+and|\/)\s*retest\b|\bbreak and retest\b/i, name: "Break and Retest" },
+  { pattern: /\brejection candle\b/i, name: "Rejection Candle" },
+  { pattern: /\brejection\b/i, name: "Rejection" },
+  { pattern: /\bprevious day high\b/i, name: "Previous Day High" },
+  { pattern: /\bprevious day low\b/i, name: "Previous Day Low" },
+  { pattern: /\bprevious week high\b/i, name: "Previous Week High" },
+  { pattern: /\bprevious week low\b/i, name: "Previous Week Low" },
+  { pattern: /\bsupply\b/i, name: "Supply" },
+  { pattern: /\bdemand\b/i, name: "Demand" },
+  { pattern: /\bzone reaction\b/i, name: "Zone Reaction" },
+  { pattern: /\bzone retest\b/i, name: "Zone Retest" },
+  { pattern: /\b(?:bullish|bearish)\s+fvg\b/i, name: "Fair Value Gap (FVG)" },
+  { pattern: /\bfvg\s+fill|fair value gap\s+fill\b/i, name: "FVG Fill" },
+  { pattern: /\bfvg\s+retest|fair value gap\s+retest\b/i, name: "FVG Retest" },
+  { pattern: /\binverse fair value gap\b|\bifvg\b/i, name: "Inverse Fair Value Gap (IFVG)" },
+  { pattern: /\bfair value gap\b|\bfvg\b/i, name: "Fair Value Gap (FVG)" },
+  { pattern: /\bbullish order block\b/i, name: "Bullish Order Block" },
+  { pattern: /\bbearish order block\b/i, name: "Bearish Order Block" },
+  { pattern: /\border block retest\b/i, name: "Order Block Retest" },
+  { pattern: /\bbreaker block\b/i, name: "Breaker Block" },
+  { pattern: /\border block\b/i, name: "Order Block" },
+  { pattern: /\bdisplacement\b/i, name: "Displacement" },
+  { pattern: /\bbreakout\b/i, name: "Breakout" },
+  { pattern: /\bpullback\b/i, name: "Pullback" },
+  { pattern: /\bretest\b/i, name: "Retest" },
+  { pattern: /\bpremium\b/i, name: "Premium" },
+  { pattern: /\bdiscount\b/i, name: "Discount" },
+  { pattern: /\bequilibrium\b/i, name: "Equilibrium" },
+  { pattern: /\bhigher[- ]timeframe\s+bias\b|\bhtf bias\b|\b\d+\s*h\b[^.!?]{0,30}\bbias\b/i, name: "Higher-timeframe bias" },
+  { pattern: /\blower[- ]timeframe\s+confirmation\b|\bltf confirmation\b/i, name: "Lower-timeframe confirmation" },
+  { pattern: /\bhigher[- ]timeframe levels?\b|\bhtf levels?\b/i, name: "Higher-timeframe levels" },
+  { pattern: /\bmultiple[- ]timeframe analysis\b/i, name: "Multi-timeframe analysis" },
+  { pattern: /\bmulti[- ]timeframe\b|\b\d+\s*h\b.*\b\d+\s*m\b/i, name: "Multi-timeframe analysis" },
+  { pattern: /\bhigher[- ]timeframe\b/i, name: "Higher-timeframe bias" },
+  { pattern: /\blower[- ]timeframe\b/i, name: "Lower-timeframe confirmation" },
+  { pattern: /\birl\b/i, name: "IRL" },
+  { pattern: /\berl\b/i, name: "ERL" },
+  { pattern: /\bsmt divergence\b|\bsmt\b/i, name: "SMT Divergence" },
+  { pattern: /\bamd\b|power of 3/i, name: "AMD / Power of 3" },
+  { pattern: /\bema\b|exponential moving average/i, name: "Exponential Moving Average (EMA)" },
+  { pattern: /\bsma\b|simple moving average/i, name: "Simple Moving Average (SMA)" },
+  { pattern: /\bprice\s+(?:above|below)\s+(?:the\s+)?ema\b/i, name: "Price above/below EMA" },
+  { pattern: /\bema crossover\b/i, name: "EMA Crossover" },
+  { pattern: /\bema rejection\b/i, name: "EMA Rejection" },
+  { pattern: /\bema trend confirmation\b/i, name: "EMA Trend Confirmation" },
+  { pattern: /\brisk[\/ -]?reward\b|\br:r\b/i, name: "Risk / Reward" },
+  { pattern: /\bpercentage risk\b|\brisk per trade\b/i, name: "Percentage Risk" },
+  { pattern: /\bposition sizing\b|\bposition size\b/i, name: "Position Sizing" },
+  { pattern: /\bmaximum risk\b|\bmax(?:imum)? risk\b/i, name: "Maximum Risk per Trade" },
+  { pattern: /\bstop[- ]loss\b|\bfixed stop\b/i, name: "Stop Loss" },
+  { pattern: /\btake[- ]profit\b|\bfixed take\b/i, name: "Take Profit" },
+];
+
+function unsupportedConceptForText(value: string): UnsupportedConceptDefinition | null {
+  return UNSUPPORTED_CONCEPTS.find(concept => concept.pattern.test(value)) || null;
+}
+
 function compatibilityForDraft(draft: any) {
   const conditions = Array.isArray(draft?.conditions) ? draft.conditions : [];
   const unsupported: string[] = conditions
-    .filter((condition: any) => !supportedRule(normalizeConditionRule(condition)))
+    .filter((condition: any) => condition?.supported !== true || !supportedRule(normalizeConditionRule(condition)))
     .map((condition: any) => String(condition?.name || condition?.triggerRules || "Unnamed condition"));
   const unsupportedConcepts = Array.isArray(draft?.conceptsUsed)
     ? draft.conceptsUsed
@@ -79,16 +162,21 @@ function compatibilityForDraft(draft: any) {
 }
 
 function knownUnsupportedConcept(name: string) {
-  return /fair value gap|\bfvg\b|ifvg|liquidity sweep|liquidity grab|buy[- ]side liquidity|sell[- ]side liquidity|equal highs?|equal lows?|order block|breaker block|supply|demand|premium|discount|equilibrium|higher[- ]timeframe|lower[- ]timeframe|multi[- ]timeframe|\bema\b|\bsma\b|moving average|break of structure|\bbos\b|change of character|\bchoch\b|smt divergence|\bamd\b|power of 3|\birl\b|\berl\b|session concept|position sizing|maximum risk|risk.reward|stop loss|take profit|fixed stop|fixed take/i.test(name);
+  return unsupportedConceptForText(name) !== null;
 }
 
 function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName: string; supported: boolean }>) {
   const concepts = new Map<string, { name: string; supported: boolean; explanation: string }>();
   const addConcept = (raw: any, fallbackName?: string) => {
-    const name = String(typeof raw === "string" ? raw : raw?.name || fallbackName || "").trim().slice(0, 120);
-    if (!name) return;
-    const matchingConditions = conditions.filter(condition => condition.conceptName.toLowerCase() === name.toLowerCase());
-    const supported = knownUnsupportedConcept(name)
+    const rawName = String(typeof raw === "string" ? raw : raw?.name || fallbackName || "").trim().slice(0, 120);
+    if (!rawName) return;
+    const unsupportedConcept = unsupportedConceptForText(rawName);
+    const name = unsupportedConcept?.name || rawName;
+    const matchingConditions = conditions.filter(condition =>
+      condition.conceptName.toLowerCase() === rawName.toLowerCase() ||
+      condition.conceptName.toLowerCase() === name.toLowerCase(),
+    );
+    const supported = unsupportedConcept
       ? false
       : matchingConditions.length > 0
         ? matchingConditions.every(condition => condition.supported) && raw?.supported !== false
@@ -115,28 +203,25 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
 
 function conceptsRequestedInMessage(message: string) {
   const requested: Array<{ name: string; supported: false; explanation: string }> = [];
-  const add = (pattern: RegExp, name: string, explanation = "Understood by the assistant, but not currently executable by historical backtesting.") => {
-    if (pattern.test(message)) requested.push({ name, supported: false, explanation });
-  };
-  add(/fair value gap|\bfvg\b|ifvg/i, "Fair Value Gap (FVG)");
-  add(/liquidity sweep|liquidity grab/i, "Liquidity Sweep");
-  add(/market structure|\bbos\b|break of structure|choch|change of character/i, "Market Structure");
-  add(/support|resistance/i, "Support and Resistance");
-  add(/supply|demand/i, "Supply and Demand");
-  add(/order block|breaker block/i, "Order Block");
-  add(/premium|discount|equilibrium/i, "Premium / Discount");
-  add(/\bema\b|exponential moving average/i, "Exponential Moving Average (EMA)");
-  add(/\bsma\b|simple moving average/i, "Simple Moving Average (SMA)");
-  add(/higher[- ]timeframe|lower[- ]timeframe|\b\d+\s*h\b.*\b\d+\s*m\b|multi[- ]timeframe/i, "Higher-timeframe bias");
-  if (/higher[- ]timeframe|lower[- ]timeframe|\b\d+\s*h\b.*\b\d+\s*m\b|multi[- ]timeframe/i.test(message)) {
+  const seen = new Set<string>();
+  for (const concept of UNSUPPORTED_CONCEPTS) {
+    if (!concept.pattern.test(message) || seen.has(concept.name)) continue;
+    seen.add(concept.name);
+    requested.push({
+      name: concept.name,
+      supported: false,
+      explanation: concept.name === "Multi-timeframe analysis"
+        ? "The engine backtests one timeframe at a time and cannot combine higher-timeframe bias with lower-timeframe entries."
+        : concept.explanation || "Understood by the assistant, but not currently executable by historical backtesting.",
+    });
+  }
+  if (/\bhigher[- ]timeframe\b|\blower[- ]timeframe\b|\b\d+\s*h\b.*\b\d+\s*m\b|\bmulti[- ]timeframe\b/i.test(message) && !seen.has("Multi-timeframe analysis")) {
     requested.push({
       name: "Multi-timeframe analysis",
       supported: false,
       explanation: "The engine backtests one timeframe at a time and cannot combine higher-timeframe bias with lower-timeframe entries.",
     });
   }
-  add(/stop[- ]loss|\bsl\b/i, "Stop loss");
-  add(/take[- ]profit|\btp\b/i, "Take profit");
   return requested;
 }
 
@@ -173,17 +258,23 @@ function parseModelJson(content: string) {
 function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | "provider"> | null {
   if (!model || typeof model.reply !== "string" || !model.reply.trim()) return null;
   const draft = model.strategyDraft && typeof model.strategyDraft === "object" ? model.strategyDraft : null;
-  const conditions = draft && Array.isArray(draft.conditions) ? draft.conditions.map((condition: any) => ({
-    name: String(condition?.name || "Assistant condition").slice(0, 160),
-    stage: ["entry", "confirmation", "invalidation", "exit"].includes(condition?.stage) ? condition.stage : "entry",
-    requirement: condition?.requirement === "optional" ? "optional" : "required",
-    conceptName: supportedRule(normalizeConditionRule(condition)) && /(?:bullish|bearish|close|open)/i.test(`${condition?.triggerRules || ""} ${condition?.conceptName || ""}`)
-      ? "Candle Direction"
-      : String(condition?.conceptName || "Assistant draft").slice(0, 160),
-    timeframe: String(condition?.timeframe || "Not specified").slice(0, 40),
-    triggerRules: normalizeConditionRule(condition).slice(0, 400),
-    supported: supportedRule(normalizeConditionRule(condition)),
-  })).slice(0, 20) : [];
+  const conditions = draft && Array.isArray(draft.conditions) ? draft.conditions.map((condition: any) => {
+    const normalizedRule = normalizeConditionRule(condition);
+    const rawConceptName = String(condition?.conceptName || "Assistant draft").slice(0, 160);
+    const unsupportedConcept = unsupportedConceptForText(rawConceptName);
+    const ruleIsSupported = supportedRule(normalizedRule);
+    return {
+      name: String(condition?.name || "Assistant condition").slice(0, 160),
+      stage: ["entry", "confirmation", "invalidation", "exit"].includes(condition?.stage) ? condition.stage : "entry",
+      requirement: condition?.requirement === "optional" ? "optional" : "required",
+      conceptName: unsupportedConcept?.name || (ruleIsSupported && /(?:bullish|bearish|close|open)/i.test(`${condition?.triggerRules || ""} ${condition?.conceptName || ""}`)
+        ? "Candle Direction"
+        : rawConceptName),
+      timeframe: String(condition?.timeframe || "Not specified").slice(0, 40),
+      triggerRules: normalizedRule.slice(0, 400),
+      supported: ruleIsSupported && !unsupportedConcept,
+    };
+  }).slice(0, 20) : [];
   const conceptsUsed = draft ? normalizeConcepts(draft.conceptsUsed, conditions) : [];
   const compatibility = draft
     ? compatibilityForDraft({ ...draft, conditions, conceptsUsed })
@@ -220,18 +311,7 @@ function isStrategyDraftRequest(message: string) {
 }
 
 function unsupportedConceptFromRequest(message: string) {
-  const candidates = [
-    { pattern: /fair value gap|\bfvg\b|ifvg/i, name: "Fair Value Gap (FVG)" },
-    { pattern: /liquidity sweep|liquidity grab/i, name: "Liquidity Sweep" },
-    { pattern: /order block|breaker block/i, name: "Order Block" },
-    { pattern: /market structure|\bbos\b|break of structure|choch|change of character/i, name: "Market Structure" },
-    { pattern: /\bema\b|exponential moving average/i, name: "Exponential Moving Average (EMA)" },
-    { pattern: /\bsma\b|simple moving average/i, name: "Simple Moving Average (SMA)" },
-    { pattern: /support|resistance/i, name: "Support and Resistance" },
-    { pattern: /supply|demand/i, name: "Supply and Demand" },
-    { pattern: /premium|discount|equilibrium/i, name: "Premium / Discount" },
-  ];
-  return candidates.find(candidate => candidate.pattern.test(message)) || {
+  return unsupportedConceptForText(message) || {
     name: "Requested strategy concept",
     pattern: /./i,
   };
@@ -539,13 +619,15 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
       }),
     });
     if (!upstream.ok) {
-      const errorBody = await upstream.text();
+      await upstream.text();
       logger.warn({
         upstreamStatus: upstream.status,
-        responseBody: errorBody.slice(0, 500),
       }, "OpenRouter assistant request was rejected");
-      if (upstream.status === 429 || upstream.status === 503 || upstream.status === 502) {
+      if (upstream.status === 429) {
         return ChatAssistantResponse.parse({ status: "rate_limited", reply: RATE_LIMIT_MESSAGE, provider: OPENROUTER_MODEL, intent: null, strategyDraft: null, compatibility: null, backtestSetup: null });
+      }
+      if (upstream.status === 502 || upstream.status === 503 || upstream.status === 504) {
+        return ChatAssistantResponse.parse({ status: "unavailable", reply: PROVIDER_TEMPORARY_MESSAGE, provider: OPENROUTER_MODEL, intent: null, strategyDraft: null, compatibility: null, backtestSetup: null });
       }
       throw new Error(`OpenRouter request failed with status ${upstream.status}`);
     }
@@ -575,10 +657,9 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
     return ChatAssistantResponse.parse({ status: "available", provider: OPENROUTER_MODEL, ...parsed, backtestSetup });
   } catch (error) {
     logger.warn({
-      error: error instanceof Error ? error.message : "Unknown assistant error",
-      timedOut: controller.signal.aborted,
+      failureType: controller.signal.aborted ? "timeout" : "provider_or_server_error",
     }, "OpenRouter assistant request failed");
-    return ChatAssistantResponse.parse({ status: "unavailable", reply: UNAVAILABLE_MESSAGE, provider: OPENROUTER_MODEL, intent: null, strategyDraft: null, compatibility: null, backtestSetup: null });
+    return ChatAssistantResponse.parse({ status: "unavailable", reply: controller.signal.aborted ? TIMEOUT_MESSAGE : UNAVAILABLE_MESSAGE, provider: OPENROUTER_MODEL, intent: null, strategyDraft: null, compatibility: null, backtestSetup: null });
   } finally {
     clearTimeout(timeout);
   }
