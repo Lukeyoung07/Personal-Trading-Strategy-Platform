@@ -1,0 +1,68 @@
+Complete QA task #12 only.
+
+Do not add new product features.
+Do not redesign anything.
+Do not change existing trading logic, monitoring calculations, AI, backtesting, Journal, or provider behaviour.
+
+The remaining QA gap is exercising every Strategy Monitoring state with a compatible monitoring fixture.
+
+Create only temporary test data/fixtures necessary to safely exercise the existing Strategy Monitoring workflow.
+
+Verify the existing monitoring system can correctly display and transition through:
+
+- MET
+- NOT MET
+- WAITING
+- INVALID
+
+Also verify:
+
+- Missing market data
+- Missing/unregistered detector/condition handling
+- Closed-candle-only evaluation
+- Correct active strategy version
+- Correct strategy/version association
+- Correct monitoring state after a candle evaluation
+- No incorrect state transitions
+- No duplicate durable alerts from repeated evaluations
+- Meaningful MET transitions create the expected alert history
+- Meaningful INVALID transitions create the expected alert history
+
+Use temporary test fixtures only.
+
+Do not modify or delete existing user/project data.
+
+Clean up all temporary test data after verification.
+
+IMPORTANT:
+If a state cannot genuinely be reproduced because the existing architecture/data does not allow it, do NOT fake the result. Clearly report which state could not be exercised and why.
+
+After testing:
+
+- Run relevant API tests
+- Run relevant frontend tests
+- Run API typecheck
+- Run frontend typecheck
+- Run production builds if affected
+- Run git diff --check
+- Perform a final browser verification
+
+Do not make unrelated changes.
+
+FINAL REPORT:
+
+Tell me:
+
+1. Which monitoring states were successfully exercised.
+2. How each state was triggered.
+3. Whether each state displayed correctly.
+4. Whether alerts behaved correctly.
+5. Whether temporary fixtures were completely removed.
+6. Any bugs found and fixed.
+7. Any states that could not be reproduced.
+8. Tests passed.
+9. Typechecks passed.
+10. Build results.
+11. Final browser verification result.
+
+If no bug is found, say so clearly.
