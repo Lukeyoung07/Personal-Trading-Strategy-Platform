@@ -347,14 +347,37 @@ function Alerts() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<Alert | null | false>(false);
   const [confirm, setConfirm] = useState<Alert | null>(null);
-  const [view, setView] = useState<'all' | 'reminders' | 'monitoring'>('all');
+  const [view, setView] = useState<'all' | 'price' | 'monitoring' | 'reminders'>('all');
+  const isPriceAlert = (alert: Alert) => alert.sourceType === "manual" && /^price (above|below)$/i.test(alert.condition.trim()) && Boolean(alert.threshold);
+  const categoryFor = (alert: Alert) => alert.sourceType === "monitoring" ? "monitoring" : isPriceAlert(alert) ? "price" : "reminders";
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: getListAlertsQueryKey() });
     qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
   };
-  const visibleAlerts = (q.data || []).filter((alert: Alert) => (
-    view === 'all' || (view === 'reminders' ? alert.sourceType === 'manual' : alert.sourceType === 'monitoring')
-  ));
+  const visibleAlerts = (q.data || []).filter((alert: Alert) => view === 'all' || categoryFor(alert) === view);
+  const statusControl = (alert: Alert) => {
+    const category = categoryFor(alert);
+    if (category === "monitoring") {
+      return alert.status === "triggered"
+        ? <button className="tag tag-triggered" onClick={() => u.mutate({ alertId: alert.id, data: { status: "acknowledged" } }, { onSuccess: invalidate })} data-testid={`button-ack-alert-${alert.id}`}>Acknowledge</button>
+        : <span className={`tag tag-${alert.status}`}>{alert.status}</span>;
+    }
+    if (category === "price" && alert.status === "triggered") {
+      return <button className="tag tag-triggered" onClick={() => u.mutate({ alertId: alert.id, data: { status: "acknowledged" } }, { onSuccess: invalidate })} data-testid={`button-ack-alert-${alert.id}`}>Acknowledge</button>;
+    }
+    return <button className={`tag tag-${alert.status}`} onClick={() => u.mutate({ alertId: alert.id, data: { status: alert.status === "active" ? "paused" : "active" } }, { onSuccess: invalidate })} data-testid={`button-toggle-alert-${alert.id}`}>{alert.status}</button>;
+  };
+  const alertDetails = (alert: Alert) => {
+    const category = categoryFor(alert);
+    if (category === "monitoring") {
+      return <><div className="font-semibold">{alert.strategyName || alert.name.replace(/ monitoring$/i, "")}</div><div className="text-[11px] text-muted-foreground">{alert.versionNumber ? `Exact version v${alert.versionNumber}` : "Exact version unavailable"}{alert.triggeredAt ? ` · ${new Date(alert.triggeredAt).toLocaleString()}` : ""}</div></>;
+    }
+    return <><div className="font-semibold">{alert.name}</div><div className="text-[11px] text-muted-foreground">{category === "price" ? "Price alert" : "Manual reminder"} · created {new Date(alert.createdAt).toLocaleString()}</div></>;
+  };
+  const alertExplanation = (alert: Alert) => {
+    if (categoryFor(alert) === "monitoring") return <><div>{alert.threshold || "Monitoring transition"}</div><div className="text-[11px] text-muted-foreground mt-1">{alert.message || "The monitored strategy changed state."}</div></>;
+    return <>{alert.condition}{alert.threshold && ` · trigger ${alert.threshold}`}</>;
+  };
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -372,26 +395,27 @@ function Alerts() {
   };
   return <Page eyebrow="Review" title="Alerts" description="Review manual reminders and monitoring-generated events that need attention. No external delivery or trade execution is performed." action={<button className="btn btn-primary" onClick={() => setModal(null)} data-testid="button-create-alert"><Plus size={15} /> New reminder</button>}>
     {q.isLoading ? <LoadingBlock /> : q.isError ? <ErrorState retry={() => q.refetch()} /> : <>
-      <div className="panel p-1 flex flex-wrap gap-1 mb-5 max-w-xl" role="tablist" aria-label="Alert type">
+       <div className="panel p-1 grid grid-cols-2 md:flex md:flex-wrap gap-1 mb-5 max-w-2xl" role="tablist" aria-label="Alert type">
         {([
           ['all', 'All alerts'],
+           ['price', 'Price alerts'],
+           ['monitoring', 'Monitoring events'],
           ['reminders', 'Reminders'],
-          ['monitoring', 'Monitoring events'],
         ] as const).map(([value, label]) => (
           <button key={value} type="button" role="tab" aria-selected={view === value} className={`btn flex-1 min-w-[120px] ${view === value ? 'bg-secondary text-foreground' : 'btn-ghost'}`} onClick={() => setView(value)} data-testid={`button-alert-view-${value}`}>
             {label}
           </button>
         ))}
       </div>
-      {visibleAlerts.length ? <div className="panel table-wrap"><table><thead><tr><th>Alert</th><th>Market</th><th>Rule</th><th>Status</th><th /></tr></thead><tbody>
+       {visibleAlerts.length ? <><div className="panel table-wrap hidden md:block"><table><thead><tr><th>Alert</th><th>Market</th><th>Rule / reason</th><th>Status</th><th /></tr></thead><tbody>
       {visibleAlerts.map((alert: Alert) => <tr key={alert.id} data-testid={`row-alert-${alert.id}`}>
-        <td><div className="font-semibold">{alert.name}</div><div className="text-[11px] text-muted-foreground">{alert.sourceType === "monitoring" ? "Monitoring event" : "Manual reminder"}{alert.triggeredAt ? ` · ${new Date(alert.triggeredAt).toLocaleString()}` : ""}</div></td>
+         <td>{alertDetails(alert)}</td>
         <td className="mono">{alert.marketSymbol || "—"}</td>
-        <td className="text-muted-foreground">{alert.message || alert.condition}{alert.threshold && ` · ${alert.threshold}`}</td>
-        <td>{alert.sourceType === "monitoring" ? <button className={`tag tag-${alert.status}`} onClick={() => alert.status === "triggered" && u.mutate({ alertId: alert.id, data: { status: "acknowledged" } }, { onSuccess: invalidate })} disabled={alert.status === "acknowledged"} data-testid={`button-ack-alert-${alert.id}`}>{alert.status === "triggered" ? "Acknowledge" : alert.status}</button> : <button className={`tag tag-${alert.status}`} onClick={() => u.mutate({ alertId: alert.id, data: { status: alert.status === "active" ? "paused" : "active" } }, { onSuccess: invalidate })} data-testid={`button-toggle-alert-${alert.id}`}>{alert.status}</button>}</td>
-        <td><div className="flex justify-end">{alert.sourceType === "manual" && <button className="btn btn-ghost" onClick={() => setModal(alert)} data-testid={`button-edit-alert-${alert.id}`}><Pencil size={13} /></button>}<button className="btn btn-ghost text-destructive" onClick={() => setConfirm(alert)} data-testid={`button-delete-alert-${alert.id}`}><Trash2 size={13} /></button></div></td>
+         <td className="text-muted-foreground">{alertExplanation(alert)}</td>
+         <td>{statusControl(alert)}</td>
+         <td><div className="flex justify-end">{categoryFor(alert) === "reminders" && <button className="btn btn-ghost" onClick={() => setModal(alert)} data-testid={`button-edit-alert-${alert.id}`}><Pencil size={13} /></button>}<button className="btn btn-ghost text-destructive" onClick={() => setConfirm(alert)} data-testid={`button-delete-alert-${alert.id}`}><Trash2 size={13} /></button></div></td>
       </tr>)}
-    </tbody></table></div> : <EmptyState icon={Bell} title={view === 'monitoring' ? "No monitoring events yet" : view === 'reminders' ? "No reminders yet" : "No alerts yet"} text={view === 'monitoring' ? "Monitoring-generated events will appear here when a monitored strategy changes state." : "Create a reminder for a review you want to keep in your workspace."} action={view !== 'monitoring' ? <button className="btn btn-primary" onClick={() => setModal(null)} data-testid="button-empty-create-alert"><Plus size={14} /> Create reminder</button> : undefined} />}
+     </tbody></table></div><div className="space-y-3 md:hidden">{visibleAlerts.map((alert: Alert) => <div key={alert.id} className="panel p-4" data-testid={`card-alert-${alert.id}`}><div className="flex items-start justify-between gap-3"><div className="min-w-0">{alertDetails(alert)}</div>{statusControl(alert)}</div><div className="text-xs text-muted-foreground mt-4">{alert.marketSymbol || "No market"}</div><div className="text-sm mt-2">{alertExplanation(alert)}</div><div className="flex justify-end gap-1 mt-4">{categoryFor(alert) === "reminders" && <button className="btn btn-ghost" onClick={() => setModal(alert)} aria-label="Edit reminder"><Pencil size={13} /></button>}<button className="btn btn-ghost text-destructive" onClick={() => setConfirm(alert)} aria-label="Delete alert"><Trash2 size={13} /></button></div></div>)}</div></> : <EmptyState icon={Bell} title={view === 'monitoring' ? "No monitoring events yet" : view === 'price' ? "No price alerts yet" : view === 'reminders' ? "No reminders yet" : "No alerts yet"} text={view === 'monitoring' ? "Monitoring-generated events will appear here when a monitored strategy changes state." : view === 'price' ? "Create a price alert from the Market Monitor." : "Create a reminder for a review you want to keep in your workspace."} action={view === 'monitoring' || view === 'price' ? undefined : <button className="btn btn-primary" onClick={() => setModal(null)} data-testid="button-empty-create-alert"><Plus size={14} /> Create reminder</button>} />}
     </>}
     {modal !== false && <Modal title={modal && typeof modal === "object" ? "Edit reminder" : "New reminder"} onClose={() => setModal(false)}><form onSubmit={save} className="space-y-4"><Field label="Name"><input className="input" name="name" required defaultValue={modal && typeof modal === "object" ? modal.name : ""} placeholder="Give the reminder a name" data-testid="input-alert-name" /></Field><Field label="Market"><select className="select" name="marketId" defaultValue={modal && typeof modal === "object" ? modal.marketId || "" : ""} data-testid="select-alert-market"><option value="">No market</option>{(markets.data || []).map((market: Market) => <option key={market.id} value={market.id}>{market.symbol}</option>)}</select></Field><div className="grid grid-cols-2 gap-3"><Field label="Condition"><input className="input" name="condition" required defaultValue={modal && typeof modal === "object" ? modal.condition : ""} placeholder="Review when…" data-testid="input-alert-condition" /></Field><Field label="Threshold"><input className="input" name="threshold" defaultValue={modal && typeof modal === "object" ? modal.threshold || "" : ""} placeholder="Optional" data-testid="input-alert-threshold" /></Field></div><Field label="Status"><select className="select" name="status" defaultValue={modal && typeof modal === "object" ? modal.status : "active"} data-testid="select-alert-status"><option value="active">Active</option><option value="paused">Paused</option></select></Field><button className="btn btn-primary w-full" disabled={c.isPending || u.isPending} data-testid="button-submit-alert">Save reminder</button></form></Modal>}
     {confirm && <Confirm title={`Remove “${confirm.name}”?`} onCancel={() => setConfirm(null)} onConfirm={() => del.mutate({ alertId: confirm.id }, { onSuccess: () => { setConfirm(null); invalidate(); } })} busy={del.isPending} />}

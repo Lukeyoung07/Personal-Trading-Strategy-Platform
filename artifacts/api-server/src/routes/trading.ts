@@ -1519,11 +1519,23 @@ router.get("/performance/summary", async (_req, res): Promise<void> => {
 
 router.get("/alerts", async (_req, res): Promise<void> => {
   const rows = await db
-    .select({ alert: alertsTable, symbol: marketsTable.symbol })
+    .select({
+      alert: alertsTable,
+      symbol: marketsTable.symbol,
+      strategyName: strategiesTable.name,
+      versionNumber: strategyVersionsTable.versionNumber,
+    })
     .from(alertsTable)
     .leftJoin(marketsTable, eq(alertsTable.marketId, marketsTable.id))
+    .leftJoin(strategyVersionsTable, eq(alertsTable.strategyVersionId, strategyVersionsTable.id))
+    .leftJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
     .orderBy(desc(alertsTable.updatedAt));
-  res.json(ListAlertsResponse.parse(rows.map(({ alert, symbol }) => ({ ...alert, marketSymbol: symbol }))));
+  res.json(ListAlertsResponse.parse(rows.map(({ alert, symbol, strategyName, versionNumber }) => ({
+    ...alert,
+    marketSymbol: symbol,
+    strategyName,
+    versionNumber,
+  }))));
 });
 
 router.post("/alerts", async (req, res): Promise<void> => {
@@ -1533,7 +1545,12 @@ router.post("/alerts", async (req, res): Promise<void> => {
     return;
   }
   const [created] = await db.insert(alertsTable).values({ ...parsed.data, sourceType: "manual" }).returning();
-  res.status(201).json(CreateAlertResponse.parse({ ...created, marketSymbol: await marketSymbol(created.marketId) }));
+  res.status(201).json(CreateAlertResponse.parse({
+    ...created,
+    marketSymbol: await marketSymbol(created.marketId),
+    strategyName: null,
+    versionNumber: null,
+  }));
 });
 
 router.patch("/alerts/:alertId", async (req, res): Promise<void> => {
@@ -1556,7 +1573,12 @@ router.patch("/alerts/:alertId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Alert not found" });
     return;
   }
-  res.json(UpdateAlertResponse.parse({ ...updated, marketSymbol: await marketSymbol(updated.marketId) }));
+  res.json(UpdateAlertResponse.parse({
+    ...updated,
+    marketSymbol: await marketSymbol(updated.marketId),
+    strategyName: null,
+    versionNumber: null,
+  }));
 });
 
 router.delete("/alerts/:alertId", async (req, res): Promise<void> => {

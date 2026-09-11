@@ -366,7 +366,7 @@ function ConditionModal({ strategyId, concepts, condition, onClose, onSaved }: {
   </Modal>;
 }
 
-function ConditionFlow({ strategyId, conditions, concepts, onAdd, onEdit, onChanged }: { strategyId: number; conditions: StrategyCondition[]; concepts: TradingConcept[]; onAdd: () => void; onEdit: (condition: StrategyCondition) => void; onChanged: () => void }) {
+function ConditionFlow({ strategyId, conditions, concepts, marketSymbol, onAdd, onEdit, onChanged }: { strategyId: number; conditions: StrategyCondition[]; concepts: TradingConcept[]; marketSymbol: string | null; onAdd: () => void; onEdit: (condition: StrategyCondition) => void; onChanged: () => void }) {
   const reorder = useReorderStrategyConditions();
   const remove = useDeleteStrategyCondition();
   const queryClient = useQueryClient();
@@ -405,15 +405,16 @@ function ConditionFlow({ strategyId, conditions, concepts, onAdd, onEdit, onChan
           <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center mono text-xs font-bold shrink-0">{String(index + 1).padStart(2, "0")}</div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="tag tag-active">{condition.stage}</span>
+              <span className="tag tag-active">{condition.stage === "invalidation" ? "exit / invalidation" : condition.stage}</span>
               <span className={`tag ${condition.requirement === "required" ? "tag-active" : "tag-draft"}`}>{condition.requirement}</span>
               <span className="tag tag-draft">{condition.timeframe}</span>
               <span className="tag tag-draft">{condition.direction}</span>
+              <span className="tag tag-draft">{marketSymbol || "market open"}</span>
             </div>
             <h3 className="font-semibold mt-3">{condition.name}</h3>
             <div className="text-xs text-primary mt-1">{condition.conceptName}</div>
             {condition.description && <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{condition.description}</p>}
-            {condition.triggerRules && <div className="mt-4 p-3 rounded-md bg-secondary/50"><div className="eyebrow">Trigger rules</div><p className="text-xs text-muted-foreground mt-1 leading-relaxed">{condition.triggerRules}</p></div>}
+            {condition.triggerRules && <div className="mt-4 p-3 rounded-md bg-secondary/50"><div className="flex flex-wrap items-center justify-between gap-2"><div className="eyebrow">Parameters / rule</div><span className={`tag ${isBacktestCompatibleRule(condition.triggerRules) ? "tag-active" : "tag-draft"}`}>{isBacktestCompatibleRule(condition.triggerRules) ? "Executable" : "Review required"}</span></div><p className="text-xs text-muted-foreground mt-1 leading-relaxed">{condition.triggerRules}</p>{!isBacktestCompatibleRule(condition.triggerRules) && <p className="text-[11px] text-amber-200 mt-2">This condition is preserved as descriptive logic, but Backtesting cannot evaluate it yet.</p>}</div>}
           </div>
           <div className="flex shrink-0">
             <button className="btn btn-ghost" onClick={() => move(index, -1)} disabled={index === 0 || reorder.isPending} aria-label="Move condition up" data-testid={`button-move-condition-up-${condition.id}`}><ArrowUp size={14} /></button>
@@ -447,6 +448,11 @@ function riskNarrative(value: string | null) {
     .join("; ") || "";
 }
 
+function riskManagementValue(value: string | null, label: "risk" | "risk amount" | "risk/reward") {
+  const match = value?.match(new RegExp(`${label.replace("/", "\\/")}\\s*[:=]\\s*([^;\\n]+)`, "i"));
+  return match?.[1]?.trim().replace(/R$/i, "") || "";
+}
+
 function StrategyControls({ strategy, conditions }: { strategy: Strategy; conditions: StrategyCondition[] }) {
   const update = useUpdateStrategy();
   const queryClient = useQueryClient();
@@ -455,6 +461,9 @@ function StrategyControls({ strategy, conditions }: { strategy: Strategy; condit
   const [takeProfitEnabled, setTakeProfitEnabled] = useState(Boolean(riskPercent(strategy.riskManagementRules, "take-profit")));
   const [stopLoss, setStopLoss] = useState(riskPercent(strategy.riskManagementRules, "stop-loss") || "1");
   const [takeProfit, setTakeProfit] = useState(riskPercent(strategy.riskManagementRules, "take-profit") || "2");
+  const [riskBudget, setRiskBudget] = useState(riskManagementValue(strategy.riskManagementRules, "risk"));
+  const [riskAmount, setRiskAmount] = useState(riskManagementValue(strategy.riskManagementRules, "risk amount"));
+  const [riskReward, setRiskReward] = useState(riskManagementValue(strategy.riskManagementRules, "risk/reward"));
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -463,15 +472,23 @@ function StrategyControls({ strategy, conditions }: { strategy: Strategy; condit
     setTakeProfitEnabled(Boolean(riskPercent(strategy.riskManagementRules, "take-profit")));
     setStopLoss(riskPercent(strategy.riskManagementRules, "stop-loss") || "1");
     setTakeProfit(riskPercent(strategy.riskManagementRules, "take-profit") || "2");
+    setRiskBudget(riskManagementValue(strategy.riskManagementRules, "risk"));
+    setRiskAmount(riskManagementValue(strategy.riskManagementRules, "risk amount"));
+    setRiskReward(riskManagementValue(strategy.riskManagementRules, "risk/reward"));
   }, [strategy.id, strategy.direction, strategy.riskManagementRules]);
 
-  const entryConditions = conditions.filter(condition => condition.stage === "entry" || condition.stage === "confirmation");
+  const entryConditions = conditions.filter(condition => condition.stage === "entry");
+  const confirmationConditions = conditions.filter(condition => condition.stage === "confirmation");
+  const entryAndConfirmationConditions = [...entryConditions, ...confirmationConditions];
   const exitConditions = conditions.filter(condition => condition.stage === "exit" || condition.stage === "invalidation");
   const unsupportedConditions = conditions.filter(condition => !isBacktestCompatibleRule(condition.triggerRules)).map(condition => condition.name || "Unnamed condition");
-  const missingEntryCondition = entryConditions.length === 0;
+  const missingEntryCondition = entryAndConfirmationConditions.length === 0;
   const compatible = !missingEntryCondition && unsupportedConditions.length === 0 && isBacktestCompatibleRiskRules(strategy.riskManagementRules);
   const riskRules = [
     riskNarrative(strategy.riskManagementRules),
+      riskBudget ? `risk: ${riskBudget}%` : "",
+      riskAmount ? `risk amount: ${riskAmount}` : "",
+      riskReward ? `risk/reward: ${riskReward}R` : "",
     stopLossEnabled && stopLoss ? `stop-loss: ${stopLoss}%` : "",
     takeProfitEnabled && takeProfit ? `take-profit: ${takeProfit}%` : "",
   ].filter(Boolean).join("; ") || null;
@@ -518,6 +535,15 @@ function StrategyControls({ strategy, conditions }: { strategy: Strategy; condit
           {takeProfitEnabled && <span className="flex items-center gap-2 mt-4"><input className="input w-24" type="number" min="0.01" step="0.01" value={takeProfit} onChange={event => setTakeProfit(event.target.value)} aria-label="Take profit percentage" data-testid="input-builder-take-profit" /><span className="text-sm text-muted-foreground">%</span></span>}
         </label>
       </div>
+       <div className="mt-5 pt-5 border-t border-border">
+         <div className="eyebrow">Position risk</div>
+         <p className="text-xs text-muted-foreground mt-2">Optional sizing notes stay separate from the strategy’s descriptive conditions.</p>
+         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+           <Field label="Risk %"><div className="flex items-center gap-2"><input className="input" type="number" min="0.01" step="0.01" value={riskBudget} onChange={event => setRiskBudget(event.target.value)} placeholder="e.g. 1" data-testid="input-builder-risk-percent" /><span className="text-sm text-muted-foreground">%</span></div></Field>
+           <Field label="Risk amount"><input className="input" value={riskAmount} onChange={event => setRiskAmount(event.target.value)} placeholder="e.g. £100" data-testid="input-builder-risk-amount" /></Field>
+           <Field label="Risk / reward"><div className="flex items-center gap-2"><input className="input" type="number" min="0.01" step="0.01" value={riskReward} onChange={event => setRiskReward(event.target.value)} placeholder="e.g. 2" data-testid="input-builder-risk-reward" /><span className="text-sm text-muted-foreground">R</span></div></Field>
+         </div>
+       </div>
        <div className="rounded-md border border-border bg-secondary/30 p-3 text-[11px] text-muted-foreground mt-4">Exit-stage conditions are managed in the ordered Conditions section above and saved with the strategy. This control only edits percentage-based stop and target rules.</div>
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive mt-4" role="alert" data-testid="status-builder-settings-error">{error}</div>}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-5 pt-5 border-t border-border">
@@ -531,12 +557,18 @@ function StrategyControls({ strategy, conditions }: { strategy: Strategy; condit
       <h2 className="font-semibold mt-2">Your strategy</h2>
       <div className="mt-5 rounded-lg border border-primary/25 bg-primary/5 p-4 md:p-5 text-sm leading-relaxed">
         <p><strong>{directionLabel}</strong> when:</p>
-        {entryConditions.length ? <div className="mt-3 space-y-2">{entryConditions.map((condition, index) => <div key={condition.id} className="flex gap-3"><span className="mono text-primary text-xs">{index ? "AND" : "01"}</span><span>{condition.triggerRules || condition.name}</span></div>)}</div> : <p className="text-muted-foreground mt-3">No entry conditions yet. Add a condition to tell the strategy when to enter a trade.</p>}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5 pt-5 border-t border-primary/15">
-          <div><div className="eyebrow">Stop Loss</div><div className="font-semibold mt-1">{stopLossEnabled ? `${stopLoss}%` : "Disabled"}</div></div>
-          <div><div className="eyebrow">Take Profit</div><div className="font-semibold mt-1">{takeProfitEnabled ? `${takeProfit}%` : "Disabled"}</div></div>
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+           <div><div className="eyebrow">Entry conditions</div>{entryConditions.length ? <div className="mt-2 space-y-1.5">{entryConditions.map(condition => <div key={condition.id} className="text-xs">{condition.triggerRules || condition.name}</div>)}</div> : <div className="text-xs text-muted-foreground mt-2">None added</div>}</div>
+           <div><div className="eyebrow">Confirmation conditions</div>{confirmationConditions.length ? <div className="mt-2 space-y-1.5">{confirmationConditions.map(condition => <div key={condition.id} className="text-xs">{condition.triggerRules || condition.name}</div>)}</div> : <div className="text-xs text-muted-foreground mt-2">None added</div>}</div>
+           <div><div className="eyebrow">Exit conditions</div>{exitConditions.length ? <div className="mt-2 space-y-1.5">{exitConditions.map(condition => <div key={condition.id} className="text-xs">{condition.triggerRules || condition.name}</div>)}</div> : <div className="text-xs text-muted-foreground mt-2">None added</div>}</div>
+         </div>
+         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-5 pt-5 border-t border-primary/15">
+           <div><div className="eyebrow">Risk %</div><div className="font-semibold mt-1">{riskBudget ? `${riskBudget}%` : "Not set"}</div></div>
+           <div><div className="eyebrow">Risk amount</div><div className="font-semibold mt-1">{riskAmount || "Not set"}</div></div>
+           <div><div className="eyebrow">Risk / reward</div><div className="font-semibold mt-1">{riskReward ? `${riskReward}R` : "Not set"}</div></div>
+           <div><div className="eyebrow">Stop Loss</div><div className="font-semibold mt-1">{stopLossEnabled ? `${stopLoss}%` : "Disabled"}</div></div>
+           <div><div className="eyebrow">Take Profit</div><div className="font-semibold mt-1">{takeProfitEnabled ? `${takeProfit}%` : "Disabled"}</div></div>
         </div>
-        {exitConditions.length > 0 && <p className="text-xs text-muted-foreground mt-4">Exit conditions: {exitConditions.map(condition => condition.name).join(", ")}.</p>}
       </div>
       <p className="text-[11px] text-muted-foreground mt-4">This is a plain-English view of saved conditions. It describes your process; it does not recommend trades or create signals.</p>
     </section>
@@ -745,11 +777,11 @@ export function StrategyBuilder() {
               <RuleSummary label="Alerts" value={activeStrategy.alertRules} />
             </div>
           </Panel>
-           <div className="flex items-end justify-between gap-4">
-             <div><div className="eyebrow">02 · Entry conditions</div><h2 className="font-semibold mt-2">When should the strategy enter?</h2><p className="text-xs text-muted-foreground mt-2">Choose a plain-language condition. Required conditions are combined as AND.</p><div className="flex flex-wrap items-center gap-2 mt-3 text-[11px]" data-testid="builder-logic-legend"><span className="tag tag-active">AND</span><span className="text-muted-foreground">required checkpoints must all match</span><span className="tag ml-2">OR</span><span className="text-muted-foreground">not currently supported by Backtesting</span></div></div>
+             <div className="flex items-end justify-between gap-4">
+              <div><div className="eyebrow">02 · Ordered conditions</div><h2 className="font-semibold mt-2">Build the strategy logic</h2><p className="text-xs text-muted-foreground mt-2">Organise entry, confirmation, and exit checkpoints. Each card keeps its market, direction, timeframe, parameters, and execution status visible.</p><div className="flex flex-wrap items-center gap-2 mt-3 text-[11px]" data-testid="builder-logic-legend"><span className="tag tag-active">AND</span><span className="text-muted-foreground">required checkpoints must all match</span><span className="tag ml-2">OR</span><span className="text-muted-foreground">not currently supported by Backtesting</span><span className="tag ml-2">Review required</span><span className="text-muted-foreground">descriptive only until supported</span></div></div>
              <button className="btn btn-primary" onClick={() => setConditionModal("new")} data-testid="button-add-strategy-condition"><Plus size={14} /> Add Condition</button>
           </div>
-          {strategyConditions.isLoading ? <div className="panel p-8 text-center text-sm text-muted-foreground">Loading conditions…</div> : strategyConditions.isError ? <div className="panel p-8 text-center text-sm text-muted-foreground">Couldn’t load conditions.</div> : <ConditionFlow strategyId={strategyId} conditions={strategyConditions.data || []} concepts={concepts.data || []} onAdd={() => setConditionModal("new")} onEdit={condition => setConditionModal(condition)} onChanged={refreshConditions} />}
+           {strategyConditions.isLoading ? <div className="panel p-8 text-center text-sm text-muted-foreground">Loading conditions…</div> : strategyConditions.isError ? <div className="panel p-8 text-center text-sm text-muted-foreground">Couldn’t load conditions.</div> : <ConditionFlow strategyId={strategyId} conditions={strategyConditions.data || []} concepts={concepts.data || []} marketSymbol={activeStrategy.marketSymbol || null} onAdd={() => setConditionModal("new")} onEdit={condition => setConditionModal(condition)} onChanged={refreshConditions} />}
            <StrategyControls strategy={activeStrategy} conditions={strategyConditions.data || []} />
         </div>
         <div className="space-y-5">

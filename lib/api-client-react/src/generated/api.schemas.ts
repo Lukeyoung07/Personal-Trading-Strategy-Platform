@@ -1757,6 +1757,10 @@ export interface Alert {
   monitorSessionId: number | null;
   /** @nullable */
   strategyVersionId: number | null;
+  /** @nullable */
+  strategyName: string | null;
+  /** @nullable */
+  versionNumber: number | null;
   sourceType: AlertSourceType;
   condition: string;
   /** @nullable */

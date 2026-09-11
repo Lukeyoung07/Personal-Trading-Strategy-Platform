@@ -626,14 +626,15 @@ export class StrategyMonitoringEngine {
         if (!currentSession || currentSession.overallStatus !== summary.overallStatus) {
           const meaningfulTransition = summary.overallStatus === "met" || summary.overallStatus === "invalid";
           if (meaningfulTransition) {
+              const previousStatus = currentSession?.overallStatus ?? "waiting";
             await tx.insert(alertsTable).values({
               name: `${item.strategy.name} monitoring`,
               marketId: item.version.marketId,
               monitorSessionId: session.id,
               strategyVersionId: item.version.id,
               sourceType: "monitoring",
-              condition: `strategy_monitor_${summary.overallStatus}`,
-              threshold: summary.overallStatus,
+                condition: "Overall monitoring state changed",
+                threshold: `${previousStatus} → ${summary.overallStatus}`,
               status: "triggered",
               message: summary.statusReason,
               triggeredAt: evaluatedAt,
