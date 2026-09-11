@@ -399,7 +399,7 @@ function Assumptions({ backtest }: { backtest: BacktestResults["backtest"] }) {
 
 export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRunAgain }: BacktestResultsPanelProps) {
   const query = useGetBacktestResults(backtestId, {
-    query: { enabled: Number.isFinite(backtestId), queryKey: getGetBacktestResultsQueryKey(backtestId) },
+    query: { enabled: Number.isFinite(backtestId), retry: false, queryKey: getGetBacktestResultsQueryKey(backtestId) },
   });
   const results = query.data;
   const trades = useMemo(() => results?.trades ?? [], [results?.trades]);

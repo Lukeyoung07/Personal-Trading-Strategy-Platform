@@ -8,16 +8,20 @@ const resultState = vi.hoisted(() => ({
   current: null as any,
   isLoading: false,
   isError: false,
+  queryOptions: null as any,
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
   getGetBacktestResultsQueryKey: (id: number) => ["backtest-results", id],
-  useGetBacktestResults: () => ({
-    data: resultState.current,
-    isLoading: resultState.isLoading,
-    isError: resultState.isError,
-    refetch: vi.fn(),
-  }),
+  useGetBacktestResults: (_id: number, options: any) => {
+    resultState.queryOptions = options;
+    return {
+      data: resultState.current,
+      isLoading: resultState.isLoading,
+      isError: resultState.isError,
+      refetch: vi.fn(),
+    };
+  },
 }));
 
 afterEach(() => {
@@ -25,6 +29,7 @@ afterEach(() => {
   resultState.current = null;
   resultState.isLoading = false;
   resultState.isError = false;
+  resultState.queryOptions = null;
 });
 
 const baseBacktest = {
@@ -144,5 +149,14 @@ describe("BacktestResultsPanel", () => {
 
     expect(screen.getByTestId("backtest-zero-trade-state")).toHaveTextContent("No trades found for this strategy and period.");
     expect(screen.queryByText("What the recorded trades did")).not.toBeInTheDocument();
+  });
+
+  it("shows the missing-result error without retrying a 404", () => {
+    resultState.isError = true;
+
+    render(<BacktestResultsPanel backtestId={999999} onBack={vi.fn()} />);
+
+    expect(screen.getByTestId("backtest-results-error")).toHaveTextContent("Couldn’t load this result");
+    expect(resultState.queryOptions.query.retry).toBe(false);
   });
 });

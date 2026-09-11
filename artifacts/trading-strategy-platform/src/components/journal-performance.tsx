@@ -5,6 +5,7 @@ import {
   getGetJournalPerformanceQueryKey,
   getListStrategyVersionsQueryKey,
   useGetJournalPerformance,
+  useGetSettings,
   useListStrategyVersions,
   useUpdateJournalDayNote,
   type GetJournalPerformanceParams,
@@ -202,6 +203,8 @@ export function JournalPerformance({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const strategyId = Number(filters.strategyId) || undefined;
   const versionsQuery = useListStrategyVersions(strategyId || 0, { query: { enabled: !!strategyId, queryKey: getListStrategyVersionsQueryKey(strategyId || 0) } });
+  const settings = useGetSettings();
+  const settingsReady = settings.isSuccess || settings.isError;
   const params = useMemo<GetJournalPerformanceParams>(() => ({
     month,
     strategyId,
@@ -210,9 +213,9 @@ export function JournalPerformance({
     side: filters.side || undefined,
     from: filters.from || undefined,
     to: filters.to || undefined,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  }), [filters, month, strategyId]);
-  const performance = useGetJournalPerformance(params);
+    timezone: settings.data?.timezone || "UTC",
+  }), [filters, month, settings.data?.timezone, strategyId]);
+  const performance = useGetJournalPerformance(params, { query: { enabled: settingsReady, queryKey: getGetJournalPerformanceQueryKey(params) } });
   const data = performance.data as JournalPerformance | undefined;
   const selectedDay = data?.daily.find(day => day.date === selectedDate) || null;
   const selectedDayTrades = useMemo(() => {
