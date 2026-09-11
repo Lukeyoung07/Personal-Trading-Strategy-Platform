@@ -13,6 +13,14 @@ import { HistoricalDataError } from "./historical-errors";
 export type MarketDataCapability = "realtime" | "candles" | "historical" | "sessions";
 export type MarketDataConnectionState = "disconnected" | "connecting" | "connected" | "degraded" | "error";
 
+function isMarketDataConnectionState(value: unknown): value is MarketDataConnectionState {
+  return value === "disconnected"
+    || value === "connecting"
+    || value === "connected"
+    || value === "degraded"
+    || value === "error";
+}
+
 export interface ProviderCandleRequest {
   providerSymbol: string;
   timeframeCode: string;
@@ -527,7 +535,8 @@ export class MarketDataService {
     if (!timeframe) throw new Error("Timeframe not found");
     const earliestCandle = summary?.earliestCandle ?? null;
     const latestCandle = summary?.latestCandle ?? null;
-    const providerErrorMatch = connection?.status === "error"
+    const providerStatus = isMarketDataConnectionState(connection?.status) ? connection.status : null;
+    const providerErrorMatch = providerStatus === "error"
       ? connection.statusMessage?.match(/^Historical provider (rate_limited|provider_failure|unavailable|unknown): (.*)$/i)
       : null;
     return {
@@ -547,11 +556,11 @@ export class MarketDataService {
           to: request.to,
           timeframeDurationSeconds: timeframe.durationSeconds,
         }) ? "complete" : "partial",
-      providerStatus: connection?.status ?? null,
+      providerStatus,
       providerError: providerErrorMatch ? {
         code: providerErrorMatch[1].toLowerCase() as HistoricalDataError["code"],
         message: providerErrorMatch[2],
-      } : connection?.status === "error" ? {
+      } : providerStatus === "error" ? {
         code: "unknown",
         message: connection.statusMessage ?? "Historical provider failed.",
       } : null,

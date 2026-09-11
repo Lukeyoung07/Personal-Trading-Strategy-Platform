@@ -164,6 +164,55 @@ describe("Dukascopy historical provider", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("honors Retry-After without issuing a concurrent retry", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(response({ error: "busy" }, 429, { "retry-after": "3" }))
+      .mockResolvedValueOnce(response(payload()));
+    const request = dukascopyAdapter.candles({
+      providerSymbol: "XAU-USD",
+      timeframeCode: "1h",
+      from: new Date("2026-09-10T10:00:00.000Z"),
+      to: new Date("2026-09-10T11:00:00.000Z"),
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(2_999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await request;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses exponential backoff for transient provider failures", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(response({ error: "busy" }, 503))
+      .mockResolvedValueOnce(response({ error: "busy" }, 503))
+      .mockResolvedValueOnce(response(payload()));
+    const request = dukascopyAdapter.candles({
+      providerSymbol: "XAU-USD",
+      timeframeCode: "1h",
+      from: new Date("2026-09-10T10:00:00.000Z"),
+      to: new Date("2026-09-10T11:00:00.000Z"),
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(3_999);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    await request;
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("classifies an exhausted rate limit separately from unavailable history", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => response({ error: "busy" }, 429, { "retry-after": "0" }));
     vi.useFakeTimers();
