@@ -1,0 +1,671 @@
+TRADEX — COMPLETE STRATEGY BUILDER REMAKE + BACKTESTING INTEGRATION
+
+I want you to completely rebuild the Strategy Builder experience.
+
+This is NOT a small UI change.
+
+The current Strategy Builder is too complicated and confusing to use. I should be able to build a trading strategy without needing to understand technical database terminology or translate trading concepts into confusing technical rules.
+
+The new Builder must be simple for a beginner while still being powerful enough to create proper trading strategies.
+
+IMPORTANT:
+
+Do not blindly rewrite the existing backend.
+
+First inspect the current Strategy Builder, Trading Concept Library, strategy/version system and Backtesting engine.
+
+Understand exactly how they currently work before making changes.
+
+Preserve existing working functionality where possible.
+
+==================================================
+1. MAIN GOAL
+==================================================
+
+The Builder should feel like:
+
+CREATE STRATEGY
+↓
+CHOOSE MARKET
+↓
+CHOOSE DIRECTION
+↓
+CHOOSE TIMEFRAMES
+↓
+BUILD CONDITIONS
+↓
+SET RISK
+↓
+REVIEW
+↓
+SAVE
+↓
+BACKTEST
+
+The user should never have to understand how the backend represents a condition.
+
+The Builder should translate simple trading instructions into the structured format required by TradeX.
+
+==================================================
+2. STRATEGY BASICS
+==================================================
+
+At the top show a simple "Strategy Setup" section.
+
+Fields:
+
+Strategy Name
+Description
+Market / Instrument
+Direction
+Timeframes
+
+Direction options:
+
+Long
+Short
+Both
+
+Market should use the existing TradeX market/instrument system.
+
+Timeframes should use the existing supported timeframe system.
+
+Do not create duplicate market or direction fields elsewhere.
+
+==================================================
+3. CONDITIONS — COMPLETELY SIMPLIFY THIS
+==================================================
+
+Replace the current confusing condition-entry experience with a simple condition builder.
+
+The user should see:
+
++ Add Condition
+
+When clicked, show a simple form:
+
+CONDITION NAME
+
+[ text input ]
+
+TRADING CONCEPT
+
+[ select concept ]
+
+WHEN
+
+[ Entry / Confirmation / Exit ]
+
+DIRECTION
+
+[ Long / Short / Both ]
+
+TIMEFRAME
+
+[ select timeframe ]
+
+WHAT SHOULD BE TRUE?
+
+[ simple rule selector ]
+
+The user should NOT need to manually understand technical rule syntax.
+
+==================================================
+4. TRADING CONCEPT LIBRARY
+==================================================
+
+Use the existing Trading Concept Library.
+
+Do not invent concepts that don't exist.
+
+The concept selected by the user should remain attached to the condition.
+
+Examples of existing concepts may include:
+
+EMA
+SMA
+FVG
+IFVG
+Liquidity Sweep
+Order Block
+Market Structure
+Support and Resistance
+Supply and Demand
+Premium / Discount
+HTF / LTF
+IRL
+ERL
+SMT
+AMD
+Power of 3
+etc.
+
+ONLY show concepts that actually exist in the current TradeX concept library.
+
+If a concept exists in the library but is not executable by the current Backtesting engine, clearly mark it:
+
+"Review required — not currently supported by Backtesting"
+
+Do not pretend that a descriptive concept is executable.
+
+==================================================
+5. RULES MUST BE SIMPLE
+==================================================
+
+The user should choose rules using plain language.
+
+For example:
+
+Candle is bullish
+Candle is bearish
+Price is above the candle open
+Price is below the candle open
+Price crosses above the previous high
+Price crosses below the previous low
+Always true
+
+Use the exact rules currently supported by the Backtesting engine.
+
+If additional rules are already supported by the backend, expose them in a beginner-friendly way.
+
+Do NOT expose raw technical rule strings unless absolutely necessary.
+
+==================================================
+6. IMPORTANT — BACKTESTING COMPATIBILITY
+==================================================
+
+This is one of the most important parts of this task.
+
+The Strategy Builder and Backtesting engine must agree on what a condition means.
+
+When creating/editing a condition, immediately show its compatibility.
+
+For example:
+
+✓ Backtest supported
+
+or:
+
+⚠ Review required
+This concept cannot currently be executed by the Backtesting engine.
+
+Do not allow the user to believe that a strategy can be backtested if its conditions cannot actually be executed.
+
+Before a backtest is started, show a clear compatibility summary.
+
+==================================================
+7. DO NOT FABRICATE EXECUTION
+==================================================
+
+This is critical.
+
+If TradeX does not currently have an executable detector for:
+
+Liquidity Sweep
+FVG
+IFVG
+Order Block
+BOS/CHoCH
+SMT
+etc.
+
+DO NOT create fake execution logic.
+
+Do not claim that the backtester understands the concept.
+
+Instead:
+
+Concept = saved correctly
+Condition = reviewable
+Execution = unsupported
+
+This distinction must be visible to the user.
+
+==================================================
+8. CONDITION CARDS
+==================================================
+
+Once a condition is added, display it as a clean card.
+
+Example:
+
+ENTRY
+
+Liquidity Sweep
+
+LONG · 15M
+
+"When price sweeps liquidity and the candle closes bullish."
+
+Status:
+
+⚠ Review required
+
+[Edit]
+[Remove]
+
+Do not display large amounts of backend information.
+
+The card should be understandable without technical knowledge.
+
+==================================================
+9. CONDITION GROUPING
+==================================================
+
+Organise conditions into:
+
+ENTRY
+CONFIRMATION
+EXIT
+
+Do not put everything into one giant list.
+
+Each section should have:
+
+Section title
+Short explanation
+Existing conditions
++ Add Condition
+
+For example:
+
+ENTRY
+Conditions that must be met to enter a trade.
+
+CONFIRMATION
+Additional conditions that confirm the setup.
+
+EXIT
+Conditions that cause the strategy to exit.
+
+==================================================
+10. CONDITION ORDER
+==================================================
+
+Conditions must preserve their order.
+
+The user should be able to reorder them easily.
+
+The exact order must remain correct when:
+
+Saving
+Reloading
+Editing
+Creating a version
+Activating a version
+Backtesting
+
+==================================================
+11. RISK MANAGEMENT
+==================================================
+
+Create a dedicated Risk Management section.
+
+Keep it simple.
+
+Risk per trade:
+[ 1% ]
+
+Risk/reward:
+[ 2:1 ]
+
+Stop loss:
+[ selector / rule ]
+
+Take profit:
+[ selector / rule ]
+
+Clearly explain each field in simple language.
+
+Do not mix risk management with entry conditions.
+
+==================================================
+12. REVIEW STRATEGY
+==================================================
+
+Create a clean final review screen.
+
+Show:
+
+STRATEGY
+
+Name
+Market
+Direction
+Timeframes
+
+ENTRY
+
+Condition 1
+Condition 2
+etc.
+
+CONFIRMATION
+
+Condition 1
+Condition 2
+etc.
+
+EXIT
+
+Condition 1
+Condition 2
+etc.
+
+RISK
+
+Risk %
+Risk/reward
+Stop loss
+Take profit
+
+BACKTEST COMPATIBILITY
+
+✓ Conditions supported by Backtesting
+
+⚠ Conditions requiring review
+
+The user should immediately understand whether the strategy is actually testable.
+
+==================================================
+13. SAVE SYSTEM
+==================================================
+
+Preserve the existing immutable version system.
+
+But make the actions extremely clear.
+
+SAVE
+
+Saves changes to the editable strategy.
+
+SAVE AS NEW VERSION
+
+Creates a new immutable strategy version.
+
+ACTIVATE VERSION
+
+Makes the selected version active for monitoring.
+
+These must NOT behave like the same action.
+
+Do not overwrite immutable versions.
+
+Do not delete existing version history.
+
+==================================================
+14. BACKTEST BUTTON
+==================================================
+
+After reviewing a strategy, provide:
+
+"Backtest Strategy"
+
+Before starting:
+
+Check whether every condition is executable.
+
+If everything is supported:
+
+Show:
+
+✓ Ready to backtest
+
+If some conditions aren't supported:
+
+Show:
+
+⚠ This strategy contains conditions that Backtesting cannot currently execute.
+
+List them clearly.
+
+Do not silently remove them.
+
+Do not convert them into something else.
+
+Do not fabricate results.
+
+==================================================
+15. BACKTEST FLOW
+==================================================
+
+The flow should be:
+
+Build Strategy
+↓
+Review
+↓
+Compatibility Check
+↓
+Backtest
+↓
+Results
+
+The exact strategy version being tested must be clearly displayed.
+
+The backtest must use the exact saved strategy/version.
+
+No accidental use of another version.
+
+==================================================
+16. AI ASSISTANT INTEGRATION
+==================================================
+
+Preserve the existing AI Assistant → Builder workflow.
+
+If the Assistant creates a structured strategy draft:
+
+Builder should automatically populate:
+
+Name
+Market
+Direction
+Timeframes
+Conditions
+Concepts
+Risk rules
+
+The user should be able to review and edit everything before saving.
+
+Do not lose drafts.
+
+Do not replace drafts with stale session data.
+
+Do not change existing AI behavior unless required for this integration.
+
+==================================================
+17. BEGINNER-FRIENDLY DESIGN
+==================================================
+
+The Builder should be understandable to someone who is completely new to strategy building.
+
+Use short explanations.
+
+For example:
+
+"Entry conditions decide when you can enter."
+
+"Confirmation conditions provide additional confirmation."
+
+"Exit conditions decide when you leave the trade."
+
+Avoid developer terminology such as:
+
+condition payload
+detector ID
+execution metadata
+strategy schema
+etc.
+
+Those should remain internal.
+
+==================================================
+18. UI
+==================================================
+
+Use the existing TradeX visual style.
+
+Keep it clean and modern.
+
+Dark interface.
+
+Purple accents.
+
+No grainy textures.
+
+No excessive gradients.
+
+No huge empty spaces.
+
+No giant walls of cards.
+
+No unnecessarily long scrolling page.
+
+Use expandable/collapsible sections where appropriate.
+
+The important information should be visible immediately.
+
+==================================================
+19. MOBILE
+==================================================
+
+The Builder must work properly at:
+
+375px
+402px
+768px
+1440px
+
+No horizontal scrolling.
+
+Controls must be easy to tap.
+
+Condition cards should stack naturally.
+
+==================================================
+20. TESTING
+==================================================
+
+After implementation, test an actual strategy from start to finish.
+
+Create:
+
+Liquidity Sweep Reversal — XAUUSD
+
+Market:
+XAUUSD
+
+Direction:
+Both
+
+Timeframes:
+4H
+15M
+5M
+
+Add several conditions using ONLY concepts and rules actually available in TradeX.
+
+Do not invent unavailable concepts.
+
+Then:
+
+Save
+Reload
+Edit
+Save as New Version
+Activate
+Backtest
+
+Confirm the exact strategy version is used.
+
+Also test an AI-generated strategy draft.
+
+Test unsupported concepts and confirm they are clearly marked as review-required rather than falsely executable.
+
+==================================================
+21. DO NOT CHANGE UNRELATED SYSTEMS
+==================================================
+
+Do not redesign:
+
+Markets
+Journal
+Alerts
+Economic Calendar
+Dashboard
+
+unless a small integration change is absolutely required.
+
+Do not change:
+
+BiQuote
+Market data
+Monitoring calculations
+Journal calculations
+Trading logic
+Existing version immutability
+
+unless required to make the Builder/Backtesting integration correct.
+
+==================================================
+22. VERIFICATION
+==================================================
+
+Run:
+
+Frontend tests
+API tests
+Frontend typecheck
+API typecheck
+Production builds
+git diff --check
+
+Then perform real browser testing.
+
+Check:
+
+Strategy creation
+Condition creation
+Condition editing
+Condition deletion
+Condition ordering
+Strategy saving
+Reloading
+Version creation
+Version activation
+Backtest compatibility
+Backtest execution
+AI draft handoff
+Mobile layout
+
+Do not report completion simply because the code compiles.
+
+==================================================
+FINAL RESULT
+==================================================
+
+I want Strategy Builder to feel like a proper trading-strategy builder rather than a technical form.
+
+The user should be able to think:
+
+"I want this trading condition"
+
+→ choose the concept
+
+→ choose when it happens
+
+→ choose direction/timeframe
+
+→ choose what should be true
+
+→ save it
+
+→ review the strategy
+
+→ immediately know whether TradeX can actually backtest it.
+
+Most importantly:
+
+THE BUILDER MUST NOT CLAIM THAT A STRATEGY IS BACKTESTABLE WHEN THE BACKTESTING ENGINE CANNOT ACTUALLY EXECUTE ITS CONDITIONS.
+
+Keep the powerful backend functionality, but completely simplify the user experience.
