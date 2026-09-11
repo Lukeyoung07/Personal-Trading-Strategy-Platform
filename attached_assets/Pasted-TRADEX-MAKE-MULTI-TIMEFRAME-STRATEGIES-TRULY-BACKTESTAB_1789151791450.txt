@@ -1,0 +1,480 @@
+TRADEX — MAKE MULTI-TIMEFRAME STRATEGIES TRULY BACKTESTABLE
+
+Implement the next TradeX task: make higher-timeframe (HTF) and lower-timeframe (LTF) confirmation genuinely backtestable.
+
+Do NOT redesign the application.
+
+Do NOT change the existing Strategy Builder UI unnecessarily.
+
+Do NOT change the existing Markets page.
+
+Do NOT replace the existing concept system.
+
+Do NOT rebuild the Backtesting engine from scratch.
+
+Do NOT fabricate historical data.
+
+Build on the existing executable concept architecture.
+
+==================================================
+1. GOAL
+==================================================
+
+TradeX currently allows strategy conditions to use different timeframes, but multi-timeframe combinations are currently marked as review-only.
+
+I want the Backtesting engine to genuinely evaluate strategies containing multiple timeframes.
+
+Example:
+
+HTF:
+1H
+
+LTF:
+5M
+
+The backtest must retrieve and evaluate 1H candles for the HTF condition and 5M candles for the LTF condition.
+
+==================================================
+2. TIMEFRAME-AWARE BACKTESTING
+==================================================
+
+Each condition must be evaluated using its own configured timeframe.
+
+Example:
+
+Condition 1:
+Concept: Break of Structure
+Timeframe: 1H
+
+Condition 2:
+Concept: Fair Value Gap Retest
+Timeframe: 5M
+
+The engine must:
+
+- Load 1H historical candles
+- Load 5M historical candles
+- Evaluate the BOS condition using 1H data
+- Evaluate the FVG condition using 5M data
+- Correctly combine the results
+
+Do NOT evaluate every condition using the strategy's primary timeframe.
+
+==================================================
+3. CANDLE ALIGNMENT
+==================================================
+
+This is critical.
+
+Different timeframes close at different times.
+
+For every lower-timeframe candle, the engine must only use the most recent COMPLETED higher-timeframe candle available at that exact historical moment.
+
+Example:
+
+A 5M candle at 10:25 can use the latest completed 1H candle.
+
+It MUST NOT use information from the 1H candle that closes at 11:00.
+
+Prevent all look-ahead bias.
+
+==================================================
+4. CLOSED-CANDLE RULE
+==================================================
+
+Preserve TradeX's existing closed-candle-only behaviour.
+
+A higher-timeframe condition becomes available only after its corresponding HTF candle has closed.
+
+Never use a partially formed future HTF candle.
+
+==================================================
+5. HTF + LTF CONDITIONS
+==================================================
+
+Support strategies where conditions from different timeframes must align.
+
+Example:
+
+1H:
+Bullish BOS
+
+AND
+
+5M:
+Bullish FVG Retest
+
+↓
+
+Long entry
+
+Short example:
+
+1H:
+Bearish BOS
+
+AND
+
+5M:
+Bearish FVG Retest
+
+↓
+
+Short entry
+
+Do NOT hard-code these concepts.
+
+This must work with any combination of currently executable concepts.
+
+==================================================
+6. TIMEFRAME COMBINATIONS
+==================================================
+
+Support combinations such as:
+
+1H + 15M
+
+1H + 5M
+
+4H + 15M
+
+4H + 5M
+
+15M + 5M
+
+and other combinations where both timeframes are supported by the existing market-data system.
+
+Do not hard-code only one pair.
+
+==================================================
+7. DATA RETRIEVAL
+==================================================
+
+Use the existing MarketDataService and historical candle infrastructure.
+
+Do NOT fabricate candles.
+
+Do NOT create a second market-data system.
+
+If multiple API requests are required to retrieve the different timeframes, use the existing provider architecture.
+
+Respect provider limits.
+
+Avoid repeatedly downloading identical historical data unnecessarily.
+
+==================================================
+8. HISTORICAL PERIOD
+==================================================
+
+The multi-timeframe backtest must use the exact date range selected by the user.
+
+For example:
+
+Start:
+1 January 2025
+
+End:
+31 December 2025
+
+The engine should retrieve the required historical data for every timeframe needed by the strategy.
+
+Do not silently shorten the requested period.
+
+If the provider cannot supply the requested historical range, report the actual limitation.
+
+==================================================
+9. NO LOOK-AHEAD BIAS TESTING
+==================================================
+
+Add automated tests specifically designed to catch look-ahead bias.
+
+Example:
+
+An HTF candle closes at 11:00.
+
+A 5M candle at 10:55 must NOT be able to access the 11:00 HTF close.
+
+A 5M candle after 11:00 may use the completed HTF candle.
+
+Verify this with deterministic test data.
+
+==================================================
+10. STRATEGY VERSIONING
+==================================================
+
+Use the exact selected immutable strategy version.
+
+Every condition's:
+
+- Concept
+- Parameters
+- Direction
+- Timeframe
+- Stage
+
+must come from the selected version.
+
+Do not accidentally use the current Builder state.
+
+==================================================
+11. STRATEGY BUILDER
+==================================================
+
+The Builder should clearly support multi-timeframe strategies.
+
+For example:
+
+TIMEFRAMES
+
+1H
+5M
+
+ENTRY
+
+Break of Structure
+1H
+
+CONFIRMATION
+
+Fair Value Gap Retest
+5M
+
+Do not redesign the Builder.
+
+Only make the minimum changes required to remove the incorrect review-only limitation when the combination is genuinely supported.
+
+==================================================
+12. BUILD WITH AI
+==================================================
+
+Build with AI must continue generating multi-timeframe strategies correctly.
+
+Example:
+
+"Create a Gold reversal strategy using 1H higher timeframe bias and 5M confirmation."
+
+The generated strategy should preserve:
+
+HTF:
+1H
+
+LTF:
+5M
+
+and the requested concepts.
+
+Do not convert the request into a single timeframe.
+
+==================================================
+13. COMPATIBILITY STATUS
+==================================================
+
+A strategy using multiple timeframes should no longer automatically show:
+
+Review required
+
+if all of its individual concepts and timeframe combinations are genuinely supported.
+
+Show:
+
+✓ Backtest supported
+
+only after the actual multi-timeframe engine can evaluate it.
+
+If a specific timeframe combination or concept genuinely cannot be evaluated, clearly identify the actual reason.
+
+==================================================
+14. BACKTEST RESULTS
+==================================================
+
+The Backtest result should clearly show the timeframes used.
+
+Example:
+
+Instrument:
+XAUUSD
+
+Timeframes:
+1H + 5M
+
+Period:
+User-selected period
+
+HTF candles processed:
+Actual count
+
+LTF candles processed:
+Actual count
+
+Trades:
+Actual count
+
+Do not invent values.
+
+==================================================
+15. ZERO-TRADE RESULTS
+==================================================
+
+If the HTF and LTF conditions never align:
+
+The correct result is:
+
+0 trades
+
+Do not force a trade.
+
+Do not treat zero trades as an error.
+
+==================================================
+16. PERFORMANCE
+==================================================
+
+Multi-timeframe backtests may involve significantly more candles.
+
+Use efficient:
+
+- Data retrieval
+- Caching
+- Candle indexing
+- Time alignment
+
+Do not repeatedly search the entire candle dataset for every candle if this can be avoided.
+
+Correctness is more important than speed.
+
+==================================================
+17. REAL END-TO-END TEST
+==================================================
+
+Create a temporary strategy through the actual Strategy Builder UI.
+
+Use:
+
+Market:
+XAUUSD
+
+Direction:
+Both
+
+HTF:
+1H
+
+LTF:
+5M
+
+Entry:
+an executable 1H condition
+
+Confirmation:
+an executable 5M condition
+
+Then:
+
+Save
+↓
+Create version
+↓
+Activate
+↓
+Backtest
+
+Verify:
+
+- Both timeframe datasets are retrieved
+- Each condition uses its correct timeframe
+- Candles are correctly aligned
+- No future information is used
+- Trades occur only when the configured conditions actually align
+- Results use real historical data
+
+Delete the temporary test strategy through the normal UI afterward.
+
+==================================================
+18. REGRESSION
+==================================================
+
+Preserve all existing functionality:
+
+- Single-timeframe strategies
+- Liquidity Sweep
+- FVG
+- FVG Retest
+- BOS
+- CHoCH
+- MSS
+- EMA
+- SMA
+- RSI
+- MACD
+- VWAP
+- ATR
+- Breakouts
+- Price action concepts
+- Strategy Builder
+- Build with AI
+- Strategy Library
+- Versioning
+- Backtesting
+- Markets
+- Alerts
+- Monitoring
+- Journal
+
+Run:
+
+- Frontend tests
+- API tests
+- Frontend typecheck
+- API typecheck
+- Production builds
+- git diff --check
+
+Check the browser console.
+
+Test:
+
+375px
+402px
+768px
+1440px
+
+==================================================
+FINAL REQUIREMENT
+==================================================
+
+Do not solve this by simply removing the "Review required" message.
+
+The underlying Backtesting engine must genuinely support:
+
+HTF historical candles
++
+LTF historical candles
++
+Correct candle alignment
++
+Closed-candle logic
++
+No look-ahead bias
++
+Correct condition evaluation
++
+Correct trade generation
+
+The final architecture should be:
+
+Strategy
+↓
+Exact immutable version
+↓
+Condition 1 → HTF candles
+Condition 2 → LTF candles
+↓
+Time alignment
+↓
+Condition evaluation
+↓
+Entry/exit logic
+↓
+Backtest results
+
+Make multi-timeframe strategies genuinely backtestable using real historical data.
