@@ -1,0 +1,303 @@
+TradeX — Build Long-Running Background Backtests
+
+The historical-data pipeline is now working correctly with Dukascopy, including XAUUSD 5m/1h and USTEC 1h historical retrieval, caching, pagination, rate-limit handling, and complete-range validation.
+
+The next feature is to make backtests capable of running for long periods without requiring the browser request to remain active or expecting results instantly.
+
+IMPORTANT:
+Do not replace Dukascopy.
+Do not change the existing backtest calculation logic.
+Do not change the Strategy Builder.
+Do not change strategy conditions.
+Do not fabricate historical data.
+Do not modify or delete existing strategies or saved backtest results.
+
+The goal is to make the EXISTING backtest engine run as a durable background job.
+
+1. BACKGROUND BACKTEST JOB
+
+When the user clicks "Run Backtest":
+
+- Validate the strategy/version/instrument/timeframe/date range exactly as currently done.
+- Create a backtest job.
+- Return a job ID immediately.
+- Do not keep the browser HTTP request waiting for the entire backtest.
+- The server continues the job independently.
+
+The job must survive:
+
+- The user navigating away from the Backtesting page.
+- The user refreshing the page.
+- The browser being closed.
+- Long historical-data downloads.
+- Long backtest processing.
+
+2. JOB STATES
+
+Create clear states:
+
+- QUEUED
+- DOWNLOADING_DATA
+- PROCESSING
+- COMPLETED
+- FAILED
+- CANCELLED
+
+Store progress for each job.
+
+3. HISTORICAL DATA
+
+Use the EXISTING cache-first historical-data system.
+
+For each required timeframe:
+
+- Check existing cached candles first.
+- Download only missing ranges.
+- Continue using Dukascopy's sequential throttling.
+- Respect Retry-After.
+- Use exponential backoff.
+- Persist successful pages immediately.
+- Resume from cached coverage after failures.
+- Validate complete requested coverage before processing.
+
+Do not run a backtest using materially incomplete historical data.
+
+4. PROGRESS
+
+Expose useful progress information to the frontend.
+
+Show:
+
+- Current job status.
+- Instrument.
+- Strategy/version.
+- Requested date range.
+- Required timeframes.
+- Historical candles downloaded.
+- Historical coverage.
+- Current processing progress where determinable.
+- Error information if failed.
+
+Do not invent an estimated completion time unless it can be calculated reliably.
+
+5. BACKTEST PROCESSING
+
+After historical coverage is complete:
+
+- Run the existing backtest engine.
+- Preserve closed-candle-only behavior.
+- Preserve multi-timeframe causal evaluation.
+- Preserve next-candle-open execution.
+- Preserve existing stop-loss/exit behavior.
+- Preserve zero-trade results.
+- Preserve existing P/L calculations.
+- Preserve existing result metadata.
+
+Do not change how the strategy itself is evaluated.
+
+6. RESULT PERSISTENCE
+
+When processing finishes:
+
+- Save the completed backtest result exactly as the current system does.
+- Associate it with the exact strategy version.
+- Store all existing metadata.
+- Store the job status as COMPLETED.
+- Allow the user to open the normal existing Backtest Result page.
+
+If the job fails:
+
+- Store FAILED status.
+- Store a useful error category/message.
+- Do not create a fake or partial completed result.
+
+7. BACKTESTING UI
+
+Update the Backtesting UI so the user can see active jobs.
+
+Example:
+
+BACKTEST RUNNING
+
+Gold Reversal Strategy
+v1
+XAUUSD
+5m + 1h
+90 days
+
+Status:
+Downloading historical data...
+
+5m
+17,574 candles
+Complete
+
+1h
+1,466 candles
+Complete
+
+Processing backtest...
+
+The exact presentation can follow the existing TradeX design.
+
+When complete:
+
+BACKTEST COMPLETE
+
+View Results
+
+If the user leaves and comes back later, the job/result should still be visible.
+
+8. POLLING / UPDATES
+
+Use a lightweight status mechanism such as polling or the existing real-time infrastructure.
+
+Do not continuously reload the entire application.
+
+The frontend should update the job status while it is running.
+
+9. MULTIPLE JOBS
+
+Prevent accidental duplicate submissions of the exact same backtest while one is already running.
+
+A user should not accidentally create multiple identical long-running jobs by repeatedly clicking Run Backtest.
+
+Do not unnecessarily restrict different legitimate backtests from running.
+
+10. CANCELLATION
+
+If practical within the existing architecture, add a Cancel Backtest action.
+
+Cancellation must:
+
+- Stop further downloading/processing.
+- Mark the job CANCELLED.
+- Never create a completed result from the cancelled job.
+- Preserve historical candles that were successfully downloaded because they are valid cached data.
+
+If cancellation cannot be implemented cleanly in this task, leave it out rather than creating unreliable behaviour.
+
+11. IMPORTANT LARGE-RANGE SUPPORT
+
+The system must be designed for:
+
+- 7 days
+- 30 days
+- 90 days
+- 6 months
+- 1 year
+- multi-year custom ranges
+
+Do not impose an arbitrary short timeout that prevents legitimate long backtests.
+
+Do not introduce an artificial small candle limit just to make the job finish.
+
+The existing historical-data availability validation remains the authority on whether a requested range is actually available.
+
+12. RESOURCE SAFETY
+
+Because multi-year 5m backtests can involve very large candle counts:
+
+- Process data in memory-efficient batches where practical.
+- Avoid loading unnecessarily duplicated datasets into memory.
+- Avoid database bind-parameter limits.
+- Avoid blocking the entire API server unnecessarily.
+- Keep the job resumable between historical-data pages.
+- Use the existing batching approach already added for large multi-timeframe persistence.
+
+13. TESTING
+
+Add regression tests for:
+
+- Job creation.
+- Job state transitions.
+- Background execution.
+- Historical-data download progress.
+- Cache reuse.
+- Rate-limit retry during a job.
+- Failed jobs.
+- Successful jobs.
+- Multi-timeframe jobs.
+- Long date ranges.
+- Duplicate job prevention.
+- Browser refresh/navigation while a job is running.
+- Result persistence.
+- Zero-trade completed results.
+- Cancellation if implemented.
+
+Run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- API production build
+- Frontend production build
+- git diff --check
+
+14. REAL END-TO-END TEST
+
+Do not only unit-test this.
+
+Run a real non-destructive backtest through the actual TradeX Backtesting UI using:
+
+Strategy:
+Gold Reversal Strategy (1H Bias + 5M FVG Retest)
+
+Version:
+v1
+
+Instrument:
+XAUUSD
+
+Execution timeframe:
+5m
+
+Higher timeframe:
+1h
+
+Period:
+90 days
+
+Verify that:
+
+Run Backtest
+→ job is created
+→ browser does not need to remain on the request
+→ historical data is retrieved/loaded
+→ job processes the backtest
+→ job becomes COMPLETED
+→ saved result can be opened normally.
+
+Use the existing real Dukascopy historical data.
+
+Do not fabricate a result.
+
+15. PRESERVE EVERYTHING
+
+Do not break:
+
+- Build with AI
+- Strategy Builder
+- Concept Library
+- Strategy Library
+- Strategy Versioning
+- Market Monitor
+- Live BiQuote data
+- Alerts
+- Journal
+- Monitoring
+- Existing backtesting logic
+- Existing saved backtest results
+
+At the end, report:
+
+- What was implemented.
+- API/frontend test counts.
+- Whether all builds passed.
+- Whether the real 90-day XAUUSD 1H/5M background backtest completed.
+- How long the real test took.
+- Number of candles processed.
+- Number of trades generated.
+- Whether the saved result opened correctly.
+- Any remaining limitations.
