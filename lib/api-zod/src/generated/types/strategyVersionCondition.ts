@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { StrategyVersionConditionDirection } from './strategyVersionConditionDirection';
+import type { StrategyVersionConditionParameters } from './strategyVersionConditionParameters';
 import type { StrategyVersionConditionRequirement } from './strategyVersionConditionRequirement';
 import type { StrategyVersionConditionStage } from './strategyVersionConditionStage';
 
@@ -32,6 +33,8 @@ export interface StrategyVersionCondition {
   order: number;
   /** @nullable */
   triggerRules: string | null;
+  /** @nullable */
+  parameters: StrategyVersionConditionParameters;
   /** @nullable */
   invalidationRules: string | null;
   /** @nullable */

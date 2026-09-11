@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { StrategyConditionInputDirection } from './strategyConditionInputDirection';
+import type { StrategyConditionInputParameters } from './strategyConditionInputParameters';
 import type { StrategyConditionInputRequirement } from './strategyConditionInputRequirement';
 import type { StrategyConditionInputStage } from './strategyConditionInputStage';
 
@@ -23,6 +24,8 @@ export interface StrategyConditionInput {
   requirement?: StrategyConditionInputRequirement;
   /** @nullable */
   triggerRules?: string | null;
+  /** @nullable */
+  parameters?: StrategyConditionInputParameters;
   /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */

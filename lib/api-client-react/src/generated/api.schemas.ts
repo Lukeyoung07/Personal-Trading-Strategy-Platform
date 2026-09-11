@@ -597,6 +597,11 @@ export const StrategyVersionConditionRequirement = {
   optional: 'optional',
 } as const;
 
+/**
+ * @nullable
+ */
+export type StrategyVersionConditionParameters = { [key: string]: unknown } | null;
+
 export interface StrategyVersionCondition {
   id: number;
   strategyVersionId: number;
@@ -620,6 +625,8 @@ export interface StrategyVersionCondition {
   order: number;
   /** @nullable */
   triggerRules: string | null;
+  /** @nullable */
+  parameters: StrategyVersionConditionParameters;
   /** @nullable */
   invalidationRules: string | null;
   /** @nullable */
@@ -654,6 +661,11 @@ export const StrategyConditionRequirement = {
   optional: 'optional',
 } as const;
 
+/**
+ * @nullable
+ */
+export type StrategyConditionParameters = { [key: string]: unknown } | null;
+
 export interface StrategyCondition {
   id: number;
   strategyId: number;
@@ -671,6 +683,8 @@ export interface StrategyCondition {
   order: number;
   /** @nullable */
   triggerRules: string | null;
+  /** @nullable */
+  parameters: StrategyConditionParameters;
   /** @nullable */
   invalidationRules: string | null;
   /** @nullable */
@@ -706,6 +720,11 @@ export const StrategyConditionInputRequirement = {
   optional: 'optional',
 } as const;
 
+/**
+ * @nullable
+ */
+export type StrategyConditionInputParameters = { [key: string]: unknown } | null;
+
 export interface StrategyConditionInput {
   /** @minimum 1 */
   conceptId: number;
@@ -720,6 +739,8 @@ export interface StrategyConditionInput {
   requirement?: StrategyConditionInputRequirement;
   /** @nullable */
   triggerRules?: string | null;
+  /** @nullable */
+  parameters?: StrategyConditionInputParameters;
   /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */
@@ -753,6 +774,11 @@ export const StrategyConditionUpdateRequirement = {
   optional: 'optional',
 } as const;
 
+/**
+ * @nullable
+ */
+export type StrategyConditionUpdateParameters = { [key: string]: unknown } | null;
+
 export interface StrategyConditionUpdate {
   /** @minimum 1 */
   conceptId?: number;
@@ -767,6 +793,8 @@ export interface StrategyConditionUpdate {
   requirement?: StrategyConditionUpdateRequirement;
   /** @nullable */
   triggerRules?: string | null;
+  /** @nullable */
+  parameters?: StrategyConditionUpdateParameters;
   /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */
@@ -2072,6 +2100,11 @@ export const AssistantStrategyConditionDirection = {
   both: 'both',
 } as const;
 
+/**
+ * @nullable
+ */
+export type AssistantStrategyConditionParameters = { [key: string]: unknown } | null;
+
 export interface AssistantStrategyCondition {
   name: string;
   stage: AssistantStrategyConditionStage;
@@ -2080,6 +2113,8 @@ export interface AssistantStrategyCondition {
   timeframe: string;
   direction: AssistantStrategyConditionDirection;
   triggerRules: string;
+  /** @nullable */
+  parameters: AssistantStrategyConditionParameters;
   ruleSupported: boolean;
   supported?: boolean;
 }

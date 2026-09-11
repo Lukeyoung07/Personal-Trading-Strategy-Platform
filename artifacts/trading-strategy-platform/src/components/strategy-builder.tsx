@@ -29,7 +29,13 @@ import {
   type AssistantStrategyDraft,
   type AssistantChatResponse,
 } from "@workspace/api-client-react";
-import { isHistoricalRuleSupported } from "@workspace/api-zod";
+import {
+  DEFAULT_FAIR_VALUE_GAP_PARAMETERS,
+  DEFAULT_LIQUIDITY_SWEEP_PARAMETERS,
+  executableConceptKind,
+  isHistoricalRuleSupported,
+  normalizeExecutableParameters,
+} from "@workspace/api-zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { StrategyVersionManager } from "@/components/strategy-versioning";
 import { clearPendingAssistantDraft, getPendingAssistantDraft, setPendingAssistantDraft } from "@/lib/assistant-draft-store";
@@ -96,6 +102,11 @@ function friendlyMutationError(error: unknown, fallback: string) {
 
 function isBacktestCompatibleRule(rule: string | null | undefined) {
   return isHistoricalRuleSupported(rule);
+}
+
+function isBacktestCompatibleCondition(condition: Pick<StrategyCondition, "conceptName" | "triggerRules" | "parameters">) {
+  return isBacktestCompatibleRule(condition.triggerRules)
+    || Boolean(normalizeExecutableParameters(condition.conceptName, condition.parameters));
 }
 
 function isBacktestCompatibleRiskRules(riskRules: string | null | undefined) {
@@ -411,10 +422,24 @@ function ConditionModal({ strategyId, strategyDirection, concepts, timeframes, c
   const queryClient = useQueryClient();
   const [conceptId, setConceptId] = useState<number | null>(condition?.conceptId || null);
   const [rulePreset, setRulePreset] = useState(rulePresetFor(condition?.triggerRules || null));
+  const [executionParameters, setExecutionParameters] = useState<Record<string, unknown> | null>(() =>
+    normalizeExecutableParameters(condition?.conceptName, condition?.parameters) as Record<string, unknown> | null,
+  );
   const [conditionName, setConditionName] = useState(condition?.name || "");
   const nameTouched = useRef(Boolean(condition?.name));
   const [error, setError] = useState("");
   const selectedConcept = concepts.find(concept => concept.id === conceptId);
+  const executableKind = executableConceptKind(selectedConcept?.name);
+  useEffect(() => {
+    if (executableKind) {
+      setExecutionParameters(normalizeExecutableParameters(
+        selectedConcept?.name,
+        condition && condition.conceptName === selectedConcept?.name ? condition.parameters : null,
+      ) as Record<string, unknown> | null);
+    } else {
+      setExecutionParameters(null);
+    }
+  }, [selectedConcept?.id, executableKind]);
   useEffect(() => {
     if (!nameTouched.current) setConditionName(conditionNameFor(selectedConcept, rulePreset));
   }, [selectedConcept?.id, rulePreset]);
@@ -423,7 +448,16 @@ function ConditionModal({ strategyId, strategyDirection, concepts, timeframes, c
     const form = new FormData(event.currentTarget);
     const customRule = String(form.get("customRule") || "").trim();
     const selectedPreset = RULE_PRESETS.find(preset => preset.value === rulePreset);
-    const triggerRules = rulePreset === "custom" ? customRule : selectedPreset?.rule || "";
+    const triggerRules = executableKind
+      ? executableKind === "liquidity_sweep"
+        ? "Liquidity sweep: close back inside the swept level"
+        : executionParameters?.interaction === "retest"
+          ? "Fair Value Gap retest"
+          : "Fair Value Gap formation"
+      : rulePreset === "custom" ? customRule : selectedPreset?.rule || "";
+    const parameters = executableKind
+      ? normalizeExecutableParameters(selectedConcept?.name, executionParameters)
+      : null;
     const data = {
       conceptId: conceptId as number,
       stage: String(form.get("stage") || "entry") as "entry" | "confirmation" | "invalidation" | "exit",
@@ -433,6 +467,7 @@ function ConditionModal({ strategyId, strategyDirection, concepts, timeframes, c
       direction: String(form.get("direction") || "both") as "long" | "short" | "both",
       requirement: String(form.get("requirement") || "required") as "required" | "optional",
       triggerRules: triggerRules || null,
+      parameters,
       invalidationRules: String(form.get("invalidationRules") || "") || null,
       resetBehavior: String(form.get("resetBehavior") || "") || null,
     };
@@ -448,7 +483,7 @@ function ConditionModal({ strategyId, strategyDirection, concepts, timeframes, c
       setError("Please choose a timeframe for this condition.");
       return;
     }
-    if (!triggerRules) {
+     if (!triggerRules || (executableKind && !parameters)) {
       setError(rulePreset === "custom" ? "Please describe the rule, or choose a supported rule from the list." : "Please choose an entry condition.");
       return;
     }
@@ -498,15 +533,34 @@ function ConditionModal({ strategyId, strategyDirection, concepts, timeframes, c
         <section className="rounded-lg border border-primary/30 bg-primary/5 p-4 md:p-5" data-testid="builder-when-condition">
           <div className="eyebrow text-primary">What should be true?</div>
           <p className="text-xs text-muted-foreground mt-2 leading-relaxed">Choose the clearest rule for this condition.</p>
-          <div className="mt-4">
-            <select className="select bg-background" value={rulePreset} onChange={event => setRulePreset(event.target.value)} data-testid="select-builder-condition-rule">
-              <option value="">Choose a rule</option>
-              {RULE_PRESETS.map(preset => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
-              <option value="custom">Custom rule</option>
-            </select>
-          </div>
-          {rulePreset && rulePreset !== "custom" && <div className={`mt-3 rounded-md p-3 text-xs ${RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported ? "bg-background/70 text-muted-foreground" : "border border-amber-500/40 bg-amber-500/10 text-amber-200"}`}><ShieldCheck size={14} className={`inline mr-2 ${RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported ? "text-primary" : "text-amber-300"}`} />{RULE_PRESETS.find(preset => preset.value === rulePreset)?.description}{!RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported && <strong className="block mt-1 ml-6">Not currently supported by Backtesting.</strong>}</div>}
-          {rulePreset === "custom" && <Field label="Describe the rule" hint="Unsupported concepts remain visible for review and are never treated as executable."><textarea className="textarea mt-2" name="customRule" defaultValue={condition?.triggerRules || ""} placeholder="Describe what should be true" data-testid="input-builder-condition-custom-rule" /></Field>}
+           {executableKind === "liquidity_sweep" && <div className="space-y-4 rounded-md border border-primary/30 bg-background/60 p-4" data-testid="builder-liquidity-sweep-parameters">
+             <div className="text-xs text-muted-foreground">This detector uses OHLC candles only. A sweep takes the selected prior level and must close back inside it.</div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <Field label="Liquidity level"><select className="select" value={String(executionParameters?.level || DEFAULT_LIQUIDITY_SWEEP_PARAMETERS.level)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "liquidity_sweep", level: event.target.value }))}><option value="previous_candle">Previous candle high / low</option><option value="lookback_extreme">Extreme of the prior lookback</option></select></Field>
+               <Field label="Sweep side"><select className="select" value={String(executionParameters?.sweepSide || "auto")} onChange={event => setExecutionParameters(current => ({ ...current, kind: "liquidity_sweep", sweepSide: event.target.value }))}><option value="auto">Auto by direction</option><option value="sell_side">Sell-side (long reversal)</option><option value="buy_side">Buy-side (short reversal)</option></select></Field>
+             </div>
+             <Field label="Lookback candles" hint="Used when the liquidity level is a lookback extreme."><input className="input" type="number" min="1" max="50" value={String(executionParameters?.lookback ?? DEFAULT_LIQUIDITY_SWEEP_PARAMETERS.lookback)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "liquidity_sweep", lookback: Number(event.target.value) }))} /></Field>
+           </div>}
+           {executableKind === "fair_value_gap" && <div className="space-y-4 rounded-md border border-primary/30 bg-background/60 p-4" data-testid="builder-fvg-parameters">
+             <div className="text-xs text-muted-foreground">A bullish gap is current low above the high two candles earlier. A bearish gap is the inverse.</div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <Field label="Gap direction"><select className="select" value={String(executionParameters?.polarity || DEFAULT_FAIR_VALUE_GAP_PARAMETERS.polarity)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "fair_value_gap", polarity: event.target.value }))}><option value="auto">Auto by direction</option><option value="bullish">Bullish FVG</option><option value="bearish">Bearish FVG</option></select></Field>
+               <Field label="Interaction"><select className="select" value={String(executionParameters?.interaction || DEFAULT_FAIR_VALUE_GAP_PARAMETERS.interaction)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "fair_value_gap", interaction: event.target.value }))}><option value="formation">Formation / confirmation</option><option value="retest">Retest of a prior FVG</option></select></Field>
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <Field label="Retest lookback" hint="Maximum candles back to search for a formed gap."><input className="input" type="number" min="1" max="100" value={String(executionParameters?.lookback ?? DEFAULT_FAIR_VALUE_GAP_PARAMETERS.lookback)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "fair_value_gap", lookback: Number(event.target.value) }))} /></Field>
+               <Field label="Minimum gap" hint="Price units; zero accepts any positive or zero-width boundary gap."><input className="input" type="number" min="0" step="any" value={String(executionParameters?.minimumGap ?? DEFAULT_FAIR_VALUE_GAP_PARAMETERS.minimumGap)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "fair_value_gap", minimumGap: Number(event.target.value) }))} /></Field>
+             </div>
+           </div>}
+           {!executableKind && <><div className="mt-4">
+             <select className="select bg-background" value={rulePreset} onChange={event => setRulePreset(event.target.value)} data-testid="select-builder-condition-rule">
+               <option value="">Choose a rule</option>
+               {RULE_PRESETS.map(preset => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
+               <option value="custom">Custom rule</option>
+             </select>
+           </div>
+           {rulePreset && rulePreset !== "custom" && <div className={`mt-3 rounded-md p-3 text-xs ${RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported ? "bg-background/70 text-muted-foreground" : "border border-amber-500/40 bg-amber-500/10 text-amber-200"}`}><ShieldCheck size={14} className={`inline mr-2 ${RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported ? "text-primary" : "text-amber-300"}`} />{RULE_PRESETS.find(preset => preset.value === rulePreset)?.description}{!RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported && <strong className="block mt-1 ml-6">Not currently supported by Backtesting.</strong>}</div>}
+           {rulePreset === "custom" && <Field label="Describe the rule" hint="Unsupported concepts remain visible for review and are never treated as executable."><textarea className="textarea mt-2" name="customRule" defaultValue={condition?.triggerRules || ""} placeholder="Describe what should be true" data-testid="input-builder-condition-custom-rule" /></Field>}</>}
         </section>
         <input type="hidden" name="requirement" value={condition?.requirement || "required"} />
         <details className="rounded-md border border-border p-4 group">
@@ -559,7 +613,7 @@ function ConditionFlow({ strategyId, conditions, marketSymbol, onlyStage, onAdd,
   };
   const renderCard = (condition: StrategyCondition) => {
     const index = ordered.findIndex(item => item.id === condition.id);
-    const supported = isBacktestCompatibleRule(condition.triggerRules);
+     const supported = isBacktestCompatibleCondition(condition);
     return <div key={condition.id}>
       <div className="panel panel-hover p-3 md:p-4">
         <div className="flex items-start gap-3">
@@ -998,6 +1052,7 @@ export function StrategyBuilder() {
               : strategy.direction,
             requirement: condition.requirement,
             triggerRules: condition.triggerRules || null,
+            parameters: condition.parameters || null,
             invalidationRules: null,
             resetBehavior: null,
           },

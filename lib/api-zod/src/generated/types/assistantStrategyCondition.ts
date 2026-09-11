@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AssistantStrategyConditionDirection } from './assistantStrategyConditionDirection';
+import type { AssistantStrategyConditionParameters } from './assistantStrategyConditionParameters';
 import type { AssistantStrategyConditionRequirement } from './assistantStrategyConditionRequirement';
 import type { AssistantStrategyConditionStage } from './assistantStrategyConditionStage';
 
@@ -17,6 +18,8 @@ export interface AssistantStrategyCondition {
   timeframe: string;
   direction: AssistantStrategyConditionDirection;
   triggerRules: string;
+  /** @nullable */
+  parameters: AssistantStrategyConditionParameters;
   ruleSupported: boolean;
   supported?: boolean;
 }

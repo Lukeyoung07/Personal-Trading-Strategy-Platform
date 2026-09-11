@@ -63,6 +63,7 @@ export const ChatAssistantResponse = zod.object({
   "timeframe": zod.string(),
   "direction": zod.enum(['long', 'short', 'both']),
   "triggerRules": zod.string(),
+  "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "ruleSupported": zod.boolean(),
   "supported": zod.boolean().optional()
 })),
@@ -749,6 +750,7 @@ export const ListStrategyVersionConditionsResponseItem = zod.object({
   "requirement": zod.enum(['required', 'optional']),
   "order": zod.number().int(),
   "triggerRules": zod.string().nullable(),
+  "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "invalidationRules": zod.string().nullable(),
   "resetBehavior": zod.string().nullable(),
   "createdAt": zod.coerce.date()
@@ -868,6 +870,7 @@ export const ListStrategyConditionsResponseItem = zod.object({
   "requirement": zod.enum(['required', 'optional']),
   "order": zod.number().int(),
   "triggerRules": zod.string().nullable(),
+  "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "invalidationRules": zod.string().nullable(),
   "resetBehavior": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
@@ -901,6 +904,7 @@ export const CreateStrategyConditionBody = zod.object({
   "direction": zod.enum(['long', 'short', 'both']).default(createStrategyConditionBodyDirectionDefault),
   "requirement": zod.enum(['required', 'optional']).default(createStrategyConditionBodyRequirementDefault),
   "triggerRules": zod.string().nullish(),
+  "parameters": zod.record(zod.string(), zod.unknown()).nullish(),
   "invalidationRules": zod.string().nullish(),
   "resetBehavior": zod.string().nullish()
 })
@@ -919,6 +923,7 @@ export const CreateStrategyConditionResponse = zod.object({
   "requirement": zod.enum(['required', 'optional']),
   "order": zod.number().int(),
   "triggerRules": zod.string().nullable(),
+  "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "invalidationRules": zod.string().nullable(),
   "resetBehavior": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
@@ -957,6 +962,7 @@ export const ReorderStrategyConditionsResponseItem = zod.object({
   "requirement": zod.enum(['required', 'optional']),
   "order": zod.number().int(),
   "triggerRules": zod.string().nullable(),
+  "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "invalidationRules": zod.string().nullable(),
   "resetBehavior": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
@@ -991,6 +997,7 @@ export const UpdateStrategyConditionBody = zod.object({
   "direction": zod.enum(['long', 'short', 'both']).optional(),
   "requirement": zod.enum(['required', 'optional']).optional(),
   "triggerRules": zod.string().nullish(),
+  "parameters": zod.record(zod.string(), zod.unknown()).nullish(),
   "invalidationRules": zod.string().nullish(),
   "resetBehavior": zod.string().nullish()
 })
@@ -1009,6 +1016,7 @@ export const UpdateStrategyConditionResponse = zod.object({
   "requirement": zod.enum(['required', 'optional']),
   "order": zod.number().int(),
   "triggerRules": zod.string().nullable(),
+  "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "invalidationRules": zod.string().nullable(),
   "resetBehavior": zod.string().nullable(),
   "createdAt": zod.coerce.date(),

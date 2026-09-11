@@ -95,9 +95,18 @@ import {
   UpdateTradeBody,
   UpdateTradeParams,
   UpdateTradeResponse,
+  executableConceptKind,
+  normalizeExecutableParameters,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+function conditionParameters(conceptName: string | null | undefined, value: unknown) {
+  if (!executableConceptKind(conceptName)) return value ?? null;
+  const parameters = normalizeExecutableParameters(conceptName, value);
+  if (!parameters) throw new Error(`Parameters for ${conceptName} are invalid.`);
+  return parameters;
+}
 
 const DEFAULT_CONCEPTS = [
   ["MARKET STRUCTURE", "Higher High"],
@@ -232,6 +241,25 @@ const DEFAULT_CONCEPTS = [
   ["RISK / TRADE MANAGEMENT", "Trailing Stop"],
 ] as const;
 
+const EXECUTABLE_CONCEPT_METADATA: Record<string, { description: string; detectionRules: string }> = {
+  "Liquidity Sweep": {
+    description: "A prior high or low is swept and the candle closes back inside that level.",
+    detectionRules: "Structured detector: previous candle or prior lookback extreme; close-back-inside confirmation.",
+  },
+  "Bullish FVG": {
+    description: "A bullish three-candle fair value gap, optionally retested.",
+    detectionRules: "Structured detector: current low is above the high two candles earlier.",
+  },
+  "Bearish FVG": {
+    description: "A bearish three-candle fair value gap, optionally retested.",
+    detectionRules: "Structured detector: current high is below the low two candles earlier.",
+  },
+  "Fair Value Gap": {
+    description: "A three-candle fair value gap, optionally retested.",
+    detectionRules: "Structured detector: bullish or bearish three-candle gap, with formation or retest interaction.",
+  },
+};
+
 async function ensureBuiltInConcepts(): Promise<void> {
   const existing = await db
     .select({ name: tradingConceptsTable.name })
@@ -248,6 +276,12 @@ async function ensureBuiltInConcepts(): Promise<void> {
   }));
   if (missing.length > 0) {
     await db.insert(tradingConceptsTable).values(missing);
+  }
+  for (const [name, metadata] of Object.entries(EXECUTABLE_CONCEPT_METADATA)) {
+    await db.update(tradingConceptsTable).set(metadata).where(and(
+      eq(tradingConceptsTable.name, name),
+      eq(tradingConceptsTable.isBuiltIn, true),
+    ));
   }
 }
 
@@ -643,6 +677,7 @@ async function buildVersionConditionSnapshots(
       requirement: condition.requirement,
       conditionOrder: condition.conditionOrder,
       triggerRules: condition.triggerRules,
+      parameters: conditionParameters(concept?.name, condition.parameters),
       invalidationRules: condition.invalidationRules,
       resetBehavior: condition.resetBehavior,
     };
@@ -819,6 +854,7 @@ router.post("/strategies/:strategyId/duplicate", async (req, res): Promise<void>
         requirement: condition.requirement,
         conditionOrder: condition.conditionOrder,
         triggerRules: condition.triggerRules,
+        parameters: condition.parameters,
         invalidationRules: condition.invalidationRules,
         resetBehavior: condition.resetBehavior,
       })));
@@ -956,6 +992,7 @@ async function activateVersionSnapshot(strategyId: number, versionId: number) {
         requirement: condition.requirement,
         conditionOrder: condition.conditionOrder,
         triggerRules: condition.triggerRules,
+        parameters: condition.parameters,
         invalidationRules: condition.invalidationRules,
         resetBehavior: condition.resetBehavior,
       })));
@@ -1039,6 +1076,7 @@ router.post("/strategies/:strategyId/versions/:versionId/clone", async (req, res
         requirement: condition.requirement,
         conditionOrder: condition.conditionOrder,
         triggerRules: condition.triggerRules,
+        parameters: condition.parameters,
         invalidationRules: condition.invalidationRules,
         resetBehavior: condition.resetBehavior,
       })));
@@ -1068,6 +1106,7 @@ router.post("/strategies/:strategyId/versions/:versionId/clone", async (req, res
         requirement: condition.requirement,
         conditionOrder: condition.conditionOrder,
         triggerRules: condition.triggerRules,
+        parameters: condition.parameters,
         invalidationRules: condition.invalidationRules,
         resetBehavior: condition.resetBehavior,
       })));
@@ -1145,13 +1184,25 @@ router.post("/strategies/:strategyId/conditions", async (req, res): Promise<void
     res.status(404).json({ error: "Strategy not found" });
     return;
   }
+  const [concept] = await db.select({ name: tradingConceptsTable.name }).from(tradingConceptsTable).where(eq(tradingConceptsTable.id, body.data.conceptId));
+  if (!concept) {
+    res.status(400).json({ error: "Concept not found." });
+    return;
+  }
+  let parameters: unknown;
+  try {
+    parameters = conditionParameters(concept.name, body.data.parameters);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Condition parameters are invalid." });
+    return;
+  }
   const [latest] = await db
     .select({ conditionOrder: max(strategyConditionsTable.conditionOrder) })
     .from(strategyConditionsTable)
     .where(eq(strategyConditionsTable.strategyId, params.data.strategyId));
   const [created] = await db
     .insert(strategyConditionsTable)
-    .values({ ...body.data, strategyId: params.data.strategyId, conditionOrder: Number(latest?.conditionOrder ?? 0) + 1 })
+    .values({ ...body.data, parameters, strategyId: params.data.strategyId, conditionOrder: Number(latest?.conditionOrder ?? 0) + 1 })
     .returning();
   res.status(201).json(CreateStrategyConditionResponse.parse(await strategyConditionView(created)));
 });
@@ -1191,15 +1242,30 @@ router.patch("/strategies/:strategyId/conditions/:conditionId", async (req, res)
     res.status(400).json({ error: !params.success ? params.error.message : body.success ? "Invalid request body" : body.error.message });
     return;
   }
-  const [updated] = await db
-    .update(strategyConditionsTable)
-    .set({ ...body.data, updatedAt: new Date() })
-    .where(and(eq(strategyConditionsTable.id, params.data.conditionId), eq(strategyConditionsTable.strategyId, params.data.strategyId)))
-    .returning();
-  if (!updated) {
+  const [existing] = await db.select().from(strategyConditionsTable)
+    .where(and(eq(strategyConditionsTable.id, params.data.conditionId), eq(strategyConditionsTable.strategyId, params.data.strategyId)));
+  if (!existing) {
     res.status(404).json({ error: "Strategy condition not found" });
     return;
   }
+  const [concept] = await db.select({ name: tradingConceptsTable.name }).from(tradingConceptsTable)
+    .where(eq(tradingConceptsTable.id, body.data.conceptId ?? existing.conceptId));
+  if (!concept) {
+    res.status(400).json({ error: "Concept not found." });
+    return;
+  }
+  let parameters: unknown;
+  try {
+    parameters = conditionParameters(concept.name, body.data.parameters ?? existing.parameters);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Condition parameters are invalid." });
+    return;
+  }
+  const [updated] = await db
+    .update(strategyConditionsTable)
+    .set({ ...body.data, parameters, updatedAt: new Date() })
+    .where(and(eq(strategyConditionsTable.id, params.data.conditionId), eq(strategyConditionsTable.strategyId, params.data.strategyId)))
+    .returning();
   res.json(UpdateStrategyConditionResponse.parse(await strategyConditionView(updated)));
 });
 

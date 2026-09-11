@@ -1,4 +1,9 @@
-import { historicalRuleCompatibilityError, normalizeHistoricalRule } from "@workspace/api-zod";
+import {
+  historicalRuleCompatibilityError,
+  normalizeHistoricalRule,
+  normalizeExecutableParameters,
+  type ExecutableConceptParameters,
+} from "@workspace/api-zod";
 
 export type BacktestSide = "long" | "short";
 
@@ -15,10 +20,12 @@ export interface HistoricalCandle {
 
 export interface BacktestCondition {
   name: string;
+  conceptName?: string | null;
   stage: "entry" | "confirmation" | "invalidation" | "exit";
   direction: "long" | "short" | "both";
   requirement: "required" | "optional";
   triggerRules: string | null;
+  parameters?: unknown;
   invalidationRules: string | null;
   conceptDetectionRules: string | null;
 }
@@ -118,6 +125,70 @@ function evaluateRule(rule: string, candle: HistoricalCandle, previous: Historic
   return normalized.split("||").some(group => group.split("&&").every(clause => evaluateClause(group === clause ? clause : clause, candle, previous)));
 }
 
+function executableParameters(condition: BacktestCondition): ExecutableConceptParameters | null {
+  return normalizeExecutableParameters(condition.conceptName || condition.name, condition.parameters);
+}
+
+function levelForLiquidity(candles: HistoricalCandle[], index: number, level: "high" | "low", lookback: number) {
+  const source = candles.slice(Math.max(0, index - lookback), index);
+  if (source.length < lookback) return null;
+  return level === "high"
+    ? Math.max(...source.map(candle => candle.high))
+    : Math.min(...source.map(candle => candle.low));
+}
+
+function fvgAt(candles: HistoricalCandle[], index: number, polarity: "bullish" | "bearish", minimumGap: number) {
+  if (index < 2) return null;
+  const first = candles[index - 2];
+  const current = candles[index];
+  if (polarity === "bullish") {
+    const gap = current.low - first.high;
+    return gap > minimumGap ? { low: first.high, high: current.low } : null;
+  }
+  const gap = first.low - current.high;
+  return gap > minimumGap ? { low: current.high, high: first.low } : null;
+}
+
+function evaluateExecutableCondition(
+  condition: BacktestCondition,
+  side: BacktestSide,
+  candles: HistoricalCandle[],
+  index: number,
+) {
+  const parameters = executableParameters(condition);
+  if (!parameters) return null;
+  const candle = candles[index];
+  if (parameters.kind === "liquidity_sweep") {
+    const sweepSide = parameters.sweepSide === "auto"
+      ? side === "long" ? "sell_side" : "buy_side"
+      : parameters.sweepSide;
+    const level = levelForLiquidity(
+      candles,
+      index,
+      sweepSide === "buy_side" ? "high" : "low",
+      parameters.level === "previous_candle" ? 1 : parameters.lookback,
+    );
+    if (level == null) return false;
+    return sweepSide === "buy_side"
+      ? candle.high > level && candle.close < level
+      : candle.low < level && candle.close > level;
+  }
+
+  const polarity = parameters.polarity === "auto"
+    ? side === "long" ? "bullish" : "bearish"
+    : parameters.polarity;
+  if (parameters.interaction === "formation") {
+    return fvgAt(candles, index, polarity, parameters.minimumGap) !== null;
+  }
+  const start = Math.max(2, index - parameters.lookback);
+  for (let formationIndex = index - 1; formationIndex >= start; formationIndex -= 1) {
+    const zone = fvgAt(candles, formationIndex, polarity, parameters.minimumGap);
+    if (!zone) continue;
+    if (candle.high >= zone.low && candle.low <= zone.high) return true;
+  }
+  return false;
+}
+
 export function validateHistoricalRule(rule: string) {
   return historicalRuleCompatibilityError(rule);
 }
@@ -131,6 +202,11 @@ export function validateHistoricalBacktestStrategy(strategy: BacktestStrategy) {
   }
   for (const condition of [...entryConditions, ...exitConditions]) {
     try {
+      if (condition.conceptName && condition.parameters != null && !executableParameters(condition)) {
+        errors.push(`${condition.name}: executable parameters are invalid.`);
+        continue;
+      }
+      if (executableParameters(condition)) continue;
       const rule = ruleForCondition(condition);
       const error = validateHistoricalRule(rule);
       if (error) errors.push(`${condition.name}: ${error}`);
@@ -153,6 +229,7 @@ export function validateHistoricalBacktestStrategy(strategy: BacktestStrategy) {
 }
 
 function ruleForCondition(condition: BacktestCondition) {
+  if (executableParameters(condition)) return "always";
   const rule = condition.triggerRules?.trim() || condition.conceptDetectionRules?.trim();
   if (!rule) throw new BacktestEngineError(`Condition '${condition.name}' has no executable historical rule.`);
   return rule;
@@ -175,26 +252,33 @@ function conditionMatches(condition: BacktestCondition, side: BacktestSide) {
   return condition.direction === "both" || condition.direction === side;
 }
 
-function evaluateConditions(conditions: BacktestCondition[], side: BacktestSide, candle: HistoricalCandle, previous: HistoricalCandle | undefined) {
+function evaluateConditions(conditions: BacktestCondition[], side: BacktestSide, candles: HistoricalCandle[], index: number) {
+  const candle = candles[index];
+  const previous = index > 0 ? candles[index - 1] : undefined;
   const selected = conditions.filter(condition => conditionMatches(condition, side));
   const required = selected.filter(condition => condition.requirement === "required");
   const optional = selected.filter(condition => condition.requirement === "optional");
   if (!required.length && !optional.length) return { matched: false, reasons: [] as string[] };
-  const requiredResults = required.map(condition => ({ condition, matched: evaluateRule(ruleForCondition(condition), candle, previous) }));
-  const optionalResults = optional.map(condition => ({ condition, matched: evaluateRule(ruleForCondition(condition), candle, previous) }));
+  const evaluate = (condition: BacktestCondition) =>
+    evaluateExecutableCondition(condition, side, candles, index)
+    ?? evaluateRule(ruleForCondition(condition), candle, previous);
+  const requiredResults = required.map(condition => ({ condition, matched: evaluate(condition) }));
+  const optionalResults = optional.map(condition => ({ condition, matched: evaluate(condition) }));
   return {
     matched: requiredResults.every(result => result.matched),
     reasons: [...requiredResults, ...optionalResults].filter(result => result.matched).map(result => result.condition.name),
   };
 }
 
-function inferSide(strategy: BacktestStrategy, entryConditions: BacktestCondition[], candle: HistoricalCandle, previous: HistoricalCandle | undefined): BacktestSide | null {
+function inferSide(strategy: BacktestStrategy, entryConditions: BacktestCondition[], candles: HistoricalCandle[], index: number): BacktestSide | null {
+  const candle = candles[index];
+  const previous = index > 0 ? candles[index - 1] : undefined;
   if (strategy.direction === "long") return "long";
   if (strategy.direction === "short") return "short";
   const explicit = entryConditions.filter(condition => condition.direction !== "both");
   if (explicit.length) {
-    const long = evaluateConditions(entryConditions, "long", candle, previous).matched;
-    const short = evaluateConditions(entryConditions, "short", candle, previous).matched;
+    const long = evaluateConditions(entryConditions, "long", candles, index).matched;
+    const short = evaluateConditions(entryConditions, "short", candles, index).matched;
     if (long === short) return null;
     return long ? "long" : "short";
   }
@@ -223,7 +307,9 @@ export function runHistoricalBacktest(strategy: BacktestStrategy, inputCandles: 
   if (!entryConditions.length && !entryRule) {
     throw new BacktestEngineError("This strategy version has no executable entry rule. Add a supported OHLC rule to an entry checkpoint or entry rules.");
   }
-  for (const condition of [...entryConditions, ...exitConditions]) ruleForCondition(condition);
+  for (const condition of [...entryConditions, ...exitConditions]) {
+    if (!executableParameters(condition)) ruleForCondition(condition);
+  }
   if (exitRule && exitConditions.length === 0) evaluateRule(exitRule, candles[0], undefined);
   const risk = parseRiskRules(strategy.riskRules);
   const assumptions = [
@@ -293,7 +379,7 @@ export function runHistoricalBacktest(strategy: BacktestStrategy, inputCandles: 
 
     if (position) {
       const exitMatched = exitConditions.length
-        ? evaluateConditions(exitConditions, position.side, candle, previous).matched
+        ? evaluateConditions(exitConditions, position.side, candles, index).matched
         : exitRule ? evaluateRule(exitRule, candle, previous) : false;
       if (exitMatched) pendingExitReason = exitConditions.length
         ? `exit_condition:${exitConditions.filter(condition => conditionMatches(condition, position!.side)).map(condition => condition.name).join(",")}`
@@ -301,9 +387,9 @@ export function runHistoricalBacktest(strategy: BacktestStrategy, inputCandles: 
     }
 
     if (!position && !pendingEntry && !exitedThisCandle && index < candles.length - 1) {
-      const side = inferSide(strategy, entryConditions, candle, previous);
+      const side = inferSide(strategy, entryConditions, candles, index);
       const entryMatched = entryConditions.length
-        ? side != null && evaluateConditions(entryConditions, side, candle, previous).matched
+        ? side != null && evaluateConditions(entryConditions, side, candles, index).matched
         : entryRule ? evaluateRule(entryRule, candle, previous) : false;
       if (entryMatched && side) {
         pendingEntry = {

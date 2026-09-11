@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
   boolean,
+  jsonb,
   uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -80,6 +81,7 @@ export const strategyConditionsTable = pgTable("strategy_conditions", {
   requirement: text("requirement").notNull().default("required"),
   conditionOrder: integer("condition_order").notNull().default(1),
   triggerRules: text("trigger_rules"),
+  parameters: jsonb("parameters"),
   invalidationRules: text("invalidation_rules"),
   resetBehavior: text("reset_behavior"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -103,6 +105,7 @@ export const strategyVersionConditionsTable = pgTable("strategy_version_conditio
   requirement: text("requirement").notNull().default("required"),
   conditionOrder: integer("condition_order").notNull().default(1),
   triggerRules: text("trigger_rules"),
+  parameters: jsonb("parameters"),
   invalidationRules: text("invalidation_rules"),
   resetBehavior: text("reset_behavior"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

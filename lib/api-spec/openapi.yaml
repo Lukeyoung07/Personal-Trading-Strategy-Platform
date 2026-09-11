@@ -1770,7 +1770,7 @@ components:
         label: { type: ["string", "null"] }
     StrategyVersionCondition:
       type: object
-      required: [id, strategyVersionId, conceptId, conceptName, conceptCategory, conceptDescription, conceptDetectionRules, conceptInvalidationRules, stage, name, description, timeframe, direction, requirement, order, triggerRules, invalidationRules, resetBehavior, createdAt]
+      required: [id, strategyVersionId, conceptId, conceptName, conceptCategory, conceptDescription, conceptDetectionRules, conceptInvalidationRules, stage, name, description, timeframe, direction, requirement, order, triggerRules, parameters, invalidationRules, resetBehavior, createdAt]
       properties:
         id: { type: integer }
         strategyVersionId: { type: integer }
@@ -1794,12 +1794,13 @@ components:
           enum: [required, optional]
         order: { type: integer }
         triggerRules: { type: ["string", "null"] }
+        parameters: { type: ["object", "null"], additionalProperties: true }
         invalidationRules: { type: ["string", "null"] }
         resetBehavior: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
     StrategyCondition:
       type: object
-      required: [id, strategyId, conceptId, conceptName, conceptCategory, stage, name, description, timeframe, direction, requirement, order, triggerRules, invalidationRules, resetBehavior, createdAt, updatedAt]
+      required: [id, strategyId, conceptId, conceptName, conceptCategory, stage, name, description, timeframe, direction, requirement, order, triggerRules, parameters, invalidationRules, resetBehavior, createdAt, updatedAt]
       properties:
         id: { type: integer }
         strategyId: { type: integer }
@@ -1820,6 +1821,7 @@ components:
           enum: [required, optional]
         order: { type: integer }
         triggerRules: { type: ["string", "null"] }
+        parameters: { type: ["object", "null"], additionalProperties: true }
         invalidationRules: { type: ["string", "null"] }
         resetBehavior: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
@@ -1844,6 +1846,7 @@ components:
           enum: [required, optional]
           default: required
         triggerRules: { type: ["string", "null"] }
+        parameters: { type: ["object", "null"], additionalProperties: true }
         invalidationRules: { type: ["string", "null"] }
         resetBehavior: { type: ["string", "null"] }
     StrategyConditionUpdate:
@@ -1863,6 +1866,7 @@ components:
           type: string
           enum: [required, optional]
         triggerRules: { type: ["string", "null"] }
+        parameters: { type: ["object", "null"], additionalProperties: true }
         invalidationRules: { type: ["string", "null"] }
         resetBehavior: { type: ["string", "null"] }
     StrategyConditionReorderInput:
@@ -2650,7 +2654,7 @@ components:
           $ref: "#/components/schemas/AssistantContext"
     AssistantStrategyCondition:
       type: object
-      required: [name, stage, requirement, conceptName, timeframe, direction, triggerRules, ruleSupported]
+      required: [name, stage, requirement, conceptName, timeframe, direction, triggerRules, parameters, ruleSupported]
       properties:
         name: { type: string }
         stage:
@@ -2665,6 +2669,7 @@ components:
           type: string
           enum: [long, short, both]
         triggerRules: { type: string }
+        parameters: { type: ["object", "null"], additionalProperties: true }
         ruleSupported: { type: boolean }
         supported: { type: boolean }
     AssistantCompatibility:

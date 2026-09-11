@@ -11,7 +11,12 @@ import {
   timeframesTable,
   tradingConceptsTable,
 } from "@workspace/db";
-import { ChatAssistantResponse, type ChatAssistantBody } from "@workspace/api-zod";
+import {
+  ChatAssistantResponse,
+  executableConceptKind,
+  normalizeExecutableParameters,
+  type ChatAssistantBody,
+} from "@workspace/api-zod";
 import { calculateBacktestStatistics } from "./backtest-results";
 import { logger } from "../lib/logger";
 
@@ -142,13 +147,17 @@ const UNSUPPORTED_CONCEPTS: UnsupportedConceptDefinition[] = [
 ];
 
 function unsupportedConceptForText(value: string): UnsupportedConceptDefinition | null {
+  if (executableConceptKind(value)) return null;
   return UNSUPPORTED_CONCEPTS.find(concept => concept.pattern.test(value)) || null;
 }
 
 function compatibilityForDraft(draft: any) {
   const conditions = Array.isArray(draft?.conditions) ? draft.conditions : [];
   const unsupported: string[] = conditions
-    .filter((condition: any) => condition?.supported !== true || !supportedRule(normalizeConditionRule(condition)))
+    .filter((condition: any) => condition?.supported !== true || (
+      !supportedRule(normalizeConditionRule(condition))
+      && !normalizeExecutableParameters(condition?.conceptName, condition?.parameters)
+    ))
     .map((condition: any) => String(condition?.name || condition?.triggerRules || "Unnamed condition"));
   const unsupportedConcepts = Array.isArray(draft?.conceptsUsed)
     ? draft.conceptsUsed
@@ -183,8 +192,11 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
       condition.conceptName.toLowerCase() === rawName.toLowerCase() ||
       condition.conceptName.toLowerCase() === name.toLowerCase(),
     );
+    const executable = executableConceptKind(rawName) !== null || matchingConditions.some(condition => executableConceptKind(condition.conceptName) !== null);
     const supported = unsupportedConcept
       ? false
+      : executable
+        ? matchingConditions.length === 0 || matchingConditions.every(condition => condition.supported)
       : matchingConditions.length > 0
         ? matchingConditions.every(condition => condition.supported) && raw?.supported !== false
         : raw?.supported === true;
@@ -393,8 +405,12 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
       conceptName: conceptName || String(condition.conceptName || "Unmapped concept").slice(0, 160),
       timeframe: timeframe || String(condition.timeframe || "Not specified").slice(0, 40),
       direction: ["long", "short", "both"].includes(condition.direction) ? condition.direction : draft.direction,
-      ruleSupported: condition.ruleSupported === true,
-      supported: Boolean(conceptName) && condition.supported === true,
+      parameters: normalizeExecutableParameters(conceptName, condition.parameters),
+      ruleSupported: condition.ruleSupported === true || Boolean(normalizeExecutableParameters(conceptName, condition.parameters)),
+      supported: Boolean(conceptName) && (
+        condition.supported === true
+        || Boolean(normalizeExecutableParameters(conceptName, condition.parameters))
+      ),
     };
   }).filter((condition: any) => {
     if (requestMessage && !/(?:\bexit\b|\binvalidation\b|\bclose\b|\bstop[- ]loss\b|\btake[- ]profit\b|\btarget\b|\btp\b|\bsl\b)/i.test(requestMessage)) {
@@ -448,11 +464,18 @@ function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | 
     const rawConceptName = String(condition?.conceptName || "Assistant draft").slice(0, 160);
     const unsupportedConcept = unsupportedConceptForText(rawConceptName);
     const ruleIsSupported = supportedRule(normalizedRule);
+    const executableInput = condition?.parameters || (
+      executableConceptKind(rawConceptName) === "fair_value_gap"
+      && /(?:retest|fill)/i.test(`${condition?.name || ""} ${condition?.triggerRules || ""}`)
+        ? { interaction: "retest" }
+        : null
+    );
+    const parameters = normalizeExecutableParameters(rawConceptName, executableInput);
     return {
       name: String(condition?.name || "Assistant condition").slice(0, 160),
       stage: ["entry", "confirmation", "invalidation", "exit"].includes(condition?.stage) ? condition.stage : "entry",
       requirement: condition?.requirement === "optional" ? "optional" : "required",
-      conceptName: unsupportedConcept?.name || (ruleIsSupported && /(?:bullish|bearish|close|open)/i.test(`${condition?.triggerRules || ""} ${condition?.conceptName || ""}`)
+       conceptName: executableConceptKind(rawConceptName) ? rawConceptName : unsupportedConcept?.name || (ruleIsSupported && /(?:bullish|bearish|close|open)/i.test(`${condition?.triggerRules || ""} ${condition?.conceptName || ""}`)
         ? "Candle Direction"
         : rawConceptName),
       timeframe: String(condition?.timeframe || "Not specified").slice(0, 40),
@@ -460,8 +483,9 @@ function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | 
         ? condition.direction
         : (draft.direction === "long" || draft.direction === "short" || draft.direction === "both" ? draft.direction : "both"),
       triggerRules: normalizedRule.slice(0, 400),
-      ruleSupported: ruleIsSupported,
-      supported: ruleIsSupported && !unsupportedConcept,
+      parameters,
+      ruleSupported: ruleIsSupported || Boolean(parameters),
+      supported: (ruleIsSupported || Boolean(parameters)) && !unsupportedConcept,
     };
   }).slice(0, 20) : [];
   const conceptsUsed = draft ? normalizeConcepts(draft.conceptsUsed, conditions) : [];
@@ -500,6 +524,11 @@ function isStrategyDraftRequest(message: string) {
 }
 
 function unsupportedConceptFromRequest(message: string) {
+  const executable = [
+    { pattern: /\bliquidity\s+sweep\b/i, name: "Liquidity Sweep" },
+    { pattern: /\b(?:bullish|bearish)\s+fvg\b|\bfair\s+value\s+gap\b|\bfvg\b/i, name: "Fair Value Gap" },
+  ].find(concept => concept.pattern.test(message));
+  if (executable) return { name: executable.name, pattern: executable.pattern };
   return unsupportedConceptForText(message) || {
     name: "Requested strategy concept",
     pattern: /./i,
@@ -513,7 +542,11 @@ function fallbackDraftForUnsupportedRequest(message: string, reply: string) {
     .map(match => match[0].replace(/\s+/g, " ").trim())
     .slice(0, 4);
   const conditionName = `Requested ${concept.name}`;
-  const explanation = "Understood by the assistant, but not currently executable by historical backtesting.";
+  const parameters = normalizeExecutableParameters(concept.name, null);
+  const executable = Boolean(parameters);
+  const explanation = executable
+    ? "Mapped to the structured historical detector; review its parameters before saving."
+    : "Understood by the assistant, but not currently executable by historical backtesting.";
   return {
     name: `${marketSymbol ? `${marketSymbol} ` : ""}${concept.name} strategy`.slice(0, 160),
     description: reply.slice(0, 2000),
@@ -530,12 +563,14 @@ function fallbackDraftForUnsupportedRequest(message: string, reply: string) {
       requirement: "required" as const,
       conceptName: concept.name,
       timeframe: timeframes[0] || "Not specified",
-      triggerRules: `${concept.name} requested; unsupported for historical execution.`,
-      supported: false,
+       triggerRules: executable ? `${concept.name} structured detector` : `${concept.name} requested; unsupported for historical execution.`,
+       parameters,
+       ruleSupported: executable,
+       supported: executable,
     }],
     conceptsUsed: [{
       name: concept.name,
-      supported: false,
+       supported: executable,
       explanation,
     }],
     riskManagementRules: null,
@@ -712,11 +747,11 @@ function systemPrompt(context: Record<string, unknown>) {
 Safety and product boundaries:
 - Never place trades, execute orders, connect to brokers, guarantee outcomes, fabricate market data, news, or backtest statistics.
 - Use only the stored context supplied below for strategy and backtest facts. If a fact is absent, say it is unavailable.
-- Existing Backtesting supports only: always, bullish, bearish, OHLC comparisons, and previous-candle crossings. If a requested condition cannot be represented exactly, identify it as unsupported and never claim it is backtest-compatible.
+- Historical Backtesting supports exact OHLC rules plus structured Liquidity Sweep and Fair Value Gap conditions. Liquidity Sweep uses a prior candle or prior lookback extreme and requires a close back inside the level. Fair Value Gap uses the three-candle gap and supports formation or a bounded retest. If a requested condition cannot be represented exactly, identify it as unsupported.
 - Strategy directions must be exactly long, short, or both. Conditions must use the existing model fields.
 - For strategy drafts, use only concept names, market symbols, and timeframe codes/labels from builderCatalog. Common aliases such as FVG, BOS, CHoCH, MSS, SMT, HTF, LTF, AMD, OB, and Gold must be mapped to a matching catalog item only when one exists. If no match exists, preserve the requested wording and mark it for review; never invent a library item.
 - Recognise both normal-language requests and the structured TRADEX STRATEGY format with NAME, MARKET, DIRECTION, TIMEFRAMES, ENTRY, CONFIRMATION, EXIT, and RISK sections.
-- Use only the exact historical rules supported by the Builder: always, bullish, bearish, close > open, close < open, and close crosses above/below a previous OHLC value. Preserve other requested concepts as descriptive unsupported conditions.
+- Use exact supported rules or structured parameters for Liquidity Sweep and Fair Value Gap. Do not turn a concept into a bullish/bearish candle rule.
 - Only infer bullish or bearish from an explicit Bullish Candle, Bearish Candle, or Candle Direction descriptor. Never convert an FVG, liquidity, structure, indicator, or other concept description into a candle rule.
 - Never silently save, overwrite, activate, or run anything. Prepare drafts and explain the user's next explicit action.
 - When setup context contains a strategy or version ID, copy those IDs unchanged. Never substitute a different strategy version.
@@ -732,7 +767,7 @@ Return JSON only with this shape:
     "direction": "long | short | both",
     "marketSymbol": "string or null",
     "timeframes": ["string"],
-     "conditions": [{"name":"string","stage":"entry|confirmation|invalidation|exit","requirement":"required|optional","conceptName":"string","timeframe":"string","direction":"long|short|both","triggerRules":"exact supported rule or descriptive unsupported rule"}],
+     "conditions": [{"name":"string","stage":"entry|confirmation|invalidation|exit","requirement":"required|optional","conceptName":"string","timeframe":"string","direction":"long|short|both","triggerRules":"exact supported rule or descriptive unsupported rule","parameters":null}],
     "conceptsUsed": [{"name":"string","supported":true,"explanation":"string"}],
     "riskManagementRules": "string or null"
   },

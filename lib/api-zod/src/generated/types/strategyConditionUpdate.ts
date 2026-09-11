@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { StrategyConditionUpdateDirection } from './strategyConditionUpdateDirection';
+import type { StrategyConditionUpdateParameters } from './strategyConditionUpdateParameters';
 import type { StrategyConditionUpdateRequirement } from './strategyConditionUpdateRequirement';
 import type { StrategyConditionUpdateStage } from './strategyConditionUpdateStage';
 
@@ -23,6 +24,8 @@ export interface StrategyConditionUpdate {
   requirement?: StrategyConditionUpdateRequirement;
   /** @nullable */
   triggerRules?: string | null;
+  /** @nullable */
+  parameters?: StrategyConditionUpdateParameters;
   /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */

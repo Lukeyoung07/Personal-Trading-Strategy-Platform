@@ -229,10 +229,8 @@ describe("AI Trading Assistant provider boundary", () => {
       { conceptName: "Fair Value Gap", stage: "confirmation", direction: "both", triggerRules: "bullish", ruleSupported: true },
     ]);
     expect(response.strategyDraft?.riskManagementRules).toBeNull();
-    expect(response.strategyDraft?.compatibility.unsupportedConditions).toEqual(expect.arrayContaining([
-      "Liquidity Sweep",
-      "Fair Value Gap confirmation",
-    ]));
+     expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Liquidity Sweep");
+     expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Fair Value Gap confirmation");
     expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Take Profit");
   });
 
@@ -316,30 +314,30 @@ Risk/Reward: 2:1`,
     expect(response.strategyDraft?.riskManagementRules).toBe("risk: 1%; risk/reward: 2R");
   });
 
-  it("does not trust a model-supported flag for concepts the engine cannot execute", async () => {
+   it("does not trust a model-supported flag for concepts the engine cannot execute", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
       choices: [{
         message: {
           content: JSON.stringify({
-            reply: "Prepared an FVG draft with an execution limitation.",
+             reply: "Prepared an EMA draft with an execution limitation.",
             intent: "strategy_proposal",
             strategyDraft: {
-              name: "FVG draft",
-              description: "A fair value gap strategy.",
+               name: "EMA draft",
+               description: "An exponential moving average strategy.",
               direction: "long",
               marketSymbol: "XAUUSD",
               timeframes: ["15m"],
               conditions: [{
-                name: "Bullish FVG",
+                 name: "EMA crossover",
                 stage: "entry",
                 requirement: "required",
-                conceptName: "Fair Value Gap (FVG)",
+                 conceptName: "EMA Cross",
                 timeframe: "15m",
                 triggerRules: "bullish",
               }],
               conceptsUsed: [{
-                name: "Fair Value Gap (FVG)",
+                 name: "EMA Cross",
                 supported: true,
                 explanation: "The model should not be able to override this guardrail.",
               }],
@@ -356,12 +354,12 @@ Risk/Reward: 2:1`,
       context: { page: "/strategy-builder" },
     });
 
-    expect(response.strategyDraft?.conceptsUsed).toEqual(expect.arrayContaining([{
-      name: "Fair Value Gap (FVG)",
+     expect(response.strategyDraft?.conceptsUsed).toEqual(expect.arrayContaining([{
+       name: "Exponential Moving Average (EMA)",
       supported: false,
       explanation: "The model should not be able to override this guardrail.",
     }]));
-    expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("Bullish FVG");
+     expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("EMA crossover");
   });
 
   it("keeps an unsupported strategy request as a reviewable draft when the model omits one", async () => {
@@ -440,21 +438,21 @@ Risk/Reward: 2:1`,
       "Multi-timeframe analysis",
     ]));
     expect(response.strategyDraft?.compatibility.unsupportedConditions).toEqual(expect.arrayContaining([
-      "Fair Value Gap (FVG)",
       "Higher-timeframe bias",
       "Multi-timeframe analysis",
     ]));
+     expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Fair Value Gap (FVG)");
   });
 
   it("preserves the remaining taxonomy aliases as unsupported review metadata", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
-    const requests = [
-      { message: "Build me a liquidity sweep strategy.", expected: ["Liquidity Sweep"] },
-      { message: "Create an XAUUSD strategy using an FVG.", expected: ["Fair Value Gap (FVG)"] },
-      { message: "Use a 4H bullish bias and 15M entry.", expected: ["Higher-timeframe bias", "Multi-timeframe analysis"] },
-      { message: "Build an SMC strategy using BOS and an order block.", expected: ["Break of Structure", "Order Block"] },
-      { message: "Use the 20 EMA as confirmation.", expected: ["Exponential Moving Average (EMA)"] },
-      { message: "Create a strategy using premium and discount.", expected: ["Premium", "Discount"] },
+     const requests = [
+       { message: "Build me a liquidity sweep strategy.", expected: ["Liquidity Sweep"], unsupported: [] },
+       { message: "Create an XAUUSD strategy using an FVG.", expected: ["Fair Value Gap (FVG)"], unsupported: [] },
+       { message: "Use a 4H bullish bias and 15M entry.", expected: ["Higher-timeframe bias", "Multi-timeframe analysis"], unsupported: ["Higher-timeframe bias", "Multi-timeframe analysis"] },
+       { message: "Build an SMC strategy using BOS and an order block.", expected: ["Break of Structure", "Order Block"], unsupported: ["Break of Structure", "Order Block"] },
+       { message: "Use the 20 EMA as confirmation.", expected: ["Exponential Moving Average (EMA)"], unsupported: ["Exponential Moving Average (EMA)"] },
+       { message: "Create a strategy using premium and discount.", expected: ["Premium", "Discount"], unsupported: ["Premium", "Discount"] },
     ];
 
     for (const request of requests) {
@@ -487,7 +485,9 @@ Risk/Reward: 2:1`,
 
       expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).toEqual(expect.arrayContaining(request.expected));
       expect(response.strategyDraft?.compatibility.compatible).toBe(false);
-      expect(response.strategyDraft?.compatibility.unsupportedConditions).toEqual(expect.arrayContaining(request.expected));
+       if (request.unsupported.length) {
+         expect(response.strategyDraft?.compatibility.unsupportedConditions).toEqual(expect.arrayContaining(request.unsupported));
+       }
     }
   });
 });

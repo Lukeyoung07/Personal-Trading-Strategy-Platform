@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { StrategyConditionDirection } from './strategyConditionDirection';
+import type { StrategyConditionParameters } from './strategyConditionParameters';
 import type { StrategyConditionRequirement } from './strategyConditionRequirement';
 import type { StrategyConditionStage } from './strategyConditionStage';
 
@@ -26,6 +27,8 @@ export interface StrategyCondition {
   order: number;
   /** @nullable */
   triggerRules: string | null;
+  /** @nullable */
+  parameters: StrategyConditionParameters;
   /** @nullable */
   invalidationRules: string | null;
   /** @nullable */
