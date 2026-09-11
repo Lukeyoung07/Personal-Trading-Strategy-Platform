@@ -1,0 +1,913 @@
+TRADEX — COMPLETE STRATEGY BUILDER + TRADING CONCEPT LIBRARY + BACKTESTING OVERHAUL
+
+I want to improve the Strategy Builder, Trading Concept Library, and their connection to Backtesting.
+
+IMPORTANT:
+The current overall TradeX UI direction is good.
+
+DO NOT redesign the entire website.
+DO NOT change the Markets, Journal, Alerts, Dashboard, or overall TradeX visual style.
+
+Keep the existing dark/purple design, clean sections, dropdowns, accordions, responsive layout, and navigation.
+
+The problem is specifically that building an actual trading strategy is still too confusing and the Trading Concept Library does not contain enough useful concepts.
+
+The goal is:
+
+EASY TO BUILD
++
+LARGE CONCEPT LIBRARY
++
+CLEAR BACKTEST COMPATIBILITY
++
+NO FAKE/UNSUPPORTED EXECUTION
+
+==================================================
+PART 1 — STRATEGY BUILDER
+==================================================
+
+Completely simplify the actual process of creating a strategy while keeping the current UI structure.
+
+The user should feel like they are answering simple trading questions rather than filling out a technical form.
+
+The flow should be:
+
+STRATEGY
+↓
+ENTRY
+↓
+CONFIRMATION
+↓
+EXIT
+↓
+RISK
+↓
+REVIEW
+
+Each section should remain clearly separated and collapsible.
+
+==================================================
+STRATEGY SETUP
+==================================================
+
+Show only:
+
+Strategy Name
+Description
+Market / Instrument
+Direction
+Timeframes
+
+Direction:
+
+Long
+Short
+Both
+
+Use dropdowns wherever possible.
+
+Do not expose backend terminology.
+
+==================================================
+ENTRY
+==================================================
+
+Show:
+
+ENTRY
+
+"What needs to happen before entering a trade?"
+
++ Add Entry Condition
+
+When adding an entry condition, use a simple guided form.
+
+STEP 1
+
+WHAT TRADING CONCEPT ARE YOU USING?
+
+[ Trading Concept ▼ ]
+
+This dropdown must come directly from the Trading Concept Library.
+
+Do not hard-code a separate list.
+
+STEP 2
+
+WHAT SHOULD HAPPEN?
+
+[ Rule ▼ ]
+
+Only display rules that are actually supported by TradeX.
+
+Examples of currently supported rules may include:
+
+Candle is bullish
+Candle is bearish
+Price is above the candle open
+Price is below the candle open
+Price crosses above the previous high
+Price crosses below the previous low
+Always true
+
+Do not invent rules.
+
+STEP 3
+
+WHICH TIMEFRAME?
+
+[ Timeframe ▼ ]
+
+STEP 4
+
+WHICH DIRECTION?
+
+Only show this if the strategy direction is BOTH.
+
+Otherwise automatically use the strategy direction.
+
+STEP 5
+
+ADD CONDITION
+
+[ Add Condition ]
+
+The user should NOT need to manually create a technical rule string.
+
+==================================================
+CONFIRMATION
+==================================================
+
+Show:
+
+CONFIRMATION
+
+"Additional conditions that confirm the setup."
+
++ Add Confirmation Condition
+
+Use the exact same simple condition builder.
+
+Because the user clicked "Add Confirmation Condition", automatically set:
+
+When = Confirmation
+
+Do not ask the user to select Confirmation again.
+
+==================================================
+EXIT
+==================================================
+
+Show:
+
+EXIT
+
+"Conditions that tell the strategy when to leave the trade."
+
++ Add Exit Condition
+
+Automatically set:
+
+When = Exit
+
+Use the same condition builder.
+
+==================================================
+CONDITION NAME
+==================================================
+
+Do not require the user to invent a condition name.
+
+Generate a sensible name automatically from the selected concept and rule.
+
+Example:
+
+Concept:
+Liquidity Sweep
+
+Rule:
+Candle is bullish
+
+Automatically generate:
+
+Bullish Liquidity Sweep
+
+Allow the user to edit the name if desired.
+
+==================================================
+CONDITION PREVIEW
+==================================================
+
+Before adding a condition, show a small preview:
+
+CONDITION PREVIEW
+
+Bullish Liquidity Sweep
+
+Long · 15M
+
+Candle is bullish
+
+Then show:
+
+✓ Backtest supported
+
+OR
+
+⚠ Review required
+
+"This concept can be saved, but Backtesting cannot currently execute it."
+
+This must be accurate.
+
+==================================================
+CONDITION CARDS
+==================================================
+
+After adding a condition, collapse the editor.
+
+Display a compact card containing only useful information:
+
+Bullish Liquidity Sweep
+
+Liquidity Sweep
+LONG · 15M
+
+Candle is bullish
+
+✓ Backtest supported
+
+[Edit] [Remove]
+
+Do not show internal IDs, payloads, detector IDs, schemas, or backend terminology.
+
+==================================================
+CONDITION GROUPING
+==================================================
+
+Conditions must stay inside their correct sections:
+
+ENTRY
+CONFIRMATION
+EXIT
+
+Never combine all conditions into one large list.
+
+Preserve condition ordering.
+
+Allow conditions to be reordered.
+
+The order must remain correct after:
+
+Save
+Reload
+Edit
+Version creation
+Activation
+Backtesting
+
+==================================================
+PART 2 — EXPAND THE TRADING CONCEPT LIBRARY
+==================================================
+
+Expand the existing Trading Concept Library substantially.
+
+Do NOT remove existing concepts.
+
+Do NOT duplicate existing concepts.
+
+Do NOT invent concepts that don't belong in the trading concept library.
+
+Organise concepts into categories.
+
+==================================================
+MARKET STRUCTURE
+==================================================
+
+Add/use concepts such as:
+
+Higher High (HH)
+Higher Low (HL)
+Lower High (LH)
+Lower Low (LL)
+Break of Structure (BOS)
+Change of Character (CHoCH)
+Market Structure Shift (MSS)
+Internal Structure
+External Structure
+Swing High
+Swing Low
+Trend
+Trend Reversal
+
+==================================================
+LIQUIDITY
+==================================================
+
+Add/use:
+
+Buy-Side Liquidity
+Sell-Side Liquidity
+Liquidity Sweep
+Liquidity Grab
+Equal Highs
+Equal Lows
+Previous Day High
+Previous Day Low
+Previous Week High
+Previous Week Low
+Previous Session High
+Previous Session Low
+Internal Liquidity
+External Liquidity
+Liquidity Pool
+Liquidity Raid
+
+==================================================
+FAIR VALUE GAPS / IMBALANCE
+==================================================
+
+Add/use:
+
+Fair Value Gap (FVG)
+Bullish FVG
+Bearish FVG
+FVG Fill
+FVG Retest
+Inverse Fair Value Gap (IFVG)
+Bullish IFVG
+Bearish IFVG
+Imbalance
+Displacement
+
+==================================================
+ORDER BLOCKS
+==================================================
+
+Add/use:
+
+Order Block
+Bullish Order Block
+Bearish Order Block
+Order Block Retest
+Mitigation
+Breaker Block
+Bullish Breaker
+Bearish Breaker
+
+==================================================
+SUPPLY & DEMAND
+==================================================
+
+Add/use:
+
+Supply Zone
+Demand Zone
+Supply Retest
+Demand Retest
+Supply Reaction
+Demand Reaction
+Fresh Supply
+Fresh Demand
+
+==================================================
+PREMIUM / DISCOUNT
+==================================================
+
+Add/use:
+
+Premium
+Discount
+Equilibrium
+50% Equilibrium
+Dealing Range
+Premium Entry
+Discount Entry
+
+==================================================
+PRICE ACTION
+==================================================
+
+Add/use:
+
+Bullish Candle
+Bearish Candle
+Rejection
+Strong Rejection
+Wick Rejection
+Displacement
+Breakout
+Pullback
+Break and Retest
+Failed Breakout
+Continuation
+Reversal
+
+==================================================
+SUPPORT & RESISTANCE
+==================================================
+
+Add/use:
+
+Support
+Resistance
+Previous Support
+Previous Resistance
+Support Break
+Resistance Break
+Support Retest
+Resistance Retest
+
+==================================================
+INDICATORS
+==================================================
+
+Add/use:
+
+EMA
+SMA
+EMA Cross
+SMA Cross
+Price Above EMA
+Price Below EMA
+RSI
+RSI Overbought
+RSI Oversold
+RSI Divergence
+MACD
+MACD Cross
+VWAP
+Volume
+Moving Average
+
+Only mark an indicator concept as executable if the Backtesting engine can actually calculate it.
+
+==================================================
+SESSIONS
+==================================================
+
+Add/use:
+
+Asian Session
+London Session
+New York Session
+London Open
+New York Open
+Session High
+Session Low
+Previous Session Range
+
+==================================================
+ICT / SMC
+==================================================
+
+Add/use:
+
+IRL
+ERL
+SMT Divergence
+AMD
+Power of 3
+Judas Swing
+Kill Zones
+Liquidity Raid
+Displacement
+FVG
+IFVG
+Order Block
+Breaker Block
+Mitigation Block
+
+==================================================
+MULTI-TIMEFRAME
+==================================================
+
+Add/use:
+
+Higher Timeframe Bias
+Lower Timeframe Confirmation
+Multi-Timeframe Analysis
+HTF Structure
+LTF Structure
+HTF Liquidity
+LTF Liquidity
+HTF FVG
+HTF Order Block
+
+==================================================
+RISK / TRADE MANAGEMENT
+==================================================
+
+Add/use:
+
+Risk/Reward
+Percentage Risk
+Risk Amount
+Position Size
+Maximum Risk
+Stop Loss
+Take Profit
+Break Even
+Trailing Stop
+
+==================================================
+PART 3 — CONCEPT LIBRARY SEARCH
+==================================================
+
+Improve concept searching.
+
+Examples:
+
+Searching:
+
+FVG
+
+should find:
+
+Fair Value Gap
+Bullish FVG
+Bearish FVG
+FVG Fill
+FVG Retest
+Inverse Fair Value Gap
+
+Searching:
+
+liquidity
+
+should find all liquidity-related concepts.
+
+Searching:
+
+EMA
+
+should find all EMA-related concepts.
+
+Searching:
+
+BOS
+
+should find:
+
+Break of Structure
+
+Support aliases and alternative names.
+
+==================================================
+PART 4 — CONCEPT CATEGORIES
+==================================================
+
+Add simple category filters:
+
+All
+Market Structure
+Liquidity
+FVG / Imbalance
+Order Blocks
+Supply & Demand
+Premium / Discount
+Price Action
+Support & Resistance
+Indicators
+Sessions
+ICT / SMC
+Multi-Timeframe
+Risk Management
+
+Keep this compact and easy to navigate.
+
+==================================================
+PART 5 — BACKTESTING COMPATIBILITY
+==================================================
+
+This is one of the most important requirements.
+
+The Strategy Builder and Backtesting engine must use the SAME underlying rule definitions.
+
+There must be one source of truth.
+
+Do not create separate interpretations of conditions.
+
+Every concept must have an accurate status:
+
+✓ BACKTEST SUPPORTED
+
+or
+
+⚠ REVIEW REQUIRED
+
+If the Backtesting engine cannot actually execute a concept, it MUST NOT be labelled supported.
+
+Examples of concepts that may require review depending on the current implementation:
+
+Liquidity Sweep
+FVG
+IFVG
+BOS
+CHoCH
+SMT
+Order Block
+etc.
+
+DO NOT fabricate detectors.
+
+DO NOT create fake backtesting calculations just to make concepts appear supported.
+
+A concept can exist in the library and be saved in a strategy while remaining:
+
+⚠ Review required
+
+==================================================
+PART 6 — BACKTEST COMPATIBILITY CHECK
+==================================================
+
+Before a backtest begins, perform a compatibility check.
+
+Show:
+
+BACKTEST COMPATIBILITY
+
+✓ Supported conditions
+⚠ Conditions requiring review
+
+If all conditions are executable:
+
+✓ Ready to backtest
+
+If unsupported conditions exist:
+
+⚠ This strategy contains conditions that Backtesting cannot currently execute.
+
+Clearly list them.
+
+Do not silently remove unsupported conditions.
+
+Do not replace unsupported conditions with different rules.
+
+==================================================
+PART 7 — RISK MANAGEMENT
+==================================================
+
+Keep Risk Management separate from trading conditions.
+
+Show:
+
+Risk per trade
+[ dropdown ]
+
+Risk / Reward
+[ dropdown ]
+
+Stop Loss
+[ dropdown ]
+
+Take Profit
+[ dropdown ]
+
+Use simple descriptions.
+
+Example:
+
+Risk per trade
+
+"The maximum amount you are willing to risk on one trade."
+
+==================================================
+PART 8 — REVIEW
+==================================================
+
+Make Review Strategy extremely easy to understand.
+
+Example:
+
+LIQUIDITY SWEEP REVERSAL
+
+XAUUSD
+Both
+4H · 15M · 5M
+
+ENTRY
+
+1. Liquidity Sweep
+   Long · 15M
+   Bullish candle
+
+2. Market Structure
+   Long · 15M
+   Price crosses above previous high
+
+CONFIRMATION
+
+1. ...
+
+EXIT
+
+1. ...
+
+RISK
+
+1% risk
+2:1 risk/reward
+
+BACKTEST
+
+✓ Ready to backtest
+
+OR:
+
+⚠ Review required
+
+Do not expose backend information.
+
+==================================================
+PART 9 — VERSIONING
+==================================================
+
+Preserve the existing immutable version system.
+
+Keep these actions clearly separated:
+
+SAVE
+
+Saves the editable strategy.
+
+SAVE AS NEW VERSION
+
+Creates a new immutable version.
+
+ACTIVATE VERSION
+
+Makes that exact version active.
+
+Do not overwrite immutable versions.
+
+Do not delete existing versions.
+
+Do not break existing strategy history.
+
+==================================================
+PART 10 — AI INTEGRATION
+==================================================
+
+Preserve the existing AI Assistant → Strategy Builder workflow.
+
+AI-generated strategy drafts should populate:
+
+Strategy name
+Market
+Direction
+Timeframes
+Trading concepts
+Conditions
+Risk management
+
+The user must be able to review and edit the generated strategy before saving.
+
+Do not automatically save AI-generated strategies.
+
+==================================================
+PART 11 — IMPORTANT BACKTESTING RULE
+==================================================
+
+A strategy must never appear to be successfully backtested if the engine did not actually execute all of its conditions.
+
+If a condition is unsupported:
+
+Show that clearly.
+
+If necessary, prevent the backtest from running until the user removes or replaces unsupported conditions.
+
+Do not produce misleading results.
+
+==================================================
+PART 12 — TEST WITH REAL STRATEGIES
+==================================================
+
+After implementation, use the actual running application.
+
+Create:
+
+Liquidity Sweep Reversal — XAUUSD
+
+Market:
+XAUUSD
+
+Direction:
+Both
+
+Timeframes:
+4H
+15M
+5M
+
+Build several conditions using concepts that actually exist in the library.
+
+Then test:
+
+Create
+Save
+Reload
+Edit
+Remove condition
+Re-add condition
+Reorder conditions
+Review
+Save as New Version
+Activate Version
+Backtest Compatibility
+
+Then create a second test strategy for:
+
+US Tech 100
+
+Verify the same Builder workflow works.
+
+==================================================
+PART 13 — MOBILE
+==================================================
+
+Test at:
+
+375px
+402px
+768px
+1440px
+
+Ensure:
+
+No horizontal scrolling
+Dropdowns are easy to tap
+Condition cards remain readable
+Sections remain obvious
+The Builder isn't excessively tall
+Collapsed sections work properly
+
+==================================================
+PART 14 — REGRESSION
+==================================================
+
+Do not break:
+
+Markets
+Journal
+Alerts
+Economic Calendar
+Dashboard
+Strategy Monitoring
+BiQuote
+Market data
+AI Assistant
+Strategy Library
+Strategy versioning
+Backtesting
+Existing journal trades
+Existing strategies
+
+Run all existing:
+
+Frontend tests
+API tests
+Frontend typecheck
+API typecheck
+Production builds
+git diff --check
+
+==================================================
+FINAL REQUIREMENT
+==================================================
+
+The final Strategy Builder should feel like this:
+
+"I know what I want my strategy to do."
+
+↓
+
+"I choose the trading concept."
+
+↓
+
+"I choose the simple rule."
+
+↓
+
+"I choose the timeframe."
+
+↓
+
+"I add the condition."
+
+↓
+
+"I move to the next section."
+
+↓
+
+"TradeX tells me whether Backtesting can actually execute it."
+
+I should NOT have to understand technical/backend terminology to build a strategy.
+
+Make the Builder simpler, not more complicated.
+
+Keep the existing UI design.
+
+Focus on usability, clarity, accurate concept handling, and a trustworthy connection between Strategy Builder and Backtesting.

@@ -327,59 +327,56 @@ function ConditionModal({ strategyId, concepts, timeframes, condition, defaultSt
   return <Modal title={condition ? "Edit condition" : "Add condition"} onClose={onClose}>
     <form onSubmit={save} className="space-y-5">
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive" role="alert" data-testid="status-builder-condition-error">{error}</div>}
-      <Field label="Concept from Trading Concept Library">
+      <Field label="What are you looking for?">
         <SearchableConcept concepts={concepts} value={conceptId} onChange={setConceptId} />
       </Field>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Condition name" hint="Use words you would say out loud."><input className="input" name="name" defaultValue={condition?.name || ""} placeholder="e.g. Candle confirms momentum" data-testid="input-builder-condition-name" /></Field>
-        <Field label="Stage">
-           <select className="select" name="stage" defaultValue={condition?.stage || defaultStage} data-testid="select-builder-condition-stage">
-            {STAGES.map(stage => <option key={stage.value} value={stage.value}>{stage.label}</option>)}
-          </select>
-        </Field>
-      </div>
-      <section className="rounded-lg border border-primary/30 bg-primary/5 p-4 md:p-5" data-testid="builder-when-condition">
-        <div className="eyebrow text-primary">When</div>
-        <p className="text-sm font-semibold mt-2">What should be true?</p>
-        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Choose a plain-language rule. Supported rules are saved in the exact format the historical Backtesting engine understands.</p>
-        <div className="mt-4">
-          <select className="select bg-background" value={rulePreset} onChange={event => setRulePreset(event.target.value)} data-testid="select-builder-condition-rule">
-            <option value="">Choose a condition</option>
-            {RULE_PRESETS.map(preset => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
-            <option value="custom">Advanced technical rule</option>
-          </select>
+      {!conceptId && <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">Choose a trading concept to continue.</div>}
+      {conceptId && <>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Condition name" hint="Use words you would say out loud."><input className="input" name="name" defaultValue={condition?.name || ""} placeholder="e.g. Candle confirms momentum" data-testid="input-builder-condition-name" /></Field>
+          <Field label="When should it matter?">
+            <select className="select" name="stage" defaultValue={condition?.stage || defaultStage} data-testid="select-builder-condition-stage">
+              {STAGES.filter(stage => stage.value !== "invalidation" || condition?.stage === "invalidation").map(stage => <option key={stage.value} value={stage.value}>{stage.value === "invalidation" ? "Exit" : stage.label}</option>)}
+            </select>
+          </Field>
         </div>
-        {rulePreset && rulePreset !== "custom" && <div className={`mt-3 rounded-md p-3 text-xs ${RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported ? "bg-background/70 text-muted-foreground" : "border border-amber-500/40 bg-amber-500/10 text-amber-200"}`}><ShieldCheck size={14} className={`inline mr-2 ${RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported ? "text-primary" : "text-amber-300"}`} />{RULE_PRESETS.find(preset => preset.value === rulePreset)?.description}{!RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported && <strong className="block mt-1 ml-6">Not currently supported by Backtesting.</strong>}</div>}
-        {rulePreset === "custom" && <Field label="Technical rule" hint="Only use this for a rule already supported by Backtesting: OHLC comparisons, bullish, bearish, always, or previous-candle crossing rules."><textarea className="textarea mt-2" name="customRule" defaultValue={condition?.triggerRules || ""} placeholder="e.g. close > previous_high" data-testid="input-builder-condition-custom-rule" /></Field>}
-      </section>
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-         <Field label="Timeframe" hint="Choose an active timeframe for this condition.">
-           {activeTimeframes.length ? <select className="select" name="timeframe" defaultValue={condition?.timeframe && timeframeKnown ? activeTimeframes.find(timeframe => timeframe.code.toLowerCase() === condition.timeframe?.toLowerCase() || timeframe.label.toLowerCase() === condition.timeframe?.toLowerCase())?.code : ""} data-testid="select-builder-condition-timeframe">
-             <option value="">Choose timeframe</option>
-             {condition?.timeframe && !timeframeKnown && <option value={condition.timeframe}>{condition.timeframe} · saved value</option>}
-             {activeTimeframes.map(timeframe => <option key={timeframe.id} value={timeframe.code}>{timeframe.label} · {timeframe.code}</option>)}
-           </select> : <input className="input" name="timeframe" defaultValue={condition?.timeframe || ""} placeholder="e.g. 4H" data-testid="input-builder-condition-timeframe" />}
-         </Field>
-        <Field label="Direction">
-          <select className="select" name="direction" defaultValue={condition?.direction || "both"} data-testid="select-builder-condition-direction">
-            {DIRECTIONS.map(direction => <option key={direction.value} value={direction.value}>{direction.value === "long" ? "BUY only" : direction.value === "short" ? "SELL only" : "BUY or SELL"}</option>)}
-          </select>
-        </Field>
-        <Field label="Requirement">
-          <select className="select" name="requirement" defaultValue={condition?.requirement || "required"} data-testid="select-builder-condition-requirement">
-            <option value="required">Required</option>
-            <option value="optional">Optional note</option>
-          </select>
-        </Field>
-      </div>
-      <details className="rounded-md border border-border p-4 group">
-        <summary className="cursor-pointer text-sm font-semibold list-none flex items-center justify-between">Advanced details <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" /></summary>
-        <div className="space-y-4 mt-4 pt-4 border-t border-border">
-          <Field label="Description"><textarea className="textarea" name="description" defaultValue={condition?.description || ""} placeholder="What does this condition mean in your process?" data-testid="input-builder-condition-description" /></Field>
-          <Field label="Invalidation rules"><textarea className="textarea" name="invalidationRules" defaultValue={condition?.invalidationRules || ""} placeholder="What would make this condition no longer valid?" data-testid="input-builder-condition-invalidation-rules" /></Field>
-          <Field label="Reset behaviour"><textarea className="textarea" name="resetBehavior" defaultValue={condition?.resetBehavior || ""} placeholder="How should this condition reset before the process begins again?" data-testid="input-builder-condition-reset-behaviour" /></Field>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Which direction?">
+            <select className="select" name="direction" defaultValue={condition?.direction || "both"} data-testid="select-builder-condition-direction">
+              {DIRECTIONS.map(direction => <option key={direction.value} value={direction.value}>{direction.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Which timeframe?">
+            {activeTimeframes.length ? <select className="select" name="timeframe" defaultValue={condition?.timeframe && timeframeKnown ? activeTimeframes.find(timeframe => timeframe.code.toLowerCase() === condition.timeframe?.toLowerCase() || timeframe.label.toLowerCase() === condition.timeframe?.toLowerCase())?.code : ""} data-testid="select-builder-condition-timeframe">
+              <option value="">Choose timeframe</option>
+              {condition?.timeframe && !timeframeKnown && <option value={condition.timeframe}>{condition.timeframe} · saved value</option>}
+              {activeTimeframes.map(timeframe => <option key={timeframe.id} value={timeframe.code}>{timeframe.label} · {timeframe.code}</option>)}
+            </select> : <input className="input" name="timeframe" defaultValue={condition?.timeframe || ""} placeholder="e.g. 4H" data-testid="input-builder-condition-timeframe" />}
+          </Field>
         </div>
-      </details>
+        <section className="rounded-lg border border-primary/30 bg-primary/5 p-4 md:p-5" data-testid="builder-when-condition">
+          <div className="eyebrow text-primary">What should be true?</div>
+          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">Choose the clearest rule for this condition.</p>
+          <div className="mt-4">
+            <select className="select bg-background" value={rulePreset} onChange={event => setRulePreset(event.target.value)} data-testid="select-builder-condition-rule">
+              <option value="">Choose a rule</option>
+              {RULE_PRESETS.map(preset => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
+              <option value="custom">Custom rule</option>
+            </select>
+          </div>
+          {rulePreset && rulePreset !== "custom" && <div className={`mt-3 rounded-md p-3 text-xs ${RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported ? "bg-background/70 text-muted-foreground" : "border border-amber-500/40 bg-amber-500/10 text-amber-200"}`}><ShieldCheck size={14} className={`inline mr-2 ${RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported ? "text-primary" : "text-amber-300"}`} />{RULE_PRESETS.find(preset => preset.value === rulePreset)?.description}{!RULE_PRESETS.find(preset => preset.value === rulePreset)?.supported && <strong className="block mt-1 ml-6">Not currently supported by Backtesting.</strong>}</div>}
+          {rulePreset === "custom" && <Field label="Describe the rule" hint="Unsupported concepts remain visible for review and are never treated as executable."><textarea className="textarea mt-2" name="customRule" defaultValue={condition?.triggerRules || ""} placeholder="Describe what should be true" data-testid="input-builder-condition-custom-rule" /></Field>}
+        </section>
+        <input type="hidden" name="requirement" value={condition?.requirement || "required"} />
+        <details className="rounded-md border border-border p-4 group">
+          <summary className="cursor-pointer text-sm font-semibold list-none flex items-center justify-between">More notes <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" /></summary>
+          <div className="space-y-4 mt-4 pt-4 border-t border-border">
+            <Field label="Description"><textarea className="textarea" name="description" defaultValue={condition?.description || ""} placeholder="What does this condition mean in your process?" data-testid="input-builder-condition-description" /></Field>
+            <Field label="Exit notes"><textarea className="textarea" name="invalidationRules" defaultValue={condition?.invalidationRules || ""} placeholder="What would make this condition no longer valid?" data-testid="input-builder-condition-invalidation-rules" /></Field>
+            <Field label="Reset notes"><textarea className="textarea" name="resetBehavior" defaultValue={condition?.resetBehavior || ""} placeholder="How should this condition reset before the process begins again?" data-testid="input-builder-condition-reset-behaviour" /></Field>
+          </div>
+        </details>
+      </>}
       <div className="flex justify-end gap-3 pt-1">
         <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
          <button className="btn btn-primary" disabled={busy} data-testid="button-save-builder-condition">{busy ? "Saving…" : "Save condition"}</button>
