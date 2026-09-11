@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent, type Re
 import { Link, useLocation } from "wouter";
 import {
   ArrowDown, ArrowRight, ArrowUp, Check, ChevronDown, ChevronRight, Edit3, FileText, Pencil, Plus,
-  Save, Search, ShieldCheck, SlidersHorizontal, Trash2, X, Zap,
+  AlertTriangle, LoaderCircle, Save, Search, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, X, Zap,
 } from "lucide-react";
 import {
   getGetDashboardSummaryQueryKey,
@@ -20,17 +20,19 @@ import {
   useReorderStrategyConditions,
   useUpdateStrategy,
   useUpdateStrategyCondition,
+  useChatAssistant,
   type Market,
   type Strategy,
   type StrategyCondition,
   type Timeframe,
   type TradingConcept,
   type AssistantStrategyDraft,
+  type AssistantChatResponse,
 } from "@workspace/api-client-react";
 import { isHistoricalRuleSupported } from "@workspace/api-zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { StrategyVersionManager } from "@/components/strategy-versioning";
-import { clearPendingAssistantDraft, getPendingAssistantDraft } from "@/lib/assistant-draft-store";
+import { clearPendingAssistantDraft, getPendingAssistantDraft, setPendingAssistantDraft } from "@/lib/assistant-draft-store";
 
 const STAGES = [
   { value: "entry", label: "Entry" },
@@ -146,6 +148,114 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       {children}
     </div>
   </div>;
+}
+
+function BuildWithAI({ onReview }: { onReview: (draft: AssistantStrategyDraft) => void }) {
+  const chat = useChatAssistant();
+  const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [result, setResult] = useState<AssistantChatResponse | null>(null);
+  const [error, setError] = useState("");
+
+  const close = () => {
+    if (chat.isPending) return;
+    setOpen(false);
+    setPrompt("");
+    setResult(null);
+    setError("");
+  };
+
+  const generate = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = prompt.trim();
+    if (!message || chat.isPending) return;
+    setError("");
+    setResult(null);
+    chat.mutate({
+      data: {
+        message,
+        messages: [{ role: "user", content: message }],
+        context: { page: "/strategy-builder-ai" },
+      },
+    }, {
+      onSuccess: response => {
+        if (response?.status === "available" && response.strategyDraft) {
+          setResult(response);
+          return;
+        }
+        setError("Unable to generate strategy.");
+      },
+      onError: () => setError("Unable to generate strategy."),
+    });
+  };
+
+  const draft = result?.strategyDraft;
+  const count = (stage: string) => draft?.conditions.filter(condition => condition.stage === stage).length || 0;
+
+  return <>
+    <button className="btn btn-secondary" onClick={() => { setOpen(true); setError(""); }} data-testid="button-build-with-ai">
+      <Sparkles size={15} /> Build with AI
+    </button>
+    {open && <Modal title="BUILD A STRATEGY WITH AI" onClose={close}>
+      {!draft ? <form onSubmit={generate} className="space-y-5">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Describe the strategy you want to build and TradeX will turn it into a strategy you can review and edit.
+        </p>
+        {error && <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive" role="alert" data-testid="status-build-with-ai-error">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" /><span>{error}</span>
+        </div>}
+        <Field label="Describe your strategy">
+          <textarea
+            className="textarea min-h-36 resize-y"
+            value={prompt}
+            maxLength={2000}
+            onChange={event => setPrompt(event.target.value)}
+            placeholder="Describe your strategy..."
+            autoFocus
+            data-testid="input-build-with-ai-prompt"
+          />
+        </Field>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          You can use normal language or paste a structured TRADEX STRATEGY prompt with Entry, Confirmation, Exit, and Risk sections.
+        </p>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button type="button" className="btn btn-secondary" onClick={close} disabled={chat.isPending} data-testid="button-cancel-build-with-ai">Cancel</button>
+          <button className="btn btn-primary" disabled={!prompt.trim() || chat.isPending} data-testid="button-generate-strategy">
+            {chat.isPending ? <><LoaderCircle size={14} className="animate-spin" /> Generating…</> : <><Sparkles size={14} /> Generate Strategy</>}
+          </button>
+        </div>
+      </form> : <div className="space-y-5" data-testid="build-with-ai-result">
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-4">
+          <div className="eyebrow text-primary">STRATEGY GENERATED</div>
+          <h3 className="mt-2 text-lg font-semibold">{draft.name}</h3>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{result?.reply}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Summary label="Market" value={draft.marketSymbol || "Open"} />
+          <Summary label="Direction" value={draft.direction} />
+          <Summary label="Timeframes" value={draft.timeframes.length ? draft.timeframes.join(" · ") : "Review needed"} />
+          <Summary label="Risk" value={draft.riskManagementRules || "Not set"} />
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Summary label="Entry" value={`${count("entry")} condition${count("entry") === 1 ? "" : "s"}`} />
+          <Summary label="Confirmation" value={`${count("confirmation")} condition${count("confirmation") === 1 ? "" : "s"}`} />
+          <Summary label="Exit" value={`${count("exit") + count("invalidation")} condition${count("exit") + count("invalidation") === 1 ? "" : "s"}`} />
+        </div>
+        {!draft.compatibility.compatible && <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-100" data-testid="build-with-ai-review-warning">
+          <div className="font-semibold">Review required</div>
+          <p className="mt-1">The draft is preserved, but these items need review before it can be treated as backtest-compatible:</p>
+          <ul className="mt-2 space-y-1">{draft.compatibility.unsupportedConditions.map(item => <li key={item}>• {item}</li>)}</ul>
+        </div>}
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button type="button" className="btn btn-secondary" onClick={() => { setResult(null); setError(""); }} data-testid="button-try-again-build-with-ai">Try Again</button>
+          <button type="button" className="btn btn-primary" onClick={() => { onReview(draft); close(); }} data-testid="button-review-generated-strategy">
+            <ArrowRight size={14} /> Review Strategy
+          </button>
+        </div>
+        <p className="text-center text-[10px] text-muted-foreground">Nothing is saved, versioned, activated, backtested, or monitored until you use the normal Builder actions.</p>
+      </div>}
+    </Modal>}
+  </>;
 }
 
 function SearchableConcept({ concepts, value, onChange }: { concepts: TradingConcept[]; value: number | null; onChange: (id: number) => void }) {
@@ -827,7 +937,7 @@ function DraftCondition({ condition }: { condition: AssistantStrategyDraft["cond
 }
 
 export function StrategyBuilder() {
-  const [routeLocation] = useLocation();
+  const [routeLocation, setLocation] = useLocation();
   const strategies = useListStrategies();
   const markets = useListMarkets();
   const concepts = useListConcepts();
@@ -903,7 +1013,16 @@ export function StrategyBuilder() {
     clearPendingAssistantDraft();
   };
   const refreshConditions = () => queryClient.invalidateQueries({ queryKey: getListStrategyConditionsQueryKey(strategyId) });
-  const action = <button className="btn btn-primary" onClick={() => setStrategyModal("new")} data-testid="button-new-builder-strategy"><Plus size={15} /> New strategy</button>;
+  const action = <div className="flex flex-col-reverse gap-2 sm:flex-row">
+    <BuildWithAI onReview={draft => {
+      setPendingAssistantDraft(draft);
+      setAssistantDraft(draft);
+      setDraftImportMessage("");
+      setUnmatchedDraftConditions([]);
+      setLocation("/strategy-builder?assistantDraft=1&assistantAction=review");
+    }} />
+    <button className="btn btn-primary" onClick={() => setStrategyModal("new")} data-testid="button-new-builder-strategy"><Plus size={15} /> New strategy</button>
+  </div>;
 
   if (strategies.isLoading) return <BuilderPage><div className="panel p-10 text-center text-sm text-muted-foreground">Loading your strategies…</div></BuilderPage>;
   if (strategies.isError || markets.isError || concepts.isError || timeframes.isError) return <BuilderPage><div className="panel p-10 text-center"><div className="font-semibold">Couldn’t load the builder records</div><p className="text-sm text-muted-foreground mt-2">Your workspace is intact. Try refreshing the page.</p></div></BuilderPage>;

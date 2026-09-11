@@ -281,6 +281,8 @@ const CONCEPT_ALIASES: Record<string, string[]> = {
   "power of 3 / amd": ["amd", "power of 3", "power of three"],
   "order block": ["ob"],
   "smt divergence": ["smt"],
+  ema: ["ema", "exponential moving average"],
+  sma: ["sma", "simple moving average"],
 };
 
 function matchCatalogConcept(value: string, catalog: BuilderCatalog): string | null {
@@ -288,7 +290,10 @@ function matchCatalogConcept(value: string, catalog: BuilderCatalog): string | n
   if (!key) return null;
   const exact = catalog.concepts.find(concept => catalogKey(concept.name) === key);
   if (exact) return exact.name;
-  const aliasTarget = Object.entries(CONCEPT_ALIASES).find(([, aliases]) => aliases.some(alias => catalogKey(alias) === key))?.[0];
+  const aliasTarget = Object.entries(CONCEPT_ALIASES).find(([, aliases]) => aliases.some(alias => {
+    const aliasKey = catalogKey(alias);
+    return aliasKey === key || key.includes(aliasKey);
+  }))?.[0];
   if (aliasTarget) {
     const aliased = catalog.concepts.find(concept => catalogKey(concept.name) === catalogKey(aliasTarget));
     if (aliased) return aliased.name;
@@ -776,9 +781,13 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
     if (!parsed) throw new Error("OpenRouter returned an invalid assistant response.");
     if (isStrategyDraftRequest(input.message) && !parsed.strategyDraft) {
       const fallbackDraft = fallbackDraftForUnsupportedRequest(input.message, parsed.reply);
-      parsed.strategyDraft = fallbackDraft;
+      const validatedFallback = validateDraftAgainstCatalog(
+        fallbackDraft,
+        (context.builderCatalog || { concepts: [], markets: [], timeframes: [] }) as BuilderCatalog,
+      );
+      parsed.strategyDraft = validatedFallback;
       parsed.intent = "strategy_proposal";
-      parsed.compatibility = fallbackDraft.compatibility;
+      parsed.compatibility = validatedFallback.compatibility;
     } else if (parsed.strategyDraft) {
       const enrichedDraft = enrichDraftConcepts(parsed.strategyDraft, input.message);
       const validatedDraft = validateDraftAgainstCatalog(

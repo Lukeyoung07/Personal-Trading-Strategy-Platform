@@ -11,6 +11,10 @@ const state = vi.hoisted(() => ({
   markets: [] as any[],
   createCondition: vi.fn(),
   updateStrategy: vi.fn(),
+  chat: {
+    isPending: false,
+    mutate: vi.fn(),
+  },
 }));
 
 vi.mock("@workspace/api-client-react", () => ({
@@ -29,6 +33,7 @@ vi.mock("@workspace/api-client-react", () => ({
   useReorderStrategyConditions: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateStrategy: () => ({ mutate: state.updateStrategy, isPending: false }),
   useUpdateStrategyCondition: () => ({ mutate: vi.fn(), isPending: false }),
+  useChatAssistant: () => state.chat,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -41,7 +46,7 @@ vi.mock("./strategy-versioning", () => ({
 
 vi.mock("wouter", () => ({
   Link: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
-  useLocation: () => [window.location.pathname + window.location.search],
+  useLocation: () => [window.location.pathname + window.location.search, vi.fn()],
 }));
 
 const strategy = {
@@ -84,9 +89,80 @@ afterEach(() => {
   state.markets = [];
   state.createCondition.mockReset();
   state.updateStrategy.mockReset();
+  state.chat.mutate.mockReset();
+  state.chat.isPending = false;
+  window.history.pushState({}, "", "/strategy-builder");
 });
 
 describe("StrategyBuilder", () => {
+  it("opens Build with AI and keeps cancellation separate from the manual Builder", () => {
+    render(<StrategyBuilder />);
+
+    fireEvent.click(screen.getByTestId("button-build-with-ai"));
+    expect(screen.getByText("BUILD A STRATEGY WITH AI")).toBeInTheDocument();
+    expect(screen.getByTestId("input-build-with-ai-prompt")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("button-cancel-build-with-ai"));
+    expect(screen.queryByText("BUILD A STRATEGY WITH AI")).not.toBeInTheDocument();
+    expect(screen.getByTestId("button-new-builder-strategy")).toBeInTheDocument();
+  });
+
+  it("shows the generated summary and hands the draft to the existing Builder review flow", () => {
+    state.chat.mutate.mockImplementation((_request: unknown, options: { onSuccess?: (response: unknown) => void }) => {
+      options.onSuccess?.({
+        status: "available",
+        provider: "openrouter/free",
+        reply: "The requested concepts were mapped to the current library.",
+        strategyDraft: {
+          name: "Gold Liquidity Reversal",
+          description: "A reversal hypothesis.",
+          direction: "both",
+          marketSymbol: "XAUUSD",
+          timeframes: ["15m", "5m"],
+          conditions: [
+            { name: "Liquidity sweep", stage: "entry", requirement: "required", conceptName: "Liquidity Sweep", timeframe: "15m", triggerRules: "bullish", supported: true },
+            { name: "FVG confirmation", stage: "confirmation", requirement: "required", conceptName: "Fair Value Gap", timeframe: "5m", triggerRules: "close > open", supported: true },
+            { name: "Unmapped filter", stage: "exit", requirement: "optional", conceptName: "Invented Filter", timeframe: "15m", triggerRules: "unknown rule", supported: false },
+          ],
+          conceptsUsed: [{ name: "Invented Filter", supported: false, explanation: "Needs review." }],
+          riskManagementRules: "risk: 1%; risk/reward: 2R",
+          compatibility: { compatible: false, unsupportedConditions: ["Unmapped filter", "Invented Filter"] },
+        },
+      });
+    });
+
+    render(<StrategyBuilder />);
+    fireEvent.click(screen.getByTestId("button-build-with-ai"));
+    fireEvent.change(screen.getByTestId("input-build-with-ai-prompt"), {
+      target: { value: "TRADEX STRATEGY\nName: Gold Liquidity Reversal\nMarket: XAUUSD" },
+    });
+    fireEvent.click(screen.getByTestId("button-generate-strategy"));
+
+    expect(screen.getByTestId("build-with-ai-result")).toHaveTextContent("Gold Liquidity Reversal");
+    expect(screen.getByTestId("build-with-ai-result")).toHaveTextContent("Entry");
+    expect(screen.getByTestId("build-with-ai-result")).toHaveTextContent("Confirmation");
+    expect(screen.getByTestId("build-with-ai-review-warning")).toHaveTextContent("Invented Filter");
+
+    fireEvent.click(screen.getByTestId("button-review-generated-strategy"));
+    expect(JSON.parse(sessionStorage.getItem("assistant-strategy-draft") || "{}").draft.name).toBe("Gold Liquidity Reversal");
+    expect(screen.getByTestId("assistant-draft-builder-preview")).toHaveTextContent("Gold Liquidity Reversal");
+    expect(screen.getByTestId("input-builder-strategy-name")).toHaveValue("Gold Liquidity Reversal");
+  });
+
+  it("shows the required failure state without creating a partial draft", () => {
+    state.chat.mutate.mockImplementation((_request: unknown, options: { onSuccess?: (response: unknown) => void }) => {
+      options.onSuccess?.({ status: "unavailable", provider: "openrouter/free", reply: "Unavailable" });
+    });
+
+    render(<StrategyBuilder />);
+    fireEvent.click(screen.getByTestId("button-build-with-ai"));
+    fireEvent.change(screen.getByTestId("input-build-with-ai-prompt"), { target: { value: "Build a strategy" } });
+    fireEvent.click(screen.getByTestId("button-generate-strategy"));
+
+    expect(screen.getByTestId("status-build-with-ai-error")).toHaveTextContent("Unable to generate strategy.");
+    expect(sessionStorage.getItem("assistant-strategy-draft")).toBeNull();
+  });
+
   it("renders the complete AI draft before any strategy is created", () => {
     const draft = {
       name: "XAUUSD candle review",
