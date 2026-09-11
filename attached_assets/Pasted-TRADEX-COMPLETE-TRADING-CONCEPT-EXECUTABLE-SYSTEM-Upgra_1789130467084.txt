@@ -1,0 +1,801 @@
+TRADEX — COMPLETE TRADING CONCEPT EXECUTABLE SYSTEM
+
+Upgrade the existing TradeX Trading Concept Library, Strategy Builder, Build with AI system, strategy validation, and Backtesting integration so that trading concepts are properly structured and executable wherever they can be deterministically calculated from available historical market data.
+
+IMPORTANT:
+
+This is NOT a request to redesign the application.
+
+Do NOT redesign the existing UI.
+
+Do NOT remove existing concepts.
+
+Do NOT break existing strategies.
+
+Do NOT replace the current Strategy Builder.
+
+Do NOT rebuild the Markets page.
+
+Do NOT rebuild the existing Backtesting system from scratch.
+
+Do NOT fabricate historical data or trading signals.
+
+Extend the architecture that is already being used for the existing executable concepts:
+
+- Liquidity Sweep
+- Fair Value Gap
+- Fair Value Gap Retest
+
+Use the same canonical concept → parameters → condition → validation → backtesting architecture.
+
+==================================================
+1. MAIN OBJECTIVE
+==================================================
+
+Currently some concepts exist in the Trading Concept Library but are only descriptive.
+
+I want TradeX to have a single consistent system where a trading concept can progress through:
+
+Trading Concept Library
+↓
+Canonical concept definition
+↓
+Structured parameters
+↓
+Strategy Builder condition
+↓
+AI Strategy Builder mapping
+↓
+Strategy validation
+↓
+Strategy version
+↓
+Backtesting
+
+A concept must NEVER be labelled "Backtest supported" unless the Backtesting engine genuinely knows how to calculate it.
+
+A concept that cannot yet be deterministically calculated should remain clearly marked as:
+
+Review required
+or
+Not currently executable
+
+Do NOT fake support.
+
+==================================================
+2. CONCEPTS TO IMPLEMENT
+==================================================
+
+Implement structured executable definitions for as many of the following as can be deterministically calculated from the existing OHLC/historical market data.
+
+MARKET STRUCTURE
+
+- Break of Structure (BOS)
+- Change of Character (CHoCH)
+- Market Structure Shift (MSS)
+- Higher High (HH)
+- Higher Low (HL)
+- Lower High (LH)
+- Lower Low (LL)
+- Swing High
+- Swing Low
+
+LIQUIDITY
+
+- Liquidity Sweep
+- Buy-Side Liquidity
+- Sell-Side Liquidity
+- Equal Highs
+- Equal Lows
+- Previous Day High
+- Previous Day Low
+- Previous Week High
+- Previous Week Low
+
+IMBALANCE / FVG
+
+- Fair Value Gap (FVG)
+- Fair Value Gap Retest
+- Inverse Fair Value Gap (IFVG)
+
+INSTITUTIONAL / ICT STRUCTURES
+
+- Order Block
+- Breaker Block
+- Mitigation Block
+
+TREND / INDICATORS
+
+- EMA
+- SMA
+- RSI
+- MACD
+- VWAP
+- ATR
+
+PRICE ACTION
+
+- Breakout
+- Breakout Retest
+- Support
+- Resistance
+- Bullish Engulfing
+- Bearish Engulfing
+- Pin Bar
+- Inside Bar
+
+ICT / MARKET CONTEXT
+
+- Premium
+- Discount
+- Equilibrium
+- OTE
+- IRL
+- ERL
+- HTF Bias
+- LTF Confirmation
+- PO3
+- AMD
+- SMT Divergence
+
+==================================================
+3. DO NOT ASSUME EVERY CONCEPT IS AUTOMATICALLY BACKTESTABLE
+==================================================
+
+This is extremely important.
+
+Some concepts may require definitions that do not currently exist.
+
+Do NOT simply mark them executable because they are present in the Concept Library.
+
+For every concept, determine whether it can be represented deterministically using the data available to TradeX.
+
+If yes:
+
+Create the structured executable definition.
+
+If no:
+
+Keep the concept available in the Library but clearly mark it as:
+
+Not currently executable
+
+or:
+
+Review required
+
+with a precise explanation of what is missing.
+
+Do not silently replace the concept with another rule.
+
+==================================================
+4. USE ONE CANONICAL DEFINITION
+==================================================
+
+Each executable concept must have ONE shared definition.
+
+The same definition must be used by:
+
+- Trading Concept Library
+- Strategy Builder
+- Build with AI
+- Strategy validation
+- Backtesting
+- Strategy versioning
+
+Do not create separate implementations for the Builder and Backtester.
+
+The Builder and Backtester must evaluate the same condition.
+
+==================================================
+5. STRUCTURED PARAMETERS
+==================================================
+
+Where a concept requires configuration, expose only the parameters actually needed.
+
+Examples:
+
+BOS:
+- Bullish / Bearish
+- Structure lookback
+- Swing sensitivity if required
+- Break confirmation if required
+
+Liquidity Sweep:
+- Liquidity level type
+- Sweep side
+- Lookback
+
+FVG:
+- Bullish / Bearish
+- Formation / Retest
+- Retest lookback
+- Minimum gap size
+
+Indicators:
+
+EMA:
+- Period
+
+SMA:
+- Period
+
+RSI:
+- Period
+- Above / Below
+- Threshold
+
+MACD:
+- Fast period
+- Slow period
+- Signal period
+- Cross direction
+
+ATR:
+- Period
+- Threshold or multiplier where required
+
+Do NOT add unnecessary parameters.
+
+Do NOT invent arbitrary defaults.
+
+Use existing TradeX defaults where they already exist.
+
+==================================================
+6. MARKET STRUCTURE
+==================================================
+
+Implement deterministic swing identification first where required.
+
+Then use those swings to calculate:
+
+HH
+HL
+LH
+LL
+BOS
+CHoCH
+MSS
+
+The implementation must distinguish bullish and bearish structure.
+
+For example:
+
+Bullish BOS:
+Price closes through a previously established swing high.
+
+Bearish BOS:
+Price closes through a previously established swing low.
+
+However, do not blindly assume this exact definition if TradeX already has an established market-structure definition elsewhere.
+
+Inspect the existing code first.
+
+Use the project's existing definition if one already exists.
+
+The important requirement is consistency.
+
+==================================================
+7. LIQUIDITY
+==================================================
+
+Build on the existing structured Liquidity Sweep implementation.
+
+Do NOT replace it.
+
+Extend the same architecture to related liquidity concepts where deterministic.
+
+Liquidity concepts must use actual historical price information.
+
+Do not generate random liquidity levels.
+
+==================================================
+8. FAIR VALUE GAPS
+==================================================
+
+Preserve the existing executable FVG implementation.
+
+It must continue supporting:
+
+- Bullish FVG
+- Bearish FVG
+- Formation
+- Retest
+- Retest lookback
+- Minimum gap size
+
+Add IFVG only if it can be deterministically defined using the available data.
+
+Do not create duplicate FVG implementations.
+
+==================================================
+9. ORDER BLOCKS / BREAKERS / MITIGATION
+==================================================
+
+Where these concepts can be deterministically defined from OHLC data:
+
+create structured definitions.
+
+Do not pretend there is a universal definition if TradeX does not have one.
+
+If a concept requires subjective discretionary interpretation that cannot reliably be determined from the available data, leave it non-executable and explain why.
+
+Do not convert it into an unrelated candle condition.
+
+==================================================
+10. INDICATORS
+==================================================
+
+Implement deterministic indicator conditions using historical OHLC data.
+
+The Builder should allow the user to configure supported indicators.
+
+Examples:
+
+EMA 20
+EMA 50
+
+RSI above 70
+RSI below 30
+
+MACD bullish cross
+
+Price above VWAP
+
+ATR above a specified value
+
+The exact supported parameter set should match the implementation.
+
+==================================================
+11. PRICE ACTION
+==================================================
+
+Implement deterministic price-action patterns where possible.
+
+Examples:
+
+Bullish Engulfing
+Bearish Engulfing
+Pin Bar
+Inside Bar
+Breakout
+Breakout Retest
+
+Again:
+
+Do not mark a pattern executable unless the engine actually calculates it.
+
+==================================================
+12. HTF / LTF
+==================================================
+
+Where the existing TradeX architecture supports multiple timeframes, allow concepts to reference:
+
+HTF
+
+and:
+
+LTF
+
+conditions.
+
+The Builder should preserve the exact timeframe associated with each condition.
+
+Example:
+
+HTF:
+1H
+
+LTF:
+5M
+
+Do not hard-code timeframes.
+
+==================================================
+13. PREMIUM / DISCOUNT
+==================================================
+
+If deterministic swing ranges are available, Premium / Discount / Equilibrium can be represented using the defined range.
+
+Do not invent a range if one has not been established.
+
+If required information is missing, make the required configuration explicit.
+
+==================================================
+14. OTE / IRL / ERL / PO3 / AMD / SMT
+==================================================
+
+These concepts require particular care.
+
+Only make them executable where TradeX can define them deterministically from available data.
+
+Do not claim full execution simply because the concept exists in the Library.
+
+If a deterministic implementation is possible, create the structured definition.
+
+If it is not currently possible, preserve it as a concept and clearly identify the missing data/definition.
+
+Do not silently replace it with an unrelated condition.
+
+==================================================
+15. STRATEGY BUILDER
+==================================================
+
+The Strategy Builder should use the same concept system.
+
+The flow should remain:
+
+Select concept
+↓
+Select rule / pattern
+↓
+Configure parameters
+↓
+Select timeframe
+↓
+Select direction where applicable
+↓
+Add condition
+
+The UI should remain simple and clear.
+
+Do not create a completely new Builder interface.
+
+Use the existing Builder sections:
+
+ENTRY
+CONFIRMATION
+EXIT
+
+==================================================
+16. BUILD WITH AI
+==================================================
+
+Build with AI must use the same canonical concept definitions.
+
+Examples:
+
+"BOS"
+"Break of Structure"
+
+must resolve to the same BOS concept.
+
+"FVG"
+"Fair Value Gap"
+"FVG Retest"
+
+must resolve to the existing FVG implementation.
+
+"Gold"
+must resolve to XAUUSD.
+
+"US Tech 100"
+must resolve to the existing USTEC instrument.
+
+"15 minute"
+must resolve to 15m.
+
+Do not create AI-specific definitions.
+
+The AI must populate the exact same Builder structures that manual Builder input creates.
+
+==================================================
+17. AI MUST NOT INVENT CONDITIONS
+==================================================
+
+If the user asks:
+
+"Create me a Gold reversal strategy using BOS and FVG."
+
+The AI should create:
+
+BOS
++
+FVG
+
+using the actual executable definitions.
+
+It must NOT convert BOS into:
+
+Candle is bullish
+
+or FVG into:
+
+Price is above the candle open.
+
+If a requested concept is unsupported, preserve the requested concept and clearly identify it as unsupported.
+
+==================================================
+18. BACKTESTING
+==================================================
+
+Every executable concept must actually be evaluated by the historical engine.
+
+The Backtester must use:
+
+Strategy
+↓
+Exact strategy version
+↓
+Exact conditions
+↓
+Historical candles
+↓
+Concept calculations
+↓
+Signal evaluation
+↓
+Trades
+↓
+Results
+
+Do not fabricate signals.
+
+Do not treat unsupported concepts as automatically true.
+
+Do not ignore unsupported conditions.
+
+==================================================
+19. VERSIONING
+==================================================
+
+All structured concept parameters must be preserved inside immutable strategy versions.
+
+For example:
+
+BOS lookback
+FVG polarity
+FVG retest setting
+Liquidity Sweep lookback
+EMA period
+RSI threshold
+
+must all remain attached to the exact version that is backtested.
+
+Backtesting must never accidentally use the current Builder settings instead of the selected version's settings.
+
+==================================================
+20. COMPATIBILITY STATUS
+==================================================
+
+Every condition should have an explicit compatibility state.
+
+For example:
+
+✓ Backtest supported
+
+or:
+
+Review required
+
+or:
+
+Not currently executable
+
+This status must be calculated from the actual implementation.
+
+Do not use generic warnings.
+
+If only one condition is unsupported, only that condition should be flagged.
+
+The entire strategy should not become mysteriously unusable.
+
+==================================================
+21. CONCEPT LIBRARY
+==================================================
+
+Update the existing Trading Concept Library so each concept clearly indicates:
+
+Concept name
+Category
+Description
+Executable status
+Available parameters where applicable
+
+Do not create duplicate concepts.
+
+Maintain aliases.
+
+Examples:
+
+BOS
+Break of Structure
+
+CHoCH
+Change of Character
+
+MSS
+Market Structure Shift
+
+FVG
+Fair Value Gap
+
+IFVG
+Inverse Fair Value Gap
+
+OB
+Order Block
+
+EMA
+Exponential Moving Average
+
+etc.
+
+==================================================
+22. TESTING
+==================================================
+
+Do not rely only on unit tests.
+
+For every newly executable concept, test the actual workflow where practical:
+
+Concept Library
+→ Builder
+→ Save
+→ Version
+→ Activate
+→ Backtest
+
+Use real historical data.
+
+Do not create fake market data.
+
+Create temporary test strategies only where necessary and delete them afterward.
+
+==================================================
+23. AI TESTS
+==================================================
+
+Test Build with AI using several requests.
+
+TEST 1:
+
+"Create me a Gold reversal strategy using Liquidity Sweep, BOS and Fair Value Gap confirmation. Use 15m for the setup and 5m for confirmation, trading both long and short."
+
+TEST 2:
+
+"Create me a US Tech 100 strategy using Break of Structure, Order Block and Fair Value Gap."
+
+TEST 3:
+
+"Create me a Gold strategy using EMA 20, RSI and Breakout confirmation."
+
+TEST 4:
+
+"Create me a strategy using higher timeframe bias and lower timeframe confirmation."
+
+Verify that the AI maps concepts into the correct Builder structures.
+
+==================================================
+24. BACKTEST TESTS
+==================================================
+
+For every concept that is marked executable, verify that the historical engine genuinely evaluates it.
+
+Test:
+
+- Bullish
+- Bearish
+- Long
+- Short
+- Multiple timeframes
+- Multiple conditions
+
+Verify zero-trade situations are handled correctly.
+
+A strategy producing zero trades is not automatically an error.
+
+==================================================
+25. REGRESSION
+==================================================
+
+Preserve everything already working.
+
+Especially:
+
+- Liquidity Sweep
+- FVG
+- FVG Retest
+- Existing candle rules
+- Strategy Builder
+- Build with AI
+- Strategy Library
+- Versioning
+- Backtesting
+- Markets
+- Alerts
+- Monitoring
+- Journal
+- Economic Calendar
+- Navigation
+
+Run:
+
+- Frontend tests
+- API tests
+- Frontend typecheck
+- API typecheck
+- Production builds
+- git diff --check
+
+Check browser console.
+
+Test:
+
+375px
+402px
+768px
+1440px
+
+==================================================
+26. IMPORTANT — DO NOT OVERCLAIM
+==================================================
+
+At the end of the implementation, produce a table internally showing:
+
+Concept
+Executable?
+Builder support?
+AI support?
+Backtesting support?
+Reason if unsupported
+
+Do not tell me that every concept is supported unless the implementation genuinely supports every concept.
+
+It is completely acceptable for some concepts to remain:
+
+Not currently executable
+
+provided the system handles them cleanly and does not pretend they are backtestable.
+
+==================================================
+FINAL ARCHITECTURE
+==================================================
+
+I want TradeX to eventually work like this:
+
+TRADING CONCEPT LIBRARY
+
+↓
+
+Canonical Concept Definition
+
+↓
+
+Structured Parameters
+
+↓
+
+STRATEGY BUILDER
+
+↓
+
+BUILD WITH AI
+
+↓
+
+Strategy Validation
+
+↓
+
+Immutable Strategy Version
+
+↓
+
+BACKTESTING
+
+↓
+
+Real Historical Data
+
+↓
+
+Real Deterministic Condition Evaluation
+
+The most important requirement is that there is ONE source of truth for each concept.
+
+Do not create separate AI, Builder and Backtesting interpretations of the same concept.
+
+Start by inspecting the existing executable concept architecture for Liquidity Sweep and FVG and extend that architecture to the rest of the library.
+
+Do not rewrite working functionality unnecessarily.
