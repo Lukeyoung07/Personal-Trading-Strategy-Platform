@@ -149,6 +149,203 @@ function fvgAt(candles: HistoricalCandle[], index: number, polarity: "bullish" |
   return gap > minimumGap ? { low: current.high, high: first.low } : null;
 }
 
+function rollingLevel(candles: HistoricalCandle[], index: number, field: "high" | "low", lookback: number) {
+  const source = candles.slice(Math.max(0, index - lookback), index);
+  if (source.length < lookback) return null;
+  return field === "high" ? Math.max(...source.map(candle => candle.high)) : Math.min(...source.map(candle => candle.low));
+}
+
+function priorPeriodLevel(candles: HistoricalCandle[], index: number, period: "day" | "week", field: "high" | "low") {
+  const current = candles[index].openTime;
+  const key = (date: Date) => period === "day"
+    ? `${date.getUTCFullYear()}-${date.getUTCMonth()}-${date.getUTCDate()}`
+    : `${date.getUTCFullYear()}-${Math.floor((Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - Date.UTC(date.getUTCFullYear(), 0, 1)) / 86400000 / 7)}`;
+  const currentKey = key(current);
+  const groups = new Map<string, HistoricalCandle[]>();
+  for (const candle of candles.slice(0, index)) {
+    const groupKey = key(candle.openTime);
+    if (groupKey === currentKey) continue;
+    const group = groups.get(groupKey) || [];
+    group.push(candle);
+    groups.set(groupKey, group);
+  }
+  const prior = [...groups.entries()].sort((a, b) => {
+    const aTime = a[1][a[1].length - 1].openTime.getTime();
+    const bTime = b[1][b[1].length - 1].openTime.getTime();
+    return bTime - aTime;
+  })[0]?.[1];
+  if (!prior?.length) return null;
+  return field === "high" ? Math.max(...prior.map(candle => candle.high)) : Math.min(...prior.map(candle => candle.low));
+}
+
+function evaluateMarketStructure(
+  candles: HistoricalCandle[],
+  index: number,
+  parameters: Extract<ExecutableConceptParameters, { kind: "market_structure" }>,
+) {
+  const candle = candles[index];
+  const priorHigh = rollingLevel(candles, index, "high", parameters.lookback);
+  const priorLow = rollingLevel(candles, index, "low", parameters.lookback);
+  if (priorHigh == null || priorLow == null) return false;
+  const bullish = parameters.polarity === "bullish" || parameters.polarity === "auto";
+  const bearish = parameters.polarity === "bearish" || parameters.polarity === "auto";
+  if (parameters.signal === "swing_high" || parameters.signal === "higher_high") return bullish && candle.high > priorHigh;
+  if (parameters.signal === "swing_low" || parameters.signal === "lower_low") return bearish && candle.low < priorLow;
+  if (parameters.signal === "higher_low") return bullish && candle.low > priorLow;
+  if (parameters.signal === "lower_high") return bearish && candle.high < priorHigh;
+  const breaksBullish = candle.close > priorHigh;
+  const breaksBearish = candle.close < priorLow;
+  if (parameters.signal === "bos" || parameters.signal === "mss") {
+    return (bullish && breaksBullish) || (bearish && breaksBearish);
+  }
+  let lastBreak: "bullish" | "bearish" | null = null;
+  for (let previousIndex = Math.max(parameters.lookback, index - parameters.lookback * 4); previousIndex < index; previousIndex += 1) {
+    const previousHigh = rollingLevel(candles, previousIndex, "high", parameters.lookback);
+    const previousLow = rollingLevel(candles, previousIndex, "low", parameters.lookback);
+    if (previousHigh != null && candles[previousIndex].close > previousHigh) lastBreak = "bullish";
+    if (previousLow != null && candles[previousIndex].close < previousLow) lastBreak = "bearish";
+  }
+  return (bullish && breaksBullish && lastBreak === "bearish") || (bearish && breaksBearish && lastBreak === "bullish");
+}
+
+function evaluateLiquidityLevel(
+  candles: HistoricalCandle[],
+  index: number,
+  parameters: Extract<ExecutableConceptParameters, { kind: "liquidity_level" }>,
+) {
+  const candle = candles[index];
+  if (parameters.level === "previous_day_high" || parameters.level === "previous_day_low" || parameters.level === "previous_week_high" || parameters.level === "previous_week_low") {
+    const period = parameters.level.includes("week") ? "week" : "day";
+    const field = parameters.level.endsWith("high") ? "high" : "low";
+    const level = priorPeriodLevel(candles, index, period, field);
+    return level == null ? false : field === "high" ? candle.high >= level && candle.close <= level : candle.low <= level && candle.close >= level;
+  }
+  const field = parameters.level === "sell_side" || parameters.level === "equal_lows" ? "low" : "high";
+  const level = rollingLevel(candles, index, field, parameters.lookback);
+  if (level == null) return false;
+  if (parameters.level === "equal_highs" || parameters.level === "equal_lows") {
+    const values = candles.slice(index - parameters.lookback, index).map(item => field === "high" ? item.high : item.low);
+    return values.some(value => Math.abs(value - (field === "high" ? candle.high : candle.low)) <= parameters.tolerance)
+      && (field === "high" ? candle.high >= level : candle.low <= level);
+  }
+  return field === "high" ? candle.high >= level : candle.low <= level;
+}
+
+function average(values: number[]) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
+function indicatorValue(candles: HistoricalCandle[], index: number, parameters: Extract<ExecutableConceptParameters, { kind: "indicator" }>): number | null {
+  const closes = candles.slice(0, index + 1).map(candle => candle.close);
+  if (parameters.indicator === "sma") return closes.length >= parameters.period ? average(closes.slice(-parameters.period)) : null;
+  if (parameters.indicator === "ema") {
+    if (closes.length < parameters.period) return null;
+    let ema = average(closes.slice(0, parameters.period))!;
+    const multiplier = 2 / (parameters.period + 1);
+    for (const close of closes.slice(parameters.period)) ema = (close - ema) * multiplier + ema;
+    return ema;
+  }
+  if (parameters.indicator === "rsi") {
+    if (closes.length <= parameters.period) return null;
+    const changes = closes.slice(1).map((close, changeIndex) => close - closes[changeIndex]);
+    const recent = changes.slice(-parameters.period);
+    const gains = average(recent.map(change => Math.max(change, 0))) || 0;
+    const losses = average(recent.map(change => Math.max(-change, 0))) || 0;
+    return losses === 0 ? 100 : 100 - (100 / (1 + gains / losses));
+  }
+  if (parameters.indicator === "atr") {
+    if (index < parameters.period) return null;
+    const trueRanges = candles.slice(1, index + 1).map((candle, rangeIndex) => {
+      const previous = candles[rangeIndex];
+      return Math.max(candle.high - candle.low, Math.abs(candle.high - previous.close), Math.abs(candle.low - previous.close));
+    });
+    return average(trueRanges.slice(-parameters.period));
+  }
+  if (parameters.indicator === "vwap") {
+    const source = candles.slice(0, index + 1);
+    const weighted = source.reduce((sum, candle) => sum + ((candle.high + candle.low + candle.close) / 3) * (candle.volume ?? 1), 0);
+    const volume = source.reduce((sum, candle) => sum + (candle.volume ?? 1), 0);
+    return volume ? weighted / volume : null;
+  }
+  if (closes.length < parameters.slowPeriod! + parameters.signalPeriod!) return null;
+  const ema = (period: number, values: number[]) => {
+    if (values.length < period) return null;
+    let result = average(values.slice(0, period))!;
+    const multiplier = 2 / (period + 1);
+    for (const value of values.slice(period)) result = (value - result) * multiplier + result;
+    return result;
+  };
+  const macdValues: number[] = [];
+  for (let macdIndex = parameters.slowPeriod! - 1; macdIndex < closes.length; macdIndex += 1) {
+    const prefix = closes.slice(0, macdIndex + 1);
+    const fast = ema(parameters.fastPeriod!, prefix);
+    const slow = ema(parameters.slowPeriod!, prefix);
+    if (fast != null && slow != null) macdValues.push(fast - slow);
+  }
+  if (macdValues.length < parameters.signalPeriod!) return null;
+  const macdLine = macdValues[macdValues.length - 1];
+  const signal = ema(parameters.signalPeriod!, macdValues);
+  return signal == null ? null : macdLine - signal;
+}
+
+function evaluateIndicator(candles: HistoricalCandle[], index: number, parameters: Extract<ExecutableConceptParameters, { kind: "indicator" }>) {
+  const value = indicatorValue(candles, index, parameters);
+  if (value == null) return false;
+  const candle = candles[index];
+  const current = parameters.indicator === "rsi" || parameters.indicator === "macd" || parameters.indicator === "atr"
+    ? value
+    : parameters.indicator === "vwap" || parameters.indicator === "ema" || parameters.indicator === "sma" ? candle.close - value : value;
+  const threshold = parameters.indicator === "ema" || parameters.indicator === "sma" || parameters.indicator === "vwap" ? 0 : parameters.threshold ?? 0;
+  if (parameters.comparison === "above") return current > threshold;
+  if (parameters.comparison === "below") return current < threshold;
+  if (index === 0) return false;
+  const previous = indicatorValue(candles, index - 1, parameters);
+  if (previous == null) return false;
+  const previousCurrent = parameters.indicator === "ema" || parameters.indicator === "sma" || parameters.indicator === "vwap"
+    ? candles[index - 1].close - previous : previous;
+  return parameters.comparison === "cross_above" ? current > threshold && previousCurrent <= threshold : current < threshold && previousCurrent >= threshold;
+}
+
+function evaluatePriceAction(candles: HistoricalCandle[], index: number, parameters: Extract<ExecutableConceptParameters, { kind: "price_action" }>) {
+  const candle = candles[index];
+  const previous = candles[index - 1];
+  if (!previous) return false;
+  const bullish = parameters.polarity === "bullish" || parameters.polarity === "auto";
+  const bearish = parameters.polarity === "bearish" || parameters.polarity === "auto";
+  if (parameters.pattern === "bullish_engulfing") return bullish && previous.close < previous.open && candle.close > candle.open && candle.open <= previous.close && candle.close >= previous.open;
+  if (parameters.pattern === "bearish_engulfing") return bearish && previous.close > previous.open && candle.close < candle.open && candle.open >= previous.close && candle.close <= previous.open;
+  if (parameters.pattern === "inside_bar") return candle.high < previous.high && candle.low > previous.low;
+  if (parameters.pattern === "pin_bar") {
+    const body = Math.abs(candle.close - candle.open);
+    const upperWick = candle.high - Math.max(candle.open, candle.close);
+    const lowerWick = Math.min(candle.open, candle.close) - candle.low;
+    return Math.max(upperWick, lowerWick) >= Math.max(body, 1e-12) * parameters.wickRatio;
+  }
+  const priorHigh = rollingLevel(candles, index, "high", parameters.lookback);
+  const priorLow = rollingLevel(candles, index, "low", parameters.lookback);
+  if (priorHigh == null || priorLow == null) return false;
+  if (parameters.pattern === "breakout") return (bullish && candle.close > priorHigh) || (bearish && candle.close < priorLow);
+  if (parameters.pattern === "support") return candle.low <= priorLow && candle.close > priorLow;
+  if (parameters.pattern === "resistance") return candle.high >= priorHigh && candle.close < priorHigh;
+  for (let breakoutIndex = Math.max(parameters.lookback, index - parameters.lookback); breakoutIndex < index; breakoutIndex += 1) {
+    const breakoutHigh = rollingLevel(candles, breakoutIndex, "high", parameters.lookback);
+    const breakoutLow = rollingLevel(candles, breakoutIndex, "low", parameters.lookback);
+    if (bullish && breakoutHigh != null && candles[breakoutIndex].close > breakoutHigh && candle.low <= breakoutHigh && candle.close >= breakoutHigh) return true;
+    if (bearish && breakoutLow != null && candles[breakoutIndex].close < breakoutLow && candle.high >= breakoutLow && candle.close <= breakoutLow) return true;
+  }
+  return false;
+}
+
+function evaluateRangeLocation(candles: HistoricalCandle[], index: number, parameters: Extract<ExecutableConceptParameters, { kind: "range_location" }>) {
+  const high = rollingLevel(candles, index, "high", parameters.lookback);
+  const low = rollingLevel(candles, index, "low", parameters.lookback);
+  if (high == null || low == null || high <= low) return false;
+  const midpoint = low + (high - low) / 2;
+  return parameters.location === "premium" ? candles[index].close > midpoint
+    : parameters.location === "discount" ? candles[index].close < midpoint
+      : candles[index].close === midpoint;
+}
+
 function evaluateExecutableCondition(
   condition: BacktestCondition,
   side: BacktestSide,
@@ -174,18 +371,38 @@ function evaluateExecutableCondition(
       : candle.low < level && candle.close > level;
   }
 
-  const polarity = parameters.polarity === "auto"
-    ? side === "long" ? "bullish" : "bearish"
-    : parameters.polarity;
-  if (parameters.interaction === "formation") {
-    return fvgAt(candles, index, polarity, parameters.minimumGap) !== null;
+  if (parameters.kind === "fair_value_gap") {
+    const polarity = parameters.polarity === "auto"
+      ? side === "long" ? "bullish" : "bearish"
+      : parameters.polarity;
+    if (parameters.interaction === "formation") {
+      if (!parameters.inverse) return fvgAt(candles, index, polarity, parameters.minimumGap) !== null;
+      return false;
+    }
+    if (parameters.inverse) {
+      const start = Math.max(2, index - parameters.lookback);
+      for (let formationIndex = index - 1; formationIndex >= start; formationIndex -= 1) {
+        const polarities = parameters.polarity === "auto" ? ["bullish", "bearish"] as const : [polarity];
+        for (const sourcePolarity of polarities) {
+          const zone = fvgAt(candles, formationIndex, sourcePolarity, parameters.minimumGap);
+          if (zone && (sourcePolarity === "bullish" ? candle.close < zone.low : candle.close > zone.high)) return true;
+        }
+      }
+      return false;
+    }
+    const start = Math.max(2, index - parameters.lookback);
+    for (let formationIndex = index - 1; formationIndex >= start; formationIndex -= 1) {
+      const zone = fvgAt(candles, formationIndex, polarity, parameters.minimumGap);
+      if (!zone) continue;
+      if (candle.high >= zone.low && candle.low <= zone.high) return true;
+    }
+    return false;
   }
-  const start = Math.max(2, index - parameters.lookback);
-  for (let formationIndex = index - 1; formationIndex >= start; formationIndex -= 1) {
-    const zone = fvgAt(candles, formationIndex, polarity, parameters.minimumGap);
-    if (!zone) continue;
-    if (candle.high >= zone.low && candle.low <= zone.high) return true;
-  }
+  if (parameters.kind === "market_structure") return evaluateMarketStructure(candles, index, parameters);
+  if (parameters.kind === "liquidity_level") return evaluateLiquidityLevel(candles, index, parameters);
+  if (parameters.kind === "indicator") return evaluateIndicator(candles, index, parameters);
+  if (parameters.kind === "price_action") return evaluatePriceAction(candles, index, parameters);
+  if (parameters.kind === "range_location") return evaluateRangeLocation(candles, index, parameters);
   return false;
 }
 

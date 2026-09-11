@@ -32,6 +32,12 @@ import {
 import {
   DEFAULT_FAIR_VALUE_GAP_PARAMETERS,
   DEFAULT_LIQUIDITY_SWEEP_PARAMETERS,
+  DEFAULT_INDICATOR_PARAMETERS,
+  DEFAULT_LIQUIDITY_LEVEL_PARAMETERS,
+  DEFAULT_MARKET_STRUCTURE_PARAMETERS,
+  DEFAULT_PRICE_ACTION_PARAMETERS,
+  DEFAULT_RANGE_LOCATION_PARAMETERS,
+  executableConceptTriggerRules,
   executableConceptKind,
   isHistoricalRuleSupported,
   normalizeExecutableParameters,
@@ -449,11 +455,7 @@ function ConditionModal({ strategyId, strategyDirection, concepts, timeframes, c
     const customRule = String(form.get("customRule") || "").trim();
     const selectedPreset = RULE_PRESETS.find(preset => preset.value === rulePreset);
     const triggerRules = executableKind
-      ? executableKind === "liquidity_sweep"
-        ? "Liquidity sweep: close back inside the swept level"
-        : executionParameters?.interaction === "retest"
-          ? "Fair Value Gap retest"
-          : "Fair Value Gap formation"
+       ? executionParameters ? executableConceptTriggerRules(executionParameters as any) : ""
       : rulePreset === "custom" ? customRule : selectedPreset?.rule || "";
     const parameters = executableKind
       ? normalizeExecutableParameters(selectedConcept?.name, executionParameters)
@@ -552,6 +554,48 @@ function ConditionModal({ strategyId, strategyDirection, concepts, timeframes, c
                <Field label="Minimum gap" hint="Price units; zero accepts any positive or zero-width boundary gap."><input className="input" type="number" min="0" step="any" value={String(executionParameters?.minimumGap ?? DEFAULT_FAIR_VALUE_GAP_PARAMETERS.minimumGap)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "fair_value_gap", minimumGap: Number(event.target.value) }))} /></Field>
              </div>
            </div>}
+            {executableKind === "market_structure" && <div className="space-y-4 rounded-md border border-primary/30 bg-background/60 p-4" data-testid="builder-market-structure-parameters">
+              <div className="text-xs text-muted-foreground">Structure is causal: each candle is compared only with the completed prior rolling range, so no future candle is used.</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Structure event"><select className="select" value={String(executionParameters?.signal || DEFAULT_MARKET_STRUCTURE_PARAMETERS.signal)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "market_structure", signal: event.target.value }))}>
+                  <option value="bos">Break of Structure</option><option value="choch">Change of Character</option><option value="mss">Market Structure Shift</option><option value="higher_high">Higher High</option><option value="higher_low">Higher Low</option><option value="lower_high">Lower High</option><option value="lower_low">Lower Low</option><option value="swing_high">Swing High</option><option value="swing_low">Swing Low</option>
+                </select></Field>
+                <Field label="Structure direction"><select className="select" value={String(executionParameters?.polarity || "auto")} onChange={event => setExecutionParameters(current => ({ ...current, kind: "market_structure", polarity: event.target.value }))}><option value="auto">Auto</option><option value="bullish">Bullish</option><option value="bearish">Bearish</option></select></Field>
+              </div>
+              <Field label="Lookback candles" hint="Prior completed candles used to establish the rolling structure level."><input className="input" type="number" min="2" max="100" value={String(executionParameters?.lookback ?? DEFAULT_MARKET_STRUCTURE_PARAMETERS.lookback)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "market_structure", lookback: Number(event.target.value) }))} /></Field>
+            </div>}
+            {executableKind === "liquidity_level" && <div className="space-y-4 rounded-md border border-primary/30 bg-background/60 p-4" data-testid="builder-liquidity-level-parameters">
+              <div className="text-xs text-muted-foreground">Levels are derived from completed historical candles. Day and week levels use UTC calendar periods.</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Liquidity level"><select className="select" value={String(executionParameters?.level || DEFAULT_LIQUIDITY_LEVEL_PARAMETERS.level)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "liquidity_level", level: event.target.value }))}><option value="buy_side">Buy-side liquidity</option><option value="sell_side">Sell-side liquidity</option><option value="equal_highs">Equal highs</option><option value="equal_lows">Equal lows</option><option value="previous_day_high">Previous day high</option><option value="previous_day_low">Previous day low</option><option value="previous_week_high">Previous week high</option><option value="previous_week_low">Previous week low</option></select></Field>
+                <Field label="Lookback candles"><input className="input" type="number" min="2" max="100" value={String(executionParameters?.lookback ?? DEFAULT_LIQUIDITY_LEVEL_PARAMETERS.lookback)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "liquidity_level", lookback: Number(event.target.value) }))} /></Field>
+              </div>
+              <Field label="Equal-level tolerance" hint="Price units allowed between equal highs or lows."><input className="input" type="number" min="0" step="any" value={String(executionParameters?.tolerance ?? DEFAULT_LIQUIDITY_LEVEL_PARAMETERS.tolerance)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "liquidity_level", tolerance: Number(event.target.value) }))} /></Field>
+            </div>}
+            {executableKind === "indicator" && <div className="space-y-4 rounded-md border border-primary/30 bg-background/60 p-4" data-testid="builder-indicator-parameters">
+              <div className="text-xs text-muted-foreground">Indicator values use completed historical candles only. Price comparisons use close versus the calculated value.</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Indicator"><select className="select" value={String(executionParameters?.indicator || DEFAULT_INDICATOR_PARAMETERS.indicator)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "indicator", indicator: event.target.value }))}><option value="ema">EMA</option><option value="sma">SMA</option><option value="rsi">RSI</option><option value="macd">MACD</option><option value="vwap">VWAP</option><option value="atr">ATR</option></select></Field>
+                <Field label="Comparison"><select className="select" value={String(executionParameters?.comparison || DEFAULT_INDICATOR_PARAMETERS.comparison)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "indicator", comparison: event.target.value }))}><option value="above">Above</option><option value="below">Below</option><option value="cross_above">Crosses above</option><option value="cross_below">Crosses below</option></select></Field>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Field label="Period"><input className="input" type="number" min="1" max="500" value={String(executionParameters?.period ?? DEFAULT_INDICATOR_PARAMETERS.period)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "indicator", period: Number(event.target.value) }))} /></Field>
+                <Field label="Threshold" hint="Used by RSI, MACD, and ATR."><input className="input" type="number" step="any" value={String(executionParameters?.threshold ?? DEFAULT_INDICATOR_PARAMETERS.threshold)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "indicator", threshold: Number(event.target.value) }))} /></Field>
+                <Field label="MACD fast / slow / signal"><input className="input" value={`${executionParameters?.fastPeriod ?? 12}/${executionParameters?.slowPeriod ?? 26}/${executionParameters?.signalPeriod ?? 9}`} onChange={event => { const [fast, slow, signal] = event.target.value.split("/").map(Number); setExecutionParameters(current => ({ ...current, kind: "indicator", fastPeriod: fast, slowPeriod: slow, signalPeriod: signal })); }} placeholder="12/26/9" /></Field>
+              </div>
+            </div>}
+            {executableKind === "price_action" && <div className="space-y-4 rounded-md border border-primary/30 bg-background/60 p-4" data-testid="builder-price-action-parameters">
+              <div className="text-xs text-muted-foreground">Patterns use explicit OHLC relationships. Breakouts and support/resistance use a prior rolling range.</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Pattern"><select className="select" value={String(executionParameters?.pattern || DEFAULT_PRICE_ACTION_PARAMETERS.pattern)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "price_action", pattern: event.target.value }))}><option value="breakout">Breakout</option><option value="breakout_retest">Breakout retest</option><option value="bullish_engulfing">Bullish engulfing</option><option value="bearish_engulfing">Bearish engulfing</option><option value="pin_bar">Pin bar</option><option value="inside_bar">Inside bar</option><option value="support">Support</option><option value="resistance">Resistance</option></select></Field>
+                <Field label="Pattern direction"><select className="select" value={String(executionParameters?.polarity || "auto")} onChange={event => setExecutionParameters(current => ({ ...current, kind: "price_action", polarity: event.target.value }))}><option value="auto">Auto</option><option value="bullish">Bullish</option><option value="bearish">Bearish</option></select></Field>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Field label="Lookback candles"><input className="input" type="number" min="2" max="100" value={String(executionParameters?.lookback ?? DEFAULT_PRICE_ACTION_PARAMETERS.lookback)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "price_action", lookback: Number(event.target.value) }))} /></Field><Field label="Pin-bar wick ratio"><input className="input" type="number" min="1" max="20" step="any" value={String(executionParameters?.wickRatio ?? DEFAULT_PRICE_ACTION_PARAMETERS.wickRatio)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "price_action", wickRatio: Number(event.target.value) }))} /></Field></div>
+            </div>}
+            {executableKind === "range_location" && <div className="space-y-4 rounded-md border border-primary/30 bg-background/60 p-4" data-testid="builder-range-location-parameters">
+              <div className="text-xs text-muted-foreground">The range is the prior completed rolling high-low range; no range is invented when insufficient data exists.</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Field label="Location"><select className="select" value={String(executionParameters?.location || DEFAULT_RANGE_LOCATION_PARAMETERS.location)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "range_location", location: event.target.value }))}><option value="premium">Premium</option><option value="discount">Discount</option><option value="equilibrium">Equilibrium</option></select></Field><Field label="Lookback candles"><input className="input" type="number" min="2" max="100" value={String(executionParameters?.lookback ?? DEFAULT_RANGE_LOCATION_PARAMETERS.lookback)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "range_location", lookback: Number(event.target.value) }))} /></Field></div>
+            </div>}
            {!executableKind && <><div className="mt-4">
              <select className="select bg-background" value={rulePreset} onChange={event => setRulePreset(event.target.value)} data-testid="select-builder-condition-rule">
                <option value="">Choose a rule</option>
@@ -773,7 +817,7 @@ function StrategyControls({ strategy, conditions, children }: { strategy: Strate
   const confirmationConditions = conditions.filter(condition => condition.stage === "confirmation");
   const entryAndConfirmationConditions = [...entryConditions, ...confirmationConditions];
   const exitConditions = conditions.filter(condition => condition.stage === "exit" || condition.stage === "invalidation");
-  const unsupportedConditions = conditions.filter(condition => !isBacktestCompatibleRule(condition.triggerRules)).map(condition => condition.name || "Unnamed condition");
+   const unsupportedConditions = conditions.filter(condition => !isBacktestCompatibleCondition(condition)).map(condition => condition.name || "Unnamed condition");
   const missingEntryCondition = entryAndConfirmationConditions.length === 0;
   const compatible = !missingEntryCondition && unsupportedConditions.length === 0 && isBacktestCompatibleRiskRules(strategy.riskManagementRules);
   const riskRules = [
@@ -922,7 +966,7 @@ function ConceptsCard({ concepts }: { concepts: TradingConcept[] }) {
       <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />
       <input className="input pl-9 pr-9" value={search} onChange={event => { setSearch(event.target.value); setOpen(true); }} onFocus={() => setOpen(true)} placeholder="Search concepts to review" data-testid="input-builder-library-search" />
       <ChevronDown size={15} className="absolute right-3 top-3 text-muted-foreground" />
-      {open && <div className="absolute z-30 left-0 right-0 top-full mt-2 panel p-2 max-h-56 overflow-y-auto shadow-xl">{filtered.length ? filtered.map(concept => <div key={concept.id} className="px-3 py-2 rounded-md hover:bg-secondary"><div className="text-sm font-semibold">{concept.name}</div><div className="text-[10px] text-muted-foreground mt-1">{concept.category || "CUSTOM"} · {concept.isBuiltIn ? "Library concept" : "Custom concept"}</div></div>) : <div className="p-4 text-sm text-muted-foreground">No concepts match that search.</div>}</div>}
+      {open && <div className="absolute z-30 left-0 right-0 top-full mt-2 panel p-2 max-h-56 overflow-y-auto shadow-xl">{filtered.length ? filtered.map(concept => <div key={concept.id} className="px-3 py-2 rounded-md hover:bg-secondary"><div className="flex items-center gap-2"><div className="text-sm font-semibold">{concept.name}</div><span className={`tag text-[9px] ${executableConceptKind(concept.name) ? "tag-active" : concept.isBuiltIn ? "border-amber-500/40 text-amber-200" : "border-amber-500/40 text-amber-200"}`}>{executableConceptKind(concept.name) ? "Supported" : concept.isBuiltIn ? "Not executable" : "Review"}</span></div><div className="text-[10px] text-muted-foreground mt-1">{concept.category || "CUSTOM"} · {concept.isBuiltIn ? "Library concept" : "Custom concept"}</div></div>) : <div className="p-4 text-sm text-muted-foreground">No concepts match that search.</div>}</div>}
     </div>
     <div className="flex flex-wrap gap-1.5 mt-4" data-testid="builder-concept-category-filters">
       {categories.map(option => <button key={option} type="button" className={`tag ${category === option ? "tag-active" : ""}`} onClick={() => setCategory(option)}>{option}</button>)}

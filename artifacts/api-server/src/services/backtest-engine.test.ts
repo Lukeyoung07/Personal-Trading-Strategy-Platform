@@ -172,6 +172,7 @@ describe("historical backtest engine", () => {
       riskRules: "stop loss is discretionary",
       conditions: [{
         name: "EMA crossover",
+        conceptName: "Custom indicator",
         stage: "entry",
         direction: "long",
         requirement: "required",
@@ -336,5 +337,92 @@ describe("historical backtest engine", () => {
     });
 
     expect(errors).toEqual([expect.stringContaining("Invalid sweep")]);
+  });
+
+  it("evaluates market structure breaks with a causal prior range", () => {
+    const result = runHistoricalBacktest({
+      direction: "long",
+      entryRules: null,
+      exitRules: null,
+      riskRules: null,
+      conditions: [structuredCondition("Bullish BOS", "Break of Structure", "long", {
+        kind: "market_structure",
+        signal: "bos",
+        polarity: "bullish",
+        lookback: 2,
+      })],
+    }, [
+      candle(0, { open: 100, high: 102, low: 99, close: 101 }),
+      candle(1, { open: 101, high: 103, low: 100, close: 102 }),
+      candle(2, { open: 102, high: 106, low: 101, close: 105 }),
+      candle(3, { open: 106, high: 108, low: 105, close: 107 }),
+    ]);
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0]).toMatchObject({ side: "long", entryPrice: 106 });
+  });
+
+  it("evaluates indicators, price action, and range location from OHLC history", () => {
+    const ema = runHistoricalBacktest({
+      direction: "long",
+      entryRules: null,
+      exitRules: null,
+      riskRules: null,
+      conditions: [structuredCondition("EMA above", "EMA", "long", {
+        kind: "indicator",
+        indicator: "ema",
+        period: 2,
+        comparison: "above",
+        threshold: 0,
+      })],
+    }, [
+      candle(0, { open: 100, high: 101, low: 99, close: 100 }),
+      candle(1, { open: 100, high: 102, low: 100, close: 101 }),
+      candle(2, { open: 101, high: 104, low: 101, close: 103 }),
+      candle(3, { open: 104, high: 106, low: 103, close: 105 }),
+    ]);
+    const engulfing = runHistoricalBacktest({
+      direction: "long",
+      entryRules: null,
+      exitRules: null,
+      riskRules: null,
+      conditions: [structuredCondition("Bullish engulfing", "Bullish Engulfing", "long", {
+        kind: "price_action",
+        pattern: "bullish_engulfing",
+        polarity: "bullish",
+        lookback: 2,
+        wickRatio: 2,
+      })],
+    }, [
+      candle(0, { open: 100, high: 101, low: 99, close: 99 }),
+      candle(1, { open: 98, high: 103, low: 97, close: 102 }),
+      candle(2, { open: 103, high: 104, low: 102, close: 103 }),
+    ]);
+
+    expect(ema.trades).toHaveLength(1);
+    expect(engulfing.trades).toHaveLength(1);
+  });
+
+  it("evaluates prior calendar liquidity levels and supports valid zero-trade outcomes", () => {
+    const result = runHistoricalBacktest({
+      direction: "short",
+      entryRules: null,
+      exitRules: null,
+      riskRules: null,
+      conditions: [structuredCondition("Previous day high", "Previous Day High", "short", {
+        kind: "liquidity_level",
+        level: "previous_day_high",
+        lookback: 2,
+        tolerance: 0,
+      })],
+    }, [
+      { ...candle(0, { open: 100, high: 105, low: 99, close: 102 }), openTime: new Date("2026-01-01T10:00:00Z") },
+      { ...candle(1, { open: 102, high: 104, low: 101, close: 103 }), openTime: new Date("2026-01-01T11:00:00Z") },
+      { ...candle(2, { open: 103, high: 105, low: 102, close: 104 }), openTime: new Date("2026-01-02T10:00:00Z") },
+      { ...candle(3, { open: 103, high: 104, low: 102, close: 103 }), openTime: new Date("2026-01-02T11:00:00Z") },
+    ]);
+
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0]).toMatchObject({ side: "short", entryPrice: 103 });
   });
 });

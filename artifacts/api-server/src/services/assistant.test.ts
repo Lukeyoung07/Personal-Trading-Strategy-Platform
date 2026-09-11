@@ -333,7 +333,51 @@ Risk/Reward: 2:1`,
     expect(response.strategyDraft?.riskManagementRules).toBe("risk: 1%; risk/reward: 2R");
   });
 
-   it("does not trust a model-supported flag for concepts the engine cannot execute", async () => {
+  it("maps indicator and breakout requests into Builder-compatible structured parameters", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the indicator strategy draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "Gold Momentum",
+              description: "Indicator confirmation with a range breakout.",
+              direction: "both",
+              marketSymbol: "XAUUSD",
+              timeframes: ["15m"],
+              conditions: [
+                { name: "EMA 20", stage: "entry", requirement: "required", conceptName: "EMA", timeframe: "15m", direction: "both", triggerRules: "EMA above", parameters: { period: 20, comparison: "above" } },
+                { name: "RSI", stage: "confirmation", requirement: "required", conceptName: "RSI", timeframe: "15m", direction: "both", triggerRules: "RSI above 50", parameters: { period: 14, comparison: "above", threshold: 50 } },
+                { name: "Breakout", stage: "confirmation", requirement: "required", conceptName: "Breakout", timeframe: "15m", direction: "both", triggerRules: "breakout" },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: "Create me a Gold strategy using EMA 20, RSI and Breakout confirmation.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions.map(condition => ({
+      conceptName: condition.conceptName,
+      kind: condition.parameters?.kind,
+      supported: condition.supported,
+    }))).toEqual([
+      { conceptName: "EMA", kind: "indicator", supported: true },
+      { conceptName: "RSI", kind: "indicator", supported: true },
+      { conceptName: "Breakout", kind: "price_action", supported: true },
+    ]);
+    expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
+  });
+
+    it("normalizes an EMA concept into the executable indicator family", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
       choices: [{
@@ -373,15 +417,15 @@ Risk/Reward: 2:1`,
       context: { page: "/strategy-builder" },
     });
 
-     expect(response.strategyDraft?.conceptsUsed).toEqual(expect.arrayContaining([{
-       name: "Exponential Moving Average (EMA)",
-      supported: false,
-      explanation: "The model should not be able to override this guardrail.",
-    }]));
-     expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("EMA crossover");
+      expect(response.strategyDraft?.conceptsUsed).toEqual(expect.arrayContaining([{
+        name: "EMA",
+       supported: true,
+       explanation: "The model should not be able to override this guardrail.",
+     }]));
+      expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("EMA crossover");
   });
 
-  it("keeps an unsupported strategy request as a reviewable draft when the model omits one", async () => {
+   it("keeps a supported indicator request as a reviewable draft when the model omits one", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
       choices: [{
@@ -403,11 +447,11 @@ Risk/Reward: 2:1`,
 
     expect(response.intent).toBe("strategy_proposal");
     expect(response.strategyDraft?.marketSymbol).toBeNull();
-    expect(response.strategyDraft?.conceptsUsed).toEqual([{
-      name: "Exponential Moving Average (EMA)",
-      supported: false,
-      explanation: "Understood by the assistant, but not currently executable by historical backtesting.",
-    }]);
+     expect(response.strategyDraft?.conceptsUsed).toEqual([{
+       name: "EMA",
+       supported: true,
+       explanation: "Mapped to the structured historical detector; review its parameters before saving.",
+     }]);
     expect(response.strategyDraft?.compatibility.compatible).toBe(false);
   });
 
@@ -469,9 +513,9 @@ Risk/Reward: 2:1`,
        { message: "Build me a liquidity sweep strategy.", expected: ["Liquidity Sweep"], unsupported: [] },
        { message: "Create an XAUUSD strategy using an FVG.", expected: ["Fair Value Gap"], unsupported: [] },
        { message: "Use a 4H bullish bias and 15M entry.", expected: ["Higher-timeframe bias", "Multi-timeframe analysis"], unsupported: ["Higher-timeframe bias", "Multi-timeframe analysis"] },
-       { message: "Build an SMC strategy using BOS and an order block.", expected: ["Break of Structure", "Order Block"], unsupported: ["Break of Structure", "Order Block"] },
-       { message: "Use the 20 EMA as confirmation.", expected: ["Exponential Moving Average (EMA)"], unsupported: ["Exponential Moving Average (EMA)"] },
-       { message: "Create a strategy using premium and discount.", expected: ["Premium", "Discount"], unsupported: ["Premium", "Discount"] },
+        { message: "Build an SMC strategy using BOS and an order block.", expected: ["Break of Structure", "Order Block"], unsupported: ["Order Block"] },
+        { message: "Use the 20 EMA as confirmation.", expected: ["EMA"], unsupported: [] },
+        { message: "Create a strategy using premium and discount.", expected: ["Premium", "Discount"], unsupported: [] },
     ];
 
     for (const request of requests) {

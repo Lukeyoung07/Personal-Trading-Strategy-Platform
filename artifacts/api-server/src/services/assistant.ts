@@ -16,6 +16,7 @@ import {
   EXECUTABLE_CONCEPT_DEFINITIONS,
   executableConceptTriggerRules,
   executableConceptKind,
+  executableConceptLabel,
   normalizeExecutableParameters,
   type ChatAssistantBody,
 } from "@workspace/api-zod";
@@ -79,6 +80,9 @@ type UnsupportedConceptDefinition = {
 };
 
 const UNSUPPORTED_CONCEPTS: UnsupportedConceptDefinition[] = [
+  { pattern: /\b(?:bos|break of structure)\b/i, name: "Break of Structure" },
+  { pattern: /\b(?:choch|change of character)\b/i, name: "Change of Character" },
+  { pattern: /\b(?:mss|market structure shift)\b/i, name: "Market Structure Shift" },
   { pattern: /\b(?:hh|higher high)\b/i, name: "Higher High" },
   { pattern: /\b(?:hl|higher low)\b/i, name: "Higher Low" },
   { pattern: /\b(?:lh|lower high)\b/i, name: "Lower High" },
@@ -91,6 +95,8 @@ const UNSUPPORTED_CONCEPTS: UnsupportedConceptDefinition[] = [
   { pattern: /\bliquidity grab\b/i, name: "Liquidity Grab" },
   { pattern: /\bequal highs?\b/i, name: "Equal Highs" },
   { pattern: /\bequal lows?\b/i, name: "Equal Lows" },
+  { pattern: /\bbuy[- ]?side liquidity\b|\bbuy[- ]?side\b/i, name: "Buy-Side Liquidity" },
+  { pattern: /\bsell[- ]?side liquidity\b|\bsell[- ]?side\b/i, name: "Sell-Side Liquidity" },
   { pattern: /\bprevious high liquidity\b/i, name: "Previous High Liquidity" },
   { pattern: /\bprevious low liquidity\b/i, name: "Previous Low Liquidity" },
   { pattern: /\bsupport\b/i, name: "Support" },
@@ -102,6 +108,7 @@ const UNSUPPORTED_CONCEPTS: UnsupportedConceptDefinition[] = [
   { pattern: /\bprevious day low\b/i, name: "Previous Day Low" },
   { pattern: /\bprevious week high\b/i, name: "Previous Week High" },
   { pattern: /\bprevious week low\b/i, name: "Previous Week Low" },
+  { pattern: /\binverse fair value gap\b|\bifvg\b/i, name: "Inverse Fair Value Gap (IFVG)" },
   { pattern: /\bsupply\b/i, name: "Supply" },
   { pattern: /\bdemand\b/i, name: "Demand" },
   { pattern: /\bzone reaction\b/i, name: "Zone Reaction" },
@@ -117,6 +124,11 @@ const UNSUPPORTED_CONCEPTS: UnsupportedConceptDefinition[] = [
   { pattern: /\bbreaker block\b/i, name: "Breaker Block" },
   { pattern: /\border block\b/i, name: "Order Block" },
   { pattern: /\bdisplacement\b/i, name: "Displacement" },
+  { pattern: /\bbreakout retest\b|\bbreak and retest\b/i, name: "Breakout Retest" },
+  { pattern: /\bbullish engulfing\b/i, name: "Bullish Engulfing" },
+  { pattern: /\bbearish engulfing\b/i, name: "Bearish Engulfing" },
+  { pattern: /\bpin bar\b/i, name: "Pin Bar" },
+  { pattern: /\binside bar\b/i, name: "Inside Bar" },
   { pattern: /\bbreakout\b/i, name: "Breakout" },
   { pattern: /\bpullback\b/i, name: "Pullback" },
   { pattern: /\bretest\b/i, name: "Retest" },
@@ -136,6 +148,10 @@ const UNSUPPORTED_CONCEPTS: UnsupportedConceptDefinition[] = [
   { pattern: /\bamd\b|power of 3/i, name: "AMD / Power of 3" },
   { pattern: /\bema\b|exponential moving average/i, name: "Exponential Moving Average (EMA)" },
   { pattern: /\bsma\b|simple moving average/i, name: "Simple Moving Average (SMA)" },
+  { pattern: /\brsi\b/i, name: "RSI" },
+  { pattern: /\bmacd\b/i, name: "MACD" },
+  { pattern: /\bvwap\b/i, name: "VWAP" },
+  { pattern: /\batr\b|average true range/i, name: "ATR" },
   { pattern: /\bprice\s+(?:above|below)\s+(?:the\s+)?ema\b/i, name: "Price above/below EMA" },
   { pattern: /\bema crossover\b/i, name: "EMA Crossover" },
   { pattern: /\bema rejection\b/i, name: "EMA Rejection" },
@@ -189,7 +205,7 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
     const rawName = String(typeof raw === "string" ? raw : raw?.name || fallbackName || "").trim().slice(0, 120);
     if (!rawName) return;
     const unsupportedConcept = unsupportedConceptForText(rawName);
-    const name = unsupportedConcept?.name || rawName;
+    const name = unsupportedConcept?.name || executableConceptLabel(rawName) || rawName;
     const matchingConditions = conditions.filter(condition =>
       condition.conceptName.toLowerCase() === rawName.toLowerCase() ||
       condition.conceptName.toLowerCase() === name.toLowerCase(),
@@ -229,7 +245,7 @@ function conceptsRequestedInMessage(message: string) {
     if (!concept.pattern.test(message) || seen.has(concept.name)) continue;
     const executableKind = executableConceptKind(concept.name);
     if (executableKind) {
-      const name = EXECUTABLE_CONCEPT_DEFINITIONS[executableKind].label;
+       const name = executableConceptLabel(concept.name) || EXECUTABLE_CONCEPT_DEFINITIONS[executableKind].label;
       if (seen.has(name)) continue;
       seen.add(name);
       requested.push({
@@ -260,8 +276,31 @@ function conceptsRequestedInMessage(message: string) {
 
 function requestedExecutableConcepts(message: string) {
   const requested: string[] = [];
-  if (/\bliquidity\s+sweep(?:s|ed|ing)?\b/i.test(message)) requested.push("Liquidity Sweep");
-  if (/\b(?:fvg|fair\s+value\s+gap)(?:s|es)?\b/i.test(message)) requested.push("Fair Value Gap");
+  const concepts: Array<[RegExp, string]> = [
+    [/\bliquidity\s+sweep(?:s|ed|ing)?\b/i, "Liquidity Sweep"],
+    [/\b(?:fvg|fair\s+value\s+gap)(?:s|es)?\b/i, "Fair Value Gap"],
+    [/\b(?:bos|break of structure)\b/i, "Break of Structure"],
+    [/\b(?:choch|change of character)\b/i, "Change of Character"],
+    [/\b(?:mss|market structure shift)\b/i, "Market Structure Shift"],
+    [/\b(?:ema|exponential moving average)\b/i, "EMA"],
+    [/\b(?:sma|simple moving average)\b/i, "SMA"],
+    [/\brsi\b/i, "RSI"],
+    [/\bmacd\b/i, "MACD"],
+    [/\bvwap\b/i, "VWAP"],
+    [/\batr|average true range\b/i, "ATR"],
+    [/\bbullish engulfing\b/i, "Bullish Engulfing"],
+    [/\bbearish engulfing\b/i, "Bearish Engulfing"],
+    [/\bpin bar\b/i, "Pin Bar"],
+    [/\binside bar\b/i, "Inside Bar"],
+    [/\bbreakout(?:\s+retest)?\b/i, "Breakout"],
+    [/\bprevious day high\b/i, "Previous Day High"],
+    [/\bprevious day low\b/i, "Previous Day Low"],
+    [/\bprevious week high\b/i, "Previous Week High"],
+    [/\bprevious week low\b/i, "Previous Week Low"],
+    [/\bequal highs?\b/i, "Equal Highs"],
+    [/\bequal lows?\b/i, "Equal Lows"],
+  ];
+  for (const [pattern, name] of concepts) if (pattern.test(message) && !requested.includes(name)) requested.push(name);
   return requested;
 }
 
@@ -271,7 +310,7 @@ function mapRequestedExecutableConditions(conditions: any[], message: string) {
   const hasRetest = /\b(?:fvg|fair\s+value\s+gap)(?:\s+\w+){0,2}\s+retests?\b|\bfvg\s+retests?\b/i.test(message);
   return conditions.map((condition, index) => {
     const descriptor = `${condition?.name || ""} ${condition?.conceptName || ""} ${condition?.triggerRules || ""}`;
-    const direct = requested.find(name => executableConceptKind(descriptor.replace(name, "")) === executableConceptKind(name));
+    const direct = requested.find(name => executableConceptLabel(String(condition?.conceptName || condition?.name || descriptor)) === executableConceptLabel(name));
     const byStage = condition?.stage === "entry" && requested.includes("Liquidity Sweep")
       ? "Liquidity Sweep"
       : condition?.stage === "confirmation" && requested.includes("Fair Value Gap")

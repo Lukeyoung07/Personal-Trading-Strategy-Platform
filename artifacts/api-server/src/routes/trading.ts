@@ -258,6 +258,170 @@ const EXECUTABLE_CONCEPT_METADATA: Record<string, { description: string; detecti
     description: "A three-candle fair value gap, optionally retested.",
     detectionRules: "Structured detector: bullish or bearish three-candle gap, with formation or retest interaction.",
   },
+  "FVG Retest": {
+    description: "A previously formed fair value gap is revisited by a later candle.",
+    detectionRules: "Structured detector: prior three-candle gap within the configured retest lookback.",
+  },
+  "FVG Fill": {
+    description: "A previously formed fair value gap is interacted with by a later candle.",
+    detectionRules: "Structured detector: prior three-candle gap within the configured retest lookback.",
+  },
+  "Inverse Fair Value Gap": {
+    description: "A prior fair value gap is invalidated by a close through its opposite boundary.",
+    detectionRules: "Structured detector: prior three-candle gap followed by a close through the gap boundary.",
+  },
+  "Higher High": {
+    description: "The candle high exceeds the established prior rolling structure high.",
+    detectionRules: "Structured detector: current high above the prior lookback high.",
+  },
+  "Higher Low": {
+    description: "The candle low remains above the established prior rolling structure low.",
+    detectionRules: "Structured detector: current low above the prior lookback low.",
+  },
+  "Lower High": {
+    description: "The candle high remains below the established prior rolling structure high.",
+    detectionRules: "Structured detector: current high below the prior lookback high.",
+  },
+  "Lower Low": {
+    description: "The candle low falls below the established prior rolling structure low.",
+    detectionRules: "Structured detector: current low below the prior lookback low.",
+  },
+  "Swing High": {
+    description: "A causal rolling swing high above the prior lookback high.",
+    detectionRules: "Structured detector: current high above the prior lookback high.",
+  },
+  "Swing Low": {
+    description: "A causal rolling swing low below the prior lookback low.",
+    detectionRules: "Structured detector: current low below the prior lookback low.",
+  },
+  "Break of Structure": {
+    description: "The candle closes beyond the established prior rolling structure level.",
+    detectionRules: "Structured detector: close above prior high or below prior low.",
+  },
+  "Change of Character": {
+    description: "A directional structure break opposite to the most recent detected structure break.",
+    detectionRules: "Structured detector: opposite-direction close break after a prior structure break.",
+  },
+  "Market Structure Shift": {
+    description: "A directional close break through a prior rolling structure level.",
+    detectionRules: "Structured detector: bullish or bearish close break.",
+  },
+  "Buy-Side Liquidity": {
+    description: "Price reaches a prior rolling high where buy-side liquidity is defined.",
+    detectionRules: "Structured detector: current high reaches the prior lookback high.",
+  },
+  "Sell-Side Liquidity": {
+    description: "Price reaches a prior rolling low where sell-side liquidity is defined.",
+    detectionRules: "Structured detector: current low reaches the prior lookback low.",
+  },
+  "Equal Highs": {
+    description: "The current high matches a prior rolling high within the configured tolerance.",
+    detectionRules: "Structured detector: prior lookback high match within price tolerance.",
+  },
+  "Equal Lows": {
+    description: "The current low matches a prior rolling low within the configured tolerance.",
+    detectionRules: "Structured detector: prior lookback low match within price tolerance.",
+  },
+  "Previous Day High": {
+    description: "The current candle interacts with the most recent completed UTC day high.",
+    detectionRules: "Structured detector: prior calendar-day high is reached and rejected.",
+  },
+  "Previous Day Low": {
+    description: "The current candle interacts with the most recent completed UTC day low.",
+    detectionRules: "Structured detector: prior calendar-day low is reached and rejected.",
+  },
+  "Previous Week High": {
+    description: "The current candle interacts with the most recent completed UTC week high.",
+    detectionRules: "Structured detector: prior calendar-week high is reached and rejected.",
+  },
+  "Previous Week Low": {
+    description: "The current candle interacts with the most recent completed UTC week low.",
+    detectionRules: "Structured detector: prior calendar-week low is reached and rejected.",
+  },
+  "EMA": {
+    description: "An exponential moving average condition evaluated from completed closes.",
+    detectionRules: "Structured detector: EMA period and above/below comparison.",
+  },
+  "SMA": {
+    description: "A simple moving average condition evaluated from completed closes.",
+    detectionRules: "Structured detector: SMA period and above/below comparison.",
+  },
+  "RSI": {
+    description: "A relative strength index threshold condition from completed closes.",
+    detectionRules: "Structured detector: RSI period and threshold comparison.",
+  },
+  "RSI Overbought": {
+    description: "RSI is above the configured overbought threshold.",
+    detectionRules: "Structured detector: RSI period and threshold comparison.",
+  },
+  "RSI Oversold": {
+    description: "RSI is below the configured oversold threshold.",
+    detectionRules: "Structured detector: RSI period and threshold comparison.",
+  },
+  "MACD": {
+    description: "A moving-average convergence/divergence condition from completed closes.",
+    detectionRules: "Structured detector: fast, slow, signal periods and comparison.",
+  },
+  "MACD Cross": {
+    description: "A MACD line cross condition from completed closes.",
+    detectionRules: "Structured detector: fast, slow, signal periods and cross direction.",
+  },
+  "VWAP": {
+    description: "A cumulative volume-weighted average price condition.",
+    detectionRules: "Structured detector: typical price weighted by available candle volume.",
+  },
+  "ATR": {
+    description: "An average true range threshold condition from completed OHLC candles.",
+    detectionRules: "Structured detector: true-range average period and threshold.",
+  },
+  "Breakout": {
+    description: "A close beyond the prior rolling high or low.",
+    detectionRules: "Structured detector: close beyond prior lookback range.",
+  },
+  "Break and Retest": {
+    description: "A prior rolling-range breakout level is revisited and held.",
+    detectionRules: "Structured detector: prior close breakout followed by a level retest.",
+  },
+  "Breakout Retest": {
+    description: "A prior rolling-range breakout level is revisited and held.",
+    detectionRules: "Structured detector: prior close breakout followed by a level retest.",
+  },
+  "Bullish Engulfing": {
+    description: "A bullish candle fully engulfs the prior bearish candle body.",
+    detectionRules: "Structured detector: two-candle OHLC body relationship.",
+  },
+  "Bearish Engulfing": {
+    description: "A bearish candle fully engulfs the prior bullish candle body.",
+    detectionRules: "Structured detector: two-candle OHLC body relationship.",
+  },
+  "Pin Bar": {
+    description: "A candle with a wick at least the configured multiple of its body.",
+    detectionRules: "Structured detector: OHLC wick-to-body ratio.",
+  },
+  "Inside Bar": {
+    description: "The candle range is contained inside the preceding candle range.",
+    detectionRules: "Structured detector: current high below prior high and low above prior low.",
+  },
+  "Support": {
+    description: "Price reaches the prior rolling low and closes back above it.",
+    detectionRules: "Structured detector: prior rolling low interaction and rejection.",
+  },
+  "Resistance": {
+    description: "Price reaches the prior rolling high and closes back below it.",
+    detectionRules: "Structured detector: prior rolling high interaction and rejection.",
+  },
+  "Premium": {
+    description: "The close is above the midpoint of the established rolling range.",
+    detectionRules: "Structured detector: prior rolling high-low midpoint.",
+  },
+  "Discount": {
+    description: "The close is below the midpoint of the established rolling range.",
+    detectionRules: "Structured detector: prior rolling high-low midpoint.",
+  },
+  "Equilibrium": {
+    description: "The close equals the midpoint of the established rolling range.",
+    detectionRules: "Structured detector: prior rolling high-low midpoint.",
+  },
 };
 
 async function ensureBuiltInConcepts(): Promise<void> {
