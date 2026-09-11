@@ -1641,6 +1641,93 @@ export interface PerformanceSummary {
   byStrategyVersion: PerformanceVersion[];
 }
 
+export type JournalPerformanceDateField = typeof JournalPerformanceDateField[keyof typeof JournalPerformanceDateField];
+
+
+export const JournalPerformanceDateField = {
+  closedAt: 'closedAt',
+  createdAtFallback: 'createdAtFallback',
+} as const;
+
+export interface JournalDay {
+  /** @pattern ^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$ */
+  date: string;
+  tradeCount: number;
+  winningTrades: number;
+  losingTrades: number;
+  pnl: number;
+  /** @nullable */
+  winRate: number | null;
+  /** @nullable */
+  averageWinner: number | null;
+  /** @nullable */
+  averageLoser: number | null;
+  /** @nullable */
+  bestTrade: number | null;
+  /** @nullable */
+  worstTrade: number | null;
+  /** @nullable */
+  note: string | null;
+}
+
+export interface JournalCumulativePoint {
+  /** @pattern ^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$ */
+  date: string;
+  cumulativePnl: number;
+}
+
+export type JournalStreakType = typeof JournalStreakType[keyof typeof JournalStreakType];
+
+
+export const JournalStreakType = {
+  winning: 'winning',
+  losing: 'losing',
+  none: 'none',
+} as const;
+
+export interface JournalStreak {
+  type: JournalStreakType;
+  length: number;
+}
+
+export interface JournalPerformance {
+  month: string;
+  dateField: JournalPerformanceDateField;
+  hasData: boolean;
+  tradeCount: number;
+  winningTrades: number;
+  losingTrades: number;
+  /** @nullable */
+  netPnl: number | null;
+  /** @nullable */
+  winRate: number | null;
+  /** @nullable */
+  averageTradingDay: number | null;
+  bestDay: JournalDay | null;
+  worstDay: JournalDay | null;
+  daily: JournalDay[];
+  cumulative: JournalCumulativePoint[];
+  currentStreak: JournalStreak;
+  bestWinningStreak: number;
+  bestLosingStreak: number;
+  byStrategyVersion: PerformanceVersion[];
+}
+
+export interface JournalDayNote {
+  /** @pattern ^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$ */
+  date: string;
+  /** @nullable */
+  notes: string | null;
+}
+
+export interface JournalDayNoteInput {
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  notes: string | null;
+}
+
 export type AlertSourceType = typeof AlertSourceType[keyof typeof AlertSourceType];
 
 
@@ -2172,4 +2259,39 @@ to?: string;
  */
 limit?: number;
 };
+
+export type GetJournalPerformanceParams = {
+/**
+ * @pattern ^[0-9]{4}-(0[1-9]|1[0-2])$
+ */
+month: string;
+/**
+ * @minimum 1
+ */
+strategyId?: number;
+/**
+ * @minimum 1
+ */
+strategyVersionId?: number;
+/**
+ * @minimum 1
+ */
+marketId?: number;
+side?: GetJournalPerformanceSide;
+from?: string;
+to?: string;
+/**
+ * @minLength 1
+ * @maxLength 80
+ */
+timezone?: string;
+};
+
+export type GetJournalPerformanceSide = typeof GetJournalPerformanceSide[keyof typeof GetJournalPerformanceSide];
+
+
+export const GetJournalPerformanceSide = {
+  long: 'long',
+  short: 'short',
+} as const;
 

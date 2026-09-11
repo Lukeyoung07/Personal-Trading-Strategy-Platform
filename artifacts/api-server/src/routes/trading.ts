@@ -6,6 +6,7 @@ import {
   candlesTable,
   conditionsTable,
   marketsTable,
+  performanceRecordsTable,
   sourceInstrumentMappingsTable,
   strategiesTable,
   strategyConditionsTable,
@@ -48,6 +49,8 @@ import {
   DeleteTradeParams,
   DeleteStrategyConditionParams,
   GetDashboardSummaryResponse,
+  GetJournalPerformanceQueryParams,
+  GetJournalPerformanceResponse,
   GetPerformanceSummaryResponse,
   GetSettingsResponse,
   GetStrategyParams,
@@ -64,6 +67,9 @@ import {
   ListStrategyConditionsParams,
   ListStrategyConditionsResponse,
   ListTradesResponse,
+  UpdateJournalDayNoteBody,
+  UpdateJournalDayNoteParams,
+  UpdateJournalDayNoteResponse,
   UpdateAlertBody,
   UpdateAlertParams,
   UpdateAlertResponse,
@@ -252,6 +258,218 @@ function calculateJournalPerformance(rows: Array<{
     profitFactor: grossLoss > 0 ? roundMetric(grossProfit / grossLoss) : null,
     equityCurve,
     byStrategyVersion: breakdown,
+  };
+}
+
+type JournalPerformanceRow = {
+  trade: typeof tradesTable.$inferSelect;
+  strategyId: number;
+  strategyVersionId: number;
+  strategyName: string;
+  versionNumber: number;
+};
+
+type JournalDayAccumulator = {
+  date: string;
+  values: number[];
+  note: string | null;
+};
+
+function journalDateKey(value: Date, timeZone: string) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(value);
+    const year = parts.find(part => part.type === "year")?.value;
+    const month = parts.find(part => part.type === "month")?.value;
+    const day = parts.find(part => part.type === "day")?.value;
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
+  } catch {
+    // An invalid timezone should not make the journal unavailable.
+  }
+  return value.toISOString().slice(0, 10);
+}
+
+function dateOnlyKey(value: Date | undefined) {
+  return value ? value.toISOString().slice(0, 10) : undefined;
+}
+
+function journalDaySummary(day: JournalDayAccumulator) {
+  const winners = day.values.filter(value => value > 0);
+  const losers = day.values.filter(value => value < 0);
+  const pnl = day.values.reduce((total, value) => total + value, 0);
+  return {
+    date: day.date,
+    tradeCount: day.values.length,
+    winningTrades: winners.length,
+    losingTrades: losers.length,
+    pnl: roundMetric(pnl),
+    winRate: day.values.length ? roundMetric((winners.length / day.values.length) * 100) : null,
+    averageWinner: winners.length ? roundMetric(winners.reduce((total, value) => total + value, 0) / winners.length) : null,
+    averageLoser: losers.length ? roundMetric(losers.reduce((total, value) => total + value, 0) / losers.length) : null,
+    bestTrade: day.values.length ? roundMetric(Math.max(...day.values)) : null,
+    worstTrade: day.values.length ? roundMetric(Math.min(...day.values)) : null,
+    note: day.note,
+  };
+}
+
+function journalStreaks(days: Array<{ pnl: number }>) {
+  let currentType: "winning" | "losing" | "none" = "none";
+  let currentLength = 0;
+  let bestWinningStreak = 0;
+  let bestLosingStreak = 0;
+  for (const day of days) {
+    const nextType = day.pnl > 0 ? "winning" : day.pnl < 0 ? "losing" : "none";
+    if (nextType === "none") {
+      currentType = "none";
+      currentLength = 0;
+      continue;
+    }
+    if (currentType === nextType) {
+      currentLength += 1;
+    } else {
+      currentType = nextType;
+      currentLength = 1;
+    }
+    if (nextType === "winning") {
+      bestWinningStreak = Math.max(bestWinningStreak, currentLength);
+    } else {
+      bestLosingStreak = Math.max(bestLosingStreak, currentLength);
+    }
+  }
+  return {
+    currentStreak: { type: currentType, length: currentLength },
+    bestWinningStreak,
+    bestLosingStreak,
+  };
+}
+
+export function calculateJournalMonthPerformance(
+  rows: JournalPerformanceRow[],
+  notes: Map<string, string | null>,
+  params: {
+    month: string;
+    timezone: string;
+    strategyId?: number;
+    strategyVersionId?: number;
+    marketId?: number;
+    side?: "long" | "short";
+    from?: Date;
+    to?: Date;
+  },
+) {
+  const fromKey = dateOnlyKey(params.from);
+  const toKey = dateOnlyKey(params.to);
+  const filtered = rows
+    .filter(({ trade, strategyId: rowStrategyId, strategyVersionId: rowStrategyVersionId }) => {
+      if (params.strategyId != null && params.strategyId !== rowStrategyId) return false;
+      if (params.strategyVersionId != null && params.strategyVersionId !== rowStrategyVersionId) return false;
+      if (params.marketId != null && params.marketId !== trade.marketId) return false;
+      if (params.side != null && params.side !== trade.side) return false;
+      return true;
+    })
+    .map(({ trade, ...context }) => ({
+      ...context,
+      trade,
+      pnl: nullableNumber(trade.pnl),
+      timestamp: trade.closedAt ?? trade.createdAt,
+    }))
+    .filter((row): row is typeof row & { pnl: number } => row.pnl != null)
+    .map(row => ({ ...row, date: journalDateKey(row.timestamp, params.timezone) }))
+    .filter(row => {
+      if (!row.date.startsWith(`${params.month}-`)) return false;
+      if (fromKey && row.date < fromKey) return false;
+      if (toKey && row.date > toKey) return false;
+      return true;
+    })
+    .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+  const byDate = new Map<string, JournalDayAccumulator>();
+  for (const row of filtered) {
+    const existing = byDate.get(row.date) ?? { date: row.date, values: [], note: notes.get(row.date) ?? null };
+    existing.values.push(row.pnl);
+    byDate.set(row.date, existing);
+  }
+  for (const [date, note] of notes) {
+    if (!date.startsWith(`${params.month}-`)) continue;
+    if (fromKey && date < fromKey) continue;
+    if (toKey && date > toKey) continue;
+    if (!byDate.has(date)) {
+      byDate.set(date, { date, values: [], note });
+    }
+  }
+  const daily = [...byDate.values()]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(journalDaySummary);
+  const tradingDays = daily.filter(day => day.tradeCount > 0);
+  const pnlValues = filtered.map(row => row.pnl);
+  const winners = pnlValues.filter(value => value > 0);
+  const losers = pnlValues.filter(value => value < 0);
+  const netPnl = pnlValues.reduce((total, value) => total + value, 0);
+  let cumulativePnl = 0;
+  const cumulative = tradingDays.map(day => {
+    cumulativePnl += day.pnl;
+    return { date: day.date, cumulativePnl: roundMetric(cumulativePnl) };
+  });
+  const streaks = journalStreaks(tradingDays);
+  const bestDay = tradingDays.length ? tradingDays.reduce((best, day) => day.pnl > best.pnl ? day : best) : null;
+  const worstDay = tradingDays.length ? tradingDays.reduce((worst, day) => day.pnl < worst.pnl ? day : worst) : null;
+  const byVersion = new Map<number, {
+    strategyId: number;
+    strategyVersionId: number;
+    strategyName: string;
+    versionNumber: number;
+    values: number[];
+  }>();
+  for (const row of filtered) {
+    const existing = byVersion.get(row.strategyVersionId) ?? {
+      strategyId: row.strategyId,
+      strategyVersionId: row.strategyVersionId,
+      strategyName: row.strategyName,
+      versionNumber: row.versionNumber,
+      values: [],
+    };
+    existing.values.push(row.pnl);
+    byVersion.set(row.strategyVersionId, existing);
+  }
+  const byStrategyVersion = [...byVersion.values()].map(version => {
+    const versionWins = version.values.filter(value => value > 0).length;
+    return {
+      strategyId: version.strategyId,
+      strategyVersionId: version.strategyVersionId,
+      strategyName: version.strategyName,
+      versionNumber: version.versionNumber,
+      tradeCount: version.values.length,
+      winningTrades: versionWins,
+      losingTrades: version.values.filter(value => value < 0).length,
+      netPnl: roundMetric(version.values.reduce((total, value) => total + value, 0)),
+      winRate: version.values.length ? roundMetric((versionWins / version.values.length) * 100) : null,
+    };
+  });
+
+  return {
+    month: params.month,
+    dateField: "createdAtFallback" as const,
+    hasData: pnlValues.length > 0,
+    tradeCount: pnlValues.length,
+    winningTrades: winners.length,
+    losingTrades: losers.length,
+    netPnl: pnlValues.length ? roundMetric(netPnl) : null,
+    winRate: pnlValues.length ? roundMetric((winners.length / pnlValues.length) * 100) : null,
+    averageTradingDay: tradingDays.length ? roundMetric(netPnl / tradingDays.length) : null,
+    bestDay,
+    worstDay,
+    daily,
+    cumulative,
+    currentStreak: streaks.currentStreak,
+    bestWinningStreak: streaks.bestWinningStreak,
+    bestLosingStreak: streaks.bestLosingStreak,
+    byStrategyVersion,
   };
 }
 
@@ -1204,6 +1422,80 @@ router.delete("/trades/:tradeId", async (req, res): Promise<void> => {
     return;
   }
   res.sendStatus(204);
+});
+
+router.get("/journal/performance", async (req, res): Promise<void> => {
+  const parsed = GetJournalPerformanceQueryParams.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  if (parsed.data.from && parsed.data.to && parsed.data.from > parsed.data.to) {
+    res.status(400).json({ error: "The from date must be on or before the to date" });
+    return;
+  }
+  const rows = await db
+    .select({
+      trade: tradesTable,
+      strategyId: strategiesTable.id,
+      strategyVersionId: strategyVersionsTable.id,
+      strategyName: strategiesTable.name,
+      versionNumber: strategyVersionsTable.versionNumber,
+    })
+    .from(tradesTable)
+    .innerJoin(strategyVersionsTable, eq(tradesTable.strategyVersionId, strategyVersionsTable.id))
+    .innerJoin(strategiesTable, eq(strategyVersionsTable.strategyId, strategiesTable.id))
+    .where(eq(tradesTable.status, "closed"))
+    .orderBy(asc(tradesTable.closedAt), asc(tradesTable.createdAt));
+  const noteRows = await db
+    .select({ periodStart: performanceRecordsTable.periodStart, notes: performanceRecordsTable.notes })
+    .from(performanceRecordsTable);
+  const notes = new Map(noteRows.map(row => [dateOnlyKey(row.periodStart)!, row.notes]));
+  res.json(
+    GetJournalPerformanceResponse.parse(
+      calculateJournalMonthPerformance(rows, notes, parsed.data),
+    ),
+  );
+});
+
+router.put("/journal/day-notes/:date", async (req, res): Promise<void> => {
+  const params = UpdateJournalDayNoteParams.safeParse(req.params);
+  const body = UpdateJournalDayNoteBody.safeParse(req.body);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const periodStart = new Date(`${params.data.date}T00:00:00.000Z`);
+  const periodEnd = new Date(periodStart.getTime() + 24 * 60 * 60 * 1000);
+  const notes = body.data.notes?.trim() || null;
+  const [existing] = await db
+    .select({ id: performanceRecordsTable.id })
+    .from(performanceRecordsTable)
+    .where(eq(performanceRecordsTable.periodStart, periodStart));
+
+  if (!notes) {
+    if (existing) {
+      await db.delete(performanceRecordsTable).where(eq(performanceRecordsTable.id, existing.id));
+    }
+  } else if (existing) {
+    await db
+      .update(performanceRecordsTable)
+      .set({ notes })
+      .where(eq(performanceRecordsTable.id, existing.id));
+  } else {
+    await db.insert(performanceRecordsTable).values({
+      periodStart,
+      periodEnd,
+      tradeCount: 0,
+      netPnl: null,
+      notes,
+    });
+  }
+  res.json(UpdateJournalDayNoteResponse.parse({ date: params.data.date, notes }));
 });
 
 router.get("/performance/summary", async (_req, res): Promise<void> => {

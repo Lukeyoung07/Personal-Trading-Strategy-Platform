@@ -2119,6 +2119,135 @@ export const GetPerformanceSummaryResponse = zod.object({
 
 
 /**
+ * @summary Get selected-month journal performance
+ */
+export const getJournalPerformanceQueryMonthRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
+
+
+
+export const getJournalPerformanceQueryTimezoneDefault = `UTC`;
+export const getJournalPerformanceQueryTimezoneMax = 80;
+
+
+
+export const GetJournalPerformanceQueryParams = zod.object({
+  "month": zod.coerce.string().regex(getJournalPerformanceQueryMonthRegExp),
+  "strategyId": zod.coerce.number().int().min(1).optional(),
+  "strategyVersionId": zod.coerce.number().int().min(1).optional(),
+  "marketId": zod.coerce.number().int().min(1).optional(),
+  "side": zod.enum(['long', 'short']).optional(),
+  "from": zod.date().optional(),
+  "to": zod.date().optional(),
+  "timezone": zod.coerce.string().min(1).max(getJournalPerformanceQueryTimezoneMax).default(getJournalPerformanceQueryTimezoneDefault)
+})
+
+export const getJournalPerformanceResponseBestDayOneDateRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$');
+export const getJournalPerformanceResponseWorstDayOneDateRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$');
+export const getJournalPerformanceResponseDailyItemDateRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$');
+export const getJournalPerformanceResponseCumulativeItemDateRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$');
+
+
+export const GetJournalPerformanceResponse = zod.object({
+  "month": zod.string(),
+  "dateField": zod.enum(['closedAt', 'createdAtFallback']),
+  "hasData": zod.boolean(),
+  "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "netPnl": zod.number().nullable(),
+  "winRate": zod.number().nullable(),
+  "averageTradingDay": zod.number().nullable(),
+  "bestDay": zod.union([zod.object({
+  "date": zod.string().regex(getJournalPerformanceResponseBestDayOneDateRegExp),
+  "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "pnl": zod.number(),
+  "winRate": zod.number().nullable(),
+  "averageWinner": zod.number().nullable(),
+  "averageLoser": zod.number().nullable(),
+  "bestTrade": zod.number().nullable(),
+  "worstTrade": zod.number().nullable(),
+  "note": zod.string().nullable()
+}),zod.null()]),
+  "worstDay": zod.union([zod.object({
+  "date": zod.string().regex(getJournalPerformanceResponseWorstDayOneDateRegExp),
+  "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "pnl": zod.number(),
+  "winRate": zod.number().nullable(),
+  "averageWinner": zod.number().nullable(),
+  "averageLoser": zod.number().nullable(),
+  "bestTrade": zod.number().nullable(),
+  "worstTrade": zod.number().nullable(),
+  "note": zod.string().nullable()
+}),zod.null()]),
+  "daily": zod.array(zod.object({
+  "date": zod.string().regex(getJournalPerformanceResponseDailyItemDateRegExp),
+  "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "pnl": zod.number(),
+  "winRate": zod.number().nullable(),
+  "averageWinner": zod.number().nullable(),
+  "averageLoser": zod.number().nullable(),
+  "bestTrade": zod.number().nullable(),
+  "worstTrade": zod.number().nullable(),
+  "note": zod.string().nullable()
+})),
+  "cumulative": zod.array(zod.object({
+  "date": zod.string().regex(getJournalPerformanceResponseCumulativeItemDateRegExp),
+  "cumulativePnl": zod.number()
+})),
+  "currentStreak": zod.object({
+  "type": zod.enum(['winning', 'losing', 'none']),
+  "length": zod.number().int()
+}),
+  "bestWinningStreak": zod.number().int(),
+  "bestLosingStreak": zod.number().int(),
+  "byStrategyVersion": zod.array(zod.object({
+  "strategyId": zod.number().int(),
+  "strategyVersionId": zod.number().int(),
+  "strategyName": zod.string(),
+  "versionNumber": zod.number().int(),
+  "tradeCount": zod.number().int(),
+  "winningTrades": zod.number().int(),
+  "losingTrades": zod.number().int(),
+  "netPnl": zod.number().nullable(),
+  "winRate": zod.number().nullable()
+}))
+})
+
+
+/**
+ * @summary Save a journal day note
+ */
+export const updateJournalDayNotePathDateRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$');
+
+
+export const UpdateJournalDayNoteParams = zod.object({
+  "date": zod.coerce.string().regex(updateJournalDayNotePathDateRegExp)
+})
+
+export const updateJournalDayNoteBodyNotesMax = 2000;
+
+
+
+export const UpdateJournalDayNoteBody = zod.object({
+  "notes": zod.string().max(updateJournalDayNoteBodyNotesMax).nullable()
+})
+
+export const updateJournalDayNoteResponseDateRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$');
+
+
+export const UpdateJournalDayNoteResponse = zod.object({
+  "date": zod.string().regex(updateJournalDayNoteResponseDateRegExp),
+  "notes": zod.string().nullable()
+})
+
+
+/**
  * @summary List alerts
  */
 export const ListAlertsResponseItem = zod.object({

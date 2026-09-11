@@ -3,6 +3,7 @@ import { ArrowDownRight, ArrowUpRight, BookOpen, Plus, Trash2, X } from "lucide-
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetDashboardSummaryQueryKey,
+  getGetJournalPerformanceQueryKey,
   getGetPerformanceSummaryQueryKey,
   getListStrategiesQueryKey,
   getListStrategyVersionsQueryKey,
@@ -20,6 +21,7 @@ import {
   type Trade,
   type TradeInputRiskUnit,
 } from "@workspace/api-client-react";
+import { JournalPerformance } from "@/components/journal-performance";
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-5" onMouseDown={event => event.target === event.currentTarget && onClose()}>
@@ -102,6 +104,7 @@ function TradeEditor({
     };
     const done = () => {
       queryClient.invalidateQueries({ queryKey: getListTradesQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetJournalPerformanceQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetPerformanceSummaryQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListStrategiesQueryKey() });
@@ -178,23 +181,30 @@ export function TradeJournalPage() {
   const [modal, setModal] = useState<Trade | "new" | null>(null);
   const [confirm, setConfirm] = useState<Trade | null>(null);
   const [filter, setFilter] = useState("all");
+  const [month, setMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
   const rows = useMemo(() => (trades.data || []).filter(trade => filter === "all" || trade.status === filter), [filter, trades.data]);
   const deleteTrade = () => {
     if (!confirm) return;
     remove.mutate({ tradeId: confirm.id }, { onSuccess: () => {
       setConfirm(null);
       queryClient.invalidateQueries({ queryKey: getListTradesQueryKey() });
+       queryClient.invalidateQueries({ queryKey: getGetJournalPerformanceQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetPerformanceSummaryQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListStrategiesQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListStrategyVersionsQueryKey(confirm.strategyId) });
     } });
   };
-  return <div className="page-wrap">
+   return <div className="page-wrap">
     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-8">
       <div><div className="eyebrow mb-3">Journal</div><h1 className="display text-3xl md:text-4xl font-bold">Trade journal</h1><p className="text-muted-foreground text-sm mt-3 max-w-2xl">Every trade is stored against the exact saved strategy version used.</p></div>
       <button className="btn btn-primary" onClick={() => setModal("new")} disabled={!strategies.data?.length} data-testid="button-create-trade"><Plus size={15} /> Record trade</button>
     </div>
+     <JournalPerformance month={month} setMonth={setMonth} strategies={strategies.data || []} markets={markets.data || []} trades={trades.data || []} />
+     <div className="journal-trades-heading flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><div className="eyebrow">The record</div><h2 className="font-semibold mt-2">Trade entries</h2></div><div className="text-xs text-muted-foreground">Edit or remove the source records behind the review.</div></div>
     <div className="flex gap-2 mb-5 overflow-x-auto">{["all", "planned", "open", "closed", "cancelled"].map(status => <button key={status} className={`btn whitespace-nowrap ${filter === status ? "btn-primary" : "btn-secondary"}`} onClick={() => setFilter(status)}>{status === "all" ? "All" : status}</button>)}</div>
      {trades.isError || markets.isError || strategies.isError ? <div className="panel p-10 text-center"><p className="text-sm text-muted-foreground">The journal could not be loaded.</p><button className="btn btn-secondary mt-4" onClick={() => { trades.refetch(); markets.refetch(); strategies.refetch(); }}>Try again</button></div> : trades.isLoading || markets.isLoading || strategies.isLoading ? <div className="panel p-10 text-center text-sm text-muted-foreground">Loading journal…</div> : rows.length ? <div className="panel divide-y divide-border">{rows.map(trade => <TradeRow key={trade.id} trade={trade} onEdit={() => setModal(trade)} onDelete={() => setConfirm(trade)} />)}</div> : <div className="panel empty-grid p-10 md:p-14 text-center"><BookOpen size={22} className="text-primary mx-auto" /><h2 className="font-semibold text-lg mt-5">{filter === "all" ? "No recorded trades yet" : "Nothing in this view"}</h2><p className="text-sm text-muted-foreground mt-2">{strategies.data?.length ? "Record a trade and select the exact strategy version used." : "Create a strategy before recording a trade."}</p></div>}
     {modal && <Modal title={modal === "new" ? "Record trade" : "Edit trade"} onClose={() => setModal(null)}><TradeEditor trade={modal === "new" ? null : modal} markets={markets.data || []} strategies={strategies.data || []} onClose={() => setModal(null)} /></Modal>}

@@ -11,3 +11,4 @@
 - [Assistant backtest context](assistant-backtest-context.md) — result explanations require an explicit completed persisted backtest and honest no-data handling.
 - [Strategy builder assistant handoff](strategy-builder-assistant-handoff.md) — AI drafts enter a forced review state; saving remains explicit and versioned.
 - [Monitoring alert history](monitoring-alert-history.md) — monitoring alerts are in-app transition history with acknowledgement, not external delivery or trade execution.
+- [Journal performance semantics](journal-performance-semantics.md) — daily/monthly journal analytics use realized P/L dates with timezone-aware closedAt fallback and separate day notes.

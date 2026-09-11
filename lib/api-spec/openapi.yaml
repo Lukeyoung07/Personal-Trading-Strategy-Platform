@@ -1091,6 +1091,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PerformanceSummary"
+  /journal/performance:
+    get:
+      operationId: getJournalPerformance
+      tags: [performance]
+      summary: Get selected-month journal performance
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+        - name: strategyId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: strategyVersionId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: marketId
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: side
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [long, short]
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+        - name: timezone
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 80, default: UTC }
+      responses:
+        "200":
+          description: Selected-month journal performance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalPerformance"
+  /journal/day-notes/{date}:
+    put:
+      operationId: updateJournalDayNote
+      tags: [performance]
+      summary: Save a journal day note
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JournalDayNoteInput"
+      responses:
+        "200":
+          description: Saved journal day note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalDayNote"
   /alerts:
     get:
       operationId: listAlerts
@@ -2295,6 +2369,83 @@ components:
         losingTrades: { type: integer }
         netPnl: { type: ["number", "null"] }
         winRate: { type: ["number", "null"] }
+    JournalPerformance:
+      type: object
+      required: [month, dateField, hasData, tradeCount, winningTrades, losingTrades, netPnl, winRate, averageTradingDay, bestDay, worstDay, daily, cumulative, currentStreak, bestWinningStreak, bestLosingStreak, byStrategyVersion]
+      properties:
+        month: { type: string }
+        dateField: { type: string, enum: [closedAt, createdAtFallback] }
+        hasData: { type: boolean }
+        tradeCount: { type: integer }
+        winningTrades: { type: integer }
+        losingTrades: { type: integer }
+        netPnl: { type: ["number", "null"] }
+        winRate: { type: ["number", "null"] }
+        averageTradingDay: { type: ["number", "null"] }
+        bestDay:
+          anyOf:
+            - $ref: "#/components/schemas/JournalDay"
+            - type: "null"
+        worstDay:
+          anyOf:
+            - $ref: "#/components/schemas/JournalDay"
+            - type: "null"
+        daily:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalDay"
+        cumulative:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalCumulativePoint"
+        currentStreak:
+          $ref: "#/components/schemas/JournalStreak"
+        bestWinningStreak: { type: integer }
+        bestLosingStreak: { type: integer }
+        byStrategyVersion:
+          type: array
+          items:
+            $ref: "#/components/schemas/PerformanceVersion"
+    JournalDay:
+      type: object
+      required: [date, tradeCount, winningTrades, losingTrades, pnl, winRate, averageWinner, averageLoser, bestTrade, worstTrade, note]
+      properties:
+        date: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$" }
+        tradeCount: { type: integer }
+        winningTrades: { type: integer }
+        losingTrades: { type: integer }
+        pnl: { type: number }
+        winRate: { type: ["number", "null"] }
+        averageWinner: { type: ["number", "null"] }
+        averageLoser: { type: ["number", "null"] }
+        bestTrade: { type: ["number", "null"] }
+        worstTrade: { type: ["number", "null"] }
+        note: { type: ["string", "null"] }
+    JournalCumulativePoint:
+      type: object
+      required: [date, cumulativePnl]
+      properties:
+        date: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$" }
+        cumulativePnl: { type: number }
+    JournalStreak:
+      type: object
+      required: [type, length]
+      properties:
+        type:
+          type: string
+          enum: [winning, losing, none]
+        length: { type: integer }
+    JournalDayNote:
+      type: object
+      required: [date, notes]
+      properties:
+        date: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$" }
+        notes: { type: ["string", "null"] }
+    JournalDayNoteInput:
+      type: object
+      required: [notes]
+      properties:
+        notes: { type: ["string", "null"], maxLength: 2000 }
     Alert:
       type: object
       required: [id, name, marketId, marketSymbol, monitorSessionId, strategyVersionId, sourceType, condition, threshold, status, message, triggeredAt, acknowledgedAt, createdAt, updatedAt]

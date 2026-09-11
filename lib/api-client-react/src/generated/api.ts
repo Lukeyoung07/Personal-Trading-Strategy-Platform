@@ -42,10 +42,14 @@ import type {
   EconomicEventProviderStatus,
   EconomicEventUpdate,
   EconomicEventsList,
+  GetJournalPerformanceParams,
   HealthStatus,
   Instrument,
   InstrumentInput,
   InstrumentUpdate,
+  JournalDayNote,
+  JournalDayNoteInput,
+  JournalPerformance,
   ListCandlesParams,
   ListEconomicEventsParams,
   Market,
@@ -4927,6 +4931,162 @@ export function useGetPerformanceSummary<TData = Awaited<ReturnType<typeof getPe
 
 
 
+
+export const getGetJournalPerformanceUrl = (params: GetJournalPerformanceParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/journal/performance?${stringifiedParams}` : `/api/journal/performance`
+}
+
+/**
+ * @summary Get selected-month journal performance
+ */
+export const getJournalPerformance = async (params: GetJournalPerformanceParams, options?: Parameters<typeof customFetch>[1]): Promise<JournalPerformance> => {
+
+  return customFetch<JournalPerformance>(getGetJournalPerformanceUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetJournalPerformanceQueryKey = (params?: GetJournalPerformanceParams,) => {
+    return [
+    `/api/journal/performance`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetJournalPerformanceQueryOptions = <TData = Awaited<ReturnType<typeof getJournalPerformance>>, TError = ErrorType<unknown>>(params: GetJournalPerformanceParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getJournalPerformance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetJournalPerformanceQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getJournalPerformance>>> = ({ signal }) => getJournalPerformance(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getJournalPerformance>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetJournalPerformanceQueryResult = NonNullable<Awaited<ReturnType<typeof getJournalPerformance>>>
+export type GetJournalPerformanceQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get selected-month journal performance
+ */
+
+export function useGetJournalPerformance<TData = Awaited<ReturnType<typeof getJournalPerformance>>, TError = ErrorType<unknown>>(
+ params: GetJournalPerformanceParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getJournalPerformance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetJournalPerformanceQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateJournalDayNoteUrl = (date: string,) => {
+
+
+
+
+  return `/api/journal/day-notes/${date}`
+}
+
+/**
+ * @summary Save a journal day note
+ */
+export const updateJournalDayNote = async (date: string,
+    journalDayNoteInput: JournalDayNoteInput, options?: Parameters<typeof customFetch>[1]): Promise<JournalDayNote> => {
+
+  return customFetch<JournalDayNote>(getUpdateJournalDayNoteUrl(date),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(journalDayNoteInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateJournalDayNoteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateJournalDayNote>>, TError,{date: string;data: BodyType<JournalDayNoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateJournalDayNote>>, TError,{date: string;data: BodyType<JournalDayNoteInput>}, TContext> => {
+
+const mutationKey = ['updateJournalDayNote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateJournalDayNote>>, {date: string;data: BodyType<JournalDayNoteInput>}> = (props) => {
+          const {date,data} = props ?? {};
+
+          return  updateJournalDayNote(date,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateJournalDayNoteMutationResult = NonNullable<Awaited<ReturnType<typeof updateJournalDayNote>>>
+    export type UpdateJournalDayNoteMutationBody = BodyType<JournalDayNoteInput>
+    export type UpdateJournalDayNoteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save a journal day note
+ */
+export const useUpdateJournalDayNote = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateJournalDayNote>>, TError,{date: string;data: BodyType<JournalDayNoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateJournalDayNote>>,
+        TError,
+        {date: string;data: BodyType<JournalDayNoteInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateJournalDayNoteMutationOptions(options));
+    }
 
 export const getListAlertsUrl = () => {
 
