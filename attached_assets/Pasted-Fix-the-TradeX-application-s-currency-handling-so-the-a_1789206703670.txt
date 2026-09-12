@@ -1,0 +1,69 @@
+Fix the TradeX application's currency handling so the application's account, trading performance, backtesting, journal, and monetary UI use GBP (£) as the default display currency.
+
+IMPORTANT:
+This is a currency-display and monetary-accounting fix, not a change to market-data pricing.
+
+Use GBP (£) consistently anywhere TradeX displays user/account monetary values, including:
+
+- Backtesting Net P/L
+- Gross profit/loss
+- Average winner
+- Average loser
+- Largest winner
+- Largest loser
+- Drawdown monetary values
+- Equity/account balance values
+- Trade P/L
+- Trade Journal monetary values
+- Strategy performance monetary values
+- Risk amounts
+- Position/account monetary values
+- Any other user-facing monetary value representing the user's trading account or P/L
+
+Do NOT blindly replace "$" with "£".
+
+First audit the application for how currency is currently represented and formatted. Identify the shared currency/number-formatting logic and make the smallest correct architectural change so GBP is handled centrally rather than patching individual screens.
+
+Requirements:
+
+1. GBP must be the application's default account/display currency.
+2. Use the proper GBP symbol "£" and GBP formatting consistently.
+3. Remove hard-coded "$" formatting from account/P&L UI where the value should use the application currency.
+4. Ensure the Backtesting results page shown at /backtesting/:id uses GBP.
+5. Ensure all backtest calculations continue using their existing numerical values and logic. Do not alter trade-entry logic, position sizing, stop-loss logic, take-profit logic, win rate, profit factor, or the number of trades.
+6. Percentage values such as 1% stop loss and 2% take profit must remain percentages.
+7. Market prices must not be incorrectly converted simply because the application's account currency is GBP.
+8. XAUUSD and other instrument symbols/prices must retain their correct market-data meaning.
+9. If the application already has a currency setting/configuration, make GBP the correct default and use that setting throughout the application instead of creating a second competing currency system.
+10. Keep the implementation compatible with future currencies so this is not hard-coded into every component.
+11. Do not modify existing strategies, strategy versions, trades, backtests, monitoring records, alerts, or historical trading data.
+12. Do not create new trading records or run new backtests as part of this change.
+
+Also check for currency formatting in:
+- Dashboard
+- Strategy Library
+- Strategy Version pages
+- Backtesting
+- Trade Journal
+- Performance
+- Monitoring
+- Alerts
+- Any reusable P/L, balance, equity, or monetary components
+
+Testing requirements:
+
+- Add/update tests proving GBP formatting is used for account/P&L monetary values.
+- Test that percentage values remain percentages.
+- Test that market price values are not accidentally treated as account-currency values.
+- Test that negative P/L formats correctly, e.g. -£428.32.
+- Test that positive P/L formats correctly, e.g. £92.61.
+- Test that existing backtest calculations are unchanged.
+- Run the full relevant test suites.
+- Run typechecks.
+- Run production builds.
+- Run git diff --check.
+- Verify the backtesting page in the browser after the change.
+
+Before finishing, search the codebase for remaining hard-coded "$" usages and determine whether each one should remain or be converted to the centralized currency formatter.
+
+Do not make unrelated changes.
