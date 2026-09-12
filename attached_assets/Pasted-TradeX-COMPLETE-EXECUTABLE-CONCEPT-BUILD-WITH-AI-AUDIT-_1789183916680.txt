@@ -1,0 +1,649 @@
+TradeX — COMPLETE EXECUTABLE CONCEPT & BUILD WITH AI AUDIT
+
+IMPORTANT:
+Do NOT create a new trading strategy.
+
+This is a PLATFORM-WIDE audit and repair of the Trading Concept Library, Strategy Builder, Build with AI mapping, Backtesting, Monitoring, and risk-management representations.
+
+I do NOT want to keep fixing concepts one at a time.
+
+The objective is to make the entire existing executable-concept system internally consistent so that any concept marked as EXECUTABLE can actually be:
+
+Build with AI
+→ Draft
+→ Strategy Builder
+→ Strategy Version
+→ Backtest
+→ Monitoring
+
+without incorrectly becoming REVIEW REQUIRED.
+
+--------------------------------------------------
+PRIMARY OBJECTIVE
+--------------------------------------------------
+
+Perform a complete inventory of every concept currently present in the Trading Concept Library and classify each one as:
+
+1. EXECUTABLE AND VERIFIED
+2. EXECUTABLE BUT BROKEN / INCOMPLETE
+3. NON-EXECUTABLE / REVIEW REQUIRED
+
+Then FIX EVERY concept in category 2.
+
+Do NOT stop after finding the first problem.
+
+Do NOT wait for me to give you individual concepts.
+
+Inspect the entire existing registry and Builder architecture.
+
+--------------------------------------------------
+CRITICAL RULE
+--------------------------------------------------
+
+Do NOT remove REVIEW REQUIRED simply to make the UI look better.
+
+A concept may only become EXECUTABLE if there is a deterministic implementation that can actually be evaluated by the existing backtesting and monitoring architecture.
+
+However:
+
+If a concept is already intended to be executable in the Trading Concept Library, but its mapping, parameters, evaluator, Builder representation, or Build with AI normalization is broken, FIX IT.
+
+Do not leave genuinely executable concepts incorrectly marked REVIEW REQUIRED.
+
+--------------------------------------------------
+FULL CONCEPT INVENTORY
+--------------------------------------------------
+
+Audit every existing concept, including but not limited to:
+
+- EMA
+- SMA
+- RSI
+- FVG
+- FVG Retest
+- Displacement
+- Market Structure
+- Higher-Timeframe Bias
+- New York Session
+- London Session
+- Asia Session
+- Liquidity concepts
+- Session concepts
+- Structure concepts
+- Any existing ICT/SMC concepts
+- Any existing indicator concepts
+- Any existing price-action concepts
+- Any existing risk-management concepts
+
+Do not assume the examples above are the complete registry.
+
+Read the actual canonical concept registry and Builder catalog.
+
+--------------------------------------------------
+FOR EACH CONCEPT
+--------------------------------------------------
+
+For every concept determine:
+
+1. Does it exist in the canonical registry?
+2. Is it marked executable?
+3. Does it have a Builder representation?
+4. Does it have parameter normalization?
+5. Does it have API/Zod/OpenAPI representation?
+6. Does it have a deterministic evaluator?
+7. Does backtesting evaluate it?
+8. Does monitoring evaluate it?
+9. Can Build with AI map it correctly?
+10. Can the Builder serialize it correctly?
+11. Can a strategy version preserve its parameters?
+12. Does it incorrectly become REVIEW REQUIRED?
+
+Fix any inconsistency.
+
+--------------------------------------------------
+BUILD WITH AI
+--------------------------------------------------
+
+Build with AI must use the canonical concept registry.
+
+It must NEVER have a separate unofficial list of executable concepts.
+
+There must be ONE source of truth.
+
+For every executable concept:
+
+User request
+→ canonical concept
+→ normalized parameters
+→ Builder payload
+
+must work correctly.
+
+Do not allow the model to invent alternative concepts.
+
+Do not allow positional mapping.
+
+Do not allow related concepts to be substituted.
+
+Do not allow model-generated authorization to override the original user request.
+
+Preserve the authorization system that was already implemented.
+
+--------------------------------------------------
+INTERNAL PARAMETERS VS CONCEPTS
+--------------------------------------------------
+
+Fix the distinction between:
+
+CONCEPTS
+
+and
+
+INTERNAL PARAMETERS.
+
+Example:
+
+Displacement
+
+may internally use:
+
+- ATR period
+- Minimum body multiple
+- Close-location threshold
+
+Those are PARAMETERS OF DISPLACEMENT.
+
+They must NOT become separate strategy concepts.
+
+Likewise, any other concept-specific calculations must remain parameters of their parent concept.
+
+Do not create duplicate concepts merely because an evaluator uses an indicator internally.
+
+--------------------------------------------------
+PARAMETER HANDLING
+--------------------------------------------------
+
+Every executable concept must correctly preserve:
+
+- Periods
+- Thresholds
+- Polarity
+- Direction
+- Timeframe
+- Lookback
+- Session
+- Retest settings
+- Other concept-specific parameters
+
+If the user explicitly provides a parameter, preserve it exactly.
+
+If the user does not provide one, use the canonical default.
+
+Do not invent additional parameters.
+
+--------------------------------------------------
+DIRECTION HANDLING
+--------------------------------------------------
+
+Correctly support:
+
+- Long
+- Short
+- Both
+
+Where a concept is inherently directional, ensure bullish/bearish versions are represented correctly.
+
+Do not accidentally create:
+
+Long + Short + unrelated condition
+
+when the user requested a single direction.
+
+--------------------------------------------------
+TIMEFRAME HANDLING
+--------------------------------------------------
+
+Only use requested timeframes.
+
+If the concept supports a timeframe parameter, preserve it.
+
+If the concept requires another timeframe by definition, document that dependency explicitly rather than silently inventing it.
+
+Example:
+
+A request for:
+
+"5m EMA 20"
+
+must not silently become:
+
+5m EMA 20
++
+15m bias
++
+1H structure
+
+unless the user explicitly requested those things.
+
+--------------------------------------------------
+SESSION CONCEPTS
+--------------------------------------------------
+
+Verify all existing session concepts.
+
+Examples:
+
+- New York
+- London
+- Asia
+
+Make sure session conditions have:
+
+- deterministic start/end
+- correct timezone handling
+- daylight-saving handling where applicable
+- Builder representation
+- Backtest evaluator
+- Monitoring evaluator
+- Build with AI mapping
+
+Do not hard-code one instrument.
+
+--------------------------------------------------
+FVG CONCEPTS
+--------------------------------------------------
+
+Audit:
+
+- Bullish FVG
+- Bearish FVG
+- FVG Retest
+
+Make sure formation and retest use deterministic closed-candle logic.
+
+Make sure the Builder can represent:
+
+- polarity
+- timeframe
+- retest rules
+- invalidation
+
+Do not allow FVG concepts to silently introduce:
+
+- SMT
+- liquidity sweeps
+- structure
+- HTF bias
+- AMD
+- PO3
+
+--------------------------------------------------
+DISPLACEMENT
+--------------------------------------------------
+
+Keep the existing executable Displacement implementation if it is correct.
+
+Current canonical definition:
+
+- ATR period: 14
+- Minimum body: 1.5 × prior ATR
+- Minimum close location: 0.75
+
+These are displacement parameters.
+
+Do NOT expose ATR as a separate strategy concept.
+
+Verify:
+
+- bullish displacement
+- bearish displacement
+- direction handling
+- timeframe handling
+- backtest evaluator
+- monitoring evaluator
+- Builder controls
+- Build with AI mapping
+
+--------------------------------------------------
+RISK MANAGEMENT
+--------------------------------------------------
+
+Audit risk management separately from entry concepts.
+
+Do NOT force risk management into the normal entry-condition registry if the architecture has a dedicated risk/exit representation.
+
+Verify that the system can represent supported:
+
+- Stop Loss
+- Take Profit
+- Risk/Reward
+- Structural stops
+- FVG-based stops
+- Other currently supported risk rules
+
+For every risk rule that the Builder already supports:
+
+Build with AI must map it correctly.
+
+Example:
+
+"2R take profit"
+
+must become an actual 2R risk-management setting.
+
+It must NOT become:
+
+- an entry condition
+- a generic review item
+- a separate unsupported concept
+
+Likewise:
+
+"stop below FVG"
+
+must map to the supported FVG/structural stop representation if that functionality exists.
+
+--------------------------------------------------
+CONTINUATION
+--------------------------------------------------
+
+Do NOT invent a definition for "Continuation".
+
+If it is currently non-executable and there is no objective canonical definition, leave it REVIEW REQUIRED.
+
+However, ensure that:
+
+- Explicitly requested Continuation is preserved as REVIEW REQUIRED.
+- Model-invented Continuation is removed.
+- Continuation does not cause unrelated concepts to be added.
+- The UI explains that the concept is unsupported rather than implying the entire strategy is invalid.
+
+Do NOT use Continuation as a reason to mark otherwise executable concepts as unsupported.
+
+--------------------------------------------------
+UNSUPPORTED CONCEPTS
+--------------------------------------------------
+
+Unsupported concepts should remain REVIEW REQUIRED.
+
+But the review status must apply ONLY to the unsupported concept.
+
+Example:
+
+User requests:
+
+"EMA 20 + SMT divergence"
+
+If EMA 20 is executable and SMT is unsupported:
+
+EMA 20
+→ EXECUTABLE
+
+SMT divergence
+→ REVIEW REQUIRED
+
+Do NOT make the entire strategy appear unsupported.
+
+Do NOT replace SMT with another concept.
+
+--------------------------------------------------
+BUILD WITH AI DRAFT VALIDATION
+--------------------------------------------------
+
+Before a draft is returned to the UI:
+
+1. Extract the user's explicitly requested concepts.
+2. Resolve them against the canonical registry.
+3. Normalize parameters.
+4. Determine whether each concept is executable.
+5. Remove unauthorized model-generated concepts.
+6. Preserve explicitly requested unsupported concepts as REVIEW REQUIRED.
+7. Validate the final draft.
+8. Return the draft.
+
+Every executable concept must have an authorization trace.
+
+Every REVIEW REQUIRED concept must have a reason.
+
+No concept should become REVIEW REQUIRED merely because of a broken mapping.
+
+--------------------------------------------------
+FINAL AUTHORIZATION
+--------------------------------------------------
+
+Preserve the authorization pipeline already implemented.
+
+Every condition must answer:
+
+"Which original user-requested concept authorized this condition?"
+
+If there is no answer:
+
+REMOVE IT.
+
+Do not allow downstream Builder/import/session logic to reintroduce it.
+
+--------------------------------------------------
+END-TO-END TEST MATRIX
+--------------------------------------------------
+
+Create temporary disposable tests covering EVERY executable concept in the canonical registry.
+
+For each concept:
+
+1. Build with AI request
+2. Generated draft
+3. Builder payload
+4. Strategy creation
+5. Version creation
+6. Backtest compatibility
+7. Monitoring compatibility
+
+Verify the concept survives all stages with the correct parameters.
+
+Do NOT create permanent strategies.
+
+Delete all temporary test data afterward.
+
+--------------------------------------------------
+MINIMUM AI REGRESSION TESTS
+--------------------------------------------------
+
+Include:
+
+"Create an XAUUSD 5m strategy using EMA 20."
+
+"Create an XAUUSD 5m strategy using RSI below 30."
+
+"Create an XAUUSD 5m strategy using bullish FVG retest."
+
+"Create an XAUUSD 5m strategy using bearish FVG retest."
+
+"Create an XAUUSD 5m strategy using bullish displacement."
+
+"Create an XAUUSD 5m strategy using bearish displacement."
+
+"Create an XAUUSD 5m strategy using New York Session."
+
+"Create an XAUUSD 5m strategy using bullish FVG retest and bullish displacement."
+
+"Create an XAUUSD 5m strategy using EMA 20 and RSI below 30."
+
+"Create an XAUUSD 5m strategy using EMA 20. Do not add risk management."
+
+"Create an XAUUSD 5m strategy using bullish FVG retest with a 2R take profit."
+
+"Create an XAUUSD 5m strategy using bullish FVG retest with a stop below the FVG."
+
+"Create an XAUUSD 5m strategy using SMT divergence."
+
+The last test must preserve SMT as REVIEW REQUIRED if SMT is genuinely unsupported.
+
+--------------------------------------------------
+ADVERSARIAL TESTS
+--------------------------------------------------
+
+Test that the model cannot introduce unrelated concepts.
+
+Examples:
+
+"Only use EMA 20."
+
+Must NOT produce:
+
+- RSI
+- FVG
+- SMT
+- HTF bias
+- AMD
+- PO3
+- liquidity
+- displacement
+
+"Only use bullish FVG retest."
+
+Must NOT produce:
+
+- HTF bias
+- SMT
+- AMD
+- PO3
+- liquidity sweep
+- displacement unless explicitly requested
+
+--------------------------------------------------
+BACKTEST VALIDATION
+--------------------------------------------------
+
+For every concept classified as EXECUTABLE:
+
+Confirm that it can actually be evaluated by the backtesting engine.
+
+No executable concept may exist only as UI metadata.
+
+No concept may claim to be executable while returning:
+
+"Review Required"
+
+because the evaluator, mapping, schema, or Builder implementation is incomplete.
+
+--------------------------------------------------
+MONITORING VALIDATION
+--------------------------------------------------
+
+Use the same canonical evaluator architecture for monitoring.
+
+Do not create separate definitions for backtesting and monitoring.
+
+The same concept and parameters must mean the same thing in both systems.
+
+--------------------------------------------------
+REGRESSION PROTECTION
+--------------------------------------------------
+
+Add permanent tests so future changes cannot silently break executable concept mappings.
+
+Tests must detect:
+
+- Missing registry entries
+- Missing Builder mappings
+- Missing evaluators
+- Missing parameter normalization
+- Build with AI mapping failures
+- Incorrect REVIEW REQUIRED status
+- Unauthorized condition insertion
+- Parameter loss
+- Direction loss
+- Timeframe loss
+- Risk-management mapping failures
+
+--------------------------------------------------
+IMPORTANT — DO NOT OVERWRITE WORKING SYSTEMS
+--------------------------------------------------
+
+Do NOT change:
+
+- Existing backtesting logic unless required to make an existing executable concept work
+- Existing monitoring logic unless required
+- Alerts
+- Economic Calendar
+- Dukascopy
+- BiQuote
+- Historical data
+- Existing strategies
+- Existing versions
+- Existing trades
+- Existing backtests
+
+Do not alter existing user trading data.
+
+--------------------------------------------------
+VALIDATION COMMANDS
+--------------------------------------------------
+
+Run:
+
+- API tests
+- Frontend tests
+- Root/library typecheck
+- API typecheck
+- Frontend typecheck
+- API production build
+- Frontend production build
+- git diff --check
+
+Also verify:
+
+- Build with AI UI
+- Strategy Builder
+- Backtesting compatibility
+- Monitoring compatibility
+- Browser console
+- API logs
+
+--------------------------------------------------
+FINAL REPORT
+--------------------------------------------------
+
+The final report MUST include a complete table:
+
+Concept | Status Before | Status After | Builder | Backtest | Monitoring | Build with AI
+
+Use:
+
+EXECUTABLE
+BROKEN → FIXED
+REVIEW REQUIRED
+
+Do not simply report the number of tests passed.
+
+For every concept changed, explain:
+
+1. What was broken.
+2. What was fixed.
+3. What its canonical executable definition is.
+4. What parameters it supports.
+5. How Build with AI maps it.
+6. How Backtesting evaluates it.
+7. How Monitoring evaluates it.
+
+For every concept remaining REVIEW REQUIRED:
+
+Explain exactly why it cannot currently be made executable without inventing a trading rule.
+
+FINAL ACCEPTANCE CRITERION:
+
+When this task is complete, I should NOT need to keep coming back and asking you to fix individual executable concepts.
+
+Every concept that the application claims is executable must work consistently across:
+
+Trading Concept Library
+→ Build with AI
+→ Strategy Builder
+→ Strategy Version
+→ Backtesting
+→ Strategy Monitoring
+
+No executable concept should incorrectly appear as REVIEW REQUIRED.
+
+Do not claim completion until the entire canonical registry has been audited.
