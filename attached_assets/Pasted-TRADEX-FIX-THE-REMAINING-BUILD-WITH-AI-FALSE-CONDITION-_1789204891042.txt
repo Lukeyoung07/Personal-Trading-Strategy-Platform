@@ -1,0 +1,389 @@
+TRADEX — FIX THE REMAINING BUILD WITH AI FALSE-CONDITION BUG
+
+The canonical Trading Concept Library and lifecycle integration are already
+implemented and verified.
+
+Do NOT redesign the Trading Concept Library again.
+
+There is now a specific remaining defect in Build with AI.
+
+I tested this exact request:
+
+"Create a XAUUSD 5-minute strategy called XAUUSD 5M Breakout Test.
+
+Direction: Both long and short.
+
+LONG ENTRY:
+- Use the Breakout concept.
+- A closed 5-minute candle must close above the previous closed 5-minute candle's high.
+- Enter long at the close of the breakout candle.
+
+SHORT ENTRY:
+- Use the Breakout concept.
+- A closed 5-minute candle must close below the previous closed 5-minute candle's low.
+- Enter short at the close of the breakout candle.
+
+RISK MANAGEMENT:
+- Stop loss: 1%
+- Take profit: 2%
+
+IMPORTANT:
+- Use ONLY the Breakout concept and the specified risk rules.
+- Do not add EMA, SMA, RSI, FVG, FVG Retest, Displacement,
+  Liquidity Sweep, SMT, AMD/Power of 3, sessions, HTF bias,
+  or any other concept.
+- Evaluate every eligible closed 5-minute candle historically.
+- Allow multiple independent trades throughout the backtest.
+- Do not stop after the first trade.
+- Do not artificially limit the number of trades.
+- Do not use future candles to determine whether an entry occurred."
+
+The generated draft incorrectly contained:
+
+- Breakout - Short Entry
+- EMA condition
+- SMA condition
+- RSI condition
+- Fair Value Gap Retest
+- Displacement
+- Liquidity Sweep
+- SMT Divergence
+- AMD / Power of 3
+- Higher Timeframe Bias
+
+It also incorrectly produced:
+
+- Concept "AMD / Power of 3" is not in the Trading Concept Library.
+
+This is unacceptable because the user explicitly prohibited these concepts.
+
+==================================================
+ROOT PROBLEM TO INVESTIGATE
+==================================================
+
+Trace the COMPLETE Build with AI request lifecycle and determine exactly
+where the unwanted conditions are entering the draft.
+
+Inspect:
+
+1. User request
+2. Prompt construction
+3. Model response
+4. Model structured output
+5. Concept extraction
+6. Canonical registry resolution
+7. Authorization
+8. Normalization
+9. Deduplication
+10. Relationship handling
+11. Risk-rule handling
+12. Session/state storage
+13. Final draft returned to the frontend
+14. Builder handoff
+
+Do not assume the model is the only source of the problem.
+
+Log/inspect the intermediate representations during development using
+disposable test data.
+
+==================================================
+CRITICAL RULE
+==================================================
+
+Build with AI must be REQUEST-DRIVEN.
+
+The model may understand a concept, but it must NOT be allowed to invent
+additional executable conditions merely because they are commonly associated
+with the requested strategy.
+
+For example:
+
+User requests:
+
+"Breakout"
+
+The resulting executable concept set must be:
+
+Breakout
+
+NOT:
+
+Breakout
++ EMA
++ SMA
++ RSI
++ FVG
++ Displacement
++ Liquidity Sweep
++ SMT
++ AMD
++ HTF Bias
+
+unless the user explicitly requested those concepts.
+
+==================================================
+CANONICAL AUTHORIZATION
+==================================================
+
+The canonical registry must remain the final authority.
+
+A generated condition should survive only when:
+
+1. It corresponds to a concept explicitly requested by the user, OR
+2. It is an unavoidable structural component of the explicitly requested
+   canonical concept according to that concept's registry definition.
+
+Do NOT treat commonly associated ICT/SMC concepts as implicitly requested.
+
+Do NOT infer:
+
+- SMT
+- AMD / Power of 3
+- HTF Bias
+- FVG
+- Displacement
+- Liquidity Sweep
+- EMA
+- SMA
+- RSI
+- Sessions
+
+from the word "Breakout".
+
+==================================================
+DIRECTIONAL VARIANTS
+==================================================
+
+Do not incorrectly treat valid directional variants as invented concepts.
+
+For example:
+
+"Breakout long and short"
+
+may legitimately produce:
+
+- Breakout — bullish/long
+- Breakout — bearish/short
+
+These are directional variants of the same canonical Breakout concept.
+
+They must remain linked to the single canonical Breakout registry ID.
+
+The authorization system must distinguish:
+
+VALID:
+Breakout → Long
+Breakout → Short
+
+from:
+
+INVALID:
+Breakout → EMA
+Breakout → FVG
+Breakout → SMT
+etc.
+
+==================================================
+RISK RULES
+==================================================
+
+Keep risk rules separate from entry concepts.
+
+For:
+
+stop-loss: 1%
+take-profit: 2%
+
+the draft should contain exactly those structured risk rules.
+
+Do not convert risk rules into concepts.
+
+Do not invent Risk/Reward when fixed SL/TP already define the requested
+risk parameters.
+
+==================================================
+NO PROMPT-SPECIFIC PATCH
+==================================================
+
+Do NOT hard-code special handling for the phrase:
+
+"XAUUSD 5M Breakout Test"
+
+Do NOT create a one-off exception for this strategy.
+
+The fix must work for arbitrary future strategies.
+
+Test multiple completely different requests after implementing the fix.
+
+==================================================
+REGRESSION TESTS
+==================================================
+
+Add tests proving that Build with AI does not invent conditions.
+
+Test at minimum:
+
+TEST 1
+
+User requests:
+
+"XAUUSD 5m Breakout, long and short."
+
+Expected concepts:
+
+- Breakout long
+- Breakout short
+
+Nothing else.
+
+TEST 2
+
+User requests:
+
+"XAUUSD 5m EMA 20/50 cross."
+
+Expected:
+
+- EMA Cross
+- fast period 20
+- slow period 50
+- requested directions only
+
+Nothing else.
+
+TEST 3
+
+User requests:
+
+"XAUUSD 5m bullish displacement followed by bullish FVG retest."
+
+Expected:
+
+- Displacement
+- Bullish FVG
+- Bullish FVG Retest
+
+with the requested relationship.
+
+Nothing else.
+
+TEST 4
+
+User requests:
+
+"XAUUSD 5m liquidity sweep followed by bearish displacement."
+
+Expected:
+
+- Liquidity Sweep
+- Bearish Displacement
+
+Nothing else.
+
+TEST 5
+
+User requests:
+
+"XAUUSD 5m Judas Swing."
+
+Expected:
+
+- Judas Swing
+- review_required because it is unsupported
+
+Nothing else.
+
+TEST 6
+
+Use a completely minimal request:
+
+"XAUUSD 5m Breakout."
+
+Expected:
+
+ONLY the Breakout concept.
+
+==================================================
+FINAL DRAFT INVARIANT
+==================================================
+
+Before Build with AI returns a draft, perform one final deterministic
+authorization/reconciliation pass against the ORIGINAL USER REQUEST.
+
+For every retained condition, the system must be able to answer:
+
+"Which exact user-requested concept authorized this condition?"
+
+If there is no valid answer:
+
+REMOVE IT.
+
+Do not merely mark it review_required.
+
+Do not preserve it because the model suggested it.
+
+Do not substitute another concept.
+
+The original user request is the authority for what concepts are allowed.
+
+==================================================
+AMD / POWER OF 3
+==================================================
+
+Specifically investigate why "AMD / Power of 3" is appearing when it was
+explicitly prohibited.
+
+It must never be introduced into a draft unless the user explicitly asks
+for:
+
+- AMD
+- Power of 3
+- Accumulation/Manipulation/Distribution
+- an explicitly defined alias recognized by the canonical registry
+
+If it appears in model output without authorization, it must be removed
+before the draft reaches the frontend.
+
+==================================================
+VERIFICATION
+==================================================
+
+After the fix:
+
+- API tests
+- Frontend tests
+- All workspace typechecks
+- API production build
+- Frontend production build
+- git diff --check
+- Full Build with AI regression suite
+- Disposable end-to-end lifecycle test
+
+must pass.
+
+Also manually test the original Breakout request through the real UI.
+
+The final result must contain:
+
+Market: XAUUSD
+Direction: both
+Timeframe: 5m
+Entry: Breakout long + Breakout short
+Risk: 1% SL + 2% TP
+Review Required: NONE
+
+No EMA.
+No SMA.
+No RSI.
+No FVG.
+No FVG Retest.
+No Displacement.
+No Liquidity Sweep.
+No SMT.
+No AMD / Power of 3.
+No HTF Bias.
+No other unrequested concepts.
+
+Do not modify existing user trading records.
+
+Use disposable test strategies/data only and clean them up afterward.
