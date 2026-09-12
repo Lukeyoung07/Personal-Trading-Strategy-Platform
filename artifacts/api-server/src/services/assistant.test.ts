@@ -1198,6 +1198,61 @@ Risk/Reward: 2:1`,
     expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
   });
 
+  it("maps Failed Breakout and all canonical session names into executable draft parameters", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the requested failed-breakout and session draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "Failed breakout sessions",
+              description: "A deterministic breakout failure with session filters.",
+              direction: "long",
+              marketSymbol: "XAUUSD",
+              timeframes: ["5m"],
+              conditions: [
+                { name: "Bullish failed breakout", stage: "entry", requirement: "required", conceptName: "Failed Breakout", timeframe: "5m", direction: "long", triggerRules: "model failure" },
+                { name: "New York Session", stage: "confirmation", requirement: "required", conceptName: "New York Session", timeframe: "5m", direction: "long", triggerRules: "session" },
+                { name: "London Session", stage: "confirmation", requirement: "required", conceptName: "London Session", timeframe: "5m", direction: "long", triggerRules: "session" },
+                { name: "Asian Session", stage: "confirmation", requirement: "required", conceptName: "Asian Session", timeframe: "5m", direction: "long", triggerRules: "session" },
+                { name: "Kill Zones", stage: "confirmation", requirement: "required", conceptName: "Kill Zones", timeframe: "5m", direction: "long", triggerRules: "session" },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: "Create an XAUUSD 5m strategy using a bullish failed breakout within 3 bars, New York Session, London Session, Asian Session, and Kill Zone.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+    const conditions = response.strategyDraft?.conditions || [];
+    expect(conditions).toHaveLength(5);
+    expect(conditions[0]).toMatchObject({
+      conceptName: "Failed Breakout",
+      supported: true,
+      parameters: {
+        kind: "failed_breakout",
+        polarity: "bullish",
+        levelType: "auto",
+        maxBarsToFailure: 3,
+      },
+    });
+    expect(conditions.slice(1).every(condition => condition.supported)).toBe(true);
+    expect(conditions.slice(1).map(condition => (condition.parameters as any)?.session)).toEqual([
+      "new_york",
+      "london",
+      "asian",
+      "kill_zone",
+    ]);
+    expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
+  });
+
   it("preserves explicitly requested continuation as review-required beside an FVG", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({

@@ -438,6 +438,26 @@ const EXECUTABLE_CONCEPT_METADATA: Record<string, { description: string; detecti
     description: "A wick rejection uses the same deterministic directional wick and close-location evaluator as Rejection.",
     detectionRules: "Structured detector: bullish lower-wick or bearish upper-wick fraction plus directional close location.",
   },
+  "Failed Breakout": {
+    description: "A confirmed resistance or support breakout closes back through the same level within a bounded number of closed candles.",
+    detectionRules: "Structured detector: prior rolling resistance/support level, closed breakout, then bounded closed-candle failure.",
+  },
+  "London Session": {
+    description: "Closed candles whose timestamps fall within the canonical Europe/London session window, with DST-aware local-time evaluation.",
+    detectionRules: "Structured detector: IANA timezone local-time window; canonical 08:00–17:00 Europe/London unless overridden.",
+  },
+  "New York Session": {
+    description: "Closed candles whose timestamps fall within the canonical America/New_York session window, with DST-aware local-time evaluation.",
+    detectionRules: "Structured detector: IANA timezone local-time window; canonical 08:00–17:00 America/New_York unless overridden.",
+  },
+  "Asian Session": {
+    description: "Closed candles whose timestamps fall within the canonical Asia/Tokyo session window.",
+    detectionRules: "Structured detector: IANA timezone local-time window; canonical 09:00–17:00 Asia/Tokyo unless overridden.",
+  },
+  "Kill Zones": {
+    description: "Closed candles inside the configured kill-zone window using the same IANA timezone and DST-aware session evaluator.",
+    detectionRules: "Structured detector: configurable IANA timezone local-time window; canonical 07:00–10:00 Europe/London unless overridden.",
+  },
   "Support": {
     description: "Price reaches the prior rolling low and closes back above it.",
     detectionRules: "Structured detector: prior rolling low interaction and rejection.",

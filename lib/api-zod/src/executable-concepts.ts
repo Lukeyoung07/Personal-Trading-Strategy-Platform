@@ -69,6 +69,24 @@ export type RejectionParameters = {
   minimumCloseLocation: number;
 };
 
+export type FailedBreakoutParameters = {
+  kind: "failed_breakout";
+  polarity: "auto" | "bullish" | "bearish";
+  levelType: "auto" | "support" | "resistance";
+  lookback: number;
+  maxBarsToFailure: number;
+};
+
+export type SessionName = "london" | "new_york" | "asian" | "kill_zone";
+
+export type SessionParameters = {
+  kind: "session";
+  session: SessionName;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+};
+
 export type ExecutableConceptParameters =
   | LiquiditySweepParameters
   | FairValueGapParameters
@@ -78,7 +96,9 @@ export type ExecutableConceptParameters =
   | PriceActionParameters
   | RangeLocationParameters
   | DisplacementParameters
-  | RejectionParameters;
+  | RejectionParameters
+  | FailedBreakoutParameters
+  | SessionParameters;
 
 export const DEFAULT_LIQUIDITY_SWEEP_PARAMETERS: LiquiditySweepParameters = {
   kind: "liquidity_sweep",
@@ -150,6 +170,27 @@ export const DEFAULT_REJECTION_PARAMETERS: RejectionParameters = {
   minimumCloseLocation: 0.75,
 };
 
+export const DEFAULT_FAILED_BREAKOUT_PARAMETERS: FailedBreakoutParameters = {
+  kind: "failed_breakout",
+  polarity: "auto",
+  levelType: "auto",
+  lookback: 20,
+  maxBarsToFailure: 3,
+};
+
+export const CANONICAL_SESSION_DEFINITIONS: Record<SessionName, Omit<SessionParameters, "kind" | "session">> = {
+  london: { startTime: "08:00", endTime: "17:00", timezone: "Europe/London" },
+  new_york: { startTime: "08:00", endTime: "17:00", timezone: "America/New_York" },
+  asian: { startTime: "09:00", endTime: "17:00", timezone: "Asia/Tokyo" },
+  kill_zone: { startTime: "07:00", endTime: "10:00", timezone: "Europe/London" },
+};
+
+export const DEFAULT_SESSION_PARAMETERS: SessionParameters = {
+  kind: "session",
+  session: "london",
+  ...CANONICAL_SESSION_DEFINITIONS.london,
+};
+
 const keyForConcept = (name: string) => name.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
 
 export function executableConceptLabel(name: string | null | undefined): string | null {
@@ -181,6 +222,7 @@ export function executableConceptLabel(name: string | null | undefined): string 
   if (key.includes("vwap")) return "VWAP";
   if (key.includes("atr")) return "ATR";
   if (key.includes("breakout retest") || key.includes("break and retest")) return "Breakout Retest";
+  if (key === "failed breakout" || key.includes("failed breakout") || key === "false breakout") return "Failed Breakout";
   if (key === "breakout") return "Breakout";
   if (key.includes("bullish engulfing")) return "Bullish Engulfing";
   if (key.includes("bearish engulfing")) return "Bearish Engulfing";
@@ -193,6 +235,11 @@ export function executableConceptLabel(name: string | null | undefined): string 
   if (key === "discount") return "Discount";
   if (key.includes("equilibrium")) return "Equilibrium";
   if (key === "displacement" || key.includes("displacement")) return "Displacement";
+  if (key.includes("kill zone")) return "Kill Zones";
+  if (key.includes("new york") || key.includes("ny ") || key === "ny") return "New York Session";
+  if (key.includes("london")) return "London Session";
+  if (key.includes("asian") || key === "asia") return "Asian Session";
+  if (key === "session") return "Session";
   return null;
 }
 
@@ -237,6 +284,12 @@ export function executableConceptKind(name: string | null | undefined): Executab
   if (key === "rejection" || key === "wick rejection" || key === "rejection candle" || key === "bullish rejection" || key === "bearish rejection") return "rejection";
   if (key === "premium" || key === "discount" || key === "equilibrium" || key === "50 equilibrium") return "range_location";
   if (key === "displacement" || key.includes("displacement")) return "displacement";
+  if (key === "failed breakout" || key.includes("failed breakout") || key === "false breakout") return "failed_breakout";
+  if (
+    key === "session" || key.includes("london session") || key.includes("new york session") ||
+    key.includes("asian session") || key === "asia session" || key.includes("kill zone") ||
+    key.includes("london") || key.includes("new york") || key === "ny" || key.includes("ny session") || key.includes("asian") || key === "asia"
+  ) return "session";
   return null;
 }
 
@@ -246,6 +299,28 @@ function integerInRange(value: unknown, minimum: number, maximum: number): value
 
 function numberInRange(value: unknown, minimum: number, maximum: number): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= minimum && value <= maximum;
+}
+
+function validSessionTime(value: unknown): value is string {
+  return typeof value === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function validIanaTimezone(value: unknown): value is string {
+  if (typeof value !== "string" || !value.includes("/")) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sessionNameForConcept(conceptName: string): SessionName {
+  const key = keyForConcept(conceptName);
+  if (key.includes("kill zone")) return "kill_zone";
+  if (key.includes("new york") || key === "ny" || key.includes("ny session")) return "new_york";
+  if (key.includes("asian") || key === "asia" || key.includes("asia session")) return "asian";
+  return "london";
 }
 
 export function normalizeExecutableParameters(
@@ -434,6 +509,40 @@ export function normalizeExecutableParameters(
     return numberInRange(result.minimumWickFraction, 0, 1)
       && numberInRange(result.minimumCloseLocation, 0.5, 1) ? result : null;
   }
+  if (kind === "failed_breakout") {
+    const defaults = DEFAULT_FAILED_BREAKOUT_PARAMETERS;
+    const conceptKey = keyForConcept(conceptName || "");
+    if (input.polarity != null && input.polarity !== "auto" && input.polarity !== "bullish" && input.polarity !== "bearish") return null;
+    if (input.levelType != null && input.levelType !== "auto" && input.levelType !== "support" && input.levelType !== "resistance") return null;
+    const result: FailedBreakoutParameters = {
+      kind,
+      polarity: input.polarity === "bullish" || input.polarity === "bearish"
+        ? input.polarity
+        : conceptKey.includes("bullish") ? "bullish" : conceptKey.includes("bearish") ? "bearish" : defaults.polarity,
+      levelType: input.levelType === "support" || input.levelType === "resistance"
+        ? input.levelType
+        : conceptKey.includes("resistance") ? "resistance" : conceptKey.includes("support") ? "support" : defaults.levelType,
+      lookback: input.lookback == null ? defaults.lookback : Number(input.lookback),
+      maxBarsToFailure: input.maxBarsToFailure == null ? defaults.maxBarsToFailure : Number(input.maxBarsToFailure),
+    };
+    return integerInRange(result.lookback, 2, 100)
+      && integerInRange(result.maxBarsToFailure, 1, 20) ? result : null;
+  }
+  if (kind === "session") {
+    const session = input.session === "london" || input.session === "new_york" || input.session === "asian" || input.session === "kill_zone"
+      ? input.session
+      : sessionNameForConcept(conceptName || "");
+    const defaults = CANONICAL_SESSION_DEFINITIONS[session];
+    const result: SessionParameters = {
+      kind,
+      session,
+      startTime: input.startTime == null ? defaults.startTime : String(input.startTime),
+      endTime: input.endTime == null ? defaults.endTime : String(input.endTime),
+      timezone: input.timezone == null ? defaults.timezone : String(input.timezone),
+    };
+    return validSessionTime(result.startTime) && validSessionTime(result.endTime) && validIanaTimezone(result.timezone)
+      && result.startTime !== result.endTime ? result : null;
+  }
   return null;
 }
 
@@ -453,6 +562,13 @@ export function executableConceptTriggerRules(parameters: ExecutableConceptParam
   if (parameters.kind === "rejection") {
     const polarity = parameters.polarity === "auto" ? "directional" : parameters.polarity;
     return `Rejection: ${polarity} wick >= ${parameters.minimumWickFraction * 100}% of range with close location >= ${parameters.minimumCloseLocation}`;
+  }
+  if (parameters.kind === "failed_breakout") {
+    const polarity = parameters.polarity === "auto" ? "directional" : parameters.polarity;
+    return `Failed breakout: ${polarity} ${parameters.levelType} level failure within ${parameters.maxBarsToFailure} closed bars`;
+  }
+  if (parameters.kind === "session") {
+    return `${parameters.session.replaceAll("_", " ")} session ${parameters.startTime}-${parameters.endTime} ${parameters.timezone}`;
   }
   return `Range location: ${parameters.location}`;
 }
@@ -502,6 +618,16 @@ export const EXECUTABLE_CONCEPT_DEFINITIONS = {
     label: "Rejection",
     description: "A directional candle with a configurable wick fraction and close location.",
     aliases: ["rejection", "wick rejection", "rejection candle", "bullish rejection", "bearish rejection"],
+  },
+  failed_breakout: {
+    label: "Failed Breakout",
+    description: "A confirmed support or resistance breakout that closes back through the same level within a bounded number of closed candles.",
+    aliases: ["failed breakout", "false breakout"],
+  },
+  session: {
+    label: "Session",
+    description: "A candle timestamp falls inside a configured IANA-timezone session window with DST-aware local boundaries.",
+    aliases: ["london session", "new york session", "ny session", "asian session", "asia session", "kill zone", "kill zones"],
   },
 } as const;
 

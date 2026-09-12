@@ -89,6 +89,75 @@ describe("strategy monitoring transition contracts", () => {
     });
   });
 
+  it("uses the shared Failed Breakout and session evaluators for monitoring", async () => {
+    const makeCandle = (index: number, values: { high: number; low: number; close: number; openTime?: string }) => ({
+      id: index,
+      openTime: new Date(values.openTime || `2026-01-01T0${index}:00:00.000Z`),
+      closeTime: new Date(`2026-01-01T0${index}:59:00.000Z`),
+      open: 100,
+      high: values.high,
+      low: values.low,
+      close: values.close,
+      volume: null,
+      isClosed: true,
+      receivedAt: new Date("2026-09-12T00:00:00.000Z"),
+    });
+    const failedBreakoutDetector = createBuiltInStrategyMonitoringDetector({ id: 78, name: "Failed Breakout" });
+    const failedBreakoutCondition = {
+      id: 2,
+      conceptId: 78,
+      name: "Bullish failed breakout",
+      conceptName: "Failed Breakout",
+      timeframe: "5m",
+      direction: "long",
+      requirement: "required",
+      order: 1,
+      stage: "entry",
+      triggerRules: "Failed Breakout",
+      parameters: { kind: "failed_breakout", polarity: "bullish", levelType: "resistance", lookback: 3, maxBarsToFailure: 3 },
+      invalidationRules: null,
+      conceptDetectionRules: null,
+    } as any;
+    const failedBreakoutCandles = [
+      makeCandle(0, { high: 105, low: 95, close: 100 }),
+      makeCandle(1, { high: 105, low: 95, close: 100 }),
+      makeCandle(2, { high: 105, low: 95, close: 100 }),
+      makeCandle(3, { high: 107, low: 99, close: 106 }),
+      makeCandle(4, { high: 108, low: 100, close: 106 }),
+      makeCandle(5, { high: 107, low: 99, close: 104 }),
+      makeCandle(6, { high: 106, low: 100, close: 104 }),
+    ];
+    expect(failedBreakoutDetector).not.toBeNull();
+    expect(failedBreakoutDetector!.requiredCandleCount(failedBreakoutCondition)).toBe(7);
+    await expect(failedBreakoutDetector!.evaluate({
+      condition: failedBreakoutCondition,
+      candles: failedBreakoutCandles,
+      dependencyStates: new Map(),
+      previousStatus: null,
+      previousState: null,
+      evaluatedAt: new Date("2026-09-12T00:00:00.000Z"),
+    })).resolves.toMatchObject({ status: "met", reasonCode: "EXECUTABLE_CONDITION_MET" });
+
+    const sessionDetector = createBuiltInStrategyMonitoringDetector({ id: 79, name: "New York Session" });
+    const sessionCondition = {
+      ...failedBreakoutCondition,
+      id: 3,
+      conceptId: 79,
+      name: "New York Session",
+      conceptName: "New York Session",
+      parameters: { kind: "session", session: "new_york", startTime: "08:00", endTime: "17:00", timezone: "America/New_York" },
+    } as any;
+    expect(sessionDetector).not.toBeNull();
+    await expect(sessionDetector!.evaluate({
+      condition: sessionCondition,
+      candles: [makeCandle(0, { high: 101, low: 99, close: 100, openTime: "2026-07-15T13:00:00.000Z" })],
+      dependencyStates: new Map(),
+      previousStatus: null,
+      previousState: null,
+      evaluatedAt: new Date("2026-09-12T00:00:00.000Z"),
+    })).resolves.toMatchObject({ status: "met", reasonCode: "EXECUTABLE_CONDITION_MET" });
+  });
+
   it.each([
     [null, "met", true],
     ["waiting", "met", true],

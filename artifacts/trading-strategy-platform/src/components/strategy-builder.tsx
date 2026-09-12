@@ -39,6 +39,9 @@ import {
   DEFAULT_RANGE_LOCATION_PARAMETERS,
   DEFAULT_DISPLACEMENT_PARAMETERS,
   DEFAULT_REJECTION_PARAMETERS,
+  DEFAULT_FAILED_BREAKOUT_PARAMETERS,
+  DEFAULT_SESSION_PARAMETERS,
+  CANONICAL_SESSION_DEFINITIONS,
   executableConceptTriggerRules,
   executableConceptKind,
   isHistoricalRuleSupported,
@@ -644,6 +647,26 @@ function ConditionModal({ strategyId, strategyDirection, concepts, timeframes, c
                 <Field label="Minimum wick fraction" hint="0.50 means at least half of the candle range."><input className="input" type="number" min="0" max="1" step="0.01" value={String(executionParameters?.minimumWickFraction ?? DEFAULT_REJECTION_PARAMETERS.minimumWickFraction)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "rejection", minimumWickFraction: Number(event.target.value) }))} /></Field>
               </div>
               <Field label="Minimum close location" hint="0.75 means the close is in the outer 25% toward the rejection direction."><input className="input" type="number" min="0.5" max="1" step="0.01" value={String(executionParameters?.minimumCloseLocation ?? DEFAULT_REJECTION_PARAMETERS.minimumCloseLocation)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "rejection", minimumCloseLocation: Number(event.target.value) }))} /></Field>
+            </div>}
+            {executableKind === "failed_breakout" && <div className="space-y-4 rounded-md border border-primary/30 bg-background/60 p-4" data-testid="builder-failed-breakout-parameters">
+              <div className="text-xs text-muted-foreground">A confirmed rolling support or resistance level is broken by a closed candle, then reclaimed within the configured number of later closed candles.</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Failure direction"><select className="select" value={String(executionParameters?.polarity || DEFAULT_FAILED_BREAKOUT_PARAMETERS.polarity)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "failed_breakout", polarity: event.target.value }))}><option value="auto">Auto by strategy direction</option><option value="bullish">Bullish resistance failure</option><option value="bearish">Bearish support failure</option></select></Field>
+                <Field label="Level type"><select className="select" value={String(executionParameters?.levelType || DEFAULT_FAILED_BREAKOUT_PARAMETERS.levelType)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "failed_breakout", levelType: event.target.value }))}><option value="auto">Auto from direction</option><option value="resistance">Resistance</option><option value="support">Support</option></select></Field>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Level lookback"><input className="input" type="number" min="2" max="100" value={String(executionParameters?.lookback ?? DEFAULT_FAILED_BREAKOUT_PARAMETERS.lookback)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "failed_breakout", lookback: Number(event.target.value) }))} /></Field>
+                <Field label="Maximum bars to failure"><input className="input" type="number" min="1" max="20" value={String(executionParameters?.maxBarsToFailure ?? DEFAULT_FAILED_BREAKOUT_PARAMETERS.maxBarsToFailure)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "failed_breakout", maxBarsToFailure: Number(event.target.value) }))} /></Field>
+              </div>
+            </div>}
+            {executableKind === "session" && <div className="space-y-4 rounded-md border border-primary/30 bg-background/60 p-4" data-testid="builder-session-parameters">
+              <div className="text-xs text-muted-foreground">Session membership is calculated from the candle timestamp in the configured IANA timezone, including daylight-saving changes. End time is exclusive.</div>
+              <Field label="Session"><select className="select" value={String(executionParameters?.session || DEFAULT_SESSION_PARAMETERS.session)} onChange={event => { const session = event.target.value as keyof typeof CANONICAL_SESSION_DEFINITIONS; setExecutionParameters(current => ({ ...current, kind: "session", session, ...CANONICAL_SESSION_DEFINITIONS[session] })); }}><option value="london">London Session</option><option value="new_york">New York Session</option><option value="asian">Asian Session</option><option value="kill_zone">Kill Zone</option></select></Field>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Start time"><input className="input" type="time" value={String(executionParameters?.startTime || DEFAULT_SESSION_PARAMETERS.startTime)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "session", startTime: event.target.value }))} /></Field>
+                <Field label="End time"><input className="input" type="time" value={String(executionParameters?.endTime || DEFAULT_SESSION_PARAMETERS.endTime)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "session", endTime: event.target.value }))} /></Field>
+              </div>
+              <Field label="IANA timezone" hint="Examples: Europe/London, America/New_York, Asia/Tokyo."><input className="input" value={String(executionParameters?.timezone || DEFAULT_SESSION_PARAMETERS.timezone)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "session", timezone: event.target.value }))} /></Field>
             </div>}
            {!executableKind && <><div className="mt-4">
              <select className="select bg-background" value={rulePreset} onChange={event => setRulePreset(event.target.value)} data-testid="select-builder-condition-rule">

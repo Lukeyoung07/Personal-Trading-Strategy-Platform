@@ -76,6 +76,7 @@ export function requiredCandleCountForCondition(condition: BacktestCondition) {
     return Math.max(parameters.period, parameters.fastPeriod ?? 1, parameters.slowPeriod ?? 1, parameters.signalPeriod ?? 1) + 1;
   }
   if (parameters.kind === "displacement") return parameters.atrPeriod + 1;
+  if (parameters.kind === "failed_breakout") return parameters.lookback + parameters.maxBarsToFailure + 1;
   if (parameters.kind === "fair_value_gap") return Math.max(3, parameters.lookback + 2);
   if (parameters.kind === "market_structure" || parameters.kind === "liquidity_level"
     || parameters.kind === "liquidity_sweep" || parameters.kind === "price_action"
@@ -376,6 +377,35 @@ function evaluatePriceAction(candles: HistoricalCandle[], index: number, paramet
   return false;
 }
 
+function evaluateFailedBreakout(
+  candles: HistoricalCandle[],
+  index: number,
+  parameters: Extract<ExecutableConceptParameters, { kind: "failed_breakout" }>,
+  side: BacktestSide,
+) {
+  const direction = parameters.polarity === "auto"
+    ? parameters.levelType === "support" ? "bearish" : parameters.levelType === "resistance" ? "bullish" : side === "long" ? "bullish" : "bearish"
+    : parameters.polarity;
+  const levelType = parameters.levelType === "auto"
+    ? direction === "bullish" ? "resistance" : "support"
+    : parameters.levelType;
+  if ((direction === "bullish" && levelType !== "resistance") || (direction === "bearish" && levelType !== "support")) return false;
+  const levelField = levelType === "resistance" ? "high" : "low";
+  const start = Math.max(parameters.lookback, index - parameters.maxBarsToFailure);
+  for (let breakoutIndex = start; breakoutIndex < index; breakoutIndex += 1) {
+    const level = rollingLevel(candles, breakoutIndex, levelField, parameters.lookback);
+    if (level == null) continue;
+    const breakout = candles[breakoutIndex];
+    const brokeLevel = direction === "bullish" ? breakout.close > level : breakout.close < level;
+    if (!brokeLevel) continue;
+    const barsAfterBreakout = index - breakoutIndex;
+    if (barsAfterBreakout <= parameters.maxBarsToFailure) {
+      return direction === "bullish" ? candles[index].close < level : candles[index].close > level;
+    }
+  }
+  return false;
+}
+
 function evaluateRejection(
   candles: HistoricalCandle[],
   index: number,
@@ -408,6 +438,30 @@ function evaluateRangeLocation(candles: HistoricalCandle[], index: number, param
   return parameters.location === "premium" ? candles[index].close > midpoint
     : parameters.location === "discount" ? candles[index].close < midpoint
       : candles[index].close === midpoint;
+}
+
+function localSessionMinutes(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const hour = Number(parts.find(part => part.type === "hour")?.value);
+  const minute = Number(parts.find(part => part.type === "minute")?.value);
+  return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : null;
+}
+
+function evaluateSession(
+  candle: HistoricalCandle,
+  parameters: Extract<ExecutableConceptParameters, { kind: "session" }>,
+) {
+  if (!candle.isClosed) return false;
+  const minutes = localSessionMinutes(candle.openTime, parameters.timezone);
+  if (minutes == null) return false;
+  const start = Number(parameters.startTime.slice(0, 2)) * 60 + Number(parameters.startTime.slice(3));
+  const end = Number(parameters.endTime.slice(0, 2)) * 60 + Number(parameters.endTime.slice(3));
+  return start < end ? minutes >= start && minutes < end : minutes >= start || minutes < end;
 }
 
 function evaluateExecutableCondition(
@@ -476,6 +530,8 @@ function evaluateExecutableCondition(
     if (direction === "bearish" && (!bearish || (candle.high - candle.close) / range < parameters.minimumCloseLocation)) return false;
     return true;
   }
+  if (parameters.kind === "failed_breakout") return evaluateFailedBreakout(candles, index, parameters, side);
+  if (parameters.kind === "session") return evaluateSession(candle, parameters);
   if (parameters.kind === "market_structure") return evaluateMarketStructure(candles, index, parameters);
   if (parameters.kind === "liquidity_level") return evaluateLiquidityLevel(candles, index, parameters);
   if (parameters.kind === "indicator") return evaluateIndicator(candles, index, parameters);

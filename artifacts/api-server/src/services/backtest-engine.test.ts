@@ -151,6 +151,86 @@ describe("historical backtest engine", () => {
     ])).toBe(false);
   });
 
+  it("confirms a failed bullish breakout only after the closed reclaim of prior resistance", () => {
+    const parameters = normalizeExecutableParameters("Failed Breakout", {
+      polarity: "bullish",
+      levelType: "resistance",
+      lookback: 3,
+      maxBarsToFailure: 3,
+    });
+    const condition = structuredCondition("Bullish failed breakout", "Failed Breakout", "long", parameters!);
+    const history = [
+      candle(0, { high: 105, low: 95, close: 100 }),
+      candle(1, { high: 105, low: 95, close: 100 }),
+      candle(2, { high: 105, low: 95, close: 100 }),
+      candle(3, { high: 107, low: 99, close: 106 }),
+      candle(4, { high: 108, low: 100, close: 106 }),
+      candle(5, { high: 107, low: 99, close: 104 }),
+      candle(6, { high: 106, low: 100, close: 104 }),
+    ];
+    expect(requiredCandleCountForCondition(condition)).toBe(7);
+    expect(evaluateExecutableConditionAtLatest(condition, history)).toBe(true);
+    expect(evaluateExecutableConditionAtLatest(condition, history.slice(0, 5))).toBe(false);
+  });
+
+  it("confirms a failed bearish breakout from prior support without using future candles", () => {
+    const parameters = normalizeExecutableParameters("Failed Breakout", {
+      polarity: "bearish",
+      levelType: "support",
+      lookback: 3,
+      maxBarsToFailure: 2,
+    });
+    const condition = structuredCondition("Bearish failed breakout", "Failed Breakout", "short", parameters!);
+    const history = [
+      candle(0, { high: 105, low: 95, close: 100 }),
+      candle(1, { high: 105, low: 95, close: 100 }),
+      candle(2, { high: 105, low: 95, close: 100 }),
+      candle(3, { high: 101, low: 93, close: 94 }),
+      candle(4, { high: 101, low: 94, close: 96 }),
+    ];
+    expect(evaluateExecutableConditionAtLatest(condition, history)).toBe(true);
+    expect(evaluateExecutableConditionAtLatest(condition, history.slice(0, 3).concat([
+      candle(3, { high: 104, low: 96, close: 101 }),
+    ]))).toBe(false);
+  });
+
+  it.each([
+    ["New York Session", "new_york", "08:00", "17:00", "America/New_York"],
+    ["London Session", "london", "08:00", "17:00", "Europe/London"],
+    ["Asian Session", "asian", "09:00", "17:00", "Asia/Tokyo"],
+    ["Kill Zones", "kill_zone", "07:00", "10:00", "Europe/London"],
+  ])("normalizes the canonical DST-aware parameters for %s", (conceptName, session, startTime, endTime, timezone) => {
+    expect(normalizeExecutableParameters(conceptName, undefined)).toEqual({
+      kind: "session",
+      session,
+      startTime,
+      endTime,
+      timezone,
+    });
+  });
+
+  it("evaluates session membership in local IANA time across DST periods and boundaries", () => {
+    const parameters = normalizeExecutableParameters("New York Session", undefined);
+    const condition = structuredCondition("New York Session", "New York Session", "long", parameters!);
+    const at = (iso: string, isClosed = true) => ({
+      ...candle(0),
+      openTime: new Date(iso),
+      isClosed,
+    });
+    expect(evaluateExecutableConditionAtLatest(condition, [at("2026-01-15T14:00:00.000Z")])).toBe(true);
+    expect(evaluateExecutableConditionAtLatest(condition, [at("2026-07-15T13:00:00.000Z")])).toBe(true);
+    expect(evaluateExecutableConditionAtLatest(condition, [at("2026-01-15T12:00:00.000Z")])).toBe(false);
+    expect(evaluateExecutableConditionAtLatest(condition, [at("2026-01-15T14:00:00.000Z", false)])).toBe(false);
+
+    const london = normalizeExecutableParameters("London Session", {
+      startTime: "08:00",
+      endTime: "09:00",
+    });
+    const londonCondition = structuredCondition("London Session", "London Session", "long", london!);
+    expect(evaluateExecutableConditionAtLatest(londonCondition, [at("2026-03-29T07:00:00.000Z")])).toBe(true);
+    expect(evaluateExecutableConditionAtLatest(londonCondition, [at("2026-03-29T06:59:00.000Z")])).toBe(false);
+  });
+
   it("processes candles oldest-first and executes signals at the next open", () => {
     const result = runHistoricalBacktest({
       direction: "long",

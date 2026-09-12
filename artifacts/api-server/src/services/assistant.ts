@@ -631,6 +631,25 @@ function requestedParameters(conceptName: string, message: string, condition: an
     if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
     if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
   }
+  if (kind === "failed_breakout") {
+    if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
+    if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
+    if (/\bresistance\b/i.test(descriptor)) input.levelType = "resistance";
+    if (/\bsupport\b/i.test(descriptor)) input.levelType = "support";
+    const maxBars = descriptor.match(/\b(?:within|in|max(?:imum)?)\s+(\d+)\s+(?:closed\s+)?bars?\b/i)?.[1];
+    if (maxBars) input.maxBarsToFailure = Number(maxBars);
+    const lookback = descriptor.match(/\b(?:lookback|prior)\s+(\d+)\s+(?:candles?|bars?)\b/i)?.[1];
+    if (lookback) input.lookback = Number(lookback);
+  }
+  if (kind === "session") {
+    const times = [...descriptor.matchAll(/\b((?:[01]\d|2[0-3]):[0-5]\d)\b/g)].map(match => match[1]);
+    if (times.length >= 2) {
+      input.startTime = times[0];
+      input.endTime = times[1];
+    }
+    const timezone = descriptor.match(/\b([A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?)\b/)?.[1];
+    if (timezone) input.timezone = timezone;
+  }
   return normalizeExecutableParameters(conceptName, input);
 }
 
