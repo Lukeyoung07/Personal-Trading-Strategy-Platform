@@ -75,6 +75,7 @@ export function requiredCandleCountForCondition(condition: BacktestCondition) {
   if (parameters.kind === "indicator") {
     return Math.max(parameters.period, parameters.fastPeriod ?? 1, parameters.slowPeriod ?? 1, parameters.signalPeriod ?? 1) + 1;
   }
+  if (parameters.kind === "displacement") return parameters.atrPeriod + 1;
   if (parameters.kind === "fair_value_gap") return Math.max(3, parameters.lookback + 2);
   if (parameters.kind === "market_structure" || parameters.kind === "liquidity_level"
     || parameters.kind === "liquidity_sweep" || parameters.kind === "price_action"
@@ -261,6 +262,18 @@ function average(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
 
+function averageTrueRangeBefore(candles: HistoricalCandle[], index: number, period: number) {
+  if (index < period) return null;
+  const trueRanges = candles.slice(index - period, index).map((candle, offset) => {
+    const candleIndex = index - period + offset;
+    const previous = candles[candleIndex - 1];
+    return previous
+      ? Math.max(candle.high - candle.low, Math.abs(candle.high - previous.close), Math.abs(candle.low - previous.close))
+      : candle.high - candle.low;
+  });
+  return average(trueRanges);
+}
+
 function indicatorValue(candles: HistoricalCandle[], index: number, parameters: Extract<ExecutableConceptParameters, { kind: "indicator" }>): number | null {
   const closes = candles.slice(0, index + 1).map(candle => candle.close);
   if (parameters.indicator === "sma") return closes.length >= parameters.period ? average(closes.slice(-parameters.period)) : null;
@@ -423,6 +436,20 @@ function evaluateExecutableCondition(
       if (candle.high >= zone.low && candle.low <= zone.high) return true;
     }
     return false;
+  }
+  if (parameters.kind === "displacement") {
+    const atr = averageTrueRangeBefore(candles, index, parameters.atrPeriod);
+    const range = candle.high - candle.low;
+    const body = Math.abs(candle.close - candle.open);
+    if (atr == null || atr <= 0 || range <= 0 || body < atr * parameters.minimumBodyAtr) return false;
+    const bullish = candle.close > candle.open;
+    const bearish = candle.close < candle.open;
+    const direction = parameters.polarity === "auto"
+      ? side === "long" ? "bullish" : "bearish"
+      : parameters.polarity;
+    if (direction === "bullish" && (!bullish || (candle.close - candle.low) / range < parameters.minimumCloseLocation)) return false;
+    if (direction === "bearish" && (!bearish || (candle.high - candle.close) / range < parameters.minimumCloseLocation)) return false;
+    return true;
   }
   if (parameters.kind === "market_structure") return evaluateMarketStructure(candles, index, parameters);
   if (parameters.kind === "liquidity_level") return evaluateLiquidityLevel(candles, index, parameters);

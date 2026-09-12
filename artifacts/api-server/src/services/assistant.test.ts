@@ -1044,4 +1044,169 @@ Risk/Reward: 2:1`,
     expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).not.toContain("Volatility Squeeze Retest");
     expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).not.toContain("SMT Divergence");
   });
+
+  it("keeps the requested displacement plus FVG handoff executable and does not invent continuation", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the displacement and FVG retest draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "Gold displacement retest",
+              description: "Bullish displacement with a bullish FVG retest.",
+              direction: "long",
+              marketSymbol: "XAUUSD",
+              timeframes: ["5m"],
+              conditions: [
+                { name: "Bullish displacement", stage: "entry", requirement: "required", conceptName: "Displacement", timeframe: "5m", direction: "long", triggerRules: "model displacement" },
+                { name: "Bullish FVG retest", stage: "confirmation", requirement: "required", conceptName: "FVG Retest", timeframe: "5m", direction: "long", triggerRules: "model retest" },
+                { name: "Continuation", stage: "confirmation", requirement: "required", conceptName: "Continuation", timeframe: "5m", direction: "long", triggerRules: "model continuation" },
+                { name: "Premium", stage: "confirmation", requirement: "optional", conceptName: "Premium", timeframe: "5m", direction: "long", triggerRules: "model premium" },
+              ],
+              conceptsUsed: [
+                { name: "Displacement", supported: true, explanation: "Requested." },
+                { name: "FVG Retest", supported: true, explanation: "Requested." },
+                { name: "Continuation", supported: true, explanation: "Suggested." },
+                { name: "Premium", supported: true, explanation: "Suggested." },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const message = "Create an XAUUSD 5m strategy using bullish displacement followed by a bullish FVG retest.";
+    const response = await answerAssistant({
+      message,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual([
+      "Displacement",
+      "Fair Value Gap",
+    ]);
+    expect(response.strategyDraft?.conditions.map(condition => condition.parameters)).toEqual([
+      {
+        kind: "displacement",
+        polarity: "bullish",
+        atrPeriod: 14,
+        minimumBodyAtr: 1.5,
+        minimumCloseLocation: 0.75,
+      },
+      {
+        kind: "fair_value_gap",
+        polarity: "bullish",
+        interaction: "retest",
+        lookback: 20,
+        minimumGap: 0,
+      },
+    ]);
+    expect(response.strategyDraft?.conditions.every(condition =>
+      condition.authorization.source === "user_request"
+      && condition.authorization.status === "explicit",
+    )).toBe(true);
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).not.toContain("Continuation");
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).not.toContain("Premium");
+    expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
+  });
+
+  it("preserves explicitly requested continuation as review-required beside an FVG", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Continuation needs review before it can be backtested.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "Continuation retest",
+              description: "An explicitly requested continuation concept.",
+              direction: "long",
+              marketSymbol: "XAUUSD",
+              timeframes: ["5m"],
+              conditions: [
+                { name: "Bullish continuation", stage: "entry", requirement: "required", conceptName: "Continuation", timeframe: "5m", direction: "long", triggerRules: "follow-through" },
+                { name: "Bullish FVG retest", stage: "confirmation", requirement: "required", conceptName: "FVG Retest", timeframe: "5m", direction: "long", triggerRules: "retest" },
+              ],
+              conceptsUsed: [],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const message = "Create an XAUUSD 5m strategy using bullish continuation and a bullish FVG retest.";
+    const response = await answerAssistant({
+      message,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual([
+      "Continuation",
+      "Fair Value Gap",
+    ]);
+    expect(response.strategyDraft?.conditions[0]).toMatchObject({
+      supported: false,
+      authorization: {
+        source: "user_request",
+        status: "review_required",
+        canonicalConcept: "Continuation",
+      },
+    });
+    expect(response.strategyDraft?.conditions[1]).toMatchObject({
+      supported: true,
+      authorization: {
+        source: "user_request",
+        status: "explicit",
+      },
+    });
+    expect(response.strategyDraft?.compatibility.compatible).toBe(false);
+  });
+
+  it("does not let the model invent displacement or continuation for an FVG-only request", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the FVG draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "FVG only",
+              description: "An FVG-only request.",
+              direction: "long",
+              marketSymbol: "XAUUSD",
+              timeframes: ["5m"],
+              conditions: [
+                { name: "FVG", stage: "entry", requirement: "required", conceptName: "Fair Value Gap", timeframe: "5m", direction: "long", triggerRules: "formation" },
+                { name: "Displacement", stage: "confirmation", requirement: "required", conceptName: "Displacement", timeframe: "5m", direction: "long", triggerRules: "model suggestion" },
+                { name: "Continuation", stage: "confirmation", requirement: "required", conceptName: "Continuation", timeframe: "5m", direction: "long", triggerRules: "model suggestion" },
+              ],
+              conceptsUsed: [
+                { name: "Fair Value Gap", supported: true },
+                { name: "Displacement", supported: true },
+                { name: "Continuation", supported: true },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: "Create an XAUUSD 5m strategy using a bullish FVG.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual(["Fair Value Gap"]);
+    expect(response.strategyDraft?.conditions[0].authorization.status).toBe("explicit");
+  });
 });

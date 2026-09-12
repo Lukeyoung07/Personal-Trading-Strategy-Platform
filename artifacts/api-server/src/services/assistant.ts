@@ -337,6 +337,7 @@ const REQUESTED_EXECUTABLE_CONCEPT_PATTERNS: Array<[RegExp, string]> = [
   [/\bbearish engulfing\b/i, "Bearish Engulfing"],
   [/\bpin bar\b/i, "Pin Bar"],
   [/\binside bar\b/i, "Inside Bar"],
+  [/\b(?:bullish|bearish)?\s*displacement\b/i, "Displacement"],
   [/\bbreakout(?:\s+retest)?\b/i, "Breakout"],
   [/\bprevious day high\b/i, "Previous Day High"],
   [/\bprevious day low\b/i, "Previous Day Low"],
@@ -633,6 +634,10 @@ function requestedParameters(conceptName: string, message: string, condition: an
     if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
   }
   if (kind === "market_structure") {
+    if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
+    if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
+  }
+  if (kind === "displacement") {
     if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
     if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
   }

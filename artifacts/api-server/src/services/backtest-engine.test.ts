@@ -383,6 +383,38 @@ describe("historical backtest engine", () => {
     expect(result.trades[0]).toMatchObject({ side: "long", entryPrice: 107 });
   });
 
+  it("evaluates objective bullish displacement from prior ATR and can combine it with FVG formation", () => {
+    const displacement = {
+      kind: "displacement" as const,
+      polarity: "bullish" as const,
+      atrPeriod: 2,
+      minimumBodyAtr: 1.5,
+      minimumCloseLocation: 0.75,
+    };
+    const candles = [
+      candle(0, { open: 99, high: 101, low: 99, close: 100 }),
+      candle(1, { open: 100, high: 102, low: 100, close: 101 }),
+      candle(2, { open: 103, high: 109, low: 103, close: 108 }),
+      candle(3, { open: 110, high: 111, low: 109, close: 110 }),
+    ];
+    const displacementCondition = structuredCondition("Bullish displacement", "Displacement", "long", displacement);
+    expect(evaluateExecutableConditionAtLatest(displacementCondition, candles)).toBe(false);
+    expect(evaluateExecutableConditionAtLatest(displacementCondition, candles.slice(0, 3))).toBe(true);
+    expect(evaluateExecutableConditionAtLatest({
+      ...displacementCondition,
+      name: "Bullish displacement with FVG",
+      conceptName: "Fair Value Gap",
+      parameters: {
+        kind: "fair_value_gap",
+        polarity: "bullish",
+        interaction: "formation",
+        lookback: 20,
+        minimumGap: 0,
+      },
+    }, candles.slice(0, 3))).toBe(true);
+    expect(requiredCandleCountForCondition(displacementCondition)).toBe(3);
+  });
+
   it("rejects invalid structured lookbacks during preflight", () => {
     const errors = validateHistoricalBacktestStrategy({
       direction: "long",

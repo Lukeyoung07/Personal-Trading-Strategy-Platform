@@ -54,6 +54,14 @@ export type RangeLocationParameters = {
   lookback: number;
 };
 
+export type DisplacementParameters = {
+  kind: "displacement";
+  polarity: "auto" | "bullish" | "bearish";
+  atrPeriod: number;
+  minimumBodyAtr: number;
+  minimumCloseLocation: number;
+};
+
 export type ExecutableConceptParameters =
   | LiquiditySweepParameters
   | FairValueGapParameters
@@ -61,7 +69,8 @@ export type ExecutableConceptParameters =
   | LiquidityLevelParameters
   | IndicatorParameters
   | PriceActionParameters
-  | RangeLocationParameters;
+  | RangeLocationParameters
+  | DisplacementParameters;
 
 export const DEFAULT_LIQUIDITY_SWEEP_PARAMETERS: LiquiditySweepParameters = {
   kind: "liquidity_sweep",
@@ -118,6 +127,14 @@ export const DEFAULT_RANGE_LOCATION_PARAMETERS: RangeLocationParameters = {
   lookback: 20,
 };
 
+export const DEFAULT_DISPLACEMENT_PARAMETERS: DisplacementParameters = {
+  kind: "displacement",
+  polarity: "auto",
+  atrPeriod: 14,
+  minimumBodyAtr: 1.5,
+  minimumCloseLocation: 0.75,
+};
+
 const keyForConcept = (name: string) => name.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
 
 export function executableConceptLabel(name: string | null | undefined): string | null {
@@ -159,6 +176,7 @@ export function executableConceptLabel(name: string | null | undefined): string 
   if (key === "premium") return "Premium";
   if (key === "discount") return "Discount";
   if (key.includes("equilibrium")) return "Equilibrium";
+  if (key === "displacement" || key.includes("displacement")) return "Displacement";
   return null;
 }
 
@@ -201,6 +219,7 @@ export function executableConceptKind(name: string | null | undefined): Executab
     key === "inside bar" || key === "support" || key === "resistance"
   ) return "price_action";
   if (key === "premium" || key === "discount" || key === "equilibrium" || key === "50 equilibrium") return "range_location";
+  if (key === "displacement" || key.includes("displacement")) return "displacement";
   return null;
 }
 
@@ -366,6 +385,23 @@ export function normalizeExecutableParameters(
     };
     return integerInRange(result.lookback, 2, 100) ? result : null;
   }
+  if (kind === "displacement") {
+    const defaults = DEFAULT_DISPLACEMENT_PARAMETERS;
+    const conceptKey = keyForConcept(conceptName || "");
+    if (input.polarity != null && input.polarity !== "auto" && input.polarity !== "bullish" && input.polarity !== "bearish") return null;
+    const result: DisplacementParameters = {
+      kind,
+      polarity: input.polarity === "bullish" || input.polarity === "bearish"
+        ? input.polarity
+        : conceptKey.includes("bullish") ? "bullish" : conceptKey.includes("bearish") ? "bearish" : defaults.polarity,
+      atrPeriod: input.atrPeriod == null ? defaults.atrPeriod : Number(input.atrPeriod),
+      minimumBodyAtr: input.minimumBodyAtr == null ? defaults.minimumBodyAtr : Number(input.minimumBodyAtr),
+      minimumCloseLocation: input.minimumCloseLocation == null ? defaults.minimumCloseLocation : Number(input.minimumCloseLocation),
+    };
+    return integerInRange(result.atrPeriod, 1, 500)
+      && numberInRange(result.minimumBodyAtr, 0, 20)
+      && numberInRange(result.minimumCloseLocation, 0.5, 1) ? result : null;
+  }
   return null;
 }
 
@@ -378,6 +414,10 @@ export function executableConceptTriggerRules(parameters: ExecutableConceptParam
   if (parameters.kind === "liquidity_level") return `Liquidity level: ${parameters.level.replaceAll("_", " ")}`;
   if (parameters.kind === "indicator") return `${parameters.indicator.toUpperCase()} ${parameters.comparison.replaceAll("_", " ")}`;
   if (parameters.kind === "price_action") return `Price action: ${parameters.pattern.replaceAll("_", " ")}`;
+  if (parameters.kind === "displacement") {
+    const polarity = parameters.polarity === "auto" ? "directional" : parameters.polarity;
+    return `Displacement: ${polarity} body >= ${parameters.minimumBodyAtr} ATR with close location >= ${parameters.minimumCloseLocation}`;
+  }
   return `Range location: ${parameters.location}`;
 }
 
@@ -409,5 +449,9 @@ export const EXECUTABLE_CONCEPT_DEFINITIONS = {
   range_location: {
     label: "Range Location",
     description: "Premium, discount, or equilibrium relative to an established rolling high-low range.",
+  },
+  displacement: {
+    label: "Displacement",
+    description: "A directional candle whose body is at least a configured multiple of prior ATR and closes near its directional extreme.",
   },
 } as const;

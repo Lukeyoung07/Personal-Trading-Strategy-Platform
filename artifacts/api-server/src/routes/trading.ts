@@ -410,6 +410,10 @@ const EXECUTABLE_CONCEPT_METADATA: Record<string, { description: string; detecti
     description: "Price reaches the prior rolling high and closes back below it.",
     detectionRules: "Structured detector: prior rolling high interaction and rejection.",
   },
+  "Displacement": {
+    description: "A directional candle has a body at least the configured ATR multiple and closes near its directional extreme.",
+    detectionRules: "Structured detector: body >= minimumBodyAtr × prior ATR and directional close location >= minimumCloseLocation.",
+  },
   "Premium": {
     description: "The close is above the midpoint of the established rolling range.",
     detectionRules: "Structured detector: prior rolling high-low midpoint.",
