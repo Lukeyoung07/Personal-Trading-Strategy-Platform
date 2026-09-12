@@ -1,0 +1,302 @@
+TRADEX — FIX BUILD WITH AI INSTRUCTION-TEXT PARSING
+
+There is a remaining generic parsing bug in Build with AI.
+
+When I entered a prompt containing instructions such as:
+
+"Use ONLY concepts that already exist in the TradeX Trading Concept Library.
+Do not invent, guess, or use placeholder concepts.
+Do not use 'another concept'.
+Do not add concepts simply because they are commonly associated with trading,
+ICT, SMC, or the requested strategy."
+
+Build with AI incorrectly extracted parts of those instructions as trading
+concepts, including:
+
+- "ONLY concepts that already exist in the TradeX Trading Concept Library"
+- "trading"
+- "ICT"
+- "SMC"
+- "or the requested"
+- "another concept"
+- "other concept"
+- "unknown concept"
+- "or similar"
+- "1. Do not invent a replacement."
+- "market/direction/timeframe information that can be reliably determined"
+
+This must be fixed GENERICALLY.
+
+==================================================
+CORE RULE
+==================================================
+
+Build with AI must distinguish between:
+
+A) TRADING CONCEPTS THE USER IS REQUESTING
+
+and
+
+B) INSTRUCTIONS ABOUT HOW BUILD WITH AI SHOULD INTERPRET THE REQUEST.
+
+Only category A may become strategy conditions.
+
+Never extract category B as concepts.
+
+The user's instructional text must never become a Trading Concept Library
+condition.
+
+==================================================
+NEGATION / INSTRUCTION HANDLING
+==================================================
+
+The following must NEVER become concepts merely because they appear in the
+prompt:
+
+- "do not add EMA"
+- "do not invent FVG"
+- "only use supported concepts"
+- "do not use ICT"
+- "don't include SMT"
+- "never add RSI"
+- "unsupported concepts should remain review_required"
+- "do not create another concept"
+- "use the canonical registry"
+- "preserve the original wording"
+
+These are instructions about generation behaviour.
+
+They are NOT requests to use those concepts.
+
+However, the system must still understand a positive request such as:
+
+"Use EMA 20"
+
+as an actual EMA request.
+
+==================================================
+POSITIVE REQUEST VS NEGATIVE REFERENCE
+==================================================
+
+Build with AI must distinguish:
+
+"Use EMA 20 and RSI below 30."
+
+→ EMA
+→ RSI
+
+from:
+
+"Do not add EMA or RSI."
+
+→ no EMA
+→ no RSI
+
+and:
+
+"Use Breakout. Do not add EMA, RSI or FVG."
+
+→ Breakout only.
+
+The presence of a concept name inside a prohibition must never authorize it.
+
+==================================================
+META-INSTRUCTIONS
+==================================================
+
+Do not extract ordinary instruction language as concepts.
+
+Examples that must NOT become concepts:
+
+- trading
+- strategy
+- requested strategy
+- market
+- direction
+- timeframe
+- risk rules
+- supported concepts
+- existing concepts
+- canonical registry
+- placeholder
+- unknown concept
+- similar
+- replacement
+- review-required
+- backtest-compatible
+- backtesting
+- monitoring
+- Builder
+- Build with AI
+
+These are not automatically Trading Concept Library concepts.
+
+Only resolve text against the canonical registry when the surrounding text
+actually expresses a positive trading-condition request.
+
+==================================================
+UNKNOWN CONCEPT HANDLING
+==================================================
+
+If the user genuinely requests:
+
+"Use Judas Swing"
+
+and Judas Swing exists in the catalog as review_required:
+
+→ preserve Judas Swing as review_required.
+
+If the user genuinely requests a concept that does not exist:
+
+→ preserve the user's actual requested phrase as review_required.
+
+But NEVER create a fake concept from an instruction fragment.
+
+For example:
+
+"Do not use another concept."
+
+must NOT produce:
+
+Concept "another concept"
+
+Instead it should produce no concept at all.
+
+==================================================
+FINAL AUTHORIZATION
+==================================================
+
+Keep the existing canonical authorization system.
+
+Before a generated condition reaches the draft, determine:
+
+1. What exact positive user request authorized this condition?
+2. Does it resolve to a canonical Trading Concept Library concept?
+3. Is the concept actually being requested rather than merely mentioned in
+   an instruction, prohibition, example, explanation, or metadata?
+
+If the answer to #1 is no:
+
+REMOVE THE CONDITION.
+
+Do not mark it review_required.
+
+Do not invent a replacement.
+
+==================================================
+IMPORTANT
+==================================================
+
+Do NOT solve this with a hard-coded list of phrases from this particular
+prompt.
+
+Do NOT add special handling for:
+
+- "another concept"
+- "ICT"
+- "SMC"
+- "ONLY concepts"
+- or any other phrase from this test.
+
+The parser needs a generic distinction between:
+
+POSITIVE TRADING REQUEST
+
+and
+
+META/INSTRUCTION/NEGATION TEXT.
+
+==================================================
+REGRESSION TESTS
+==================================================
+
+Add tests for:
+
+1. "Use Breakout."
+
+Expected:
+Breakout only.
+
+2. "Use Breakout. Do not add EMA, RSI or FVG."
+
+Expected:
+Breakout only.
+
+3. "Use EMA 20 and RSI below 30."
+
+Expected:
+EMA + RSI.
+
+4. "Do not use EMA or RSI."
+
+Expected:
+No EMA and no RSI.
+
+5. "Do not create another concept."
+
+Expected:
+No concept named "another concept".
+
+6. "Only use concepts from the Trading Concept Library."
+
+Expected:
+No concept named "Trading Concept Library".
+
+7. A completely natural strategy request containing instructional text.
+
+Expected:
+Only positively requested trading concepts.
+
+8. An explicitly requested unsupported concept.
+
+Expected:
+That exact concept as review_required.
+
+9. A mixed request containing executable + unsupported concepts.
+
+Expected:
+Executable concepts remain executable and only the genuinely requested
+unsupported concept becomes review_required.
+
+10. A long prompt containing examples of prohibited concepts.
+
+Expected:
+Prohibited examples must never become strategy conditions.
+
+==================================================
+FINAL VALIDATION
+==================================================
+
+Run the complete existing test suite.
+
+Also manually test Build with AI using:
+
+"Create a simple XAUUSD 5m Breakout strategy. Long when a closed candle
+closes above the previous candle high. Short when a closed candle closes
+below the previous candle low. Stop loss 1%. Take profit 2%."
+
+Expected:
+
+- XAUUSD
+- 5m
+- Breakout long
+- Breakout short
+- 1% stop loss
+- 2% take profit
+- Review Required: NONE
+
+No EMA.
+No SMA.
+No RSI.
+No FVG.
+No Displacement.
+No Liquidity Sweep.
+No SMT.
+No AMD.
+No HTF Bias.
+No "another concept".
+
+Do not modify existing trading records.
+
+The goal is to fix the generic Build with AI parser/reconciliation boundary,
+not to create another prompt-specific exception.
