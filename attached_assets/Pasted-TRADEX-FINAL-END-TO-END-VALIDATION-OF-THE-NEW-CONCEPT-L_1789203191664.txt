@@ -1,0 +1,299 @@
+TRADEX — FINAL END-TO-END VALIDATION OF THE NEW CONCEPT LIBRARY
+
+The canonical Trading Concept Library refactor is now implemented.
+
+Before we move on to creating strategies, finish the migration and validate
+the entire system end-to-end.
+
+IMPORTANT:
+The implementation report says the broader assistant test suite still has
+legacy expectations for the intentionally removed HTF remapping and older
+non-canonical display names.
+
+Do NOT leave those tests knowingly failing.
+
+Update the affected tests to reflect the new canonical architecture where
+the new behaviour is intentional.
+
+Do not restore the old HTF remapping.
+
+Do not reintroduce the old non-canonical behaviour just to make tests pass.
+
+==================================================
+1. BUILD WITH AI END-TO-END TEST
+==================================================
+
+Use this exact request:
+
+Create a simple XAUUSD 5m strategy.
+
+Long:
+Price closes above the previous candle high.
+
+Short:
+Price closes below the previous candle low.
+
+Stop loss: 1%
+Take profit: 2%
+
+Use only these rules.
+
+Do not add any other concepts.
+
+Verify that the resulting draft contains ONLY:
+
+- XAUUSD
+- 5m
+- Long Breakout
+- Short Breakout
+- 1% Stop Loss
+- 2% Take Profit
+
+There must be:
+
+Review Required: NONE
+
+It must NOT contain:
+
+- EMA
+- SMA
+- RSI
+- FVG
+- FVG Retest
+- Displacement
+- Liquidity Sweep
+- SMT
+- AMD / Power of 3
+- HTF Bias
+- New York Session
+- any other concept
+
+==================================================
+2. TEST A COMPLETELY DIFFERENT STRATEGY
+==================================================
+
+Do not hard-code the previous test.
+
+Test another concept combination from the canonical library.
+
+For example:
+
+XAUUSD 5m
+
+Bullish Displacement followed by Bullish FVG Retest.
+
+Stop loss: 1%
+Take profit: 2%
+
+Verify the AI resolves the concepts using the canonical registry and does
+not introduce unrelated concepts.
+
+==================================================
+3. TEST AN UNSUPPORTED CONCEPT
+==================================================
+
+Test an explicitly requested concept that genuinely remains
+review_required.
+
+For example:
+
+Create an XAUUSD 5m strategy using a Judas Swing.
+
+Verify:
+
+- Judas Swing is preserved.
+- It is Review Required.
+- The reason explains that it lacks a deterministic evaluator.
+- No unrelated concepts are added.
+- The system does NOT substitute Judas Swing with another concept.
+
+==================================================
+4. TEST MIXED EXECUTABLE + UNSUPPORTED
+==================================================
+
+Test:
+
+XAUUSD 5m
+Liquidity Sweep
+followed by
+Judas Swing
+
+Verify:
+
+Liquidity Sweep = executable
+
+Judas Swing = Review Required
+
+Do NOT make the entire strategy incorrectly Review Required because one
+concept is unsupported.
+
+Do NOT replace Judas Swing with another concept.
+
+==================================================
+5. TEST ALIASES
+==================================================
+
+Verify natural-language variants resolve to the same canonical concepts.
+
+Examples:
+
+Gold → XAUUSD
+
+5 minute → 5m
+
+bullish FVG → FVG + bullish polarity
+
+bearish FVG → FVG + bearish polarity
+
+20/50 EMA cross → EMA Cross with fast=20 and slow=50
+
+EMA 20 crosses above EMA 50 → EMA Cross with correct polarity
+
+New York session → New York Session
+
+Do not create duplicate concepts for aliases.
+
+==================================================
+6. TEST TEMPORAL RELATIONSHIPS
+==================================================
+
+Test:
+
+"bullish displacement followed by bullish FVG retest"
+
+Verify the result contains:
+
+Displacement
+FVG
+FVG Retest
+
+with the relationship:
+
+Displacement → followed by → FVG Retest
+
+Do not invent a new "Continuation" concept.
+
+Do not lose the relationship.
+
+If the relationship itself is currently unsupported by the evaluator,
+preserve that exact limitation rather than inventing behaviour.
+
+==================================================
+7. TEST MULTIPLE TRADES
+==================================================
+
+Use a sufficiently long historical period.
+
+Verify that the backtest evaluates every eligible closed candle and can
+produce multiple independent trades.
+
+Verify:
+
+- it does not stop after the first trade
+- it does not artificially cap trades at one
+- later signals can create later trades
+- open positions are not repeatedly entered from the same signal
+- closed positions allow subsequent valid signals
+
+==================================================
+8. TEST THE FULL DATA FLOW
+==================================================
+
+Verify the same canonical concept information survives:
+
+Build with AI
+↓
+Draft
+↓
+Builder
+↓
+Strategy
+↓
+Immutable Version
+↓
+Backtest
+↓
+Monitoring
+
+No stage should reinterpret the concept differently.
+
+Verify canonical ID, registry version, parameters, status and evaluator
+metadata remain consistent.
+
+==================================================
+9. REGISTRY INTEGRITY
+==================================================
+
+Verify every current Trading Concept Library concept has:
+
+- canonical ID
+- canonical definition
+- aliases
+- executable/review status
+- evaluator metadata where executable
+- parameters
+- required data/timeframe information
+- review reason where non-executable
+
+Do not silently leave concepts without definitions.
+
+==================================================
+10. TEST SUITE
+==================================================
+
+Run:
+
+- all API tests
+- all frontend tests
+- all workspace typechecks
+- production builds
+- git diff --check
+
+Fix any failures caused by the refactor.
+
+Do not simply report known failures as acceptable.
+
+Existing intentional behaviour changes should be reflected in the tests.
+
+Do not weaken tests or remove coverage just to make them pass.
+
+==================================================
+11. DATA SAFETY
+==================================================
+
+Do not modify existing:
+
+- strategies
+- versions
+- trades
+- backtests
+- monitoring records
+- alerts
+- market data
+- integrations
+
+Use disposable test data only.
+
+Delete/clean up temporary records after testing.
+
+==================================================
+FINAL ACCEPTANCE CRITERIA
+==================================================
+
+Do not report this task complete unless:
+
+1. Build with AI no longer introduces unrequested concepts.
+2. Existing executable concepts resolve through the canonical registry.
+3. Aliases resolve correctly.
+4. Explicit unsupported concepts remain Review Required.
+5. Unsupported concepts are never replaced by approximate concepts.
+6. Temporal relationships are preserved.
+7. Builder, versions, backtesting and monitoring use the same canonical
+   definitions.
+8. Multiple trades can be produced by backtesting.
+9. No intentional test failures remain.
+10. Full test/typecheck/build verification passes.
+
+The goal is to prove that the new Trading Concept Library architecture
+actually solves the original Build with AI problem generically, rather
+than merely proving that the registry itself exists.
