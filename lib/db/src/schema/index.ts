@@ -66,8 +66,16 @@ export const tradingConceptsTable = pgTable("trading_concepts", {
   detectionRules: text("detection_rules"),
   invalidationRules: text("invalidation_rules"),
   isBuiltIn: boolean("is_built_in").notNull().default(false),
+  canonicalId: text("canonical_id"),
+  registryVersion: text("registry_version"),
+  canonicalStatus: text("canonical_status"),
+  executorKind: text("executor_kind"),
+  aliases: jsonb("aliases"),
+  canonicalDefinition: jsonb("canonical_definition"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, table => [
+  uniqueIndex("trading_concepts_canonical_id_unique").on(table.canonicalId),
+]);
 
 export const strategyConditionsTable = pgTable("strategy_conditions", {
   id: serial("id").primaryKey(),
@@ -82,6 +90,11 @@ export const strategyConditionsTable = pgTable("strategy_conditions", {
   conditionOrder: integer("condition_order").notNull().default(1),
   triggerRules: text("trigger_rules"),
   parameters: jsonb("parameters"),
+  canonicalId: text("canonical_id"),
+  registryVersion: text("registry_version"),
+  canonicalStatus: text("canonical_status"),
+  executorKind: text("executor_kind"),
+  canonicalDefinition: jsonb("canonical_definition"),
   invalidationRules: text("invalidation_rules"),
   resetBehavior: text("reset_behavior"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -106,6 +119,11 @@ export const strategyVersionConditionsTable = pgTable("strategy_version_conditio
   conditionOrder: integer("condition_order").notNull().default(1),
   triggerRules: text("trigger_rules"),
   parameters: jsonb("parameters"),
+  canonicalId: text("canonical_id"),
+  registryVersion: text("registry_version"),
+  canonicalStatus: text("canonical_status"),
+  executorKind: text("executor_kind"),
+  canonicalDefinition: jsonb("canonical_definition"),
   invalidationRules: text("invalidation_rules"),
   resetBehavior: text("reset_behavior"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -494,7 +512,16 @@ export type UserSettings = typeof userSettingsTable.$inferSelect;
 export type InsertStrategy = z.infer<typeof insertStrategySchema>;
 export type InsertStrategyVersion = z.infer<typeof insertStrategyVersionSchema>;
 export type InsertStrategyVersionCondition = z.infer<typeof insertStrategyVersionConditionSchema>;
-export const insertStrategyConditionSchema = createInsertSchema(strategyConditionsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStrategyConditionSchema = createInsertSchema(strategyConditionsTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  canonicalId: true,
+  registryVersion: true,
+  canonicalStatus: true,
+  executorKind: true,
+  canonicalDefinition: true,
+});
 export type InsertStrategyCondition = z.infer<typeof insertStrategyConditionSchema>;
 export type InsertTradingConcept = z.infer<typeof insertTradingConceptSchema>;
 export type InsertCondition = z.infer<typeof insertConditionSchema>;

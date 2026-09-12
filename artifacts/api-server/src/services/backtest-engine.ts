@@ -2,6 +2,7 @@ import {
   historicalRuleCompatibilityError,
   normalizeHistoricalRule,
   normalizeExecutableParameters,
+  resolveTradingConcept,
   type ExecutableConceptParameters,
 } from "@workspace/api-zod";
 
@@ -155,7 +156,19 @@ function evaluateRule(rule: string, candle: HistoricalCandle, previous: Historic
 }
 
 function executableParameters(condition: BacktestCondition): ExecutableConceptParameters | null {
-  return normalizeExecutableParameters(condition.conceptName || condition.name, condition.parameters);
+  const conceptName = condition.conceptName || condition.name;
+  const definition = resolveTradingConcept(conceptName);
+  if (definition && definition.status !== "executable") return null;
+  return normalizeExecutableParameters(definition?.name || conceptName, condition.parameters);
+}
+
+function isReviewRequiredConcept(condition: BacktestCondition) {
+  const conceptName = condition.conceptName || condition.name;
+  const definition = resolveTradingConcept(conceptName);
+  if (["bullish candle", "bearish candle", "candle direction"].includes(
+    conceptName.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(),
+  )) return false;
+  return definition?.status === "review_required";
 }
 
 function levelForLiquidity(candles: HistoricalCandle[], index: number, level: "high" | "low", lookback: number) {
@@ -546,6 +559,7 @@ export function evaluateExecutableConditionAtLatest(
   candles: HistoricalCandle[],
 ): boolean | null {
   if (!candles.length) return false;
+  if (isReviewRequiredConcept(condition)) return null;
   const rule = condition.triggerRules?.trim() || condition.conceptDetectionRules?.trim();
   if (!executableParameters(condition)) {
     if (!rule?.trim()) return null;
@@ -576,6 +590,10 @@ export function validateHistoricalBacktestStrategy(strategy: BacktestStrategy) {
   }
   for (const condition of [...entryConditions, ...exitConditions]) {
     try {
+      if (isReviewRequiredConcept(condition)) {
+        errors.push(`${condition.name}: this canonical concept is review required and has no executable evaluator.`);
+        continue;
+      }
       if (condition.conceptName && condition.parameters != null && !executableParameters(condition)) {
         errors.push(`${condition.name}: executable parameters are invalid.`);
         continue;

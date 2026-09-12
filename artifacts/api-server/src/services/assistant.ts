@@ -14,11 +14,12 @@ import {
 import {
   ChatAssistantResponse,
   EXECUTABLE_CONCEPT_DEFINITIONS,
-  EXECUTABLE_CONCEPT_REQUEST_ALIASES,
   executableConceptTriggerRules,
   executableConceptKind,
   executableConceptLabel,
   normalizeExecutableParameters,
+  resolveTradingConcept,
+  TRADING_CONCEPT_REGISTRY,
   normalizeStrategyTimeframe,
   universalValidation,
   type UniversalRiskRule,
@@ -286,8 +287,17 @@ const UNSUPPORTED_CONCEPTS: UnsupportedConceptDefinition[] = [
 
 function unsupportedConceptForText(value: string): UnsupportedConceptDefinition | null {
   if (catalogKey(value) === "multi timeframe analysis") return null;
+  if (["bullish candle", "bearish candle", "candle direction"].includes(catalogKey(value))) return null;
   if (executableConceptKind(value)) return null;
-  return UNSUPPORTED_CONCEPTS.find(concept => concept.pattern.test(value)) || null;
+  const legacy = UNSUPPORTED_CONCEPTS.find(concept => concept.pattern.test(value));
+  if (legacy) return legacy;
+  const canonical = resolveTradingConcept(value);
+  if (!canonical || canonical.status === "executable") return null;
+  return {
+    pattern: /$^/,
+    name: canonical.name,
+    explanation: canonical.statusReason,
+  };
 }
 
 function compatibilityForDraft(draft: any) {
@@ -301,6 +311,7 @@ function compatibilityForDraft(draft: any) {
     "take profit",
   ]);
   const unsupported: string[] = conditions
+    .filter((condition: any) => !["candle direction", "bullish candle", "bearish candle"].includes(catalogKey(String(condition?.conceptName || ""))))
     .filter((condition: any) => condition?.supported !== true || (
       !supportedRule(normalizeConditionRule(condition))
       && !normalizeExecutableParameters(condition?.conceptName, condition?.parameters)
@@ -344,13 +355,8 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
     const rawName = String(typeof raw === "string" ? raw : raw?.name || fallbackName || "").trim().slice(0, 120);
     if (!rawName) return;
     const isMultiTimeframe = catalogKey(rawName) === "multi timeframe analysis";
-    const isMappedHtfBias = catalogKey(rawName) === "higher timeframe bias"
-      && conditions.some((condition: any) =>
-        executableConceptKind(condition?.conceptName) === "market_structure"
-        && /\b(?:htf|higher[- ]timeframe|bias|structure)\b/i.test(`${condition?.name || ""} ${condition?.timeframe || ""}`),
-      );
-    const unsupportedConcept = isMultiTimeframe || isMappedHtfBias ? null : unsupportedConceptForText(rawName);
-    const name = isMappedHtfBias ? "Market Structure Shift" : unsupportedConcept?.name || executableConceptLabel(rawName) || rawName;
+    const unsupportedConcept = isMultiTimeframe ? null : unsupportedConceptForText(rawName);
+    const name = unsupportedConcept?.name || executableConceptLabel(rawName) || rawName;
     const matchingConditions = conditions.filter(condition =>
       condition.conceptName.toLowerCase() === rawName.toLowerCase() ||
       condition.conceptName.toLowerCase() === name.toLowerCase(),
@@ -358,7 +364,7 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
     const executable = executableConceptKind(rawName) !== null || matchingConditions.some(condition => executableConceptKind(condition.conceptName) !== null);
     const supported = unsupportedConcept
       ? false
-      : isMultiTimeframe || isMappedHtfBias
+      : isMultiTimeframe
         ? true
         : executable
         ? matchingConditions.length === 0 || matchingConditions.every(condition => condition.supported)
@@ -392,6 +398,7 @@ function conceptsRequestedInMessage(message: string) {
     if (concept.name === "Retest" && /(?:fvg|fair\s+value\s+gap)[^.!?]{0,60}\bretests?\b/i.test(message)) continue;
     const match = message.match(concept.pattern);
     if (!match || seen.has(concept.name)) continue;
+    if (resolveTradingConcept(concept.name)?.status === "executable") continue;
     const executableKind = executableConceptKind(concept.name);
     if (executableKind) {
        const name = executableConceptLabel(concept.name) || EXECUTABLE_CONCEPT_DEFINITIONS[executableKind].label;
@@ -428,14 +435,31 @@ function conceptsRequestedInMessage(message: string) {
 }
 
 function requestedExecutableConceptMatches(message: string) {
-  const executableMatches = [...EXECUTABLE_CONCEPT_REQUEST_ALIASES]
-    .sort((left, right) => right.length - left.length)
-    .flatMap(alias => {
+  const executableMatches = TRADING_CONCEPT_REGISTRY
+    .filter(definition => definition.status === "executable")
+    .flatMap(definition => [definition.name, ...definition.aliases].map(alias => ({ alias, definition })))
+    .sort((left, right) => right.alias.length - left.alias.length)
+    .flatMap(({ alias, definition }) => {
       const match = message.match(new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")}\\b`, "i"));
       if (!match) return [];
-      return [{ name: executableConceptLabel(alias) || alias, matchedText: match[0] }];
+      return [{ name: definition.name, matchedText: match[0], canonicalId: definition.canonicalId }];
     })
-    .filter(match => !(match.name === "Rejection" && /\bstrong\s+rejection\b/i.test(message)));
+    .filter((match, index, matches) => matches.findIndex(candidate => candidate.canonicalId === match.canonicalId) === index)
+    .filter((match, index, matches) => !matches.some((candidate, candidateIndex) =>
+      candidateIndex !== index
+      && candidate.matchedText.length > match.matchedText.length
+      && candidate.matchedText.toLowerCase().includes(match.matchedText.toLowerCase()),
+    ))
+    .filter(match => {
+      const hasRetest = /\b(?:fvg|fair\s+value\s+gap)\b[^.!?]{0,60}\bretests?\b/i.test(message);
+      const hasFill = /\b(?:fvg|fair\s+value\s+gap)\b[^.!?]{0,60}\bfills?\b/i.test(message);
+      const hasDirectionalFvg = /\b(?:bullish|bearish)\s+(?:fvg|fair\s+value\s+gap)\b/i.test(message);
+      if (hasRetest && ["Fair Value Gap", "Bullish FVG", "Bearish FVG", "FVG Fill"].includes(match.name)) return false;
+      if (hasFill && ["Fair Value Gap", "Bullish FVG", "Bearish FVG", "FVG Retest"].includes(match.name)) return false;
+      if (hasDirectionalFvg && match.name === "Fair Value Gap") return false;
+      if (/\bwick\s+rejection\b/i.test(message) && match.name === "Rejection") return false;
+      return !(match.name === "Rejection" && /\bstrong\s+rejection\b/i.test(message));
+    });
   const candleMatch = message.match(/\b(?:bullish|bearish)\s+candle\b|\bcandle\s+(?:direction|strategy)\b/i);
   return candleMatch
     ? [...executableMatches, { name: "Candle Direction", matchedText: candleMatch[0] }]
@@ -468,83 +492,9 @@ function explicitConceptPhraseMatches(message: string) {
   return matches;
 }
 
-function exactHtfBiasRetestRequest(message: string) {
-  const hasBothBiasDirections = /\b(?:higher[- ]timeframe|htf)\b[^.!?]{0,50}\bbullish\b[^.!?]{0,50}\bbearish\b[^.!?]{0,30}\bbias\b/i.test(message)
-    || /\b(?:higher[- ]timeframe|htf)\b[^.!?]{0,50}\bbearish\b[^.!?]{0,50}\bbullish\b[^.!?]{0,30}\bbias\b/i.test(message);
-  return hasBothBiasDirections
-    && /(?:fvg|fair\s+value\s+gap)[^.!?]{0,60}\bretests?\b/i.test(message);
-}
-
 function requestTimeframeValues(message: string) {
   return [...message.matchAll(/\b\d+(?:\.\d+)?\s*(?:m|min|minute|h|hr|hour|d|day|w|week)s?\b/gi)]
     .map(match => match[0].replace(/\s+/g, "").toUpperCase());
-}
-
-function mappedHtfBiasRetestConditions(
-  conditions: any[],
-  message: string,
-  authorizations: RequestedConceptAuthorization[],
-) {
-  if (!exactHtfBiasRetestRequest(message)) return null;
-  const requestedTimeframes = requestTimeframeValues(message);
-  const htfCondition = conditions.find(condition => /\b(?:htf|higher[- ]timeframe|bias|structure)\b/i.test(`${condition?.name || ""} ${condition?.conceptName || ""}`));
-  const fvgCondition = conditions.find(condition => /\b(?:fvg|fair\s+value\s+gap|retest)\b/i.test(`${condition?.name || ""} ${condition?.conceptName || ""} ${condition?.triggerRules || ""}`));
-  const higherTimeframe = String(htfCondition?.timeframe || requestedTimeframes[0] || "1H");
-  const lowerTimeframe = String(fvgCondition?.timeframe || requestedTimeframes[1] || requestedTimeframes[0] || "5M");
-  const structureAuthorization = authorizations.find(authorization =>
-    ["higher timeframe bias", "market structure shift"].includes(catalogKey(authorization.canonicalConcept)),
-  );
-  const fvgAuthorization = authorizations.find(authorization => catalogKey(authorization.canonicalConcept) === "fair value gap");
-  if (!structureAuthorization || !fvgAuthorization) return null;
-  const sides = [
-    { direction: "long", polarity: "bullish", label: "Bullish" },
-    { direction: "short", polarity: "bearish", label: "Bearish" },
-  ] as const;
-  return sides.flatMap(side => {
-    const structureParameters = normalizeExecutableParameters("Market Structure Shift", {
-      signal: "mss",
-      polarity: side.polarity,
-      lookback: 10,
-    });
-    const fvgParameters = normalizeExecutableParameters("Fair Value Gap", {
-      polarity: side.polarity,
-      interaction: "retest",
-      lookback: 20,
-      minimumGap: 0,
-    });
-    return [
-      {
-        name: `${side.label} higher-timeframe structure`,
-        stage: "entry",
-        requirement: "required",
-        conceptName: "Market Structure Shift",
-        timeframe: higherTimeframe,
-        direction: side.direction,
-        triggerRules: structureParameters ? executableConceptTriggerRules(structureParameters) : "",
-        parameters: structureParameters,
-        ruleSupported: Boolean(structureParameters),
-        supported: Boolean(structureParameters),
-        authorization: conditionAuthorization(
-          { conceptName: "Market Structure Shift" },
-          authorizations,
-          { requestedConcept: structureAuthorization.requestedConcept, status: "required_for_concept" },
-        ),
-      },
-      {
-        name: `${side.label} Fair Value Gap Retest`,
-        stage: "confirmation",
-        requirement: "required",
-        conceptName: "Fair Value Gap",
-        timeframe: lowerTimeframe,
-        direction: side.direction,
-        triggerRules: fvgParameters ? executableConceptTriggerRules(fvgParameters) : "",
-        parameters: fvgParameters,
-        ruleSupported: Boolean(fvgParameters),
-        supported: Boolean(fvgParameters),
-        authorization: conditionAuthorization({ conceptName: "Fair Value Gap" }, authorizations),
-      },
-    ];
-  });
 }
 
 function requestedDirection(message: string, fallback: string) {
@@ -581,13 +531,28 @@ function requestedConceptNames(message: string) {
 
 function canonicalConceptName(value: string) {
   const normalized = String(value || "").trim();
-  return executableConceptLabel(normalized) || unsupportedConceptForText(normalized)?.name || normalized;
+  if (["bullish candle", "bearish candle", "candle direction"].includes(catalogKey(normalized))) {
+    return "Candle Direction";
+  }
+  return resolveTradingConcept(normalized)?.name
+    || executableConceptLabel(normalized)
+    || unsupportedConceptForText(normalized)?.name
+    || normalized;
+}
+
+function canonicalExecutableName(value: string) {
+  const definition = resolveTradingConcept(value);
+  return definition?.status === "executable"
+    ? definition.name
+    : executableConceptLabel(value) || value;
 }
 
 function requestedConceptAuthorizations(message: string): RequestedConceptAuthorization[] {
   const byCanonical = new Map<string, RequestedConceptAuthorization>();
   const add = (requestedConcept: string, matchedText: string, supported: boolean, explanation: string) => {
     let canonicalConcept = canonicalConceptName(requestedConcept);
+    const hasFvgInteraction = /\b(?:fvg|fair\s+value\s+gap)\b[^.!?]{0,60}\b(?:retests?|fills?)\b/i.test(message);
+    if (canonicalConcept === "Fair Value Gap" && hasFvgInteraction) return;
     if (canonicalConcept === "Kill Zones") {
       if (/\bnew\s+york\s+(?:session\s+)?kill\s+zone\b/i.test(message)) canonicalConcept = "New York Session";
       else if (/\blondon\s+(?:session\s+)?kill\s+zone\b/i.test(message)) canonicalConcept = "London Session";
@@ -595,6 +560,9 @@ function requestedConceptAuthorizations(message: string): RequestedConceptAuthor
     }
     if (!canonicalConcept) return;
     const key = catalogKey(canonicalConcept);
+    if (["FVG Retest", "FVG Fill"].includes(canonicalConcept)) {
+      byCanonical.delete(catalogKey("Fair Value Gap"));
+    }
     const existing = byCanonical.get(key);
     if (existing) {
       if (!existing.matchedText && matchedText) existing.matchedText = matchedText;
@@ -614,14 +582,12 @@ function requestedConceptAuthorizations(message: string): RequestedConceptAuthor
   }
   for (const concept of requestedExecutableConceptMatches(message)) {
     const canonical = canonicalConceptName(concept.name);
-    const definition = executableConceptKind(canonical)
-      ? EXECUTABLE_CONCEPT_DEFINITIONS[executableConceptKind(canonical)!]
-      : null;
+    const definition = resolveTradingConcept(canonical);
     add(
       concept.name,
       concept.matchedText,
-      Boolean(executableConceptKind(canonical)),
-      definition?.description || "Mapped to the existing structured executable concept definition.",
+      definition?.status === "executable",
+      definition?.definition || "Mapped to the existing structured executable concept definition.",
     );
   }
   for (const phrase of explicitConceptPhraseMatches(message)) {
@@ -629,10 +595,8 @@ function requestedConceptAuthorizations(message: string): RequestedConceptAuthor
     add(
       phrase,
       phrase,
-      Boolean(executableConceptKind(canonical)),
-      executableConceptKind(canonical)
-        ? "Mapped to the existing structured executable concept definition."
-        : "Explicitly requested, but not currently executable by the historical Builder.",
+      resolveTradingConcept(canonical)?.status === "executable" || Boolean(executableConceptKind(canonical)),
+      resolveTradingConcept(canonical)?.definition || "Explicitly requested, but not currently executable by the historical Builder.",
     );
   }
   return [...byCanonical.values()].sort((left, right) => {
@@ -853,13 +817,13 @@ function syntheticRequestedCondition(
   const direction = requestedDirection(message, draft.direction);
   const condition = {
     name: !supported
-      ? executableConceptLabel(conceptName) || conceptName
+      ? canonicalExecutableName(conceptName)
       : parameters?.kind === "fair_value_gap" && parameters.interaction === "retest"
       ? "Fair Value Gap Retest"
-      : `${executableConceptLabel(conceptName) || conceptName} condition`,
+      : `${canonicalExecutableName(conceptName)} condition`,
     stage: stageForRequestedConcept(conceptName, message, conceptName === "Fair Value Gap" ? "confirmation" : "entry"),
     requirement: "required",
-    conceptName: executableConceptLabel(conceptName) || conceptName,
+    conceptName: canonicalExecutableName(conceptName),
     timeframe: requestedTimeframes(message)[index] || requestedTimeframes(message)[0] || "Not specified",
     direction,
     triggerRules: parameters ? executableConceptTriggerRules(parameters) : `${conceptName} requested; review required because it is not executable by the current Builder.`,
@@ -910,9 +874,7 @@ function directionalizeCondition(condition: any, direction: string, message: str
 function reconcileRequestedConditions(draft: any, message: string) {
   const originalConditions = Array.isArray(draft.conditions) ? draft.conditions : [];
   const authorizations = requestedConceptAuthorizations(message);
-  const mappedHtfRetest = mappedHtfBiasRetestConditions(originalConditions, message, authorizations);
-  if (mappedHtfRetest) return mappedHtfRetest;
-  const requested = authorizations
+  const requested = [...new Set(authorizations
     .filter(authorization => ![
       "multi timeframe analysis",
       "risk reward",
@@ -922,7 +884,7 @@ function reconcileRequestedConditions(draft: any, message: string) {
       "stop loss",
       "take profit",
     ].includes(catalogKey(authorization.canonicalConcept)))
-    .map(authorization => authorization.canonicalConcept);
+    .map(authorization => canonicalConceptName(authorization.canonicalConcept)))];
   if (!requested.length) return [];
   const timeframes = requestedTimeframes(message);
   const direction = requestedDirection(message, draft.direction);
@@ -930,7 +892,7 @@ function reconcileRequestedConditions(draft: any, message: string) {
     const matching = originalConditions.filter((condition: any) => conditionMatchesConcept(condition, requestedName));
     if (!matching.length) return [syntheticRequestedCondition(requestedName, draft, message, requestedIndex, authorizations)];
     return matching.map((condition: any) => {
-      const conceptName = executableConceptLabel(condition.conceptName) || condition.conceptName || requestedName;
+      const conceptName = canonicalExecutableName(condition.conceptName || requestedName);
       const parameters = requestedParameters(conceptName, message, condition);
       const conditionTimeframe = timeframes.find(value => catalogKey(value) === catalogKey(String(condition.timeframe || "")))
         || (timeframes.length === 1 ? timeframes[0] : condition.timeframe)
@@ -1044,6 +1006,7 @@ const CONCEPT_ALIASES: Record<string, string[]> = {
 function matchCatalogConcept(value: string, catalog: BuilderCatalog): string | null {
   const key = catalogKey(value);
   if (!key) return null;
+  if (key === "candle direction") return "Candle Direction";
   const exact = catalog.concepts.find(concept => catalogKey(concept.name) === key);
   if (exact) return exact.name;
   const aliasTarget = Object.entries(CONCEPT_ALIASES).find(([, aliases]) => aliases.some(alias => {
@@ -1157,8 +1120,10 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
   const conditions = mappedConditions.map((condition: any, conditionIndex: number) => {
     const conceptName = matchCatalogConcept(String(condition.conceptName || ""), catalog);
     const timeframe = matchCatalogTimeframe(String(condition.timeframe || ""), catalog);
-    if (!conceptName) warnings.push(`Concept “${String(condition.conceptName || "Unnamed concept")}” is not in the Trading Concept Library.`);
-    if (condition.timeframe && !timeframe) warnings.push(`Timeframe “${String(condition.timeframe)}” is not in the active Builder timeframes.`);
+    if (!conceptName && catalogKey(String(condition.conceptName || "")) !== "candle direction") {
+      warnings.push(`Concept “${String(condition.conceptName || "Unnamed concept")}” is not in the Trading Concept Library.`);
+    }
+    if (condition.timeframe && condition.timeframe !== "Not specified" && !timeframe) warnings.push(`Timeframe “${String(condition.timeframe)}” is not in the active Builder timeframes.`);
     const recomputedAuthorization = requestMessage
       ? conditionAuthorization({ ...condition, conceptName: conceptName || condition.conceptName }, requestAuthorizations)
       : null;

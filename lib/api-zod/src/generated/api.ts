@@ -812,6 +812,11 @@ export const ListStrategyVersionConditionsResponseItem = zod.object({
   "conceptDescription": zod.string().nullable(),
   "conceptDetectionRules": zod.string().nullable(),
   "conceptInvalidationRules": zod.string().nullable(),
+  "canonicalId": zod.string().nullable(),
+  "registryVersion": zod.string().nullable(),
+  "canonicalStatus": zod.string().nullable(),
+  "executorKind": zod.string().nullable(),
+  "canonicalDefinition": zod.record(zod.string(), zod.unknown()).nullable(),
   "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
   "name": zod.string(),
   "description": zod.string().nullable(),
@@ -932,6 +937,11 @@ export const ListStrategyConditionsResponseItem = zod.object({
   "conceptId": zod.number().int(),
   "conceptName": zod.string(),
   "conceptCategory": zod.string().nullable(),
+  "canonicalId": zod.string().nullable(),
+  "registryVersion": zod.string().nullable(),
+  "canonicalStatus": zod.string().nullable(),
+  "executorKind": zod.string().nullable(),
+  "canonicalDefinition": zod.record(zod.string(), zod.unknown()).nullable(),
   "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
   "name": zod.string(),
   "description": zod.string().nullable(),
@@ -985,6 +995,11 @@ export const CreateStrategyConditionResponse = zod.object({
   "conceptId": zod.number().int(),
   "conceptName": zod.string(),
   "conceptCategory": zod.string().nullable(),
+  "canonicalId": zod.string().nullable(),
+  "registryVersion": zod.string().nullable(),
+  "canonicalStatus": zod.string().nullable(),
+  "executorKind": zod.string().nullable(),
+  "canonicalDefinition": zod.record(zod.string(), zod.unknown()).nullable(),
   "stage": zod.enum(['entry', 'confirmation', 'invalidation', 'exit']),
   "name": zod.string(),
   "description": zod.string().nullable(),
@@ -1120,6 +1135,12 @@ export const ListConceptsResponseItem = zod.object({
   "detectionRules": zod.string().nullable(),
   "invalidationRules": zod.string().nullable(),
   "isBuiltIn": zod.boolean(),
+  "canonicalId": zod.string().nullable(),
+  "registryVersion": zod.string().nullable(),
+  "canonicalStatus": zod.enum(["executable", "review_required"]).nullable(),
+  "executorKind": zod.string().nullable(),
+  "aliases": zod.array(zod.string()).nullable(),
+  "canonicalDefinition": zod.record(zod.string(), zod.unknown()).nullable(),
   "createdAt": zod.coerce.date()
 })
 export const ListConceptsResponse = zod.array(ListConceptsResponseItem)
@@ -1147,6 +1168,12 @@ export const CreateConceptResponse = zod.object({
   "detectionRules": zod.string().nullable(),
   "invalidationRules": zod.string().nullable(),
   "isBuiltIn": zod.boolean(),
+  "canonicalId": zod.string().nullable(),
+  "registryVersion": zod.string().nullable(),
+  "canonicalStatus": zod.enum(["executable", "review_required"]).nullable(),
+  "executorKind": zod.string().nullable(),
+  "aliases": zod.array(zod.string()).nullable(),
+  "canonicalDefinition": zod.record(zod.string(), zod.unknown()).nullable(),
   "createdAt": zod.coerce.date()
 })
 
@@ -1180,6 +1207,12 @@ export const UpdateConceptResponse = zod.object({
   "detectionRules": zod.string().nullable(),
   "invalidationRules": zod.string().nullable(),
   "isBuiltIn": zod.boolean(),
+  "canonicalId": zod.string().nullable(),
+  "registryVersion": zod.string().nullable(),
+  "canonicalStatus": zod.enum(["executable", "review_required"]).nullable(),
+  "executorKind": zod.string().nullable(),
+  "aliases": zod.array(zod.string()).nullable(),
+  "canonicalDefinition": zod.record(zod.string(), zod.unknown()).nullable(),
   "createdAt": zod.coerce.date()
 })
 

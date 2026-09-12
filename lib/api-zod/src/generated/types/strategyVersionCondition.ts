@@ -23,6 +23,16 @@ export interface StrategyVersionCondition {
   conceptDetectionRules: string | null;
   /** @nullable */
   conceptInvalidationRules: string | null;
+  /** @nullable */
+  canonicalId: string | null;
+  /** @nullable */
+  registryVersion: string | null;
+  /** @nullable */
+  canonicalStatus: string | null;
+  /** @nullable */
+  executorKind: string | null;
+  /** @nullable */
+  canonicalDefinition: Record<string, unknown> | null;
   stage: StrategyVersionConditionStage;
   name: string;
   /** @nullable */

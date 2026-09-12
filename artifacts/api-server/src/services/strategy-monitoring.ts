@@ -18,7 +18,7 @@ import {
   type StrategyVersion,
   type StrategyVersionCondition,
 } from "@workspace/db";
-import { executableConceptKind } from "@workspace/api-zod";
+import { resolveTradingConcept } from "@workspace/api-zod";
 import {
   evaluateExecutableConditionAtLatest,
   requiredCandleCountForCondition,
@@ -900,10 +900,11 @@ export class StrategyMonitoringEngine {
 export const strategyMonitoringEngine = new StrategyMonitoringEngine();
 
 export function createBuiltInStrategyMonitoringDetector(concept: { id: number; name: string }): ConditionDetector | null {
-  if (!executableConceptKind(concept.name)) return null;
+  const definition = resolveTradingConcept(concept.name);
+  if (!definition || definition.status !== "executable" || !definition.executorKind) return null;
   return {
-    id: `historical-${concept.id}`,
-    version: "1",
+    id: `canonical-${definition.canonicalId}`,
+    version: definition.registryVersion,
     conceptId: concept.id,
     requiredCandleCount: condition => condition ? requiredCandleCountForCondition(condition) : 1,
     async evaluate({ condition, candles }) {

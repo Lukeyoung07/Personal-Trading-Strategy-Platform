@@ -276,7 +276,7 @@ describe("StrategyBuilder", () => {
       conceptId: 1,
       stage: "entry",
       name: "Momentum entry",
-      description: "Prepared by AI Assistant from the Momentum concept.",
+      description: "Prepared from the canonical Momentum concept.",
       timeframe: "1H",
       direction: "long",
       requirement: "required",

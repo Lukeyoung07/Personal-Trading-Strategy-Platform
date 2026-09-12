@@ -46,6 +46,7 @@ import {
   executableConceptKind,
   isHistoricalRuleSupported,
   normalizeExecutableParameters,
+  resolveTradingConcept,
 } from "@workspace/api-zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { StrategyVersionManager } from "@/components/strategy-versioning";
@@ -75,24 +76,13 @@ const RULE_PRESETS = [
   { value: "rsi_above", label: "RSI is above a value", rule: "RSI above 70", description: "Stored as a descriptive rule for now. RSI is not currently supported by Backtesting.", supported: false },
 ] as const;
 
-const CONCEPT_ALIASES: Record<string, string[]> = {
-  "Break of Structure": ["bos"],
-  "Change of Character": ["choch"],
-  "Fair Value Gap": ["fvg", "imbalance"],
-  "Inverse Fair Value Gap": ["ifvg"],
-  "Market Structure Shift": ["mss"],
-  "Higher Timeframe Bias": ["htf"],
-  "Lower Timeframe Confirmation": ["ltf"],
-  "Power of 3 / AMD": ["amd", "power of three"],
-  "SMT Divergence": ["smt"],
-};
-
 function conceptSearchText(concept: TradingConcept) {
-  return `${concept.name} ${concept.category || ""} ${(CONCEPT_ALIASES[concept.name] || []).join(" ")}`.toLowerCase();
+  return `${concept.name} ${concept.category || ""} ${(concept.aliases || []).join(" ")}`.toLowerCase();
 }
 
 function conceptHasExecutableParameters(concept: TradingConcept) {
-  return Boolean(normalizeExecutableParameters(concept.name, undefined));
+  return concept.canonicalStatus === "executable"
+    && Boolean(normalizeExecutableParameters(concept.name, undefined));
 }
 
 function conditionNameFor(concept: TradingConcept | undefined, rule: string) {
@@ -120,6 +110,8 @@ function isBacktestCompatibleRule(rule: string | null | undefined) {
 }
 
 function isBacktestCompatibleCondition(condition: Pick<StrategyCondition, "conceptName" | "triggerRules" | "parameters">) {
+  const canonical = resolveTradingConcept(condition.conceptName);
+  if (canonical?.status === "review_required") return false;
   return isBacktestCompatibleRule(condition.triggerRules)
     || Boolean(normalizeExecutableParameters(condition.conceptName, condition.parameters));
 }
@@ -365,13 +357,16 @@ function StrategyForm({ strategy, markets, concepts, timeframes, onClose, onSave
     };
      const initialConditions = !strategy && initialDraft
        ? authorizedDraftConditions(initialDraft).flatMap(condition => {
-         const concept = concepts.find(item => item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase());
+          const canonical = resolveTradingConcept(condition.conceptName);
+          const concept = canonical
+            ? concepts.find(item => item.canonicalId === canonical.canonicalId)
+            : concepts.find(item => item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase());
          if (!concept) return [];
          return [{
            conceptId: concept.id,
            stage: condition.stage,
            name: condition.name,
-           description: `Prepared by AI Assistant from the ${condition.conceptName} concept.`,
+            description: `Prepared from the canonical ${concept.name} concept.`,
            timeframe: condition.timeframe || savedTimeframes[0] || "Not specified",
            direction: baseData.direction === "both" && ["long", "short", "both"].includes(condition.direction)
              ? condition.direction
@@ -1184,7 +1179,10 @@ export function StrategyBuilder() {
     setSelectedStrategyId(strategy.id);
     if (!assistantDraft) return;
     const unmatched = authorizedDraftConditions(assistantDraft).filter(condition =>
-      !concepts.data?.some(item => item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase()),
+      !concepts.data?.some(item => {
+        const canonical = resolveTradingConcept(condition.conceptName);
+        return canonical ? item.canonicalId === canonical.canonicalId : item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase();
+      }),
     );
     queryClient.invalidateQueries({ queryKey: getListStrategyConditionsQueryKey(strategy.id) });
     setUnmatchedDraftConditions(unmatched);

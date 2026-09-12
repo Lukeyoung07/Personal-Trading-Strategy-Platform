@@ -686,6 +686,16 @@ export interface StrategyVersionCondition {
   conceptDetectionRules: string | null;
   /** @nullable */
   conceptInvalidationRules: string | null;
+  /** @nullable */
+  canonicalId: string | null;
+  /** @nullable */
+  registryVersion: string | null;
+  /** @nullable */
+  canonicalStatus: string | null;
+  /** @nullable */
+  executorKind: string | null;
+  /** @nullable */
+  canonicalDefinition: { [key: string]: unknown } | null;
   stage: StrategyVersionConditionStage;
   name: string;
   /** @nullable */
@@ -744,6 +754,16 @@ export interface StrategyCondition {
   conceptName: string;
   /** @nullable */
   conceptCategory: string | null;
+  /** @nullable */
+  canonicalId: string | null;
+  /** @nullable */
+  registryVersion: string | null;
+  /** @nullable */
+  canonicalStatus: string | null;
+  /** @nullable */
+  executorKind: string | null;
+  /** @nullable */
+  canonicalDefinition: { [key: string]: unknown } | null;
   stage: StrategyConditionStage;
   name: string;
   /** @nullable */
@@ -835,6 +855,18 @@ export interface TradingConcept {
   /** @nullable */
   invalidationRules: string | null;
   isBuiltIn: boolean;
+  /** @nullable */
+  canonicalId: string | null;
+  /** @nullable */
+  registryVersion: string | null;
+  /** @nullable */
+  canonicalStatus: 'executable' | 'review_required' | null;
+  /** @nullable */
+  executorKind: string | null;
+  /** @nullable */
+  aliases: string[] | null;
+  /** @nullable */
+  canonicalDefinition: Record<string, unknown> | null;
   createdAt: string;
 }
 

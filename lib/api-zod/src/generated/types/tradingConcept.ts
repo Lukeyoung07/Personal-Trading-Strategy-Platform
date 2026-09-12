@@ -18,5 +18,17 @@ export interface TradingConcept {
   /** @nullable */
   invalidationRules: string | null;
   isBuiltIn: boolean;
+  /** @nullable */
+  canonicalId: string | null;
+  /** @nullable */
+  registryVersion: string | null;
+  /** @nullable */
+  canonicalStatus: 'executable' | 'review_required' | null;
+  /** @nullable */
+  executorKind: string | null;
+  /** @nullable */
+  aliases: string[] | null;
+  /** @nullable */
+  canonicalDefinition: Record<string, unknown> | null;
   createdAt: Date;
 }

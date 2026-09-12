@@ -97,6 +97,9 @@ import {
   UpdateTradeResponse,
   executableConceptKind,
   normalizeExecutableParameters,
+  TRADING_CONCEPT_REGISTRY,
+  tradingConceptMetadata,
+  resolveTradingConcept,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -490,24 +493,58 @@ const EXECUTABLE_CONCEPT_METADATA: Record<string, { description: string; detecti
 
 async function ensureBuiltInConcepts(): Promise<void> {
   const existing = await db
-    .select({ name: tradingConceptsTable.name })
+    .select({
+      id: tradingConceptsTable.id,
+      name: tradingConceptsTable.name,
+      canonicalId: tradingConceptsTable.canonicalId,
+    })
     .from(tradingConceptsTable)
     .where(eq(tradingConceptsTable.isBuiltIn, true));
-  const existingNames = new Set(existing.map(({ name }) => name));
-  const missing = DEFAULT_CONCEPTS.filter(([, name]) => !existingNames.has(name)).map(([category, name]) => ({
-    category,
-    name,
-    description: null,
-    detectionRules: null,
-    invalidationRules: null,
-    isBuiltIn: true,
-  }));
+  const existingNames = new Map(existing.map(row => [row.name, row]));
+  const existingCanonicalIds = new Set(existing.map(({ canonicalId }) => canonicalId).filter(Boolean));
+  const missing = TRADING_CONCEPT_REGISTRY
+    .filter(definition => !existingCanonicalIds.has(definition.canonicalId) && !existingNames.has(definition.name))
+    .map(definition => {
+      const metadata = tradingConceptMetadata(definition.name);
+      return {
+        category: definition.category,
+        name: definition.name,
+        description: metadata?.description ?? definition.definition,
+        detectionRules: metadata?.detectionRules ?? definition.entryBehavior,
+        invalidationRules: metadata?.invalidationRules ?? definition.invalidationBehavior,
+        isBuiltIn: true,
+        canonicalId: definition.canonicalId,
+        registryVersion: definition.registryVersion,
+        canonicalStatus: definition.status,
+        executorKind: definition.executorKind,
+        aliases: definition.aliases,
+        canonicalDefinition: definition,
+      };
+    });
   if (missing.length > 0) {
     await db.insert(tradingConceptsTable).values(missing);
   }
-  for (const [name, metadata] of Object.entries(EXECUTABLE_CONCEPT_METADATA)) {
-    await db.update(tradingConceptsTable).set(metadata).where(and(
-      eq(tradingConceptsTable.name, name),
+  for (const definition of TRADING_CONCEPT_REGISTRY) {
+    const metadata = tradingConceptMetadata(definition.name);
+    const existingRow = existingNames.get(definition.name);
+    if (!existingRow) continue;
+    await db.update(tradingConceptsTable).set({
+      description: metadata?.description ?? definition.definition,
+      detectionRules: metadata?.detectionRules ?? definition.entryBehavior,
+      invalidationRules: metadata?.invalidationRules ?? definition.invalidationBehavior,
+    }).where(and(
+      eq(tradingConceptsTable.id, existingRow.id),
+      eq(tradingConceptsTable.isBuiltIn, true),
+    ));
+    await db.update(tradingConceptsTable).set({
+      canonicalId: definition.canonicalId,
+      registryVersion: definition.registryVersion,
+      canonicalStatus: definition.status,
+      executorKind: definition.executorKind,
+      aliases: definition.aliases,
+      canonicalDefinition: definition,
+    }).where(and(
+      eq(tradingConceptsTable.id, existingRow.id),
       eq(tradingConceptsTable.isBuiltIn, true),
     ));
   }
@@ -919,6 +956,11 @@ async function buildVersionConditionSnapshots(
       conceptDescription: concept?.description ?? null,
       conceptDetectionRules: concept?.detectionRules ?? null,
       conceptInvalidationRules: concept?.invalidationRules ?? null,
+      canonicalId: concept?.canonicalId ?? null,
+      registryVersion: concept?.registryVersion ?? null,
+      canonicalStatus: concept?.canonicalStatus ?? null,
+      executorKind: concept?.executorKind ?? null,
+      canonicalDefinition: concept?.canonicalDefinition ?? null,
       stage: condition.stage,
       name: condition.name,
       description: condition.description,
@@ -993,7 +1035,7 @@ router.post("/strategies", async (req, res): Promise<void> => {
       const persistedConditions = [];
       for (const [index, inputCondition] of conditions.entries()) {
         const [concept] = await tx
-          .select({ id: tradingConceptsTable.id, name: tradingConceptsTable.name })
+          .select()
           .from(tradingConceptsTable)
           .where(eq(tradingConceptsTable.id, inputCondition.conceptId));
         if (!concept) throw new Error("Concept not found.");
@@ -1003,6 +1045,11 @@ router.post("/strategies", async (req, res): Promise<void> => {
           strategyId: strategy.id,
           conditionOrder: index + 1,
           parameters,
+          canonicalId: concept.canonicalId,
+          registryVersion: concept.registryVersion,
+          canonicalStatus: concept.canonicalStatus,
+          executorKind: concept.executorKind,
+          canonicalDefinition: concept.canonicalDefinition,
         }).returning();
         persistedConditions.push(condition);
       }
@@ -1136,6 +1183,11 @@ router.post("/strategies/:strategyId/duplicate", async (req, res): Promise<void>
         conditionOrder: condition.conditionOrder,
         triggerRules: condition.triggerRules,
         parameters: condition.parameters,
+         canonicalId: condition.canonicalId,
+         registryVersion: condition.registryVersion,
+         canonicalStatus: condition.canonicalStatus,
+         executorKind: condition.executorKind,
+         canonicalDefinition: condition.canonicalDefinition,
         invalidationRules: condition.invalidationRules,
         resetBehavior: condition.resetBehavior,
       })));
@@ -1274,6 +1326,11 @@ async function activateVersionSnapshot(strategyId: number, versionId: number) {
         conditionOrder: condition.conditionOrder,
         triggerRules: condition.triggerRules,
         parameters: condition.parameters,
+         canonicalId: condition.canonicalId,
+         registryVersion: condition.registryVersion,
+         canonicalStatus: condition.canonicalStatus,
+         executorKind: condition.executorKind,
+         canonicalDefinition: condition.canonicalDefinition,
         invalidationRules: condition.invalidationRules,
         resetBehavior: condition.resetBehavior,
       })));
@@ -1358,6 +1415,11 @@ router.post("/strategies/:strategyId/versions/:versionId/clone", async (req, res
         conditionOrder: condition.conditionOrder,
         triggerRules: condition.triggerRules,
         parameters: condition.parameters,
+        canonicalId: condition.canonicalId,
+        registryVersion: condition.registryVersion,
+        canonicalStatus: condition.canonicalStatus,
+        executorKind: condition.executorKind,
+        canonicalDefinition: condition.canonicalDefinition,
         invalidationRules: condition.invalidationRules,
         resetBehavior: condition.resetBehavior,
       })));
@@ -1465,7 +1527,7 @@ router.post("/strategies/:strategyId/conditions", async (req, res): Promise<void
     res.status(404).json({ error: "Strategy not found" });
     return;
   }
-  const [concept] = await db.select({ name: tradingConceptsTable.name }).from(tradingConceptsTable).where(eq(tradingConceptsTable.id, body.data.conceptId));
+  const [concept] = await db.select().from(tradingConceptsTable).where(eq(tradingConceptsTable.id, body.data.conceptId));
   if (!concept) {
     res.status(400).json({ error: "Concept not found." });
     return;
@@ -1483,7 +1545,17 @@ router.post("/strategies/:strategyId/conditions", async (req, res): Promise<void
     .where(eq(strategyConditionsTable.strategyId, params.data.strategyId));
   const [created] = await db
     .insert(strategyConditionsTable)
-    .values({ ...body.data, parameters, strategyId: params.data.strategyId, conditionOrder: Number(latest?.conditionOrder ?? 0) + 1 })
+    .values({
+      ...body.data,
+      parameters,
+      strategyId: params.data.strategyId,
+      conditionOrder: Number(latest?.conditionOrder ?? 0) + 1,
+      canonicalId: concept.canonicalId,
+      registryVersion: concept.registryVersion,
+      canonicalStatus: concept.canonicalStatus,
+      executorKind: concept.executorKind,
+      canonicalDefinition: concept.canonicalDefinition,
+    })
     .returning();
   res.status(201).json(CreateStrategyConditionResponse.parse(await strategyConditionView(created)));
 });
@@ -1529,7 +1601,7 @@ router.patch("/strategies/:strategyId/conditions/:conditionId", async (req, res)
     res.status(404).json({ error: "Strategy condition not found" });
     return;
   }
-  const [concept] = await db.select({ name: tradingConceptsTable.name }).from(tradingConceptsTable)
+  const [concept] = await db.select().from(tradingConceptsTable)
     .where(eq(tradingConceptsTable.id, body.data.conceptId ?? existing.conceptId));
   if (!concept) {
     res.status(400).json({ error: "Concept not found." });
@@ -1544,7 +1616,16 @@ router.patch("/strategies/:strategyId/conditions/:conditionId", async (req, res)
   }
   const [updated] = await db
     .update(strategyConditionsTable)
-    .set({ ...body.data, parameters, updatedAt: new Date() })
+    .set({
+      ...body.data,
+      parameters,
+      updatedAt: new Date(),
+      canonicalId: concept.canonicalId,
+      registryVersion: concept.registryVersion,
+      canonicalStatus: concept.canonicalStatus,
+      executorKind: concept.executorKind,
+      canonicalDefinition: concept.canonicalDefinition,
+    })
     .where(and(eq(strategyConditionsTable.id, params.data.conditionId), eq(strategyConditionsTable.strategyId, params.data.strategyId)))
     .returning();
   res.json(UpdateStrategyConditionResponse.parse(await strategyConditionView(updated)));
@@ -1578,6 +1659,11 @@ router.post("/concepts", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const canonical = resolveTradingConcept(parsed.data.name);
+  if (canonical) {
+    res.status(409).json({ error: `"${parsed.data.name}" is a built-in concept or alias. Choose it from the library instead.` });
+    return;
+  }
   const [created] = await db.insert(tradingConceptsTable).values(parsed.data).returning();
   res.status(201).json(CreateConceptResponse.parse(created));
 });
@@ -1587,6 +1673,19 @@ router.patch("/concepts/:conceptId", async (req, res): Promise<void> => {
   const body = UpdateConceptBody.safeParse(req.body);
   if (!params.success || !body.success) {
     res.status(400).json({ error: !params.success ? params.error.message : body.success ? "Invalid request body" : body.error.message });
+    return;
+  }
+  const [current] = await db.select().from(tradingConceptsTable).where(eq(tradingConceptsTable.id, params.data.conceptId));
+  if (!current) {
+    res.status(404).json({ error: "Concept not found" });
+    return;
+  }
+  if (current.isBuiltIn) {
+    res.status(409).json({ error: "Built-in concepts are canonical and cannot be edited." });
+    return;
+  }
+  if (body.data.name && resolveTradingConcept(body.data.name)) {
+    res.status(409).json({ error: `"${body.data.name}" is a built-in concept or alias.` });
     return;
   }
   const [updated] = await db.update(tradingConceptsTable).set(body.data).where(eq(tradingConceptsTable.id, params.data.conceptId)).returning();
@@ -1603,11 +1702,16 @@ router.delete("/concepts/:conceptId", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [deleted] = await db.delete(tradingConceptsTable).where(eq(tradingConceptsTable.id, params.data.conceptId)).returning();
-  if (!deleted) {
+  const [current] = await db.select().from(tradingConceptsTable).where(eq(tradingConceptsTable.id, params.data.conceptId));
+  if (!current) {
     res.status(404).json({ error: "Concept not found" });
     return;
   }
+  if (current.isBuiltIn) {
+    res.status(409).json({ error: "Built-in concepts are canonical and cannot be deleted." });
+    return;
+  }
+  await db.delete(tradingConceptsTable).where(eq(tradingConceptsTable.id, params.data.conceptId));
   res.sendStatus(204);
 });
 
