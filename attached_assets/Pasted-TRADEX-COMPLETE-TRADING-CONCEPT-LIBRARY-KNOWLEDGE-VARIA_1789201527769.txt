@@ -1,0 +1,729 @@
+TRADEX — COMPLETE TRADING CONCEPT LIBRARY KNOWLEDGE & VARIATION SYSTEM
+
+I want to make the Trading Concept Library the single source of truth for
+every trading concept in TradeX.
+
+The current system has repeatedly confused concepts, created incorrect
+conditions, and marked things Review Required because Build with AI does not
+have a sufficiently complete understanding of the concepts already present
+in the library.
+
+Do NOT solve this by adding instructions to individual strategy prompts.
+
+Fix the underlying Trading Concept Library and its canonical concept
+definitions so Build with AI, Builder, Backtesting and Monitoring all use
+the same definitions.
+
+==================================================
+PRIMARY OBJECTIVE
+==================================================
+
+Every concept currently present in the Trading Concept Library must have a
+complete, machine-readable canonical definition.
+
+For EVERY concept, define:
+
+1. Canonical concept name
+2. Definition
+3. What the concept IS
+4. What the concept IS NOT
+5. All supported directional variations
+6. All supported terminology/aliases
+7. All supported parameter variations
+8. Default parameters
+9. Required parameters
+10. Optional parameters
+11. Required market data
+12. Required timeframe
+13. Whether it can be evaluated on closed candles
+14. Exact executable conditions
+15. Exact invalidation conditions where applicable
+16. How it should behave in historical backtesting
+17. How it should behave in live monitoring
+18. How Build with AI should recognize it
+19. How Build with AI should NOT interpret it
+20. Which concepts are compatible with it
+21. Which concepts must remain separate
+22. Whether it is executable or review-required
+23. Why it is executable or why it currently requires review
+24. The canonical structured representation used by the rule engine
+
+==================================================
+VERY IMPORTANT — ALL VARIATIONS
+==================================================
+
+Do not define concepts only for their simplest wording.
+
+For every concept, identify every reasonable variation that can be
+deterministically represented by the existing concept.
+
+For example:
+
+"Liquidity Sweep"
+
+must understand variations such as:
+
+- bullish liquidity sweep
+- bearish liquidity sweep
+- buy-side liquidity sweep
+- sell-side liquidity sweep
+- sweep of previous high
+- sweep of previous low
+- sweep of a recent high
+- sweep of a recent low
+- wick through liquidity and close back inside
+- close through liquidity and reclaim
+- explicit lookback values
+- previous candle liquidity
+- previous day liquidity where supported
+- previous week liquidity where supported
+
+But DO NOT invent variants that the evaluator cannot actually execute.
+
+The canonical definition must clearly distinguish supported variations from
+unsupported ones.
+
+==================================================
+DIRECTIONAL VARIATIONS
+==================================================
+
+Where applicable, every concept must explicitly support:
+
+- bullish
+- bearish
+- long
+- short
+- automatic/neutral where appropriate
+
+Do not create separate fake concepts when one canonical concept with a
+direction parameter is more appropriate.
+
+For example:
+
+Bullish Displacement
+Bearish Displacement
+
+should map to:
+
+Displacement
+direction = bullish/bearish
+
+Likewise:
+
+Bullish FVG
+Bearish FVG
+
+should map to:
+
+FVG
+polarity = bullish/bearish
+
+Build with AI must understand both the canonical name and natural-language
+variants.
+
+==================================================
+ALIASES & NATURAL LANGUAGE
+==================================================
+
+For every concept create an explicit alias map.
+
+Examples:
+
+"gold"
+→ XAUUSD
+
+"5 minute"
+→ 5m
+
+"five minute"
+→ 5m
+
+"bullish FVG"
+→ FVG(polarity=bullish)
+
+"bearish FVG"
+→ FVG(polarity=bearish)
+
+"EMA 20 crossing EMA 50"
+→ EMA Cross(fast=20, slow=50)
+
+"20/50 EMA cross"
+→ EMA Cross(fast=20, slow=50)
+
+"EMA 20 crosses above 50"
+→ EMA Cross(fast=20, slow=50, direction=cross_above)
+
+"EMA 20 crosses below 50"
+→ EMA Cross(fast=20, slow=50, direction=cross_below)
+
+Do this comprehensively for EVERY concept in the library.
+
+Do not rely on vague semantic similarity alone.
+
+==================================================
+PARAMETER VARIATIONS
+==================================================
+
+Every concept must define which parameters are meaningful.
+
+Examples:
+
+EMA:
+- period
+- price source where supported
+
+EMA Cross:
+- fast period
+- slow period
+- cross direction
+
+RSI:
+- period
+- threshold
+- comparison
+- overbought/oversold direction
+
+FVG:
+- polarity
+- formation
+- retest/fill interaction where supported
+
+Displacement:
+- polarity
+- ATR period
+- minimum body multiple
+- close-location threshold
+
+Liquidity Sweep:
+- polarity
+- liquidity type
+- level source
+- lookback
+- reclaim/close behaviour
+
+Do not allow the AI to invent parameters that the evaluator does not support.
+
+==================================================
+CONCEPT FAMILY RELATIONSHIPS
+==================================================
+
+Define relationships explicitly.
+
+For example:
+
+FVG
+├── Bullish FVG
+├── Bearish FVG
+├── FVG Retest
+├── FVG Fill
+└── IFVG
+
+EMA
+├── EMA Cross
+├── Price Above EMA
+└── Price Below EMA
+
+Market Structure
+├── Higher High
+├── Higher Low
+├── Lower High
+├── Lower Low
+├── BOS
+├── CHoCH
+├── MSS
+├── Swing High
+└── Swing Low
+
+Liquidity
+├── Liquidity Sweep
+├── Buy-Side Liquidity
+├── Sell-Side Liquidity
+├── Equal Highs
+├── Equal Lows
+├── Previous Day High
+├── Previous Day Low
+├── Previous Week High
+└── Previous Week Low
+
+The purpose is to prevent related concepts from being confused with each
+other.
+
+==================================================
+DO NOT MERGE DISTINCT CONCEPTS
+==================================================
+
+Related concepts must remain distinct.
+
+Examples:
+
+FVG ≠ FVG Retest
+
+FVG Retest ≠ FVG Fill
+
+Liquidity Sweep ≠ Breakout
+
+Breakout ≠ Failed Breakout
+
+Displacement ≠ Momentum
+
+BOS ≠ CHoCH
+
+MSS ≠ BOS
+
+EMA ≠ EMA Cross
+
+RSI ≠ RSI Divergence
+
+Divergence ≠ SMT Divergence
+
+Order Block ≠ Order Block Retest
+
+Support ≠ Support Retest
+
+Resistance ≠ Resistance Retest
+
+Do not map one concept to another simply because the concepts are commonly
+used together.
+
+==================================================
+CONCEPTS USED TOGETHER
+==================================================
+
+The system must understand that strategy authors commonly combine concepts
+without one concept becoming part of another.
+
+For example:
+
+"bearish liquidity sweep followed by bearish displacement"
+
+contains TWO concepts:
+
+1. Liquidity Sweep
+2. Displacement
+
+Do not convert this into one invented concept.
+
+Likewise:
+
+"bullish displacement followed by FVG retest"
+
+contains:
+
+1. Displacement
+2. FVG
+3. FVG Retest
+
+The relationship/order between them should be represented separately from
+the individual concept definitions.
+
+==================================================
+TEMPORAL RELATIONSHIPS
+==================================================
+
+Preserve explicit relationships such as:
+
+- after
+- followed by
+- before
+- then
+- during
+- while
+- within
+- immediately after
+
+as strategy relationship metadata.
+
+Do NOT silently turn a temporal relationship into a new trading concept.
+
+Example:
+
+"Displacement followed by FVG retest"
+
+means:
+
+Displacement
+THEN
+FVG Retest
+
+It does not mean that "Continuation" or another concept should be
+invented.
+
+If the current rule engine cannot execute a particular temporal relationship,
+preserve the relationship explicitly and report that specific limitation.
+
+Do not replace it with a different rule.
+
+==================================================
+MULTI-TIMEFRAME CONCEPTS
+==================================================
+
+Every concept must clearly define whether it supports:
+
+- single timeframe
+- multiple timeframes
+- higher timeframe
+- lower timeframe
+- timeframe-specific parameters
+
+Examples:
+
+"1H bullish structure with 5m FVG retest"
+
+must remain:
+
+HTF Structure → 1H
+FVG Retest → 5m
+
+Do not collapse them into one generic condition.
+
+==================================================
+RISK MANAGEMENT
+==================================================
+
+Keep risk management separate from trading concepts.
+
+Define separately:
+
+- Stop Loss
+- Take Profit
+- Risk/Reward
+- Percentage Risk
+- Risk Amount
+- Position Size
+- Break Even
+- Trailing Stop
+
+Do not turn:
+
+"1% stop loss"
+
+into a trading concept.
+
+Do not turn:
+
+"2R target"
+
+into an entry condition.
+
+Only mark a risk rule executable when the existing risk engine has a
+deterministic implementation.
+
+==================================================
+SESSION CONCEPTS
+==================================================
+
+Session concepts must have complete definitions including:
+
+- session name
+- local timezone
+- start
+- end
+- DST handling
+- configurable times
+- overnight handling
+- boundary behaviour
+
+Current supported infrastructure must be preserved.
+
+Examples:
+
+- London Session
+- New York Session
+- Asian Session
+- Kill Zones
+
+Do not treat these as generic text labels.
+
+==================================================
+UNSUPPORTED CONCEPTS
+==================================================
+
+For concepts that are currently present but do not yet have deterministic
+executors:
+
+DO NOT invent a fake implementation.
+
+Instead define:
+
+- canonical meaning
+- aliases
+- variations
+- parameters that can be understood
+- why it is currently non-executable
+- exactly what infrastructure/evaluator would be required
+
+These concepts should remain Review Required ONLY when the user explicitly
+requests them.
+
+An unsupported concept must never cause unrelated concepts to become
+Review Required.
+
+==================================================
+BUILD WITH AI AUTHORIZATION
+==================================================
+
+Build with AI must use the Trading Concept Library as its source of truth.
+
+The process must be:
+
+USER REQUEST
+↓
+CONCEPT EXTRACTION
+↓
+LOOK UP CANONICAL LIBRARY DEFINITIONS
+↓
+RESOLVE ALIASES / VARIATIONS
+↓
+CREATE STRUCTURED RULES
+↓
+VALIDATE AGAINST CANONICAL DEFINITION
+↓
+AUTHORIZE ONLY REQUESTED CONCEPTS
+↓
+BUILDER
+
+The AI should NOT invent the meaning of a concept.
+
+The library definition wins.
+
+If the user writes:
+
+"bullish FVG"
+
+the AI should look up FVG and resolve:
+
+polarity = bullish
+
+It should not invent another concept.
+
+==================================================
+NO UNREQUESTED CONCEPTS
+==================================================
+
+This rule is absolute.
+
+If the user requests:
+
+"XAUUSD 5m bullish FVG retest"
+
+the output must not contain:
+
+EMA
+RSI
+Displacement
+Liquidity Sweep
+SMT
+AMD
+HTF Bias
+New York Session
+
+unless the user explicitly requested them.
+
+A concept appearing in the library does NOT mean it is authorized.
+
+Only the user's request authorizes it.
+
+==================================================
+NO FALSE REVIEW REQUIRED
+==================================================
+
+If a requested concept is executable and all required parameters are
+available:
+
+status = executable
+
+It must NOT be Review Required.
+
+If the user did not request a concept:
+
+status = not requested
+
+It must NOT be Review Required.
+
+If the user explicitly requested a concept that genuinely lacks an
+executable evaluator:
+
+status = review_required
+
+This distinction must be enforced consistently.
+
+==================================================
+SINGLE SOURCE OF TRUTH
+==================================================
+
+Builder, Build with AI, Strategy Versioning, Backtesting and Monitoring
+must all consume the same canonical concept definitions.
+
+Do not maintain separate conflicting definitions in:
+
+- AI parser
+- Builder
+- Backtester
+- Monitoring
+- frontend
+- API
+
+The canonical concept registry should define the contract and the other
+systems should consume it.
+
+==================================================
+EXISTING CONCEPTS
+==================================================
+
+Audit EVERY concept currently present in the Trading Concept Library.
+
+Do not only update the concepts we have discussed previously.
+
+The audit must cover every current library row.
+
+Do not delete concepts.
+
+Do not silently rename concepts.
+
+Do not create duplicate concepts.
+
+Where multiple names are aliases of the same behaviour, retain their
+display names while mapping them to one canonical executable definition.
+
+==================================================
+BACKTEST COMPATIBILITY
+==================================================
+
+Every executable concept must have a deterministic historical evaluator.
+
+The evaluator must:
+
+- use only information available at the evaluation candle
+- use closed candles
+- avoid lookahead
+- use the configured timeframe
+- use required historical bars only
+- return deterministic results
+- expose the same interpretation used by monitoring
+
+Do not create a library concept that claims to be executable without an
+actual evaluator.
+
+==================================================
+MONITORING COMPATIBILITY
+==================================================
+
+The monitoring engine must use the same canonical rule definition and
+evaluator as backtesting wherever possible.
+
+Do not create separate interpretations of the same concept.
+
+==================================================
+TESTING
+==================================================
+
+Create a complete concept-definition test suite.
+
+For EVERY executable concept test:
+
+- canonical name
+- every supported alias
+- bullish variation
+- bearish variation where applicable
+- parameter parsing
+- invalid parameters
+- insufficient history
+- matching condition
+- non-matching condition
+- closed-candle behaviour
+- lookahead protection
+- backtest evaluation
+- monitoring evaluation
+
+For unsupported concepts test:
+
+- correct recognition
+- correct preservation
+- correct Review Required state
+- no invented evaluator
+- no substitution with another concept
+
+For Build with AI test:
+
+- simple strategies
+- complex strategies
+- multiple concepts
+- long and short
+- multi-timeframe
+- temporal relationships
+- risk management
+- explicit exclusions
+- unsupported concepts
+- completely new combinations of existing concepts
+
+==================================================
+IMPORTANT
+==================================================
+
+Do NOT hard-code individual strategy examples.
+
+Do NOT add special cases for XAUUSD.
+
+Do NOT add special cases for one particular prompt.
+
+Do NOT solve this by adding more prompt instructions.
+
+The Trading Concept Library itself must become the authoritative knowledge
+base.
+
+The final result should allow me to write a completely new strategy in
+normal language and have TradeX correctly identify the concepts, variations,
+parameters and relationships using the definitions already contained in the
+library.
+
+==================================================
+PRESERVE EXISTING DATA
+==================================================
+
+Do not modify or delete:
+
+- existing strategies
+- strategy versions
+- trades
+- backtests
+- monitoring records
+- alerts
+- market data
+- integrations
+
+Use disposable test data only.
+
+==================================================
+VERIFICATION
+==================================================
+
+After implementation:
+
+- Run all API tests.
+- Run all frontend tests.
+- Run all workspace typechecks.
+- Run production builds.
+- Run git diff --check.
+- Verify the complete concept registry.
+- Verify every library row has a canonical definition.
+- Verify aliases and variations.
+- Verify Build with AI uses the canonical registry.
+- Verify Builder uses the canonical registry.
+- Verify Backtesting uses the canonical registry.
+- Verify Monitoring uses the canonical registry.
+- Verify no unrequested concepts are generated.
+- Verify executable requested concepts do not incorrectly show Review
+  Required.
+- Verify explicitly requested unsupported concepts still correctly show
+  Review Required.
+- Verify multiple trades can still be generated during backtesting.
+
+Do not report completion until the entire existing Trading Concept Library
+has been audited and every concept has either:
+
+1. A complete deterministic executable definition and evaluator, or
+2. A complete canonical non-executable definition with a precise
+   Review Required explanation.
+
+The goal is a Trading Concept Library that TradeX can reliably use as its
+single source of truth for ANY strategy I create in the future.
