@@ -1517,6 +1517,132 @@ Risk/Reward: 2:1`,
     ]));
   });
 
+  it("reconciles the six supported and review-required request shapes against polluted model drafts", async () => {
+    const runScenario = async ({
+      message,
+      direction,
+      conditions,
+      expectedConcepts,
+      expectedDirections,
+      marketSymbol = "XAUUSD",
+      timeframes = ["5m"],
+      riskManagementRules = null,
+    }: {
+      message: string;
+      direction: string;
+      conditions: Array<Record<string, unknown>>;
+      expectedConcepts: string[];
+      expectedDirections?: string[];
+      marketSymbol?: string;
+      timeframes?: string[];
+      riskManagementRules?: string | null;
+    }) => {
+      mockStrategyDraft({
+        name: "Polluted model draft",
+        description: "",
+        direction,
+        marketSymbol,
+        timeframes,
+        conditions,
+        conceptsUsed: [],
+        riskManagementRules,
+      });
+
+      const response = await answerAssistant({
+        message,
+        messages: [],
+        context: { page: "/strategy-builder" },
+      });
+      expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual(expectedConcepts);
+      if (expectedDirections) {
+        expect(response.strategyDraft?.conditions.map(condition => condition.direction)).toEqual(expectedDirections);
+      }
+      return response;
+    };
+
+    await runScenario({
+      message: "Create a simple XAUUSD 5-minute strategy. Both long and short. The 5-minute candle must close above the previous closed 5-minute candle's high for long entries, or below the previous closed 5-minute candle's low for short entries. Risk Management: fixed 1% stop loss and 2% take profit. Use ONLY the Breakout concept and the specified risk rules. Do not add EMA, SMA, RSI, Fair Value Gap, Displacement, Liquidity Sweep, SMT Divergence, AMD / Power of 3, HTF Bias, or any other concept.",
+      direction: "both",
+      conditions: [
+        { name: "Long Breakout", stage: "entry", requirement: "required", conceptName: "Breakout", timeframe: "5m", direction: "long", triggerRules: "close above previous high" },
+        { name: "Short Breakout", stage: "entry", requirement: "required", conceptName: "Breakout", timeframe: "5m", direction: "short", triggerRules: "close below previous low" },
+        { name: "EMA 20", stage: "confirmation", requirement: "required", conceptName: "EMA", timeframe: "5m", direction: "both", triggerRules: "model suggestion" },
+        { name: "RSI", stage: "confirmation", requirement: "required", conceptName: "RSI", timeframe: "5m", direction: "both", triggerRules: "model suggestion" },
+        { name: "SMT", stage: "confirmation", requirement: "required", conceptName: "SMT Divergence", timeframe: "5m", direction: "both", triggerRules: "model suggestion" },
+        { name: "AMD", stage: "confirmation", requirement: "required", conceptName: "AMD / Power of 3", timeframe: "5m", direction: "both", triggerRules: "model suggestion" },
+      ],
+      expectedConcepts: ["Breakout", "Breakout"],
+      expectedDirections: ["long", "short"],
+      riskManagementRules: "Stop loss: 1%. Take profit: 2%.",
+    });
+
+    const emaResponse = await runScenario({
+      message: "Create a 5m XAUUSD strategy using an EMA 20/50 cross. Do not add RSI, SMA, FVG, displacement, liquidity sweep, SMT, or risk rules.",
+      direction: "both",
+      conditions: [
+        { name: "EMA 20/50 cross", stage: "entry", requirement: "required", conceptName: "EMA Cross", timeframe: "5m", direction: "both", triggerRules: "cross" },
+        { name: "RSI", stage: "confirmation", requirement: "required", conceptName: "RSI", timeframe: "5m", direction: "both", triggerRules: "model suggestion" },
+        { name: "FVG", stage: "confirmation", requirement: "required", conceptName: "Fair Value Gap", timeframe: "5m", direction: "both", triggerRules: "model suggestion" },
+      ],
+      expectedConcepts: ["EMA Cross", "EMA Cross"],
+      expectedDirections: ["long", "short"],
+    });
+    expect(emaResponse.strategyDraft?.conditions[0].parameters).toMatchObject({
+      fastPeriod: 20,
+      slowPeriod: 50,
+    });
+    expect(emaResponse.strategyDraft?.riskRules).toEqual([]);
+
+    await runScenario({
+      message: "Build a 5m XAUUSD strategy using bullish displacement followed by a bullish FVG retest. Do not add EMA, RSI, liquidity sweep, SMT, continuation, or risk management.",
+      direction: "long",
+      conditions: [
+        { name: "Bullish displacement", stage: "entry", requirement: "required", conceptName: "Displacement", timeframe: "5m", direction: "long", triggerRules: "model displacement" },
+        { name: "Bullish FVG retest", stage: "confirmation", requirement: "required", conceptName: "FVG Retest", timeframe: "5m", direction: "long", triggerRules: "model retest" },
+        { name: "EMA", stage: "confirmation", requirement: "required", conceptName: "EMA", timeframe: "5m", direction: "long", triggerRules: "model suggestion" },
+        { name: "Continuation", stage: "confirmation", requirement: "required", conceptName: "Continuation", timeframe: "5m", direction: "long", triggerRules: "model suggestion" },
+      ],
+      expectedConcepts: ["Displacement", "FVG Retest"],
+    });
+
+    await runScenario({
+      message: "Build a 5m XAUUSD strategy using a liquidity sweep followed by bearish displacement. Do not add FVG, EMA, RSI, SMT, AMD, or any risk rule.",
+      direction: "short",
+      conditions: [
+        { name: "Liquidity Sweep", stage: "entry", requirement: "required", conceptName: "Liquidity Sweep", timeframe: "5m", direction: "short", triggerRules: "model sweep" },
+        { name: "Bearish displacement", stage: "confirmation", requirement: "required", conceptName: "Displacement", timeframe: "5m", direction: "short", triggerRules: "model displacement" },
+        { name: "FVG", stage: "confirmation", requirement: "required", conceptName: "Fair Value Gap", timeframe: "5m", direction: "short", triggerRules: "model suggestion" },
+        { name: "RSI", stage: "confirmation", requirement: "required", conceptName: "RSI", timeframe: "5m", direction: "short", triggerRules: "model suggestion" },
+      ],
+      expectedConcepts: ["Liquidity Sweep", "Displacement"],
+    });
+
+    const judasResponse = await runScenario({
+      message: "Create a 5m XAUUSD strategy using Judas Swing only. Do not add liquidity sweep, FVG, displacement, EMA, or risk rules.",
+      direction: "long",
+      conditions: [
+        { name: "Judas Swing", stage: "entry", requirement: "required", conceptName: "Judas Swing", timeframe: "5m", direction: "long", triggerRules: "model session reversal" },
+        { name: "Liquidity Sweep", stage: "confirmation", requirement: "required", conceptName: "Liquidity Sweep", timeframe: "5m", direction: "long", triggerRules: "model suggestion" },
+        { name: "FVG", stage: "confirmation", requirement: "required", conceptName: "Fair Value Gap", timeframe: "5m", direction: "long", triggerRules: "model suggestion" },
+      ],
+      expectedConcepts: ["Judas Swing"],
+    });
+    expect(judasResponse.strategyDraft?.conditions[0].executionStatus).toBe("review_required");
+    expect(judasResponse.strategyDraft?.compatibility.compatible).toBe(false);
+
+    await runScenario({
+      message: "Create a minimal 5m XAUUSD strategy using Long Breakout only. Do not add EMA, RSI, FVG, displacement, liquidity sweep, SMT, or risk management.",
+      direction: "long",
+      conditions: [
+        { name: "Long Breakout", stage: "entry", requirement: "required", conceptName: "Breakout", timeframe: "5m", direction: "long", triggerRules: "model breakout" },
+        { name: "EMA", stage: "confirmation", requirement: "required", conceptName: "EMA", timeframe: "5m", direction: "long", triggerRules: "model suggestion" },
+        { name: "SMT", stage: "confirmation", requirement: "required", conceptName: "SMT Divergence", timeframe: "5m", direction: "long", triggerRules: "model suggestion" },
+      ],
+      expectedConcepts: ["Breakout"],
+      expectedDirections: ["long"],
+    });
+  });
+
   it("preserves Judas Swing for review and keeps executable liquidity separate", async () => {
     mockStrategyDraft({
       name: "Judas Swing review",
