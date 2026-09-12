@@ -80,6 +80,13 @@ function Rule({ label, value }: { label: string; value?: string | null }) {
   return <div className="rounded-md border border-border p-3"><div className="eyebrow">{label}</div><p className="text-xs text-muted-foreground mt-2 leading-relaxed whitespace-pre-wrap">{value || "Not defined"}</p></div>;
 }
 
+function conditionParameters(parameters: Record<string, unknown> | null | undefined) {
+  if (!parameters || typeof parameters !== "object") return null;
+  const entries = Object.entries(parameters).filter(([key]) => key !== "kind");
+  if (!entries.length) return null;
+  return entries.map(([key, value]) => `${key.replace(/[A-Z]/g, letter => ` ${letter.toLowerCase()}`)}: ${String(value)}`).join(" · ");
+}
+
 function ConditionsSnapshot({ conditions }: { conditions: StrategyVersionCondition[] }) {
   if (!conditions.length) return <div className="rounded-md bg-secondary/50 p-4 text-xs text-muted-foreground">No conditions were saved in this version.</div>;
   return <div className="space-y-2">{conditions.map((condition, index) => <div key={condition.id} className="rounded-md border border-border p-3">
@@ -87,6 +94,7 @@ function ConditionsSnapshot({ conditions }: { conditions: StrategyVersionConditi
     <div className="text-xs font-semibold mt-2">{condition.name}</div>
     <div className="text-[11px] text-primary mt-1">{condition.conceptName} · {condition.timeframe}</div>
     {condition.triggerRules && <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">{condition.triggerRules}</p>}
+    {conditionParameters(condition.parameters) && <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">Parameters: {conditionParameters(condition.parameters)}</p>}
   </div>)}</div>;
 }
 

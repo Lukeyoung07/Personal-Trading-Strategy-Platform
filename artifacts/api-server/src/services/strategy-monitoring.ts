@@ -899,6 +899,39 @@ export class StrategyMonitoringEngine {
 
 export const strategyMonitoringEngine = new StrategyMonitoringEngine();
 
+export function createBuiltInStrategyMonitoringDetector(concept: { id: number; name: string }): ConditionDetector | null {
+  if (!executableConceptKind(concept.name)) return null;
+  return {
+    id: `historical-${concept.id}`,
+    version: "1",
+    conceptId: concept.id,
+    requiredCandleCount: condition => condition ? requiredCandleCountForCondition(condition) : 1,
+    async evaluate({ condition, candles }) {
+      const matched = evaluateExecutableConditionAtLatest(condition, Array.from(candles));
+      if (matched == null) {
+        return {
+          status: "waiting",
+          reasonCode: "EVALUATOR_UNAVAILABLE",
+          reason: "The saved concept does not have a supported executable monitoring evaluator.",
+        };
+      }
+      return matched
+        ? {
+            status: "met",
+            reasonCode: "EXECUTABLE_CONDITION_MET",
+            reason: `The closed ${condition.timeframe} candle satisfies ${condition.name}.`,
+            evidence: { evaluator: `historical-${concept.name}`, candleOpenTime: candles[candles.length - 1]?.openTime ?? null },
+          }
+        : {
+            status: "not_met",
+            reasonCode: "EXECUTABLE_CONDITION_NOT_MET",
+            reason: `The latest closed ${condition.timeframe} candle does not satisfy ${condition.name}.`,
+            evidence: { evaluator: `historical-${concept.name}`, candleOpenTime: candles[candles.length - 1]?.openTime ?? null },
+          };
+    },
+  };
+}
+
 export async function registerBuiltInStrategyMonitoringDetectors() {
   const concepts = await db.select({
     id: tradingConceptsTable.id,
@@ -906,35 +939,7 @@ export async function registerBuiltInStrategyMonitoringDetectors() {
   }).from(tradingConceptsTable);
 
   for (const concept of concepts) {
-    if (!executableConceptKind(concept.name)) continue;
-    strategyMonitoringEngine.registerDetector({
-      id: `historical-${concept.id}`,
-      version: "1",
-      conceptId: concept.id,
-      requiredCandleCount: condition => condition ? requiredCandleCountForCondition(condition) : 1,
-      async evaluate({ condition, candles }) {
-        const matched = evaluateExecutableConditionAtLatest(condition, Array.from(candles));
-        if (matched == null) {
-          return {
-            status: "waiting",
-            reasonCode: "EVALUATOR_UNAVAILABLE",
-            reason: "The saved concept does not have a supported executable monitoring evaluator.",
-          };
-        }
-        return matched
-          ? {
-              status: "met",
-              reasonCode: "EXECUTABLE_CONDITION_MET",
-              reason: `The closed ${condition.timeframe} candle satisfies ${condition.name}.`,
-              evidence: { evaluator: `historical-${concept.name}`, candleOpenTime: candles[candles.length - 1]?.openTime ?? null },
-            }
-          : {
-              status: "not_met",
-              reasonCode: "EXECUTABLE_CONDITION_NOT_MET",
-              reason: `The latest closed ${condition.timeframe} candle does not satisfy ${condition.name}.`,
-              evidence: { evaluator: `historical-${concept.name}`, candleOpenTime: candles[candles.length - 1]?.openTime ?? null },
-            };
-      },
-    });
+    const detector = createBuiltInStrategyMonitoringDetector(concept);
+    if (detector) strategyMonitoringEngine.registerDetector(detector);
   }
 }

@@ -62,6 +62,13 @@ export type DisplacementParameters = {
   minimumCloseLocation: number;
 };
 
+export type RejectionParameters = {
+  kind: "rejection";
+  polarity: "auto" | "bullish" | "bearish";
+  minimumWickFraction: number;
+  minimumCloseLocation: number;
+};
+
 export type ExecutableConceptParameters =
   | LiquiditySweepParameters
   | FairValueGapParameters
@@ -70,7 +77,8 @@ export type ExecutableConceptParameters =
   | IndicatorParameters
   | PriceActionParameters
   | RangeLocationParameters
-  | DisplacementParameters;
+  | DisplacementParameters
+  | RejectionParameters;
 
 export const DEFAULT_LIQUIDITY_SWEEP_PARAMETERS: LiquiditySweepParameters = {
   kind: "liquidity_sweep",
@@ -135,6 +143,13 @@ export const DEFAULT_DISPLACEMENT_PARAMETERS: DisplacementParameters = {
   minimumCloseLocation: 0.75,
 };
 
+export const DEFAULT_REJECTION_PARAMETERS: RejectionParameters = {
+  kind: "rejection",
+  polarity: "auto",
+  minimumWickFraction: 0.5,
+  minimumCloseLocation: 0.75,
+};
+
 const keyForConcept = (name: string) => name.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
 
 export function executableConceptLabel(name: string | null | undefined): string | null {
@@ -171,6 +186,7 @@ export function executableConceptLabel(name: string | null | undefined): string 
   if (key.includes("bearish engulfing")) return "Bearish Engulfing";
   if (key.includes("pin bar")) return "Pin Bar";
   if (key.includes("inside bar")) return "Inside Bar";
+  if (key === "rejection" || key === "wick rejection" || key === "rejection candle" || key === "bullish rejection" || key === "bearish rejection") return "Rejection";
   if (key === "support") return "Support";
   if (key === "resistance") return "Resistance";
   if (key === "premium") return "Premium";
@@ -218,6 +234,7 @@ export function executableConceptKind(name: string | null | undefined): Executab
     key === "bullish engulfing" || key === "bearish engulfing" || key === "pin bar" ||
     key === "inside bar" || key === "support" || key === "resistance"
   ) return "price_action";
+  if (key === "rejection" || key === "wick rejection" || key === "rejection candle" || key === "bullish rejection" || key === "bearish rejection") return "rejection";
   if (key === "premium" || key === "discount" || key === "equilibrium" || key === "50 equilibrium") return "range_location";
   if (key === "displacement" || key.includes("displacement")) return "displacement";
   return null;
@@ -402,6 +419,21 @@ export function normalizeExecutableParameters(
       && numberInRange(result.minimumBodyAtr, 0, 20)
       && numberInRange(result.minimumCloseLocation, 0.5, 1) ? result : null;
   }
+  if (kind === "rejection") {
+    const defaults = DEFAULT_REJECTION_PARAMETERS;
+    const conceptKey = keyForConcept(conceptName || "");
+    if (input.polarity != null && input.polarity !== "auto" && input.polarity !== "bullish" && input.polarity !== "bearish") return null;
+    const result: RejectionParameters = {
+      kind,
+      polarity: input.polarity === "bullish" || input.polarity === "bearish"
+        ? input.polarity
+        : conceptKey.includes("bullish") ? "bullish" : conceptKey.includes("bearish") ? "bearish" : defaults.polarity,
+      minimumWickFraction: input.minimumWickFraction == null ? defaults.minimumWickFraction : Number(input.minimumWickFraction),
+      minimumCloseLocation: input.minimumCloseLocation == null ? defaults.minimumCloseLocation : Number(input.minimumCloseLocation),
+    };
+    return numberInRange(result.minimumWickFraction, 0, 1)
+      && numberInRange(result.minimumCloseLocation, 0.5, 1) ? result : null;
+  }
   return null;
 }
 
@@ -417,6 +449,10 @@ export function executableConceptTriggerRules(parameters: ExecutableConceptParam
   if (parameters.kind === "displacement") {
     const polarity = parameters.polarity === "auto" ? "directional" : parameters.polarity;
     return `Displacement: ${polarity} body >= ${parameters.minimumBodyAtr} ATR with close location >= ${parameters.minimumCloseLocation}`;
+  }
+  if (parameters.kind === "rejection") {
+    const polarity = parameters.polarity === "auto" ? "directional" : parameters.polarity;
+    return `Rejection: ${polarity} wick >= ${parameters.minimumWickFraction * 100}% of range with close location >= ${parameters.minimumCloseLocation}`;
   }
   return `Range location: ${parameters.location}`;
 }
@@ -461,6 +497,11 @@ export const EXECUTABLE_CONCEPT_DEFINITIONS = {
     label: "Displacement",
     description: "A directional candle whose body is at least a configured multiple of prior ATR and closes near its directional extreme.",
     aliases: ["displacement", "bullish displacement", "bearish displacement"],
+  },
+  rejection: {
+    label: "Rejection",
+    description: "A directional candle with a configurable wick fraction and close location.",
+    aliases: ["rejection", "wick rejection", "rejection candle", "bullish rejection", "bearish rejection"],
   },
 } as const;
 

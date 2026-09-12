@@ -126,8 +126,29 @@ describe("historical backtest engine", () => {
     ["EMA Cross", { kind: "indicator", indicator: "ema", comparison: "cross_above" }],
     ["Price Below EMA", { kind: "indicator", indicator: "ema", comparison: "below" }],
     ["HTF Structure", { kind: "market_structure", signal: "mss" }],
+    ["Wick Rejection", { kind: "rejection", polarity: "auto", minimumWickFraction: 0.5, minimumCloseLocation: 0.75 }],
   ])("preserves executable variant parameters for %s", (conceptName, expected) => {
     expect(normalizeExecutableParameters(conceptName, undefined)).toMatchObject(expected);
+  });
+
+  it("evaluates bullish and bearish rejection from closed-candle wick and close-location rules", () => {
+    const bullish = normalizeExecutableParameters("Bullish Rejection", undefined);
+    const bearish = normalizeExecutableParameters("Bearish Rejection", undefined);
+    expect(bullish).toMatchObject({ kind: "rejection", polarity: "bullish" });
+    expect(bearish).toMatchObject({ kind: "rejection", polarity: "bearish" });
+
+    const bullishCondition = structuredCondition("Bullish rejection", "Wick Rejection", "long", bullish!);
+    const bearishCondition = structuredCondition("Bearish rejection", "Rejection", "short", bearish!);
+    expect(requiredCandleCountForCondition(bullishCondition)).toBe(1);
+    expect(evaluateExecutableConditionAtLatest(bullishCondition, [
+      candle(0, { open: 100, high: 101, low: 90, close: 99 }),
+    ])).toBe(true);
+    expect(evaluateExecutableConditionAtLatest(bearishCondition, [
+      candle(0, { open: 100, high: 110, low: 99, close: 101 }),
+    ])).toBe(true);
+    expect(evaluateExecutableConditionAtLatest(bullishCondition, [
+      candle(0, { open: 100, high: 105, low: 99, close: 101 }),
+    ])).toBe(false);
   });
 
   it("processes candles oldest-first and executes signals at the next open", () => {

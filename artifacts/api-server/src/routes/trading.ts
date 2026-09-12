@@ -430,6 +430,14 @@ const EXECUTABLE_CONCEPT_METADATA: Record<string, { description: string; detecti
     description: "The candle range is contained inside the preceding candle range.",
     detectionRules: "Structured detector: current high below prior high and low above prior low.",
   },
+  "Rejection": {
+    description: "A directional candle has a wick covering at least the configured fraction of its range and closes in the directional portion.",
+    detectionRules: "Structured detector: bullish lower-wick or bearish upper-wick fraction plus directional close location.",
+  },
+  "Wick Rejection": {
+    description: "A wick rejection uses the same deterministic directional wick and close-location evaluator as Rejection.",
+    detectionRules: "Structured detector: bullish lower-wick or bearish upper-wick fraction plus directional close location.",
+  },
   "Support": {
     description: "Price reaches the prior rolling low and closes back above it.",
     detectionRules: "Structured detector: prior rolling low interaction and rejection.",

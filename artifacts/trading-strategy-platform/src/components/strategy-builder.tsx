@@ -38,6 +38,7 @@ import {
   DEFAULT_PRICE_ACTION_PARAMETERS,
   DEFAULT_RANGE_LOCATION_PARAMETERS,
   DEFAULT_DISPLACEMENT_PARAMETERS,
+  DEFAULT_REJECTION_PARAMETERS,
   executableConceptTriggerRules,
   executableConceptKind,
   isHistoricalRuleSupported,
@@ -635,6 +636,14 @@ function ConditionModal({ strategyId, strategyDirection, concepts, timeframes, c
                 <Field label="Minimum body / ATR" hint="The candle body must be at least this multiple of prior ATR."><input className="input" type="number" min="0" max="20" step="any" value={String(executionParameters?.minimumBodyAtr ?? DEFAULT_DISPLACEMENT_PARAMETERS.minimumBodyAtr)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "displacement", minimumBodyAtr: Number(event.target.value) }))} /></Field>
                 <Field label="Minimum close location" hint="0.75 means the close is in the outer 25% of the candle range."><input className="input" type="number" min="0.5" max="1" step="0.01" value={String(executionParameters?.minimumCloseLocation ?? DEFAULT_DISPLACEMENT_PARAMETERS.minimumCloseLocation)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "displacement", minimumCloseLocation: Number(event.target.value) }))} /></Field>
               </div>
+            </div>}
+            {executableKind === "rejection" && <div className="space-y-4 rounded-md border border-primary/30 bg-background/60 p-4" data-testid="builder-rejection-parameters">
+              <div className="text-xs text-muted-foreground">Rejection uses only the closed candle range: the directional wick must meet the configured fraction and the close must be in the directional portion of the range.</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Rejection direction"><select className="select" value={String(executionParameters?.polarity || DEFAULT_REJECTION_PARAMETERS.polarity)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "rejection", polarity: event.target.value }))}><option value="auto">Auto by strategy direction</option><option value="bullish">Bullish</option><option value="bearish">Bearish</option></select></Field>
+                <Field label="Minimum wick fraction" hint="0.50 means at least half of the candle range."><input className="input" type="number" min="0" max="1" step="0.01" value={String(executionParameters?.minimumWickFraction ?? DEFAULT_REJECTION_PARAMETERS.minimumWickFraction)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "rejection", minimumWickFraction: Number(event.target.value) }))} /></Field>
+              </div>
+              <Field label="Minimum close location" hint="0.75 means the close is in the outer 25% toward the rejection direction."><input className="input" type="number" min="0.5" max="1" step="0.01" value={String(executionParameters?.minimumCloseLocation ?? DEFAULT_REJECTION_PARAMETERS.minimumCloseLocation)} onChange={event => setExecutionParameters(current => ({ ...current, kind: "rejection", minimumCloseLocation: Number(event.target.value) }))} /></Field>
             </div>}
            {!executableKind && <><div className="mt-4">
              <select className="select bg-background" value={rulePreset} onChange={event => setRulePreset(event.target.value)} data-testid="select-builder-condition-rule">

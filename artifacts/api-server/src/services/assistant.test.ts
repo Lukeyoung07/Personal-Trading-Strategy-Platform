@@ -1149,6 +1149,55 @@ Risk/Reward: 2:1`,
     expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("The current risk rules");
   });
 
+  it("maps an explicitly requested wick rejection into typed authorized parameters", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the bullish wick rejection draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "Bullish wick rejection",
+              description: "A deterministic bullish wick rejection.",
+              direction: "long",
+              marketSymbol: "XAUUSD",
+              timeframes: ["5m"],
+              conditions: [
+                { name: "Bullish wick rejection", stage: "entry", requirement: "required", conceptName: "Wick Rejection", timeframe: "5m", direction: "long", triggerRules: "model rejection" },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: "Create an XAUUSD 5m strategy using a bullish wick rejection.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions).toHaveLength(1);
+    expect(response.strategyDraft?.conditions[0]).toMatchObject({
+      conceptName: "Rejection",
+      supported: true,
+      parameters: {
+        kind: "rejection",
+        polarity: "bullish",
+        minimumWickFraction: 0.5,
+        minimumCloseLocation: 0.75,
+      },
+      authorization: {
+        source: "user_request",
+        status: "explicit",
+        canonicalConcept: "Rejection",
+      },
+    });
+    expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
+  });
+
   it("preserves explicitly requested continuation as review-required beside an FVG", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({

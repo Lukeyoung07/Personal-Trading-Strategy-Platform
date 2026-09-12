@@ -82,6 +82,7 @@ export function requiredCandleCountForCondition(condition: BacktestCondition) {
     || parameters.kind === "range_location") {
     return parameters.lookback + 1;
   }
+  if (parameters.kind === "rejection") return 1;
   return 1;
 }
 
@@ -375,6 +376,30 @@ function evaluatePriceAction(candles: HistoricalCandle[], index: number, paramet
   return false;
 }
 
+function evaluateRejection(
+  candles: HistoricalCandle[],
+  index: number,
+  parameters: Extract<ExecutableConceptParameters, { kind: "rejection" }>,
+  side: BacktestSide,
+) {
+  const candle = candles[index];
+  const range = candle.high - candle.low;
+  if (range <= 0) return false;
+  const direction = parameters.polarity === "auto"
+    ? side === "long" ? "bullish" : "bearish"
+    : parameters.polarity;
+  const bodyHigh = Math.max(candle.open, candle.close);
+  const bodyLow = Math.min(candle.open, candle.close);
+  const lowerWick = bodyLow - candle.low;
+  const upperWick = candle.high - bodyHigh;
+  if (direction === "bullish") {
+    return lowerWick / range >= parameters.minimumWickFraction
+      && (candle.close - candle.low) / range >= parameters.minimumCloseLocation;
+  }
+  return upperWick / range >= parameters.minimumWickFraction
+    && (candle.high - candle.close) / range >= parameters.minimumCloseLocation;
+}
+
 function evaluateRangeLocation(candles: HistoricalCandle[], index: number, parameters: Extract<ExecutableConceptParameters, { kind: "range_location" }>) {
   const high = rollingLevel(candles, index, "high", parameters.lookback);
   const low = rollingLevel(candles, index, "low", parameters.lookback);
@@ -456,6 +481,7 @@ function evaluateExecutableCondition(
   if (parameters.kind === "indicator") return evaluateIndicator(candles, index, parameters);
   if (parameters.kind === "price_action") return evaluatePriceAction(candles, index, parameters);
   if (parameters.kind === "range_location") return evaluateRangeLocation(candles, index, parameters);
+  if (parameters.kind === "rejection") return evaluateRejection(candles, index, parameters, side);
   return false;
 }
 

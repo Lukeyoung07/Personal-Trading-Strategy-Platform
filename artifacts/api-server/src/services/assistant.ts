@@ -332,7 +332,8 @@ function requestedExecutableConceptMatches(message: string) {
       const match = message.match(new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")}\\b`, "i"));
       if (!match) return [];
       return [{ name: executableConceptLabel(alias) || alias, matchedText: match[0] }];
-    });
+    })
+    .filter(match => !(match.name === "Rejection" && /\bstrong\s+rejection\b/i.test(message)));
   const candleMatch = message.match(/\b(?:bullish|bearish)\s+candle\b|\bcandle\s+(?:direction|strategy)\b/i);
   return candleMatch
     ? [...executableMatches, { name: "Candle Direction", matchedText: candleMatch[0] }]
@@ -623,6 +624,10 @@ function requestedParameters(conceptName: string, message: string, condition: an
     if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
   }
   if (kind === "displacement") {
+    if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
+    if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
+  }
+  if (kind === "rejection") {
     if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
     if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
   }
