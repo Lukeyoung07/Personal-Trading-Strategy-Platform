@@ -1,0 +1,730 @@
+TradeX — COMPLETE REVIEW-REQUIRED CONCEPT IMPLEMENTATION
+
+We have completed a full audit of the Trading Concept Library.
+
+The audit correctly identified a group of concepts that are currently REVIEW REQUIRED because they do not have deterministic typed evaluators.
+
+I now want to implement the REVIEW REQUIRED concepts that can be objectively defined.
+
+IMPORTANT:
+
+Do NOT simply remove "Review Required".
+
+Do NOT mark a concept executable unless it has a deterministic implementation that works across:
+
+Trading Concept Library
+→ Build with AI
+→ Strategy Builder
+→ Strategy Version
+→ Backtesting
+→ Strategy Monitoring
+
+Do NOT invent alternative concepts.
+
+Do NOT change the existing meanings of already-executable concepts.
+
+Use the definitions below as the canonical definitions.
+
+--------------------------------------------------
+GENERAL EXECUTION RULES
+--------------------------------------------------
+
+Every new concept must:
+
+- Use closed-candle semantics.
+- Be deterministic.
+- Be reproducible.
+- Never use future information.
+- Never use look-ahead bias.
+- Support configured timeframe where appropriate.
+- Preserve polarity/direction where appropriate.
+- Have typed parameters.
+- Be represented in the canonical executable registry.
+- Be supported by Builder.
+- Be supported by the shared backtest evaluator.
+- Be supported by the shared monitoring evaluator.
+- Be supported by Build with AI.
+- Preserve authorization traces.
+- Have OpenAPI/Zod/generated-type support where required.
+- Have regression tests.
+
+Do not create separate definitions for backtesting and monitoring.
+
+--------------------------------------------------
+1. CONTINUATION
+--------------------------------------------------
+
+Define Continuation objectively.
+
+A bullish continuation occurs when:
+
+1. A bullish displacement candle is confirmed.
+2. Price subsequently makes a higher high than the displacement structure.
+3. Price retraces without invalidating the bullish structure.
+4. Price then closes above the most recent retracement high.
+
+A bearish continuation is the inverse:
+
+1. Bearish displacement is confirmed.
+2. Price subsequently makes a lower low.
+3. Price retraces without invalidating bearish structure.
+4. Price then closes below the most recent retracement low.
+
+Use existing executable Displacement and Market Structure evaluators where possible.
+
+Expose:
+
+- Direction
+- Timeframe
+- Lookback/structure parameters if required
+
+Do not introduce subjective "strong continuation" language.
+
+--------------------------------------------------
+2. SUPPORT / RESISTANCE
+--------------------------------------------------
+
+Create deterministic swing-based Support and Resistance.
+
+Support:
+
+A confirmed swing low identified using configurable left/right candle confirmation.
+
+Resistance:
+
+A confirmed swing high identified using configurable left/right candle confirmation.
+
+Defaults:
+
+- Left confirmation: 2 candles
+- Right confirmation: 2 candles
+
+A level remains active until invalidated by a configurable closing-price break.
+
+Support Break:
+
+Confirmed candle closes below active support.
+
+Resistance Break:
+
+Confirmed candle closes above active resistance.
+
+Support Retest:
+
+After a confirmed support break or established support level, price returns to the level and interacts with it without immediately invalidating the retest.
+
+Resistance Retest:
+
+Inverse.
+
+Expose:
+
+- Timeframe
+- Left/right swing confirmation
+- Break threshold if applicable
+- Retest tolerance
+
+Do not use visual/manual levels.
+
+--------------------------------------------------
+3. ORDER BLOCKS
+--------------------------------------------------
+
+Define Order Block objectively.
+
+Bullish Order Block:
+
+The final bearish candle immediately preceding a confirmed bullish displacement that breaks the most recent confirmed swing high.
+
+Bearish Order Block:
+
+The final bullish candle immediately preceding a confirmed bearish displacement that breaks the most recent confirmed swing low.
+
+The Order Block zone is the full OHLC range of the identified candle.
+
+Order Block Retest:
+
+Price subsequently returns into that zone.
+
+Invalidation:
+
+Bullish Order Block invalidates when price closes below the defined lower boundary.
+
+Bearish Order Block invalidates when price closes above the defined upper boundary.
+
+Use existing Displacement and Market Structure evaluators.
+
+Do not use subjective "institutional order flow" definitions.
+
+--------------------------------------------------
+4. BREAKER BLOCK
+--------------------------------------------------
+
+A Breaker Block is created when an existing Order Block is invalidated in the opposite direction and then retested from the opposite side.
+
+Bullish Breaker:
+
+Bearish Order Block is invalidated upward and price subsequently retests the former bearish order-block zone from above.
+
+Bearish Breaker:
+
+Bullish Order Block is invalidated downward and price subsequently retests the former bullish order-block zone from below.
+
+Use the canonical Order Block evaluator.
+
+--------------------------------------------------
+5. SUPPLY / DEMAND
+--------------------------------------------------
+
+Define:
+
+Demand Zone:
+
+The final bearish candle before a confirmed bullish displacement.
+
+Supply Zone:
+
+The final bullish candle before a confirmed bearish displacement.
+
+Use the candle OHLC range as the zone.
+
+Demand Retest:
+
+Price returns into the demand zone.
+
+Supply Retest:
+
+Price returns into the supply zone.
+
+Demand Reaction:
+
+Price enters demand and subsequently closes bullish.
+
+Supply Reaction:
+
+Price enters supply and subsequently closes bearish.
+
+Fresh Demand/Supply:
+
+Zone has not previously been retested after formation.
+
+Do not use subjective zone drawing.
+
+--------------------------------------------------
+6. PREMIUM / DISCOUNT / DEALING RANGE
+--------------------------------------------------
+
+Define the dealing range using configurable confirmed swing high and swing low.
+
+Equilibrium:
+
+50% of the dealing range.
+
+Premium:
+
+Price above 50%.
+
+Discount:
+
+Price below 50%.
+
+Premium Entry:
+
+Price enters a configurable premium threshold.
+
+Discount Entry:
+
+Price enters a configurable discount threshold.
+
+Expose the range source and timeframe.
+
+Use existing confirmed swing logic.
+
+--------------------------------------------------
+7. IRL / ERL
+--------------------------------------------------
+
+Define:
+
+ERL = liquidity located outside the active dealing range.
+
+IRL = imbalance/liquidity located inside the active dealing range.
+
+Do not use vague visual interpretation.
+
+Use only objectively identifiable existing FVG/liquidity structures.
+
+Expose:
+
+- Timeframe
+- Dealing-range definition
+- Polarity where required
+
+--------------------------------------------------
+8. DAILY OPEN / WEEKLY OPEN
+--------------------------------------------------
+
+Daily Open:
+
+Opening price of the first available candle of the trading day in the configured market timezone.
+
+Weekly Open:
+
+Opening price of the first available candle of the trading week.
+
+Support:
+
+- Above Daily Open
+- Below Daily Open
+- Above Weekly Open
+- Below Weekly Open
+- Daily Open retest
+- Weekly Open retest
+
+Handle daylight-saving time correctly.
+
+Do not hard-code one instrument.
+
+--------------------------------------------------
+9. KILL ZONES
+--------------------------------------------------
+
+Implement configurable session windows.
+
+At minimum:
+
+London Kill Zone
+New York Kill Zone
+Asian Kill Zone
+
+Session definitions must use explicit timezone-aware start/end times.
+
+Handle DST correctly.
+
+Do not hard-code UTC offsets.
+
+Expose:
+
+- Start time
+- End time
+- Timezone
+
+The existing New York/London/Asian Session concepts should use this deterministic session framework.
+
+--------------------------------------------------
+10. JUDAS SWING
+--------------------------------------------------
+
+Define Judas Swing objectively as:
+
+1. Price sweeps a confirmed prior session high/low.
+2. The sweep occurs during the configured session window.
+3. Price then produces displacement in the opposite direction.
+4. The displacement closes back inside the prior range.
+
+Bullish Judas:
+
+Sell-side sweep followed by bullish displacement back inside the range.
+
+Bearish Judas:
+
+Buy-side sweep followed by bearish displacement back inside the range.
+
+Expose:
+
+- Session
+- Reference range
+- Direction
+- Displacement parameters
+
+Do not use subjective "fake move" detection.
+
+--------------------------------------------------
+11. LIQUIDITY CONCEPTS
+--------------------------------------------------
+
+Audit and standardize:
+
+- Buy-Side Liquidity
+- Sell-Side Liquidity
+- Equal Highs
+- Equal Lows
+- Previous Day High
+- Previous Day Low
+- Previous Week High
+- Previous Week Low
+
+These must share deterministic level-generation logic.
+
+Equal Highs/Lows should use a configurable price tolerance.
+
+Liquidity Sweep should use the existing canonical liquidity-sweep evaluator.
+
+--------------------------------------------------
+12. TREND
+--------------------------------------------------
+
+Define Trend using confirmed market structure.
+
+Bullish Trend:
+
+Sequence of higher highs and higher lows.
+
+Bearish Trend:
+
+Sequence of lower lows and lower highs.
+
+Trend Reversal:
+
+Bullish trend becomes bearish after confirmed bearish structure break.
+
+Bearish trend becomes bullish after confirmed bullish structure break.
+
+Do not create a separate subjective trend evaluator if the existing structure evaluator can provide this.
+
+--------------------------------------------------
+13. MULTI-TIMEFRAME CONCEPTS
+--------------------------------------------------
+
+Audit:
+
+- Higher Timeframe Bias
+- Lower Timeframe Confirmation
+- Multi-Timeframe Analysis
+- HTF FVG
+- HTF Liquidity
+- HTF Order Block
+- LTF Structure
+- LTF Liquidity
+
+These should NOT be generic vague concepts.
+
+Each must explicitly identify:
+
+- Higher timeframe
+- Lower timeframe
+- Relationship between them
+- Exact underlying canonical evaluator
+
+Example:
+
+HTF FVG = existing FVG evaluator executed on the configured higher timeframe.
+
+HTF Liquidity = existing liquidity evaluator executed on the configured higher timeframe.
+
+LTF Structure = existing structure evaluator executed on the configured lower timeframe.
+
+Do not invent additional confirmation rules.
+
+--------------------------------------------------
+14. DIVERGENCE / SMT
+--------------------------------------------------
+
+Do NOT implement SMT using a vague definition.
+
+Before implementing SMT, define supported comparison instruments explicitly.
+
+The evaluator must:
+
+1. Compare two configured instruments.
+2. Identify corresponding confirmed swing highs/lows.
+3. Detect divergence when one instrument takes a corresponding liquidity level while the other fails to do so.
+
+Expose:
+
+- Primary instrument
+- Comparison instrument
+- Direction
+- Swing confirmation parameters
+- Tolerance
+
+Do not hard-code XAUUSD, US30, NQ, ES, or any other instrument.
+
+If the existing market-data architecture cannot safely provide synchronized data for both instruments, leave SMT REVIEW REQUIRED and report exactly what infrastructure is missing.
+
+--------------------------------------------------
+15. REJECTION / WICK REJECTION
+--------------------------------------------------
+
+Implement objective candle rejection.
+
+Bullish rejection:
+
+- Lower wick ≥ configurable percentage of total candle range.
+- Close in upper configurable portion of range.
+
+Bearish rejection:
+
+- Upper wick ≥ configurable percentage of total candle range.
+- Close in lower configurable portion of range.
+
+Defaults:
+
+- Wick ≥ 50% of range
+- Close location ≥ 75% toward rejection direction
+
+Strong Rejection:
+
+Require a configurable larger wick/body relationship.
+
+Do not use subjective descriptions.
+
+--------------------------------------------------
+16. FAILED BREAKOUT
+--------------------------------------------------
+
+Define Failed Breakout:
+
+1. Price closes beyond a confirmed support/resistance level.
+2. Price subsequently closes back inside the broken level within a configurable number of candles.
+
+Expose:
+
+- Direction
+- Level type
+- Maximum bars to failure
+
+--------------------------------------------------
+17. PULLBACK
+--------------------------------------------------
+
+Define Pullback using confirmed trend structure.
+
+Bullish Pullback:
+
+Price moves against an established bullish trend without invalidating the latest confirmed bullish structural low.
+
+Bearish Pullback:
+
+Inverse.
+
+A pullback becomes confirmed when price resumes in the trend direction through a confirmed structural break.
+
+--------------------------------------------------
+18. REVERSAL
+--------------------------------------------------
+
+Define Reversal through confirmed structure:
+
+Bullish Reversal:
+
+- Existing bearish trend
+- Bullish displacement
+- Confirmed break of bearish structural high
+
+Bearish Reversal:
+
+Inverse.
+
+Do not use subjective "looks like reversal".
+
+--------------------------------------------------
+19. BALANCED PRICE RANGE
+--------------------------------------------------
+
+Define BPR using overlapping opposing FVG zones.
+
+Bullish and bearish FVGs must overlap.
+
+The overlapping price interval becomes the BPR.
+
+Expose:
+
+- Timeframe
+- Minimum overlap if required
+
+Retest:
+
+Price returns into the overlapping BPR zone.
+
+--------------------------------------------------
+20. MITIGATION
+--------------------------------------------------
+
+Define mitigation as price returning to an existing identified Order Block or FVG after its initial formation without invalidating it.
+
+Mitigation Block:
+
+The identified zone after its initial reaction has occurred and price subsequently returns.
+
+Do not create a vague institutional-flow definition.
+
+--------------------------------------------------
+21. CANDLE DIRECTION
+--------------------------------------------------
+
+Keep Candle Direction as an explicit generic OHLC condition.
+
+Bullish Candle:
+
+Close > Open.
+
+Bearish Candle:
+
+Close < Open.
+
+Do not infer candle direction unless the user explicitly requests it.
+
+--------------------------------------------------
+22. RISK MANAGEMENT
+--------------------------------------------------
+
+Keep risk management separate from entry concepts.
+
+Support the existing executable:
+
+- Percentage Stop Loss
+- Percentage Take Profit
+- Risk/Reward
+
+For R-multiple targets:
+
+Require a defining stop.
+
+Do not convert unsupported structural stops into fabricated percentages.
+
+If a structural stop cannot yet be represented deterministically, keep that specific structural stop REVIEW REQUIRED.
+
+--------------------------------------------------
+23. BUILD WITH AI
+--------------------------------------------------
+
+Build with AI must use the canonical executable registry as its single source of truth.
+
+For every newly executable concept:
+
+Explicit user request
+→ canonical concept
+→ typed parameters
+→ Builder payload
+→ strategy version
+→ backtest
+→ monitoring
+
+must work.
+
+Do not allow Build with AI to invent related concepts.
+
+Do not use positional mapping.
+
+Do not allow model-generated concepts to override authorization.
+
+Preserve the existing authorization trace system.
+
+--------------------------------------------------
+24. CONCEPT STATUS
+--------------------------------------------------
+
+After implementation:
+
+Only mark a concept EXECUTABLE when:
+
+- Canonical registry exists
+- Typed Builder representation exists
+- Parameter normalization exists
+- Backtest evaluator exists
+- Monitoring evaluator exists
+- Build with AI mapping exists
+- Authorization works
+- Regression tests exist
+
+Otherwise leave it REVIEW REQUIRED.
+
+--------------------------------------------------
+25. END-TO-END TESTING
+--------------------------------------------------
+
+For every newly implemented concept:
+
+Create disposable Build with AI tests.
+
+Verify:
+
+- Draft
+- Builder mapping
+- Parameters
+- Strategy creation
+- Version creation
+- Backtest compatibility
+- Monitoring compatibility
+
+Delete all temporary data afterward.
+
+Do not modify existing user data.
+
+--------------------------------------------------
+26. REGRESSION TESTS
+--------------------------------------------------
+
+Add permanent tests for:
+
+- Every newly executable concept
+- Every parameter
+- Long/bullish polarity
+- Short/bearish polarity
+- Timeframe
+- Unsupported concepts
+- Build with AI authorization
+- Backtest
+- Monitoring
+- No look-ahead
+- Closed-candle semantics
+
+--------------------------------------------------
+27. DO NOT FORCE IMPLEMENTATION
+--------------------------------------------------
+
+If any concept above cannot be implemented objectively with the existing architecture:
+
+DO NOT fake it.
+
+Leave it REVIEW REQUIRED.
+
+Explain:
+
+1. What information is missing.
+2. What infrastructure is missing.
+3. What would be required to make it executable.
+
+Do not substitute another concept.
+
+--------------------------------------------------
+VALIDATION
+--------------------------------------------------
+
+Run:
+
+- Root/library typecheck
+- API typecheck
+- Frontend typecheck
+- API tests
+- Frontend tests
+- API production build
+- Frontend production build
+- git diff --check
+- Browser verification
+- API verification
+
+Final report MUST contain:
+
+Concept
+Status Before
+Status After
+Canonical Definition
+Parameters
+Builder
+Build with AI
+Backtest
+Monitoring
+
+Also provide a final list of concepts that remain REVIEW REQUIRED and explain why.
+
+IMPORTANT:
+
+Do not stop after implementing one or two concepts.
+
+Audit and process the ENTIRE list.
+
+Do not create any permanent strategy or backtest.
+
+Do not modify existing trading data.
