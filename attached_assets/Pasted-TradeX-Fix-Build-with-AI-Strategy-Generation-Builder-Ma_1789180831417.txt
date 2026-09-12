@@ -1,0 +1,453 @@
+TradeX — Fix Build with AI Strategy Generation → Builder Mapping
+
+I need you to audit and fix the existing Build with AI strategy-generation pipeline.
+
+IMPORTANT: This is a GENERIC mapping/normalization fix. Do not hard-code a solution for one specific strategy, market, timeframe, or concept.
+
+The problem is that when Build with AI generates a strategy draft, it can introduce conditions or risk rules that the user did not actually request.
+
+For example, if a user asks for a simple EMA strategy, the generated draft should NOT suddenly add:
+
+- Higher-timeframe bias
+- SMT divergence
+- AMD / Power of 3
+- FVG / IFVG
+- Stop loss
+- Take profit
+- Other confirmation conditions
+- Other unrelated concepts
+
+unless the user explicitly requested them.
+
+The AI-to-Builder pipeline must accurately preserve the user's intent.
+
+--------------------------------------------------
+1. AUDIT THE COMPLETE PIPELINE
+--------------------------------------------------
+
+Trace the existing flow:
+
+User prompt
+→ AI interpretation
+→ generated strategy draft
+→ concept normalization
+→ Builder condition mapping
+→ strategy creation
+→ immutable strategy version
+
+Find exactly where unintended conditions are being introduced.
+
+Fix the underlying generic problem rather than adding a special case.
+
+Do not rebuild the Strategy Builder.
+
+Do not replace the existing strategy-generation system.
+
+Preserve existing functionality.
+
+--------------------------------------------------
+2. PRESERVE USER INTENT
+--------------------------------------------------
+
+The AI must only create conditions that:
+
+1. The user explicitly requested, OR
+2. Are genuinely required to express the requested rule.
+
+Do NOT invent additional trading concepts.
+
+For example:
+
+"Create a 5m XAUUSD strategy using EMA 20 crosses."
+
+Should produce only the requested EMA-cross logic.
+
+It should NOT automatically add:
+
+- HTF bias
+- SMT
+- AMD
+- PO3
+- FVG
+- IFVG
+- liquidity
+- stop loss
+- take profit
+- confirmation conditions
+- risk rules
+
+unless requested.
+
+--------------------------------------------------
+3. CANONICAL CONCEPT MAPPING
+--------------------------------------------------
+
+Use the existing canonical concept registry and normalization system.
+
+Do not create a second hard-coded concept system.
+
+When the AI identifies an executable concept:
+
+- map it to the existing canonical concept
+- preserve its parameters
+- preserve its direction
+- preserve its timeframe
+- preserve its intended stage
+
+Do not substitute one concept for another.
+
+Examples:
+
+EMA 20
+20 EMA
+EMA(20)
+EMA period 20
+
+should resolve to the same canonical EMA concept with period = 20.
+
+Similarly, existing supported concepts should preserve their structured parameters.
+
+--------------------------------------------------
+4. UNSUPPORTED CONCEPTS
+--------------------------------------------------
+
+If the user requests a concept that the current Builder cannot execute:
+
+DO NOT silently replace it.
+
+DO NOT invent an alternative.
+
+DO NOT pretend it is executable.
+
+Keep it explicitly marked as review-required/unsupported and explain why.
+
+For example:
+
+User:
+"Create a strategy using SMT divergence."
+
+Expected:
+
+SMT divergence → REVIEW REQUIRED / UNSUPPORTED
+
+NOT:
+
+SMT divergence → some unrelated price-action condition.
+
+--------------------------------------------------
+5. RISK RULES
+--------------------------------------------------
+
+Do not invent risk-management rules.
+
+If the user does not request:
+
+- Stop loss
+- Take profit
+- Trailing stop
+- Risk/reward
+- Position sizing
+
+then do not create them.
+
+Do not allow generic AI wording such as:
+
+"Use appropriate risk management"
+
+to become an actual Builder condition.
+
+Only structured risk rules explicitly requested by the user should be mapped into the strategy.
+
+--------------------------------------------------
+6. TIMEFRAMES
+--------------------------------------------------
+
+Only use timeframes explicitly requested by the user.
+
+For example:
+
+"5m EMA strategy"
+
+must remain 5m.
+
+Do not automatically add:
+
+- 1m
+- 15m
+- 1H
+- 4H
+- Daily
+
+unless the user requests them or the specific requested concept genuinely requires another timeframe.
+
+--------------------------------------------------
+7. DIRECTION
+--------------------------------------------------
+
+Correctly preserve:
+
+- Long
+- Short
+- Both
+
+If the user requests BOTH directions, generate the appropriate directional versions of the requested executable rule.
+
+Do not add additional directional filters.
+
+--------------------------------------------------
+8. STRATEGY STAGES
+--------------------------------------------------
+
+Correctly preserve:
+
+- Entry
+- Confirmation
+- Exit
+
+Do not automatically convert one requested entry condition into multiple conditions.
+
+If the user asks for one entry condition, create one entry condition.
+
+If the user explicitly requests confirmation conditions, map those separately.
+
+--------------------------------------------------
+9. PARAMETERS
+--------------------------------------------------
+
+Ensure all structured parameters survive the entire pipeline:
+
+AI interpretation
+→ generated draft
+→ normalization
+→ Builder
+→ strategy creation
+→ immutable strategy version
+→ backtesting
+→ monitoring
+
+Do not lose or invent:
+
+- EMA periods
+- SMA periods
+- RSI thresholds
+- MACD parameters
+- lookbacks
+- FVG parameters
+- structure parameters
+- thresholds
+- other concept-specific settings
+
+--------------------------------------------------
+10. GENERATED DRAFT MUST MATCH THE FINAL STRATEGY
+--------------------------------------------------
+
+The Build with AI draft shown to the user must accurately represent what will actually be created.
+
+Do not show a clean draft and then add hidden conditions during Builder mapping.
+
+The sequence must be:
+
+AI generation
+→ normalize
+→ validate
+→ display draft
+→ user reviews
+→ create strategy
+
+The draft should therefore already contain the final intended conditions.
+
+--------------------------------------------------
+11. VALIDATION
+--------------------------------------------------
+
+Before allowing a generated strategy to be created:
+
+Check that:
+
+- Every condition is intentional.
+- Every executable concept maps to a canonical Builder concept.
+- Every parameter is preserved.
+- Every timeframe is correct.
+- Every direction is correct.
+- Every stage is correct.
+- Unsupported concepts are clearly marked.
+- No unrequested risk rules were added.
+- No unrelated conditions were added.
+
+--------------------------------------------------
+12. REGRESSION TESTS
+--------------------------------------------------
+
+Add tests for at least these cases.
+
+TEST A:
+
+"Create a 5m XAUUSD strategy using EMA 20 crosses, both directions."
+
+Expected:
+
+- XAUUSD
+- 5m
+- Both
+- EMA 20
+- Long cross
+- Short cross
+- No HTF bias
+- No SMT
+- No AMD/PO3
+- No FVG
+- No IFVG
+- No stop loss
+- No take profit
+- No unrelated conditions
+
+TEST B:
+
+"Create a 15m long strategy using RSI below 30."
+
+Expected:
+
+- 15m
+- Long
+- RSI below 30
+- No unrelated conditions
+
+TEST C:
+
+"Create a 5m strategy using a bullish FVG retest with 1H bullish structure."
+
+Expected:
+
+- 5m FVG retest
+- 1H bullish structure
+- Correct multi-timeframe mapping
+- No unrelated conditions
+
+TEST D:
+
+"Create a strategy using SMT divergence."
+
+Expected:
+
+- SMT divergence remains review-required/unsupported
+- It is NOT silently replaced with another concept
+
+TEST E:
+
+"Create a strategy with a 2% stop loss and 4% take profit."
+
+Expected:
+
+- 2% stop loss
+- 4% take profit
+
+TEST F:
+
+"Create a strategy using EMA 20. Do not add risk management."
+
+Expected:
+
+- EMA 20 only
+- No stop loss
+- No take profit
+- No other risk rules
+
+--------------------------------------------------
+13. END-TO-END TEST
+--------------------------------------------------
+
+Create one temporary test strategy through the actual application flow:
+
+Build with AI
+→ generated draft
+→ Builder review
+→ Create strategy
+→ immutable v1
+→ backtesting compatibility
+→ monitoring compatibility
+
+Verify that the exact intended conditions and parameters survive every stage.
+
+Do not modify or delete any of the user's existing:
+
+- Strategies
+- Strategy versions
+- Trades
+- Backtests
+- Monitoring data
+
+Use a temporary test strategy only.
+
+--------------------------------------------------
+14. DO NOT CHANGE EXISTING TRADING LOGIC
+--------------------------------------------------
+
+Do not change:
+
+- Backtesting calculations
+- Monitoring evaluator semantics
+- Historical data providers
+- Dukascopy integration
+- BiQuote integration
+- Alerts
+- Economic Calendar
+- Strategy versioning
+
+unless a change is strictly required to fix the AI → Builder mapping issue.
+
+This task is specifically about the Build with AI generation/mapping pipeline.
+
+--------------------------------------------------
+15. VERIFICATION
+--------------------------------------------------
+
+After implementing the fix, run:
+
+- API tests
+- Frontend tests
+- API typecheck
+- Frontend typecheck
+- API production build
+- Frontend production build
+- git diff --check
+
+Also verify:
+
+- Build with AI
+- Strategy Builder
+- Strategy creation
+- Strategy version creation
+- Backtesting compatibility
+- Monitoring compatibility
+- Browser console
+- API logs
+
+--------------------------------------------------
+16. FINAL REPORT
+--------------------------------------------------
+
+At the end, report:
+
+1. The exact source of the unintended conditions.
+2. The generic fix implemented.
+3. How user intent is now preserved.
+4. How unsupported concepts are handled.
+5. How risk rules are handled.
+6. How timeframes are handled.
+7. How directions are handled.
+8. How stages are handled.
+9. How parameters are preserved.
+10. Regression test results.
+11. Typecheck results.
+12. Production build results.
+13. End-to-end test results.
+
+IMPORTANT:
+
+Do not claim this is fixed unless the actual Build with AI → Draft → Builder → Strategy → Version pipeline has been tested end-to-end.
+
+Do not start building the TikTok strategy as part of this task.
+
+Do not create or modify the user's real trading strategies.
+
+The goal is to make the existing Build with AI system accurately translate whatever strategy the user asks for into the existing TradeX Builder without inventing additional rules.
