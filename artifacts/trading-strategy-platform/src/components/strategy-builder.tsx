@@ -87,6 +87,10 @@ function conceptSearchText(concept: TradingConcept) {
   return `${concept.name} ${concept.category || ""} ${(CONCEPT_ALIASES[concept.name] || []).join(" ")}`.toLowerCase();
 }
 
+function conceptHasExecutableParameters(concept: TradingConcept) {
+  return Boolean(normalizeExecutableParameters(concept.name, undefined));
+}
+
 function conditionNameFor(concept: TradingConcept | undefined, rule: string) {
   if (!concept) return "";
   const preset = RULE_PRESETS.find(candidate => candidate.value === rule);
@@ -118,10 +122,13 @@ function isBacktestCompatibleCondition(condition: Pick<StrategyCondition, "conce
 
 function isBacktestCompatibleRiskRules(riskRules: string | null | undefined) {
   if (!riskRules?.trim()) return true;
-  const mentionsRisk = /(?:stop[- ]loss|sl|take[- ]profit|tp)/i.test(riskRules);
+  const mentionsRisk = /(?:stop[- ]loss|sl|take[- ]profit|tp|risk[\/ -]?reward|r\s*:\s*r)/i.test(riskRules);
   if (!mentionsRisk) return true;
-  return /(?:stop[- ]loss|sl)\s*[:=]?\s*\d+(?:\.\d+)?\s*%/i.test(riskRules)
-    || /(?:take[- ]profit|tp)\s*[:=]?\s*\d+(?:\.\d+)?\s*%/i.test(riskRules);
+  if (/(?:below|above)\s+(?:the\s+)?(?:fvg|fair value gap)|(?:trailing|break even|structural)\s+(?:stop|exit)|structural\s+fvg\s+boundary/i.test(riskRules)) return false;
+  const hasStopLoss = /(?:stop[- ]loss|sl)\s*[:=]?\s*\d+(?:\.\d+)?\s*%/i.test(riskRules);
+  const hasTakeProfit = /(?:take[- ]profit|tp)\s*[:=]?\s*\d+(?:\.\d+)?\s*%/i.test(riskRules);
+  const hasRiskReward = /(?:risk[\/ -]?reward|r\s*:\s*r)\s*[:=]?\s*\d+(?:\.\d+)?\s*R\b/i.test(riskRules);
+  return hasStopLoss || hasTakeProfit || (hasRiskReward && hasStopLoss);
 }
 
 function BuilderPage({ children, action }: { children: ReactNode; action?: ReactNode }) {
@@ -999,7 +1006,7 @@ function ConceptsCard({ concepts }: { concepts: TradingConcept[] }) {
       <Search size={15} className="absolute left-3 top-3 text-muted-foreground" />
       <input className="input pl-9 pr-9" value={search} onChange={event => { setSearch(event.target.value); setOpen(true); }} onFocus={() => setOpen(true)} placeholder="Search concepts to review" data-testid="input-builder-library-search" />
       <ChevronDown size={15} className="absolute right-3 top-3 text-muted-foreground" />
-      {open && <div className="absolute z-30 left-0 right-0 top-full mt-2 panel p-2 max-h-56 overflow-y-auto shadow-xl">{filtered.length ? filtered.map(concept => <div key={concept.id} className="px-3 py-2 rounded-md hover:bg-secondary"><div className="flex items-center gap-2"><div className="text-sm font-semibold">{concept.name}</div><span className={`tag text-[9px] ${executableConceptKind(concept.name) ? "tag-active" : concept.isBuiltIn ? "border-amber-500/40 text-amber-200" : "border-amber-500/40 text-amber-200"}`}>{executableConceptKind(concept.name) ? "Supported" : concept.isBuiltIn ? "Not executable" : "Review"}</span></div><div className="text-[10px] text-muted-foreground mt-1">{concept.category || "CUSTOM"} · {concept.isBuiltIn ? "Library concept" : "Custom concept"}</div></div>) : <div className="p-4 text-sm text-muted-foreground">No concepts match that search.</div>}</div>}
+      {open && <div className="absolute z-30 left-0 right-0 top-full mt-2 panel p-2 max-h-56 overflow-y-auto shadow-xl">{filtered.length ? filtered.map(concept => <div key={concept.id} className="px-3 py-2 rounded-md hover:bg-secondary"><div className="flex items-center gap-2"><div className="text-sm font-semibold">{concept.name}</div><span className={`tag text-[9px] ${conceptHasExecutableParameters(concept) ? "tag-active" : "border-amber-500/40 text-amber-200"}`}>{conceptHasExecutableParameters(concept) ? "Supported" : "Review required"}</span></div><div className="text-[10px] text-muted-foreground mt-1">{concept.category || "CUSTOM"} · {concept.isBuiltIn ? "Library concept" : "Custom concept"}</div></div>) : <div className="p-4 text-sm text-muted-foreground">No concepts match that search.</div>}</div>}
     </div>
     <div className="flex flex-wrap gap-1.5 mt-4" data-testid="builder-concept-category-filters">
       {categories.map(option => <button key={option} type="button" className={`tag ${category === option ? "tag-active" : ""}`} onClick={() => setCategory(option)}>{option}</button>)}

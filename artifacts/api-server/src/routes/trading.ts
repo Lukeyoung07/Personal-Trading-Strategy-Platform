@@ -270,6 +270,14 @@ const EXECUTABLE_CONCEPT_METADATA: Record<string, { description: string; detecti
     description: "A prior fair value gap is invalidated by a close through its opposite boundary.",
     detectionRules: "Structured detector: prior three-candle gap followed by a close through the gap boundary.",
   },
+  "Bullish IFVG": {
+    description: "A bullish inverse fair value gap formed when a prior gap is invalidated upward.",
+    detectionRules: "Structured detector: inverse fair value gap with bullish polarity and retest interaction.",
+  },
+  "Bearish IFVG": {
+    description: "A bearish inverse fair value gap formed when a prior gap is invalidated downward.",
+    detectionRules: "Structured detector: inverse fair value gap with bearish polarity and retest interaction.",
+  },
   "Higher High": {
     description: "The candle high exceeds the established prior rolling structure high.",
     detectionRules: "Structured detector: current high above the prior lookback high.",
@@ -305,6 +313,10 @@ const EXECUTABLE_CONCEPT_METADATA: Record<string, { description: string; detecti
   "Market Structure Shift": {
     description: "A directional close break through a prior rolling structure level.",
     detectionRules: "Structured detector: bullish or bearish close break.",
+  },
+  "HTF Structure": {
+    description: "A higher-timeframe market structure shift evaluated on completed higher-timeframe candles.",
+    detectionRules: "Structured detector: higher-timeframe directional close break.",
   },
   "Buy-Side Liquidity": {
     description: "Price reaches a prior rolling high where buy-side liquidity is defined.",
@@ -345,6 +357,22 @@ const EXECUTABLE_CONCEPT_METADATA: Record<string, { description: string; detecti
   "SMA": {
     description: "A simple moving average condition evaluated from completed closes.",
     detectionRules: "Structured detector: SMA period and above/below comparison.",
+  },
+  "EMA Cross": {
+    description: "An EMA crossing condition evaluated from completed closes.",
+    detectionRules: "Structured detector: EMA period and cross direction.",
+  },
+  "SMA Cross": {
+    description: "An SMA crossing condition evaluated from completed closes.",
+    detectionRules: "Structured detector: SMA period and cross direction.",
+  },
+  "Price Above EMA": {
+    description: "Price is above the configured EMA.",
+    detectionRules: "Structured detector: EMA period and above comparison.",
+  },
+  "Price Below EMA": {
+    description: "Price is below the configured EMA.",
+    detectionRules: "Structured detector: EMA period and below comparison.",
   },
   "RSI": {
     description: "A relative strength index threshold condition from completed closes.",
@@ -424,6 +452,10 @@ const EXECUTABLE_CONCEPT_METADATA: Record<string, { description: string; detecti
   },
   "Equilibrium": {
     description: "The close equals the midpoint of the established rolling range.",
+    detectionRules: "Structured detector: prior rolling high-low midpoint.",
+  },
+  "50% Equilibrium": {
+    description: "The close is at the 50% midpoint of the established rolling range.",
     detectionRules: "Structured detector: prior rolling high-low midpoint.",
   },
 };

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  EXECUTABLE_CONCEPT_DEFINITIONS,
+  executableConceptKind,
+  normalizeExecutableParameters,
+} from "@workspace/api-zod";
+import {
   BacktestEngineError,
   evaluateExecutableConditionAtLatest,
   requiredCandleCountForCondition,
@@ -94,6 +99,35 @@ describe("historical backtest engine", () => {
       candle(1, { low: 99, high: 100, close: 99 }),
       candle(2, { low: 98, high: 99, close: 98 }),
     ])).toBe(true);
+  });
+
+  it("keeps every canonical executable alias mapped to a normalized evaluator contract", () => {
+    for (const [kind, definition] of Object.entries(EXECUTABLE_CONCEPT_DEFINITIONS)) {
+      for (const alias of definition.aliases) {
+        expect(executableConceptKind(alias), alias).toBe(kind);
+        const parameters = normalizeExecutableParameters(alias, { kind });
+        expect(parameters, alias).not.toBeNull();
+        const condition = structuredCondition(alias, alias, "long", parameters!);
+        const history = Array.from({ length: requiredCandleCountForCondition(condition) + 2 }, (_, index) => candle(index, {
+          open: 100 + index,
+          high: 101 + index,
+          low: 99 + index,
+          close: 100.5 + index,
+        }));
+        expect(evaluateExecutableConditionAtLatest(condition, history), alias).toEqual(expect.any(Boolean));
+      }
+    }
+  });
+
+  it.each([
+    ["Bullish IFVG", { kind: "fair_value_gap", polarity: "bullish", interaction: "retest", inverse: true }],
+    ["Bearish IFVG", { kind: "fair_value_gap", polarity: "bearish", interaction: "retest", inverse: true }],
+    ["50% Equilibrium", { kind: "range_location", location: "equilibrium" }],
+    ["EMA Cross", { kind: "indicator", indicator: "ema", comparison: "cross_above" }],
+    ["Price Below EMA", { kind: "indicator", indicator: "ema", comparison: "below" }],
+    ["HTF Structure", { kind: "market_structure", signal: "mss" }],
+  ])("preserves executable variant parameters for %s", (conceptName, expected) => {
+    expect(normalizeExecutableParameters(conceptName, undefined)).toMatchObject(expected);
   });
 
   it("processes candles oldest-first and executes signals at the next open", () => {
@@ -192,6 +226,35 @@ describe("historical backtest engine", () => {
       exitPrice: 99,
       exitReason: "stop_loss_first_same_candle_ambiguity",
       pnl: -1,
+    });
+  });
+
+  it("uses the configured R multiple for a take-profit target when a percentage stop defines one R", () => {
+    const result = runHistoricalBacktest({
+      direction: "long",
+      entryRules: null,
+      exitRules: null,
+      riskRules: "stop-loss: 1%; risk/reward: 2R",
+      conditions: [{
+        name: "Bullish entry",
+        stage: "entry",
+        direction: "long",
+        requirement: "required",
+        triggerRules: "bullish",
+        invalidationRules: null,
+        conceptDetectionRules: null,
+      }],
+    }, [
+      candle(0, { open: 100, close: 101 }),
+      candle(1, { open: 100, high: 103, low: 99.5, close: 102 }),
+      candle(2, { open: 100, high: 102.1, low: 100, close: 101 }),
+    ]);
+
+    expect(result.trades[0]).toMatchObject({
+      stopLoss: 99,
+      takeProfit: 102,
+      exitPrice: 102,
+      exitReason: "take_profit",
     });
   });
 

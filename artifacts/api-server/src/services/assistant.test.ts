@@ -1114,6 +1114,41 @@ Risk/Reward: 2:1`,
     expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
   });
 
+  it("preserves an explicit R target and structural FVG stop as risk metadata", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the requested reviewable risk draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "FVG risk draft",
+              description: "A requested FVG retest with explicit risk language.",
+              direction: "long",
+              marketSymbol: "XAUUSD",
+              timeframes: ["5m"],
+              conditions: [
+                { name: "Bullish FVG retest", stage: "entry", requirement: "required", conceptName: "FVG Retest", timeframe: "5m", direction: "long", triggerRules: "model retest" },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const response = await answerAssistant({
+      message: "Create an XAUUSD 5m strategy using a bullish FVG retest with a 2R take profit and a stop below the FVG.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.riskManagementRules).toContain("risk/reward: 2R");
+    expect(response.strategyDraft?.riskManagementRules).toContain("stop-loss: structural FVG boundary");
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("The current risk rules");
+  });
+
   it("preserves explicitly requested continuation as review-required beside an FVG", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({

@@ -528,15 +528,20 @@ function ruleForCondition(condition: BacktestCondition) {
 }
 
 function parseRiskRules(riskRules: string | null) {
-  if (!riskRules?.trim()) return { stopLossPercent: null, takeProfitPercent: null };
+  if (!riskRules?.trim()) return { stopLossPercent: null, takeProfitPercent: null, riskRewardMultiple: null };
   const stopLoss = /(?:stop[- ]loss|sl)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*%/i.exec(riskRules);
   const takeProfit = /(?:take[- ]profit|tp)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*%/i.exec(riskRules);
-  if (/(?:stop[- ]loss|sl|take[- ]profit|tp)/i.test(riskRules) && (!stopLoss && !takeProfit)) {
+  const riskReward = /(?:risk[\/ -]?reward|r\s*:\s*r)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*R\b|(?:take[- ]profit|tp)\s*(?:at|of|[:=])?\s*(\d+(?:\.\d+)?)\s*R\b|(\d+(?:\.\d+)?)\s*R\s*(?:take[- ]profit|tp)\b/i.exec(riskRules);
+  if (/(?:stop[- ]loss|sl|take[- ]profit|tp|risk[\/ -]?reward|r\s*:\s*r|\d+(?:\.\d+)?\s*R\s*(?:take[- ]profit|tp))/i.test(riskRules) && (!stopLoss && !takeProfit && !riskReward)) {
     throw new BacktestEngineError("Risk rules mention stop-loss or take-profit but do not use a supported percentage form such as 'stop-loss: 1%' or 'take-profit: 2%'.");
+  }
+  if (riskReward && !stopLoss) {
+    throw new BacktestEngineError("Risk/reward targets require a supported percentage stop-loss so one R has a defined distance.");
   }
   return {
     stopLossPercent: stopLoss ? Number(stopLoss[1]) / 100 : null,
     takeProfitPercent: takeProfit ? Number(takeProfit[1]) / 100 : null,
+    riskRewardMultiple: riskReward ? Number(riskReward[1] || riskReward[2] || riskReward[3]) : null,
   };
 }
 
@@ -698,12 +703,15 @@ export function runHistoricalBacktest(
       const takeProfit = risk.takeProfitPercent == null ? null : pendingEntry.side === "long"
         ? candle.open * (1 + risk.takeProfitPercent)
         : candle.open * (1 - risk.takeProfitPercent);
+      const riskRewardTakeProfit = risk.riskRewardMultiple == null || stopLoss == null ? null : pendingEntry.side === "long"
+        ? candle.open + (candle.open - stopLoss) * risk.riskRewardMultiple
+        : candle.open - (stopLoss - candle.open) * risk.riskRewardMultiple;
       position = {
         side: pendingEntry.side,
         entryTime: candle.openTime,
         entryPrice: candle.open,
         stopLoss,
-        takeProfit,
+        takeProfit: takeProfit ?? riskRewardTakeProfit,
         exitTime: candle.openTime,
         exitPrice: candle.open,
         pnl: 0,

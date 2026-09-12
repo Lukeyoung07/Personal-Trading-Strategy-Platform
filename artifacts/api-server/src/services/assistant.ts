@@ -14,6 +14,7 @@ import {
 import {
   ChatAssistantResponse,
   EXECUTABLE_CONCEPT_DEFINITIONS,
+  EXECUTABLE_CONCEPT_REQUEST_ALIASES,
   executableConceptTriggerRules,
   executableConceptKind,
   executableConceptLabel,
@@ -92,11 +93,13 @@ function normalizeConditionRule(condition: any) {
 }
 
 function compatibleRiskRules(rules: string | null | undefined) {
-  if (!rules?.trim() || !/(?:stop[- ]loss|sl|take[- ]profit|tp)/i.test(rules)) return true;
-  if (/(?:risk[\/ -]?reward|percentage risk|risk per trade|position siz(?:e|ing)|maximum risk|max(?:imum)? risk)/i.test(rules)) return false;
+  if (!rules?.trim() || !/(?:stop[- ]loss|sl|take[- ]profit|tp|risk[\/ -]?reward|r\s*:\s*r)/i.test(rules)) return true;
+  if (/(?:below|above)\s+(?:the\s+)?(?:fvg|fair value gap)|(?:trailing|break even|structural)\s+(?:stop|exit)|structural\s+fvg\s+boundary/i.test(rules)) return false;
+  if (/(?:percentage risk|risk per trade|position siz(?:e|ing)|maximum risk|max(?:imum)? risk)/i.test(rules)) return false;
   const hasStopLoss = /(?:stop[- ]loss|sl)\s*[:=]?\s*\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%\s*(?:stop[- ]loss|sl)/i.test(rules);
   const hasTakeProfit = /(?:take[- ]profit|tp)\s*[:=]?\s*\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%\s*(?:take[- ]profit|tp)/i.test(rules);
-  return hasStopLoss && hasTakeProfit;
+  const hasRiskReward = /(?:risk[\/ -]?reward|r\s*:\s*r)\s*[:=]?\s*\d+(?:\.\d+)?\s*R\b/i.test(rules);
+  return hasStopLoss || hasTakeProfit || (hasRiskReward && hasStopLoss);
 }
 
 type UnsupportedConceptDefinition = {
@@ -188,6 +191,9 @@ const UNSUPPORTED_CONCEPTS: UnsupportedConceptDefinition[] = [
   { pattern: /\bmaximum risk\b|\bmax(?:imum)? risk\b/i, name: "Maximum Risk per Trade" },
   { pattern: /\bstop[- ]loss\b|\bfixed stop\b/i, name: "Stop Loss" },
   { pattern: /\btake[- ]profit\b|\bfixed take\b/i, name: "Take Profit" },
+  { pattern: /\b(?:new york|ny)\s+(?:session|kill zone)\b/i, name: "New York Session", explanation: "Session timing is catalogued but does not yet have a deterministic historical evaluator." },
+  { pattern: /\blondon\s+(?:session|kill zone)\b/i, name: "London Session", explanation: "Session timing is catalogued but does not yet have a deterministic historical evaluator." },
+  { pattern: /\b(?:asia|asian)\s+(?:session|kill zone)\b/i, name: "Asian Session", explanation: "Session timing is catalogued but does not yet have a deterministic historical evaluator." },
 ];
 
 function unsupportedConceptForText(value: string): UnsupportedConceptDefinition | null {
@@ -319,39 +325,18 @@ function conceptsRequestedInMessage(message: string) {
   return requested;
 }
 
-const REQUESTED_EXECUTABLE_CONCEPT_PATTERNS: Array<[RegExp, string]> = [
-  [/\bliquidity\s+sweep(?:s|ed|ing)?\b/i, "Liquidity Sweep"],
-  [/\b(?:fvg|fair\s+value\s+gap)(?:s|es)?\b/i, "Fair Value Gap"],
-  [/\b(?:bos|break of structure)\b/i, "Break of Structure"],
-  [/\b(?:choch|change of character)\b/i, "Change of Character"],
-  [/\b(?:mss|market structure shift)\b/i, "Market Structure Shift"],
-  [/\b(?:bullish|bearish)\s+(?:higher[- ]timeframe\s+)?structure\b/i, "Market Structure Shift"],
-  [/\b(?:bullish|bearish)\s+candle\b|\bcandle\s+(?:direction|strategy)\b/i, "Candle Direction"],
-  [/\b(?:ema|exponential moving average)\b/i, "EMA"],
-  [/\b(?:sma|simple moving average)\b/i, "SMA"],
-  [/\brsi\b/i, "RSI"],
-  [/\bmacd\b/i, "MACD"],
-  [/\bvwap\b/i, "VWAP"],
-  [/\batr|average true range\b/i, "ATR"],
-  [/\bbullish engulfing\b/i, "Bullish Engulfing"],
-  [/\bbearish engulfing\b/i, "Bearish Engulfing"],
-  [/\bpin bar\b/i, "Pin Bar"],
-  [/\binside bar\b/i, "Inside Bar"],
-  [/\b(?:bullish|bearish)?\s*displacement\b/i, "Displacement"],
-  [/\bbreakout(?:\s+retest)?\b/i, "Breakout"],
-  [/\bprevious day high\b/i, "Previous Day High"],
-  [/\bprevious day low\b/i, "Previous Day Low"],
-  [/\bprevious week high\b/i, "Previous Week High"],
-  [/\bprevious week low\b/i, "Previous Week Low"],
-  [/\bequal highs?\b/i, "Equal Highs"],
-  [/\bequal lows?\b/i, "Equal Lows"],
-];
-
 function requestedExecutableConceptMatches(message: string) {
-  return REQUESTED_EXECUTABLE_CONCEPT_PATTERNS.flatMap(([pattern, name]) => {
-    const match = message.match(pattern);
-    return match ? [{ name, matchedText: match[0] }] : [];
-  });
+  const executableMatches = [...EXECUTABLE_CONCEPT_REQUEST_ALIASES]
+    .sort((left, right) => right.length - left.length)
+    .flatMap(alias => {
+      const match = message.match(new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")}\\b`, "i"));
+      if (!match) return [];
+      return [{ name: executableConceptLabel(alias) || alias, matchedText: match[0] }];
+    });
+  const candleMatch = message.match(/\b(?:bullish|bearish)\s+candle\b|\bcandle\s+(?:direction|strategy)\b/i);
+  return candleMatch
+    ? [...executableMatches, { name: "Candle Direction", matchedText: candleMatch[0] }]
+    : executableMatches;
 }
 
 function requestedExecutableConcepts(message: string) {
@@ -879,6 +864,9 @@ function normalizeRiskRules(value: string | null | undefined, requestMessage?: s
     .replace(/risk\s*per\s*trade\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/gi, "risk: $1%")
     .replace(/risk\s*\/\s*reward\s*[:=]\s*(\d+(?:\.\d+)?)\s*:\s*1/gi, "risk/reward: $1R")
     .replace(/risk\s*reward\s*[:=]\s*(\d+(?:\.\d+)?)\s*:\s*1/gi, "risk/reward: $1R")
+    .replace(/(?:take[- ]profit|tp)\s*(?:at|of|[:=])?\s*(\d+(?:\.\d+)?)\s*R\b/gi, "risk/reward: $1R")
+    .replace(/(\d+(?:\.\d+)?)\s*R\s*(?:take[- ]profit|tp)\b/gi, "risk/reward: $1R")
+    .replace(/\btarget\s+(\d+(?:\.\d+)?)\s*R\b/gi, "risk/reward: $1R")
     .slice(0, 400)
     : null;
   if (requestMessage == null) return normalized;
@@ -893,11 +881,16 @@ function normalizeRiskRules(value: string | null | undefined, requestMessage?: s
   };
   addMatch(/(?:risk\s*per\s*trade|percentage\s*risk|risk)\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/i, value => `risk: ${value}%`);
   addMatch(/(?:risk\s*\/\s*reward|risk\s*reward|r\s*:\s*r)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*:\s*1/i, value => `risk/reward: ${value}R`);
+  addMatch(/(?:take[- ]profit|tp)\s*(?:at|of|[:=])?\s*(\d+(?:\.\d+)?)\s*R\b/i, value => `risk/reward: ${value}R`);
+  addMatch(/(\d+(?:\.\d+)?)\s*R\s*(?:take[- ]profit|tp)\b/i, value => `risk/reward: ${value}R`);
   addMatch(/\btarget\s+(\d+(?:\.\d+)?)\s*R\b/i, value => `risk/reward: ${value}R`);
   addMatch(/(?:stop[- ]loss|sl)\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/i, value => `stop-loss: ${value}%`);
   addMatch(/(\d+(?:\.\d+)?)\s*%\s*(?:stop[- ]loss|sl)\b/i, value => `stop-loss: ${value}%`);
   addMatch(/(?:take[- ]profit|tp)\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/i, value => `take-profit: ${value}%`);
   addMatch(/(\d+(?:\.\d+)?)\s*%\s*(?:take[- ]profit|tp)\b/i, value => `take-profit: ${value}%`);
+  if (/\b(?:stop|stop[- ]loss)\s+(?:below|above)\s+(?:the\s+)?(?:fvg|fair value gap)\b/i.test(requestMessage)) {
+    requestedRules.push("stop-loss: structural FVG boundary (review required)");
+  }
   if (requestedRules.length) return [...new Set(requestedRules)].join("; ");
   return null;
 }

@@ -140,7 +140,7 @@ const keyForConcept = (name: string) => name.trim().toLowerCase().replace(/[^a-z
 export function executableConceptLabel(name: string | null | undefined): string | null {
   const key = keyForConcept(name || "");
   if (key.includes("liquidity sweep")) return "Liquidity Sweep";
-  if (key.includes("inverse fair value gap") || key === "ifvg") return "Inverse Fair Value Gap";
+  if (key.includes("inverse fair value gap") || key === "ifvg" || key.endsWith(" ifvg")) return "Inverse Fair Value Gap";
   if (key.includes("fair value gap") || key === "fvg" || key.includes("fvg ") || key.endsWith(" fvg")) return "Fair Value Gap";
   if (key.includes("break of structure") || key === "bos") return "Break of Structure";
   if (key.includes("change of character") || key === "choch") return "Change of Character";
@@ -265,10 +265,10 @@ export function normalizeExecutableParameters(
     const result: FairValueGapParameters = {
       kind,
       polarity: polarity === "bullish" || polarity === "bearish" ? polarity : "auto",
-      interaction: interaction === "retest" || conceptKey.includes("inverse") || conceptKey === "ifvg" ? "retest" : defaults.interaction,
+      interaction: interaction === "retest" || conceptKey.includes("inverse") || conceptKey === "ifvg" || conceptKey.endsWith(" ifvg") ? "retest" : defaults.interaction,
       lookback: input.lookback == null ? defaults.lookback : Number(input.lookback),
       minimumGap: input.minimumGap == null ? defaults.minimumGap : Number(input.minimumGap),
-      ...(input.inverse === true || conceptKey.includes("inverse") || conceptKey === "ifvg" ? { inverse: true } : {}),
+      ...(input.inverse === true || conceptKey.includes("inverse") || conceptKey === "ifvg" || conceptKey.endsWith(" ifvg") ? { inverse: true } : {}),
     };
     return integerInRange(result.lookback, 1, 100) && numberInRange(result.minimumGap, 0, Number.MAX_SAFE_INTEGER) ? result : null;
   }
@@ -282,8 +282,8 @@ export function normalizeExecutableParameters(
             : conceptKey === "lower low" || conceptKey === "ll" ? "lower_low"
               : conceptKey === "swing high" ? "swing_high"
                 : conceptKey === "swing low" ? "swing_low"
-                  : conceptKey === "change of character" || conceptKey === "choch" ? "choch"
-                    : conceptKey === "market structure shift" || conceptKey === "mss" ? "mss" : "bos");
+                : conceptKey === "change of character" || conceptKey === "choch" ? "choch"
+                  : conceptKey === "market structure shift" || conceptKey === "mss" || conceptKey === "htf structure" ? "mss" : "bos");
     const signals = ["swing_high", "swing_low", "higher_high", "higher_low", "lower_high", "lower_low", "bos", "choch", "mss"];
     if (!signals.includes(String(signal))) return null;
     if (input.polarity != null && input.polarity !== "auto" && input.polarity !== "bullish" && input.polarity !== "bearish") return null;
@@ -425,33 +425,44 @@ export const EXECUTABLE_CONCEPT_DEFINITIONS = {
   liquidity_sweep: {
     label: "Liquidity Sweep",
     description: "The candle takes a prior liquidity level and closes back inside it.",
+    aliases: ["liquidity sweep"],
   },
   fair_value_gap: {
     label: "Fair Value Gap",
     description: "A three-candle imbalance, evaluated as formation or a later retest.",
+    aliases: ["fair value gap", "fvg", "bullish fvg", "bearish fvg", "fvg retest", "fvg fill", "ifvg", "bullish ifvg", "bearish ifvg"],
   },
   market_structure: {
     label: "Market Structure",
     description: "Causal rolling structure levels identify swings, HH/HL/LH/LL, and directional breaks.",
+    aliases: ["higher high", "higher low", "lower high", "lower low", "break of structure", "bos", "change of character", "choch", "market structure shift", "mss", "htf structure", "swing high", "swing low"],
   },
   liquidity_level: {
     label: "Liquidity Level",
     description: "Historical prior, equal, day, and week levels derived from completed OHLC candles.",
+    aliases: ["buy-side liquidity", "sell-side liquidity", "equal highs", "equal lows", "previous day high", "previous day low", "previous week high", "previous week low"],
   },
   indicator: {
     label: "Technical Indicator",
     description: "EMA, SMA, RSI, MACD, VWAP, and ATR calculations from historical OHLC data.",
+    aliases: ["ema", "sma", "rsi", "rsi overbought", "rsi oversold", "macd", "macd cross", "vwap", "atr", "ema cross", "sma cross", "price above ema", "price below ema"],
   },
   price_action: {
     label: "Price Action",
     description: "Deterministic candle patterns and rolling-range breakouts from OHLC data.",
+    aliases: ["breakout", "break and retest", "breakout retest", "bullish engulfing", "bearish engulfing", "pin bar", "inside bar", "support", "resistance"],
   },
   range_location: {
     label: "Range Location",
     description: "Premium, discount, or equilibrium relative to an established rolling high-low range.",
+    aliases: ["premium", "discount", "equilibrium", "50% equilibrium"],
   },
   displacement: {
     label: "Displacement",
     description: "A directional candle whose body is at least a configured multiple of prior ATR and closes near its directional extreme.",
+    aliases: ["displacement", "bullish displacement", "bearish displacement"],
   },
 } as const;
+
+export const EXECUTABLE_CONCEPT_REQUEST_ALIASES = Object.values(EXECUTABLE_CONCEPT_DEFINITIONS)
+  .flatMap(definition => definition.aliases);

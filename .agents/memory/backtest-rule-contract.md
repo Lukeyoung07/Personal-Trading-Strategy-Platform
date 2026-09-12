@@ -14,3 +14,9 @@ Canonical library labels should identify the executable concept family, while di
 **Why:** Alias-specific names otherwise fragment one executable definition across the assistant, Builder, library, and backtester, causing duplicate concepts or inconsistent support decisions.
 
 **How to apply:** Normalize aliases to the existing family label before matching conditions, then preserve the requested behavior in typed parameters and trigger rules.
+
+R-multiple take-profit rules are executable only when a supported percentage stop-loss defines the one-R distance; structural stops such as “below FVG” remain explicit review metadata.
+
+**Why:** Applying an R target without a deterministic stop distance would fabricate a price level, while dropping a structural stop would misrepresent the user’s request.
+
+**How to apply:** Preserve the normalized `risk/reward: NR` text through AI drafts and versions, reject it at backtest preflight without a numeric stop, and keep Builder compatibility aligned with the server.
