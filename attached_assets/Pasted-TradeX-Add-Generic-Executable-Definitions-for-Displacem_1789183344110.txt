@@ -1,0 +1,208 @@
+TradeX — Add Generic Executable Definitions for Displacement and Continuation
+
+Do NOT create a new strategy.
+
+Do NOT modify existing strategies, versions, trades, backtests, monitoring records, alerts, or provider integrations.
+
+The purpose of this task is to investigate whether the existing Strategy Builder can represent the concepts "displacement" and "continuation" objectively and, if not, add proper generic executable definitions.
+
+IMPORTANT:
+Do not solve this by making Build with AI guess or substitute another ICT/SMC concept.
+
+Do not map these concepts to:
+- Liquidity sweep
+- Market structure
+- Higher-timeframe bias
+- SMT
+- AMD
+- PO3
+- EMA
+- RSI
+- MACD
+- FVG
+- Any unrelated concept
+
+--------------------------------------------------
+STEP 1 — AUDIT EXISTING CAPABILITIES
+--------------------------------------------------
+
+Inspect the existing canonical executable concept registry and Strategy Builder.
+
+Determine whether there are already executable definitions that can objectively represent:
+
+1. Displacement
+2. Continuation
+
+If an existing executable definition can represent either concept, use that existing definition rather than creating a duplicate.
+
+Do not create aliases that change the meaning of an existing concept.
+
+--------------------------------------------------
+STEP 2 — OBJECTIVE DEFINITIONS
+--------------------------------------------------
+
+If the concepts genuinely do not exist, determine whether they can be represented objectively using the existing candle/price data and Builder architecture.
+
+Do NOT introduce subjective definitions such as:
+
+- "strong displacement"
+- "clean continuation"
+- "strong momentum"
+- "looks bullish"
+- "looks bearish"
+
+Any new condition must have precise deterministic parameters.
+
+If there is not enough information to define a concept objectively without inventing trading rules, DO NOT implement it.
+
+Instead report exactly what information is missing.
+
+--------------------------------------------------
+STEP 3 — BUILD WITH AI INTEGRATION
+--------------------------------------------------
+
+If an executable definition already exists or is safely added:
+
+Update Build with AI so that explicitly requested:
+
+"displacement"
+
+or
+
+"continuation"
+
+can map to the canonical executable concept.
+
+The mapping must only happen when the user explicitly requested the concept.
+
+Do NOT make Build with AI infer displacement or continuation from unrelated concepts.
+
+Do NOT make these concepts automatically appear in strategies.
+
+--------------------------------------------------
+STEP 4 — AUTHORIZATION
+--------------------------------------------------
+
+Preserve the existing authorization system.
+
+Every retained condition must still have an authorization trace back to the original user request.
+
+For example:
+
+User requests:
+"XAUUSD 5m bullish FVG retest"
+
+The system must NOT add displacement.
+
+User requests:
+"XAUUSD 5m bullish displacement followed by FVG retest"
+
+The system may retain displacement ONLY if it has a valid executable canonical definition.
+
+--------------------------------------------------
+STEP 5 — BUILDER
+--------------------------------------------------
+
+If executable definitions are added, make them available through the existing Strategy Builder architecture.
+
+They must support:
+
+- Parameters
+- Timeframe
+- Direction
+- Validation
+- Serialization
+- API contracts
+- Zod schemas
+- OpenAPI
+- Generated frontend types
+
+Use the existing architecture rather than creating a separate parallel system.
+
+--------------------------------------------------
+STEP 6 — BACKTEST
+--------------------------------------------------
+
+If the concepts are added as executable conditions, ensure the existing backtesting engine can evaluate them deterministically.
+
+Do NOT change unrelated backtesting behaviour.
+
+Do NOT introduce look-ahead bias.
+
+Use only information available at the relevant candle.
+
+Use the same closed-candle semantics as existing conditions.
+
+--------------------------------------------------
+STEP 7 — MONITORING
+--------------------------------------------------
+
+If the concepts become executable, ensure Strategy Monitoring can evaluate them using the same canonical evaluator.
+
+Do not create a separate monitoring implementation.
+
+--------------------------------------------------
+STEP 8 — REGRESSION TESTS
+--------------------------------------------------
+
+Add tests for:
+
+1. User explicitly requests displacement.
+2. User explicitly requests continuation.
+3. User requests FVG without displacement.
+4. User requests FVG without continuation.
+5. User explicitly requests displacement + FVG.
+6. User explicitly requests continuation + FVG.
+7. Build with AI does not invent displacement.
+8. Build with AI does not invent continuation.
+9. Unsupported concepts remain REVIEW REQUIRED.
+10. Authorization traces remain correct.
+
+--------------------------------------------------
+IMPORTANT
+--------------------------------------------------
+
+Do NOT invent a definition merely so the current TikTok strategy becomes executable.
+
+If "displacement" or "continuation" cannot be objectively defined from the information currently available, stop and report that rather than implementing an arbitrary interpretation.
+
+The goal is a reusable, technically correct Builder capability, not a one-off workaround for one strategy.
+
+--------------------------------------------------
+VALIDATION
+--------------------------------------------------
+
+Run:
+
+- API tests
+- Frontend tests
+- Root/library typecheck
+- API typecheck
+- Frontend typecheck
+- API production build
+- Frontend production build
+- git diff --check
+
+Also perform an end-to-end Build with AI test using:
+
+"Create an XAUUSD 5m strategy using bullish displacement followed by a bullish FVG retest."
+
+Verify that:
+
+- Requested concepts are preserved.
+- No unrelated concepts are added.
+- Unsupported concepts are clearly marked REVIEW REQUIRED.
+- Authorization traces remain present.
+
+Do not create or save a permanent strategy during this task.
+
+Final report must state exactly:
+
+1. Whether displacement already existed.
+2. Whether continuation already existed.
+3. Whether either required a new executable definition.
+4. The exact objective definition used if one was added.
+5. Whether Build with AI now maps them correctly.
+6. Test results.
+7. Typecheck results.
+8. Build results.
