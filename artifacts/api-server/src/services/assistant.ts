@@ -292,6 +292,8 @@ function requestedExecutableConcepts(message: string) {
     [/\b(?:bos|break of structure)\b/i, "Break of Structure"],
     [/\b(?:choch|change of character)\b/i, "Change of Character"],
     [/\b(?:mss|market structure shift)\b/i, "Market Structure Shift"],
+    [/\b(?:bullish|bearish)\s+(?:higher[- ]timeframe\s+)?structure\b/i, "Market Structure Shift"],
+    [/\b(?:bullish|bearish)\s+candle\b|\bcandle\s+(?:direction|strategy)\b/i, "Candle Direction"],
     [/\b(?:ema|exponential moving average)\b/i, "EMA"],
     [/\b(?:sma|simple moving average)\b/i, "SMA"],
     [/\brsi\b/i, "RSI"],
@@ -378,63 +380,199 @@ function mappedHtfBiasRetestConditions(conditions: any[], message: string) {
   });
 }
 
-function mapRequestedExecutableConditions(conditions: any[], message: string) {
-  const mappedHtfRetest = mappedHtfBiasRetestConditions(conditions, message);
-  if (mappedHtfRetest) return mappedHtfRetest;
-  const requested = requestedExecutableConcepts(message);
-  if (!requested.length) return conditions;
-  const hasRetest = /\b(?:fvg|fair\s+value\s+gap)(?:\s+\w+){0,2}\s+retests?\b|\bfvg\s+retests?\b/i.test(message);
-  return conditions.map((condition, index) => {
-    const descriptor = `${condition?.name || ""} ${condition?.conceptName || ""} ${condition?.triggerRules || ""}`;
-    const direct = requested.find(name => executableConceptLabel(String(condition?.conceptName || condition?.name || descriptor)) === executableConceptLabel(name));
-    const byStage = condition?.stage === "entry" && requested.includes("Liquidity Sweep")
-      ? "Liquidity Sweep"
-      : condition?.stage === "confirmation" && requested.includes("Fair Value Gap")
-        ? "Fair Value Gap"
-        : requested[index % requested.length];
-    const conceptName = direct || (executableConceptKind(String(condition?.conceptName || "")) ? condition.conceptName : byStage);
-    const parameters = normalizeExecutableParameters(conceptName, {
-      ...(condition?.parameters && typeof condition.parameters === "object" ? condition.parameters : {}),
-      ...(hasRetest && executableConceptKind(conceptName) === "fair_value_gap" ? { interaction: "retest" } : {}),
-    });
-    return parameters
-      ? {
-        ...condition,
-        conceptName,
-        parameters,
-        triggerRules: executableConceptTriggerRules(parameters),
-        ruleSupported: true,
-        supported: true,
-      }
-      : condition;
+function requestedDirection(message: string, fallback: string) {
+  if (/\b(?:both|long\s+and\s+short|buy\s+and\s+sell)\b|\bboth\s+directions?\b/i.test(message)) return "both";
+  if (/\b(?:short|sell|bearish)\b/i.test(message) && !/\b(?:long|buy|bullish)\b/i.test(message)) return "short";
+  if (/\b(?:long|buy|bullish)\b/i.test(message) && !/\b(?:short|sell|bearish)\b/i.test(message)) return "long";
+  return ["long", "short", "both"].includes(fallback) ? fallback : "both";
+}
+
+function requestedConceptNames(message: string) {
+  const nonConditionConcepts = new Set([
+    "Multi-timeframe analysis",
+    "Risk / Reward",
+    "Percentage Risk",
+    "Position Sizing",
+    "Maximum Risk per Trade",
+    "Stop Loss",
+    "Take Profit",
+  ]);
+  const names = [
+    ...requestedExecutableConcepts(message),
+    ...conceptsRequestedInMessage(message)
+      .filter(concept => !nonConditionConcepts.has(concept.name))
+      .map(concept => concept.name),
+  ];
+  const seen = new Set<string>();
+  return names.filter(name => {
+    const canonical = executableConceptLabel(name) || catalogKey(name);
+    if (seen.has(canonical)) return false;
+    seen.add(canonical);
+    return true;
   });
 }
 
-function addMissingRequestedExecutableConditions(draft: any, message: string) {
-  const mappedHtfRetest = mappedHtfBiasRetestConditions(Array.isArray(draft.conditions) ? draft.conditions : [], message);
-  if (mappedHtfRetest) return { ...draft, conditions: mappedHtfRetest };
-  const requested = requestedExecutableConcepts(message);
-  if (!requested.length || (Array.isArray(draft.conditions) && draft.conditions.length > 0)) return draft;
-  const timeframes = Array.isArray(draft.timeframes) ? draft.timeframes : [];
-  const direction = ["long", "short", "both"].includes(draft.direction) ? draft.direction : "both";
-  const conditions = requested.map((conceptName, index) => {
-    const parameters = normalizeExecutableParameters(conceptName, {
-      ...(conceptName === "Fair Value Gap" && /\bretests?\b/i.test(message) ? { interaction: "retest" } : {}),
-    });
+function conditionMatchesConcept(condition: any, requestedName: string) {
+  const requestedLabel = executableConceptLabel(requestedName);
+  const candidateValues = [
+    condition?.conceptName,
+    condition?.name,
+    condition?.triggerRules,
+  ].map(value => String(value || ""));
+  if (requestedLabel && candidateValues.some(value => executableConceptLabel(value) === requestedLabel)) return true;
+  const requestedKey = catalogKey(requestedName);
+  if (requestedKey === "candle direction" && candidateValues.some(value => /\b(?:bullish|bearish)\s+candle\b/i.test(value))) return true;
+  return candidateValues.some(value => {
+    const key = catalogKey(value);
+    return key === requestedKey || key.includes(requestedKey) || requestedKey.includes(key);
+  });
+}
+
+function requestedTimeframes(message: string) {
+  return requestTimeframeValues(message).filter((value, index, values) => values.indexOf(value) === index);
+}
+
+function requestedParameters(conceptName: string, message: string, condition: any = {}) {
+  const input = {
+    ...(condition?.parameters && typeof condition.parameters === "object" ? condition.parameters : {}),
+  } as Record<string, unknown>;
+  const descriptor = `${message} ${condition?.name || ""} ${condition?.conceptName || ""} ${condition?.triggerRules || ""}`;
+  const kind = executableConceptKind(conceptName);
+  if (kind === "indicator") {
+    const indicator = String((input.indicator || conceptName || "")).toLowerCase();
+    const periodMatch = descriptor.match(/(?:\b(?:ema|exponential\s+moving\s+average|sma|simple\s+moving\s+average|rsi|macd)\s*(?:\(\s*)?(\d+)|\b(\d+)\s*(?:ema|sma|rsi|macd)\b)/i);
+    if (periodMatch) input.period = Number(periodMatch[1] || periodMatch[2]);
+    const crossAbove = /\bcross(?:es|ing)?\s+(?:above|over)\b/i.test(descriptor);
+    const crossBelow = /\bcross(?:es|ing)?\s+(?:below|under)\b/i.test(descriptor);
+    if (crossAbove) input.comparison = "cross_above";
+    else if (crossBelow) input.comparison = "cross_below";
+    else if (/\b(?:rsi|relative\s+strength\s+index)\b[^.!?]{0,40}\b(?:below|under|less\s+than)\s*(\d+(?:\.\d+)?)/i.test(descriptor)) {
+      const threshold = descriptor.match(/\b(?:rsi|relative\s+strength\s+index)\b[^.!?]{0,40}\b(?:below|under|less\s+than)\s*(\d+(?:\.\d+)?)/i)?.[1];
+      input.comparison = "below";
+      if (threshold) input.threshold = Number(threshold);
+    } else if (/\b(?:rsi|relative\s+strength\s+index)\b[^.!?]{0,40}\b(?:above|over|greater\s+than)\s*(\d+(?:\.\d+)?)/i.test(descriptor)) {
+      const threshold = descriptor.match(/\b(?:rsi|relative\s+strength\s+index)\b[^.!?]{0,40}\b(?:above|over|greater\s+than)\s*(\d+(?:\.\d+)?)/i)?.[1];
+      input.comparison = "above";
+      if (threshold) input.threshold = Number(threshold);
+    }
+    if (indicator === "rsi" && input.comparison === "below" && input.threshold == null) input.threshold = 30;
+  }
+  if (kind === "fair_value_gap") {
+    if (/\bretests?\b|\bfill\b/i.test(descriptor)) input.interaction = "retest";
+    if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
+    if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
+  }
+  if (kind === "market_structure") {
+    if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
+    if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
+  }
+  return normalizeExecutableParameters(conceptName, input);
+}
+
+function stageForRequestedConcept(conceptName: string, message: string, fallback = "entry") {
+  const conceptKey = catalogKey(conceptName);
+  const nearby = new RegExp(`(?:${conceptKey.replace(/\s+/g, "\\s+")})[^.!?]{0,50}\\b(confirmation|exit|invalidation)\\b|\\b(confirmation|exit|invalidation)\\b[^.!?]{0,50}(?:${conceptKey.replace(/\s+/g, "\\s+")})`, "i");
+  const match = message.match(nearby);
+  if (match?.[1] || match?.[2]) return (match[1] || match[2]) === "invalidation" ? "invalidation" : match[1] || match[2];
+  return ["entry", "confirmation", "invalidation", "exit"].includes(fallback) ? fallback : "entry";
+}
+
+function syntheticRequestedCondition(conceptName: string, draft: any, message: string, index: number) {
+  const parameters = requestedParameters(conceptName, message);
+  const supported = Boolean(parameters);
+  const direction = requestedDirection(message, draft.direction);
+  return {
+    name: !supported
+      ? executableConceptLabel(conceptName) || conceptName
+      : parameters?.kind === "fair_value_gap" && parameters.interaction === "retest"
+      ? "Fair Value Gap Retest"
+      : `${executableConceptLabel(conceptName) || conceptName} condition`,
+    stage: stageForRequestedConcept(conceptName, message, conceptName === "Fair Value Gap" ? "confirmation" : "entry"),
+    requirement: "required",
+    conceptName: executableConceptLabel(conceptName) || conceptName,
+    timeframe: requestedTimeframes(message)[index] || requestedTimeframes(message)[0] || "Not specified",
+    direction,
+    triggerRules: parameters ? executableConceptTriggerRules(parameters) : `${conceptName} requested; review required because it is not executable by the current Builder.`,
+    parameters,
+    ruleSupported: supported,
+    supported,
+  };
+}
+
+function directionalizeCondition(condition: any, direction: string, message: string) {
+  const parameters = condition.parameters;
+  const isCross = parameters?.kind === "indicator"
+    && ["ema", "sma"].includes(parameters.indicator)
+    && (String(parameters.comparison).startsWith("cross_") || /\bcross(?:es|ing)?\b/i.test(message));
+  if (direction !== "both" || !isCross) {
+    return [{ ...condition, direction: direction === "both" ? condition.direction || "both" : direction }];
+  }
+  return (["long", "short"] as const).map(side => {
+    const sideParameters = {
+      ...parameters,
+      comparison: side === "long" ? "cross_above" : "cross_below",
+    };
     return {
-      name: conceptName === "Liquidity Sweep" ? "Liquidity Sweep" : /\bretests?\b/i.test(message) ? "Fair Value Gap Retest" : "Fair Value Gap",
-      stage: conceptName === "Liquidity Sweep" ? "entry" : "confirmation",
-      requirement: "required",
-      conceptName,
-      timeframe: timeframes[index] || timeframes[0] || "Not specified",
-      direction,
-      triggerRules: parameters ? executableConceptTriggerRules(parameters) : "",
-      parameters,
-      ruleSupported: Boolean(parameters),
-      supported: Boolean(parameters),
+      ...condition,
+      name: `${condition.name} (${side === "long" ? "Long" : "Short"})`,
+      direction: side,
+      parameters: sideParameters,
+      triggerRules: executableConceptTriggerRules(sideParameters),
+      ruleSupported: true,
+      supported: true,
     };
   });
-  return { ...draft, conditions };
+}
+
+function reconcileRequestedConditions(draft: any, message: string) {
+  const originalConditions = Array.isArray(draft.conditions) ? draft.conditions : [];
+  const mappedHtfRetest = mappedHtfBiasRetestConditions(originalConditions, message);
+  if (mappedHtfRetest) return mappedHtfRetest;
+  const requested = requestedConceptNames(message);
+  if (!requested.length) return [];
+  const timeframes = requestedTimeframes(message);
+  const direction = requestedDirection(message, draft.direction);
+  const matched = requested.flatMap((requestedName, requestedIndex) => {
+    const matching = originalConditions.filter((condition: any) => conditionMatchesConcept(condition, requestedName));
+    if (!matching.length) return [syntheticRequestedCondition(requestedName, draft, message, requestedIndex)];
+    return matching.map((condition: any) => {
+      const conceptName = executableConceptLabel(condition.conceptName) || condition.conceptName || requestedName;
+      const parameters = requestedParameters(conceptName, message, condition);
+      const conditionTimeframe = timeframes.find(value => catalogKey(value) === catalogKey(String(condition.timeframe || "")))
+        || (timeframes.length === 1 ? timeframes[0] : condition.timeframe)
+        || timeframes[requestedIndex]
+        || "Not specified";
+      return {
+        ...condition,
+        conceptName,
+        timeframe: conditionTimeframe,
+        direction: direction === "both" ? condition.direction || "both" : direction,
+        parameters,
+        triggerRules: parameters ? executableConceptTriggerRules(parameters) : condition.triggerRules,
+        ruleSupported: condition.ruleSupported === true || Boolean(parameters),
+        supported: Boolean(parameters) || condition.supported === true,
+      };
+    });
+  });
+  const seen = new Set<string>();
+  return matched
+    .flatMap(condition => directionalizeCondition(condition, direction, message))
+    .filter(condition => {
+      const key = JSON.stringify([
+        condition.conceptName,
+        condition.stage,
+        condition.timeframe,
+        condition.direction,
+        condition.parameters || null,
+      ]);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function addMissingRequestedExecutableConditions(draft: any, message: string) {
+  return { ...draft, conditions: reconcileRequestedConditions(draft, message) };
 }
 
 function enrichDraftConcepts(draft: any, message: string) {
@@ -551,6 +689,9 @@ function normalizeRiskRules(value: string | null | undefined, requestMessage?: s
     : null;
   if (requestMessage == null) return normalized;
 
+  if (/\b(?:do\s*not|don't|dont|without|no|never)\b[^.!?]{0,50}\b(?:risk|stop[- ]loss|take[- ]profit|trailing|position sizing|risk\/?reward)\b/i.test(requestMessage)) {
+    return null;
+  }
   const requestedRules: string[] = [];
   const addMatch = (pattern: RegExp, formatter: (value: string) => string) => {
     const match = requestMessage.match(pattern);
@@ -560,11 +701,11 @@ function normalizeRiskRules(value: string | null | undefined, requestMessage?: s
   addMatch(/(?:risk\s*\/\s*reward|risk\s*reward|r\s*:\s*r)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*:\s*1/i, value => `risk/reward: ${value}R`);
   addMatch(/\btarget\s+(\d+(?:\.\d+)?)\s*R\b/i, value => `risk/reward: ${value}R`);
   addMatch(/(?:stop[- ]loss|sl)\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/i, value => `stop-loss: ${value}%`);
+  addMatch(/(\d+(?:\.\d+)?)\s*%\s*(?:stop[- ]loss|sl)\b/i, value => `stop-loss: ${value}%`);
   addMatch(/(?:take[- ]profit|tp)\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/i, value => `take-profit: ${value}%`);
+  addMatch(/(\d+(?:\.\d+)?)\s*%\s*(?:take[- ]profit|tp)\b/i, value => `take-profit: ${value}%`);
   if (requestedRules.length) return [...new Set(requestedRules)].join("; ");
-  if (!/(?:stop[- ]loss|take[- ]profit|\bsl\b|\btp\b|\brisk\b|\btarget\b)/i.test(requestMessage)) return null;
-  const narrative = requestMessage.match(/(?:stop[- ]loss|take[- ]profit|sl|tp|target)[^.!?]*/i)?.[0]?.trim();
-  return narrative ? narrative.slice(0, 400) : null;
+  return null;
 }
 
 async function builderCatalog(): Promise<BuilderCatalog> {
@@ -591,9 +732,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
     ? addMissingRequestedExecutableConditions(draft, requestMessage)
     : draft;
   const warnings: string[] = [];
-  const mappedConditions = requestMessage
-    ? mapRequestedExecutableConditions(requestedDraft.conditions || [], requestMessage)
-    : requestedDraft.conditions || [];
+  const mappedConditions = requestedDraft.conditions || [];
   const conditions = mappedConditions.map((condition: any) => {
     const conceptName = matchCatalogConcept(String(condition.conceptName || ""), catalog);
     const timeframe = matchCatalogTimeframe(String(condition.timeframe || ""), catalog);
@@ -617,7 +756,8 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
     }
     return true;
   });
-  const marketSymbol = matchCatalogMarket(draft.marketSymbol, catalog);
+  const requestedMarket = requestMessage?.match(/\b(?:XAUUSD|USTEC|US30|NAS100|SPX500|EURUSD|GBPUSD|USDJPY|BTCUSD|ETHUSD|gold|spot\s+gold|nasdaq)\b/i)?.[0] || null;
+  const marketSymbol = matchCatalogMarket(draft.marketSymbol || requestedMarket, catalog);
   if (draft.marketSymbol && !marketSymbol) warnings.push(`Market “${String(draft.marketSymbol)}” is not in the active market catalog.`);
   if (!String(draft.name || "").trim()) warnings.push("Strategy name needs review.");
   if (!["long", "short", "both"].includes(draft.direction)) warnings.push("Strategy direction needs review.");
@@ -633,9 +773,15 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
     })
     : [];
   const conceptsUsed = normalizeConcepts(retainedConcepts, conditions);
-  const timeframes = Array.isArray(draft.timeframes)
-    ? draft.timeframes.map((timeframe: string) => matchCatalogTimeframe(String(timeframe), catalog) || String(timeframe).slice(0, 40)).filter(Boolean).slice(0, 8)
-    : [];
+  const requestedFrameValues = requestMessage ? requestedTimeframes(requestMessage) : [];
+  const timeframes = (requestedFrameValues.length
+    ? requestedFrameValues
+    : Array.isArray(draft.timeframes)
+      ? draft.timeframes
+      : [])
+    .map((timeframe: string) => matchCatalogTimeframe(String(timeframe), catalog) || String(timeframe).slice(0, 40))
+    .filter(Boolean)
+    .slice(0, 8);
   const next = {
     ...requestedDraft,
     marketSymbol,

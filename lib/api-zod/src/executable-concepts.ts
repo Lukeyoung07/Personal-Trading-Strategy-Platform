@@ -127,7 +127,7 @@ export function executableConceptLabel(name: string | null | undefined): string 
   if (key.includes("fair value gap") || key === "fvg" || key.includes("fvg ") || key.endsWith(" fvg")) return "Fair Value Gap";
   if (key.includes("break of structure") || key === "bos") return "Break of Structure";
   if (key.includes("change of character") || key === "choch") return "Change of Character";
-  if (key.includes("market structure shift") || key === "mss" || key === "htf structure" || key.includes("higher timeframe structure")) return "Market Structure Shift";
+   if (key.includes("market structure shift") || key === "mss" || key === "htf structure" || key.includes("higher timeframe structure") || key === "bullish structure" || key === "bearish structure") return "Market Structure Shift";
   if (key.includes("higher high") || key === "hh") return "Higher High";
   if (key.includes("higher low") || key === "hl") return "Higher Low";
   if (key.includes("lower high") || key === "lh") return "Lower High";
@@ -168,7 +168,7 @@ export function executableConceptKind(name: string | null | undefined): Executab
   if (
     key.includes("break of structure") || key === "bos" ||
     key.includes("change of character") || key === "choch" ||
-    key.includes("market structure shift") || key === "mss" || key === "htf structure" || key.includes("higher timeframe structure") ||
+     key.includes("market structure shift") || key === "mss" || key === "htf structure" || key.includes("higher timeframe structure") || key === "bullish structure" || key === "bearish structure" ||
     key === "higher high" || key === "hh" || key === "higher low" || key === "hl" ||
     key === "lower high" || key === "lh" || key === "lower low" || key === "ll" ||
     key === "swing high" || key === "swing low"
@@ -271,7 +271,9 @@ export function normalizeExecutableParameters(
     const result: MarketStructureParameters = {
       kind,
       signal: signal as MarketStructureParameters["signal"],
-      polarity: input.polarity === "bullish" || input.polarity === "bearish" ? input.polarity : defaults.polarity,
+       polarity: input.polarity === "bullish" || input.polarity === "bearish"
+         ? input.polarity
+         : conceptKey.includes("bullish") ? "bullish" : conceptKey.includes("bearish") ? "bearish" : defaults.polarity,
       lookback: input.lookback == null ? defaults.lookback : Number(input.lookback),
     };
     return integerInRange(result.lookback, 2, 100) ? result : null;

@@ -634,4 +634,177 @@ Risk/Reward: 2:1`,
        }
     }
   });
+
+  it("keeps the generated draft aligned with the concepts, timeframes, directions, and rules requested by the user", async () => {
+    const cases = [
+      {
+        message: "Create a 5m XAUUSD strategy using EMA 20 crosses, both directions.",
+        draft: {
+          direction: "both",
+          timeframes: ["1H", "5m"],
+          conditions: [
+            { name: "EMA 20", stage: "entry", requirement: "required", conceptName: "EMA", timeframe: "1H", direction: "both", triggerRules: "model rule", parameters: { kind: "indicator", indicator: "ema", period: 99, comparison: "above" } },
+            { name: "EMA 20 short", stage: "entry", requirement: "required", conceptName: "EMA", timeframe: "1H", direction: "short", triggerRules: "model rule", parameters: { kind: "indicator", indicator: "ema", period: 99, comparison: "above" } },
+            { name: "HTF bias", stage: "confirmation", requirement: "required", conceptName: "HTF Structure", timeframe: "1H", direction: "both", triggerRules: "unrelated" },
+            { name: "SMT", stage: "confirmation", requirement: "required", conceptName: "SMT Divergence", timeframe: "1H", direction: "both", triggerRules: "unrelated" },
+          ],
+          riskManagementRules: "Use appropriate risk management.",
+        },
+        verify: (response: Awaited<ReturnType<typeof answerAssistant>>) => {
+          expect(response.strategyDraft?.marketSymbol).toBe("XAUUSD");
+          expect(response.strategyDraft?.timeframes).toEqual(["5m"]);
+          expect(response.strategyDraft?.conditions.map(condition => ({
+            conceptName: condition.conceptName,
+            timeframe: condition.timeframe,
+            direction: condition.direction,
+            period: condition.parameters?.period,
+            comparison: condition.parameters?.comparison,
+          }))).toEqual([
+            { conceptName: "EMA", timeframe: "5m", direction: "long", period: 20, comparison: "cross_above" },
+            { conceptName: "EMA", timeframe: "5m", direction: "short", period: 20, comparison: "cross_below" },
+          ]);
+          expect(response.strategyDraft?.riskManagementRules).toBeNull();
+        },
+      },
+      {
+        message: "Create a 15m long strategy using RSI below 30.",
+        draft: {
+          direction: "both",
+          timeframes: ["1H"],
+          conditions: [
+            { name: "RSI", stage: "entry", requirement: "required", conceptName: "RSI", timeframe: "1H", direction: "both", triggerRules: "RSI above 70", parameters: { kind: "indicator", indicator: "rsi", period: 14, comparison: "above", threshold: 70 } },
+            { name: "FVG", stage: "confirmation", requirement: "required", conceptName: "FVG", timeframe: "1H", direction: "both", triggerRules: "unrelated" },
+          ],
+          riskManagementRules: null,
+        },
+        verify: (response: Awaited<ReturnType<typeof answerAssistant>>) => {
+          const condition = response.strategyDraft?.conditions[0];
+          expect(response.strategyDraft?.timeframes).toEqual(["15m"]);
+          expect(condition).toMatchObject({
+            conceptName: "RSI",
+            timeframe: "15m",
+            direction: "long",
+            parameters: { indicator: "rsi", period: 14, comparison: "below", threshold: 30 },
+          });
+          expect(response.strategyDraft?.conditions).toHaveLength(1);
+        },
+      },
+      {
+        message: "Create a 5m strategy using a bullish FVG retest with 1H bullish structure.",
+        draft: {
+          direction: "long",
+          timeframes: ["5m", "1H"],
+          conditions: [
+            { name: "FVG retest", stage: "confirmation", requirement: "required", conceptName: "FVG", timeframe: "5m", direction: "long", triggerRules: "formation", parameters: { kind: "fair_value_gap", polarity: "bearish", interaction: "formation" } },
+            { name: "Structure", stage: "entry", requirement: "required", conceptName: "HTF Structure", timeframe: "1H", direction: "long", triggerRules: "structure", parameters: { kind: "market_structure", signal: "bos", polarity: "bearish" } },
+            { name: "Liquidity", stage: "confirmation", requirement: "required", conceptName: "Liquidity Sweep", timeframe: "1H", direction: "long", triggerRules: "unrelated" },
+          ],
+          riskManagementRules: null,
+        },
+        verify: (response: Awaited<ReturnType<typeof answerAssistant>>) => {
+          expect(response.strategyDraft?.conditions.map(condition => ({
+            conceptName: condition.conceptName,
+            stage: condition.stage,
+            timeframe: condition.timeframe,
+            parameters: condition.parameters,
+          }))).toEqual([
+            {
+              conceptName: "Fair Value Gap",
+              stage: "confirmation",
+              timeframe: "5m",
+              parameters: { kind: "fair_value_gap", polarity: "bullish", interaction: "retest", lookback: 20, minimumGap: 0 },
+            },
+            {
+              conceptName: "Market Structure Shift",
+              stage: "entry",
+              timeframe: "1h",
+              parameters: { kind: "market_structure", signal: "bos", polarity: "bullish", lookback: 10 },
+            },
+          ]);
+        },
+      },
+      {
+        message: "Create a strategy using SMT divergence.",
+        draft: {
+          direction: "both",
+          timeframes: [],
+          conditions: [
+            { name: "EMA", stage: "entry", requirement: "required", conceptName: "EMA", timeframe: "15m", direction: "both", triggerRules: "unrelated" },
+          ],
+          riskManagementRules: null,
+        },
+        verify: (response: Awaited<ReturnType<typeof answerAssistant>>) => {
+          expect(response.strategyDraft?.conditions).toHaveLength(1);
+          expect(response.strategyDraft?.conditions[0]).toMatchObject({
+            conceptName: "SMT Divergence",
+            supported: false,
+          });
+          expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("SMT Divergence");
+        },
+      },
+      {
+        message: "Create a strategy with a 2% stop loss and 4% take profit.",
+        draft: {
+          direction: "both",
+          timeframes: [],
+          conditions: [
+            { name: "EMA", stage: "entry", requirement: "required", conceptName: "EMA", timeframe: "15m", direction: "both", triggerRules: "unrelated" },
+          ],
+          riskManagementRules: "Use appropriate risk management.",
+        },
+        verify: (response: Awaited<ReturnType<typeof answerAssistant>>) => {
+          expect(response.strategyDraft?.conditions).toEqual([]);
+          expect(response.strategyDraft?.riskManagementRules).toBe("stop-loss: 2%; take-profit: 4%");
+        },
+      },
+      {
+        message: "Create a strategy using EMA 20. Do not add risk management.",
+        draft: {
+          direction: "both",
+          timeframes: ["15m"],
+          conditions: [
+            { name: "20 EMA", stage: "entry", requirement: "required", conceptName: "EMA(20)", timeframe: "15m", direction: "both", triggerRules: "EMA above", parameters: { kind: "indicator", indicator: "ema", period: 20, comparison: "above" } },
+            { name: "FVG", stage: "confirmation", requirement: "required", conceptName: "FVG", timeframe: "15m", direction: "both", triggerRules: "unrelated" },
+          ],
+          riskManagementRules: "2% stop loss; 4% take profit",
+        },
+        verify: (response: Awaited<ReturnType<typeof answerAssistant>>) => {
+          expect(response.strategyDraft?.conditions).toHaveLength(1);
+          expect(response.strategyDraft?.conditions[0]).toMatchObject({
+            conceptName: "EMA",
+            parameters: { indicator: "ema", period: 20 },
+          });
+          expect(response.strategyDraft?.riskManagementRules).toBeNull();
+        },
+      },
+    ];
+
+    for (const testCase of cases) {
+      process.env.OPENROUTER_API_KEY = "test-key";
+      globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "Prepared a draft.",
+              intent: "strategy_proposal",
+              strategyDraft: {
+                name: "Regression draft",
+                description: "",
+                marketSymbol: null,
+                conceptsUsed: [],
+                ...testCase.draft,
+              },
+            }),
+          },
+        }],
+      }), { status: 200, headers: { "content-type": "application/json" } }));
+
+      const response = await answerAssistant({
+        message: testCase.message,
+        messages: [],
+        context: { page: "/strategy-builder" },
+      });
+      testCase.verify(response);
+    }
+  });
 });

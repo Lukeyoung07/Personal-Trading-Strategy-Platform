@@ -9,6 +9,7 @@
 - [Chart interaction model](chart-interaction-model.md) — the Markets chart is a custom SVG; extend its native pointer model for pan, zoom, axis scaling, and crosshair rather than replacing it.
 - [Economic calendar boundaries](economic-calendar-boundaries.md) — provider-neutral events use stable source deduplication, structured market mappings, and an honest disconnected state until a calendar provider is connected.
 - [Assistant provider boundary](assistant-provider-boundary.md) — the assistant uses only server-side OpenRouter free routing with no paid fallback or fabricated data.
+- [Assistant draft intent reconciliation](assistant-draft-intent-reconciliation.md) — user-requested concepts, not model condition order, control executable draft filtering and expansion.
 - [Assistant backtest context](assistant-backtest-context.md) — result explanations require an explicit completed persisted backtest and honest no-data handling.
 - [Strategy builder assistant handoff](strategy-builder-assistant-handoff.md) — AI drafts enter a forced review state; saving remains explicit and versioned.
 - [Monitoring alert history](monitoring-alert-history.md) — monitoring alerts are in-app transition history with acknowledgement, not external delivery or trade execution.
