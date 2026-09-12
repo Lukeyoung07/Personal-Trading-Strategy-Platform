@@ -1,0 +1,731 @@
+TradeX — UNIVERSAL STRATEGY RULE ENGINE REFACTOR
+
+IMPORTANT:
+This is an architectural refactor, not a request to create a trading strategy.
+
+The goal is to make Build with AI capable of reliably converting future natural-language strategy requests into the existing executable strategy system without requiring a new hard-coded mapping for every wording variation or every new strategy.
+
+DO NOT create a strategy.
+DO NOT create a backtest.
+DO NOT modify existing strategies, versions, trades, alerts, monitoring sessions, or historical data.
+
+First inspect the existing architecture and understand the current:
+- Trading Concept Library
+- canonical executable concept registry
+- Build with AI pipeline
+- AI draft generation
+- authorization layer
+- parameter normalization
+- Builder payload
+- Strategy Version model
+- backtest compatibility/evaluator system
+- monitoring evaluator system
+- risk-management system
+
+PRESERVE all currently working behavior.
+
+--------------------------------------------------
+1. CORE ARCHITECTURE
+--------------------------------------------------
+
+Change the architecture so that Build with AI does NOT depend on directly mapping natural-language text to exact Concept Library names.
+
+The target pipeline must become:
+
+Natural-language strategy request
+        ↓
+AI strategy parser
+        ↓
+Universal typed Strategy Rule Representation
+        ↓
+Authorization
+        ↓
+Canonical rule validation
+        ↓
+Builder-compatible strategy payload
+        ↓
+Strategy Version
+        ↓
+Backtest
+        ↓
+Monitoring
+
+The Concept Library remains the user-facing catalog.
+
+The canonical rule representation becomes the stable internal contract.
+
+The evaluator registry remains responsible for actually executing rules.
+
+Do not duplicate evaluator logic between Builder, Backtest, and Monitoring.
+
+--------------------------------------------------
+2. UNIVERSAL STRATEGY RULE REPRESENTATION
+--------------------------------------------------
+
+Create or refactor the existing internal representation so every strategy condition is represented by:
+
+- canonical rule type
+- direction/polarity where applicable
+- timeframe
+- typed parameters
+- condition stage
+- source/concept provenance
+- executable/review-required status
+- deterministic validation result
+
+Use typed parameters rather than storing important strategy logic only as free-form text.
+
+Examples:
+
+Displacement:
+
+rule_type = displacement
+direction = bullish
+timeframe = 5m
+parameters:
+  atr_period = 14
+  min_body_atr = 1.5
+  min_close_location = 0.75
+
+FVG Retest:
+
+rule_type = fvg_retest
+direction = bullish
+timeframe = 5m
+parameters:
+  ...
+
+EMA Cross:
+
+rule_type = ema_cross
+direction = long
+timeframe = 5m
+parameters:
+  fast_period = 20
+  slow_period = 50
+
+Percentage Stop:
+
+rule_type = percentage_stop
+parameters:
+  percentage = 1
+
+Risk/Reward Target:
+
+rule_type = risk_reward_target
+parameters:
+  r_multiple = 2
+
+The exact existing canonical parameter names and evaluator contracts should be reused wherever they already exist.
+
+Do NOT create duplicate representations for concepts that already have canonical implementations.
+
+--------------------------------------------------
+3. NATURAL-LANGUAGE PARSING
+--------------------------------------------------
+
+Build with AI should extract meaning and parameters rather than relying on exact concept-name matching.
+
+For example, all of these should resolve to the same canonical rule where the meaning is unambiguous:
+
+"bullish displacement"
+"bullish displacement candle"
+"displacement to the upside"
+
+→ displacement(direction=bullish)
+
+Likewise:
+
+"1% stop loss"
+"1 percent stop"
+"1% SL"
+"stop loss of 1%"
+
+→ percentage_stop(percentage=1)
+
+And:
+
+"2R take profit"
+"take profit at 2R"
+"2:1 risk reward"
+"RR 2"
+
+→ risk_reward_target(r_multiple=2)
+
+Implement this through a generic parsing/normalization layer.
+
+Do NOT hard-code only these examples.
+
+The parser must use:
+- canonical rule definitions
+- aliases/synonyms
+- typed parameter definitions
+- direction definitions
+- timeframe definitions
+- risk-rule definitions
+
+as metadata.
+
+--------------------------------------------------
+4. CONCEPT LIBRARY RELATIONSHIP
+--------------------------------------------------
+
+Do NOT delete the Concept Library.
+
+Instead, each executable Concept Library entry should reference its canonical rule definition.
+
+A concept can have:
+
+- display name
+- aliases
+- canonical rule type
+- description
+- supported parameters
+- parameter constraints
+- supported directions
+- supported timeframes
+- evaluator
+- execution status
+
+For example:
+
+Display concepts:
+- Displacement
+- Bullish Displacement
+- Bearish Displacement
+
+Canonical rule:
+- displacement
+
+The AI should therefore be able to understand variations without creating separate evaluators for each wording.
+
+--------------------------------------------------
+5. PARAMETERS
+--------------------------------------------------
+
+Create generic typed parameter extraction and validation.
+
+Support existing parameter types such as:
+
+- integer
+- decimal
+- percentage
+- timeframe
+- direction
+- session
+- timezone
+- boolean
+- enum
+- R-multiple
+- period
+
+Validate:
+- type
+- allowed range
+- required/optional status
+- compatible combinations
+
+Do not silently invent missing values when a value is required.
+
+Use the existing canonical default only where the system already defines a canonical default.
+
+Otherwise mark the rule for review and explain exactly what information is missing.
+
+--------------------------------------------------
+6. DIRECTION AND POLARITY
+--------------------------------------------------
+
+Handle natural language polarity consistently.
+
+Examples:
+
+bullish
+long
+buy
+upside
+
+may map to the canonical bullish/long representation ONLY where that mapping is valid for that rule.
+
+bearish
+short
+sell
+downside
+
+may map to bearish/short where valid.
+
+Do not blindly apply direction to concepts where direction has a different meaning.
+
+Preserve the existing canonical evaluator semantics.
+
+--------------------------------------------------
+7. TIMEFRAMES
+--------------------------------------------------
+
+Normalize equivalent timeframe wording:
+
+5m
+5 minute
+5 minutes
+M5
+
+→ 5m
+
+1h
+1 hour
+60m
+
+→ 1h
+
+etc.
+
+Do this generically using the existing supported timeframe registry.
+
+Do not invent unsupported timeframes.
+
+--------------------------------------------------
+8. MARKET / SYMBOL
+--------------------------------------------------
+
+Normalize market/instrument wording using the existing instrument registry.
+
+For example:
+
+XAUUSD
+Gold
+Gold/USD
+
+may resolve to XAUUSD only if the existing instrument mapping explicitly supports that alias.
+
+Do not make unsafe guesses when multiple instruments could match.
+
+Ambiguous instruments must remain ambiguous rather than silently selecting one.
+
+--------------------------------------------------
+9. RISK MANAGEMENT
+--------------------------------------------------
+
+Keep risk management separate from entry conditions.
+
+Use the existing canonical risk-management implementation.
+
+The universal representation must support:
+
+- percentage stop loss
+- percentage take profit
+- R-multiple target
+- existing supported risk/reward combinations
+
+Example:
+
+stop_loss:
+  type = percentage
+  value = 1
+
+take_profit:
+  type = risk_reward
+  value = 2
+
+This must pass compatibility validation because the percentage stop defines 1R.
+
+Continue rejecting:
+
+- R target without a defining stop
+- unsupported structural stops
+- vague risk-management language
+
+Do not turn unsupported structural rules into invented percentages.
+
+--------------------------------------------------
+10. EXECUTABILITY
+--------------------------------------------------
+
+After parsing, every rule must go through one deterministic validation process.
+
+Each rule should become either:
+
+EXECUTABLE
+
+or
+
+REVIEW_REQUIRED
+
+A rule is EXECUTABLE only when:
+
+- canonical rule type exists
+- required parameters exist
+- parameters are valid
+- evaluator exists
+- evaluator supports the requested configuration
+- the rule is compatible with the strategy/backtest system
+
+A rule is REVIEW_REQUIRED when something genuinely cannot be executed.
+
+The system must explain:
+
+- what rule was detected
+- what canonical rule it mapped to
+- which parameters were extracted
+- why it is executable OR
+- exactly what is missing/unsupported
+
+Do not show Review Required simply because the user's wording differs from the Concept Library display name.
+
+--------------------------------------------------
+11. NO UNAUTHORIZED MODEL CONDITIONS
+--------------------------------------------------
+
+Preserve the authorization system already implemented.
+
+Build with AI must NEVER add a condition simply because the AI thinks it would improve the strategy.
+
+Only rules supported by the user's request may be retained.
+
+For example, if the user asks for:
+
+"XAUUSD 5m EMA 20 cross"
+
+do not automatically add:
+
+- RSI
+- FVG
+- liquidity
+- displacement
+- session
+- SMT
+- structure
+- stop loss
+- take profit
+
+unless requested or explicitly required by an already-defined deterministic rule.
+
+The universal representation must preserve the existing authorization provenance.
+
+--------------------------------------------------
+12. COMPOUND STRATEGIES
+--------------------------------------------------
+
+Support multiple rules in one strategy.
+
+Example:
+
+"XAUUSD 5m bullish displacement followed by bullish FVG retest during the New York Session with a 1% stop and 2R target."
+
+The parser should produce separate canonical rules:
+
+- displacement
+- fvg_retest
+- session
+- percentage_stop
+- risk_reward_target
+
+Each must retain its own parameters and provenance.
+
+Do not collapse unrelated rules into one concept.
+
+--------------------------------------------------
+13. CONDITION RELATIONSHIPS
+--------------------------------------------------
+
+Preserve relationships expressed by the user.
+
+Examples:
+
+"after"
+"followed by"
+"then"
+"while"
+"and"
+"or"
+
+Do not treat every condition as an unordered list if the existing strategy system supports ordering or relationship semantics.
+
+If the existing Builder/evaluator system cannot represent a requested relationship deterministically, mark that relationship as review-required rather than inventing semantics.
+
+--------------------------------------------------
+14. UNSUPPORTED CONCEPTS
+--------------------------------------------------
+
+Do NOT artificially make unsupported concepts executable just to eliminate Review Required.
+
+For example, if a concept genuinely has no deterministic evaluator:
+
+- preserve it
+- identify it
+- explain why it is unsupported
+- keep it review-required
+
+Do not map it to a similar but different concept.
+
+However, if the concept already has a deterministic evaluator anywhere in the application, connect it to the universal rule representation rather than leaving it review-required because of an AI mapping limitation.
+
+--------------------------------------------------
+15. BUILDER
+--------------------------------------------------
+
+Builder must consume the canonical typed rule representation.
+
+Do not make Builder depend on the AI's natural-language wording.
+
+Build with AI should hand Builder canonical structured rules.
+
+Builder should display:
+
+- human-readable concept
+- canonical rule
+- parameters
+- direction
+- timeframe
+- stage
+- risk rules
+- executable/review status
+
+Editing a rule in Builder must update the canonical parameters, not create a second incompatible representation.
+
+--------------------------------------------------
+16. BACKTEST
+--------------------------------------------------
+
+Backtesting must consume the same canonical rule representation/evaluator used by Builder and Monitoring.
+
+Do not create a separate AI-specific backtest interpretation.
+
+A strategy should only pass the backtest compatibility gate when every required condition has a valid deterministic evaluator and valid parameters.
+
+--------------------------------------------------
+17. MONITORING
+--------------------------------------------------
+
+Monitoring must consume the same canonical representation and evaluator registry.
+
+Do not duplicate parsing or interpretation logic inside Monitoring.
+
+The exact strategy version must remain the source of truth.
+
+--------------------------------------------------
+18. BUILD WITH AI OUTPUT
+--------------------------------------------------
+
+Update the Build with AI result so it is transparent.
+
+For every generated rule, show something equivalent to:
+
+Detected:
+Bullish Displacement
+
+Canonical:
+Displacement
+
+Parameters:
+Direction: bullish
+Timeframe: 5m
+ATR period: 14
+Minimum body: 1.5 × ATR
+Close location: 0.75
+
+Status:
+EXECUTABLE
+
+This allows the user to see what the AI actually understood.
+
+For an unsupported rule:
+
+Detected:
+SMT Divergence
+
+Canonical:
+SMT Divergence
+
+Status:
+REVIEW REQUIRED
+
+Reason:
+No deterministic evaluator is currently available.
+
+Do not substitute another concept.
+
+--------------------------------------------------
+19. ERROR HANDLING
+--------------------------------------------------
+
+Never silently lose user rules.
+
+Never silently change user parameters.
+
+Never silently substitute concepts.
+
+Never silently invent defaults unless a canonical default already exists.
+
+If parsing is ambiguous, preserve the ambiguity and explain it.
+
+If parsing produces an invalid rule, return a useful validation message rather than a broken Builder payload.
+
+--------------------------------------------------
+20. REGRESSION TESTING
+--------------------------------------------------
+
+Create a reusable test suite for the universal parser.
+
+Test natural-language variants rather than only exact concept names.
+
+At minimum test:
+
+1.
+"XAUUSD 5m bullish displacement followed by bullish FVG retest with 1% stop and 2R target"
+
+2.
+"Gold M5 bullish displacement then FVG retest, 1 percent SL, 2R TP"
+
+3.
+"XAUUSD 5 minute EMA 20 crossing EMA 50 long"
+
+4.
+"XAUUSD 5m EMA 20 cross in both directions"
+
+5.
+"XAUUSD 5m bearish liquidity sweep during New York session"
+
+6.
+"XAUUSD 5m failed bullish breakout followed by bearish rejection"
+
+7.
+"XAUUSD 5m EMA 20 cross with 2R target"
+
+Expected:
+review/compatibility error because no defining stop exists.
+
+8.
+"XAUUSD 5m EMA 20 cross with stop below the FVG"
+
+Expected:
+structural stop remains review-required.
+
+9.
+A strategy containing an unsupported concept.
+
+Expected:
+unsupported concept remains review-required and is not substituted.
+
+10.
+A strategy containing multiple supported concepts and multiple timeframes.
+
+Expected:
+each rule remains separate with its correct parameters.
+
+--------------------------------------------------
+21. ADVERSARIAL TESTING
+--------------------------------------------------
+
+Test that model output cannot authorize itself.
+
+Test that:
+
+- model-invented concepts are removed
+- model-invented parameters are not accepted without authorization
+- duplicate rules are deduplicated
+- unsupported concepts are preserved
+- user-requested concepts are never silently dropped
+- ambiguous mappings are not guessed
+- existing authorization rules remain intact
+
+--------------------------------------------------
+22. END-TO-END TEST
+--------------------------------------------------
+
+Use disposable data only.
+
+Do not create permanent strategies.
+
+Prove:
+
+Natural language
+→ AI parse
+→ canonical rule representation
+→ authorization
+→ Builder payload
+→ Strategy Version
+→ backtest compatibility
+→ monitoring compatibility
+
+for several completely different strategy combinations.
+
+Do NOT modify existing trading data.
+
+--------------------------------------------------
+23. BACKWARD COMPATIBILITY
+--------------------------------------------------
+
+This is critical.
+
+Before changing schemas or representations:
+
+- inspect all existing persisted strategies and versions
+- preserve existing stored data
+- add migrations only where required
+- support existing strategy versions
+- do not rewrite historical trades
+- do not change historical backtest results
+- do not change existing monitoring records
+
+Existing strategies must continue to load correctly.
+
+--------------------------------------------------
+24. QUALITY REQUIREMENTS
+--------------------------------------------------
+
+Do not stop after implementing the parser.
+
+The task is only complete when the entire pipeline works.
+
+Run:
+
+- API tests
+- frontend tests
+- library typecheck
+- API typecheck
+- frontend typecheck
+- production builds
+- git diff --check
+- browser verification
+
+Also verify:
+
+- existing strategies still load
+- existing versions still load
+- Builder still works
+- Backtesting still works
+- Monitoring still works
+- Alerts still work
+- Build with AI works
+- risk-management compatibility still works
+
+Do not create or modify permanent trading data during testing.
+
+--------------------------------------------------
+FINAL ACCEPTANCE CRITERIA
+--------------------------------------------------
+
+The refactor is successful only if:
+
+1. Build with AI no longer relies on exact Concept Library wording.
+
+2. Natural-language variations resolve to the same canonical rule.
+
+3. Typed parameters are preserved correctly.
+
+4. Builder, Backtest, and Monitoring use the same canonical rule/evaluator system.
+
+5. Risk management uses the existing canonical risk engine.
+
+6. Unsupported concepts remain review-required rather than being fabricated into executable rules.
+
+7. Unauthorized AI-generated conditions cannot enter the strategy.
+
+8. Existing strategies and versions remain compatible.
+
+9. A completely new strategy can be entered without requiring a new hard-coded mapping merely because the user phrased an existing executable concept differently.
+
+10. The system provides an explicit explanation whenever a genuinely unsupported or ambiguous rule remains Review Required.
+
+DO NOT implement a one-off fix for the current test strategy.
+
+Build the generic architecture so future strategies can use the same system.
