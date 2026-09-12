@@ -505,24 +505,46 @@ function requestedExecutableConcepts(message: string) {
   return requested;
 }
 
+function isMetaInstructionPhrase(value: string) {
+  const normalized = value.trim();
+  const key = catalogKey(normalized);
+  if (!key) return true;
+  if (/^(?:do\s+not|don't|dont|never|without|no|not)\b/i.test(normalized)) return true;
+  if (/\b(?:concept|concepts)\b/i.test(normalized) && /\b(?:library|registry|supported|existing|already|canonical|another|other|unknown|similar|replacement|requested)\b/i.test(normalized)) {
+    return true;
+  }
+  if (/\b(?:original\s+wording|review[- ]required|backtest(?:ing)?|monitoring|builder|build\s+with\s+ai|placeholder)\b/i.test(normalized)) {
+    return true;
+  }
+  if (/^(?:trading|strategy|market|direction|timeframe|risk(?:\s+rules?)?|supported|existing|canonical|placeholder|unknown|similar|replacement|requested|another|other|these|those|specified|for|during|on|at|in)\b/i.test(normalized)) {
+    return true;
+  }
+  if (/^(?:or|and|the|a|an|any|some)\b/i.test(normalized) && !executableConceptKind(normalized) && !unsupportedConceptForText(normalized)) {
+    return true;
+  }
+  return false;
+}
+
 function explicitConceptPhraseMatches(message: string) {
   const matches: string[] = [];
   const add = (value: string, index = -1) => {
     if (isNegatedConceptMention(message, index)) return;
     const cleaned = value
       .replace(/^[\s,;:.-]*(?:a|an|the|my|this)\s+/i, "")
+      .replace(/^(?:only|just)\s+/i, "")
       .replace(/^\d+(?:\.\d+)?\s*(?:m|min|minute|h|hr|hour|d|day|w|week)s?\s+/i, "")
       .replace(/\s+(?:strategy|setup|system|process|confirmation|entry|condition|rules?)\s*$/i, "")
       .trim();
     if (!cleaned || cleaned.length < 3 || cleaned.length > 80) return;
     if (/(?:stop[- ]loss|take[- ]profit|risk[\/ -]?reward|r\s*:\s*r|target\s+\d+(?:\.\d+)?\s*R|\d+(?:\.\d+)?\s*R\s*(?:target|take[- ]profit|tp)|percentage\s+risk|risk\s+per\s+trade)/i.test(cleaned)) return;
     if (/^(?:strategy|setup|system|rules?|risk management|long|short|both|directions?|bullish|bearish|bias|main setup|explicit|required|optional|entry|exit|confirmation|invalidation|condition)(?:\s+(?:strategy|setup|system|rules?|directions?|entry|exit|confirmation|invalidation|condition))?$/i.test(cleaned)) return;
+    if (isMetaInstructionPhrase(cleaned)) return;
     if (!matches.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) matches.push(cleaned);
   };
   for (const match of message.matchAll(/\b(?:concept|condition)\s*:\s*([^\n;]+)/gi)) {
     add(match[1], (match.index ?? 0) + match[0].indexOf(match[1]));
   }
-  for (const match of message.matchAll(/\b(?:using|with|based on|including|combining with|combined with)\s+([^.!?\n]+)/gi)) {
+  for (const match of message.matchAll(/\b(?:using|use|with|based on|including|combining with|combined with)\s+([^.!?\n]+)/gi)) {
     for (const phrase of match[1].split(/\s+(?:and|then|followed by|plus|with)\s+|[,;]/i)) {
       const phraseIndex = (match.index ?? 0) + match[0].indexOf(phrase);
       add(phrase, phraseIndex);

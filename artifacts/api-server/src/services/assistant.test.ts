@@ -1643,6 +1643,96 @@ Risk/Reward: 2:1`,
     });
   });
 
+  it("does not turn Build with AI instructions or example text into requested concepts", async () => {
+    const condition = (conceptName: string, direction: "long" | "short" | "both" = "long") => ({
+      name: conceptName,
+      stage: "entry",
+      requirement: "required",
+      conceptName,
+      timeframe: "5m",
+      direction,
+      triggerRules: "model condition",
+    });
+    const run = async (message: string, modelConditions: Array<Record<string, unknown>>, expectedConcepts: string[], reviewConcept?: string) => {
+      mockStrategyDraft({
+        name: "Instruction parsing draft",
+        description: "",
+        direction: "long",
+        marketSymbol: "XAUUSD",
+        timeframes: ["5m"],
+        conditions: modelConditions,
+        conceptsUsed: modelConditions.map(item => ({ name: item.conceptName, supported: false })),
+        riskManagementRules: null,
+      });
+      const response = await answerAssistant({
+        message,
+        messages: [],
+        context: { page: "/strategy-builder" },
+      });
+      expect(response.strategyDraft?.conditions.map(item => item.conceptName)).toEqual(expectedConcepts);
+      if (reviewConcept) {
+        expect(response.strategyDraft?.conditions.find(item => item.conceptName === reviewConcept)).toMatchObject({
+          executionStatus: "review_required",
+          authorization: { status: "review_required" },
+        });
+      }
+      return response;
+    };
+
+    await run(
+      "Use Breakout.",
+      [condition("Breakout"), condition("another concept"), condition("Trading Concept Library")],
+      ["Breakout"],
+    );
+    await run(
+      "Use Breakout. Do not add EMA, RSI or FVG.",
+      [condition("Breakout"), condition("EMA"), condition("RSI"), condition("Fair Value Gap")],
+      ["Breakout"],
+    );
+    await run(
+      "Use EMA 20 and RSI below 30.",
+      [condition("EMA"), condition("RSI"), condition("SMT Divergence")],
+      ["EMA", "RSI"],
+    );
+    await run(
+      "Do not use EMA or RSI.",
+      [condition("EMA"), condition("RSI")],
+      [],
+    );
+    await run(
+      "Do not create another concept.",
+      [condition("another concept")],
+      [],
+    );
+    await run(
+      "Only use concepts from the Trading Concept Library.",
+      [condition("Trading Concept Library"), condition("supported concepts")],
+      [],
+    );
+    await run(
+      "Create a natural 5m XAUUSD strategy using EMA 20 and RSI below 30. Use only concepts already in the canonical registry, do not infer unsupported concepts, preserve the original wording, and do not add FVG or SMT.",
+      [condition("EMA"), condition("RSI"), condition("Fair Value Gap"), condition("SMT Divergence"), condition("unknown concept"), condition("market/direction/timeframe information")],
+      ["EMA", "RSI"],
+    );
+    await run(
+      "Use Judas Swing.",
+      [condition("Judas Swing"), condition("another concept")],
+      ["Judas Swing"],
+      "Judas Swing",
+    );
+    await run(
+      "Use EMA 20 and Judas Swing.",
+      [condition("EMA"), condition("Judas Swing"), condition("Liquidity Sweep")],
+      ["EMA", "Judas Swing"],
+      "Judas Swing",
+    );
+    await run(
+      "Use Breakout. Examples of prohibited instructions: do not add EMA, do not invent FVG, do not use ICT or SMC, do not create another concept, do not use unknown or similar replacements, and do not add market/direction/timeframe metadata.",
+      [condition("Breakout"), condition("EMA"), condition("Fair Value Gap"), condition("ICT"), condition("SMC"), condition("another concept"), condition("unknown concept"), condition("market/direction/timeframe information")],
+      ["Breakout"],
+    );
+  });
+
   it("preserves Judas Swing for review and keeps executable liquidity separate", async () => {
     mockStrategyDraft({
       name: "Judas Swing review",
