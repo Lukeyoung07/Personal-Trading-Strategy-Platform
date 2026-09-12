@@ -118,10 +118,12 @@ describe("BacktestResultsPanel", () => {
     fireEvent.click(screen.getByTestId("button-run-again-backtest"));
     expect(onRunAgain).toHaveBeenCalledWith(baseBacktest);
     expect(screen.getByTestId("stat-win-rate")).toHaveTextContent("100.0%");
-    expect(screen.getByTestId("stat-net-p/l")).toHaveTextContent("$5.00");
+    expect(screen.getByTestId("stat-net-p/l")).toHaveTextContent("£5.00");
     expect(screen.getByTestId("chart-equity-curve")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("button-select-trade-22"));
     expect(screen.getByTestId("panel-trade-details-22")).toHaveTextContent("take_profit");
+    expect(screen.getByTestId("panel-trade-details-22")).toHaveTextContent("100.00");
+    expect(screen.getByTestId("panel-trade-details-22")).not.toHaveTextContent("£100.00");
     expect(screen.getByTestId("chart-historical-ohlc")).toBeInTheDocument();
   });
 

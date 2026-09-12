@@ -23,6 +23,7 @@ import {
   type TradeInputRiskUnit,
 } from "@workspace/api-client-react";
 import { JournalPerformance } from "@/components/journal-performance";
+import { useCurrency } from "@/lib/currency";
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-5" onMouseDown={event => event.target === event.currentTarget && onClose()}>
@@ -35,10 +36,6 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return <label className="block"><span className="label">{label}</span>{children}{hint && <span className="block text-[11px] text-muted-foreground mt-1.5">{hint}</span>}</label>;
-}
-
-function money(value?: number | null) {
-  return value == null ? "—" : `${value < 0 ? "−" : ""}$${Math.abs(value).toFixed(2)}`;
 }
 
 function date(value?: string | null) {
@@ -54,6 +51,7 @@ function tradeStatusLabel(status: Trade["status"]) {
 }
 
 function TradeRow({ trade, onEdit, onDelete }: { trade: Trade; onEdit: () => void; onDelete: () => void }) {
+  const { formatMoney } = useCurrency();
   return <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 hover:bg-secondary/50 transition-colors" data-testid={`row-trade-${trade.id}`}>
     <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${trade.side === "long" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>{trade.side === "long" ? <ArrowUpRight size={15} /> : <ArrowDownRight size={15} />}</div>
     <div className="min-w-0 flex-1">
@@ -61,7 +59,7 @@ function TradeRow({ trade, onEdit, onDelete }: { trade: Trade; onEdit: () => voi
       <div className="text-[11px] text-muted-foreground mt-1">{trade.strategyName || "Unknown strategy"} · v{trade.strategyVersionNumber ?? "—"} · {date(trade.createdAt)}</div>
     </div>
      <span className={`tag tag-${trade.status}`}>{tradeStatusLabel(trade.status)}</span>
-    {trade.pnl != null && <span className={`mono text-xs font-semibold ${trade.pnl >= 0 ? "text-primary" : "text-destructive"}`}>{money(trade.pnl)}</span>}
+     {trade.pnl != null && <span className={`mono text-xs font-semibold ${trade.pnl >= 0 ? "text-primary" : "text-destructive"}`}>{formatMoney(trade.pnl)}</span>}
     <div className="flex"><button className="btn btn-ghost" onClick={onEdit}>Edit</button><button className="btn btn-ghost text-destructive" onClick={onDelete}><Trash2 size={13} /></button></div>
   </div>;
 }
@@ -77,6 +75,7 @@ function TradeEditor({
   strategies: Strategy[];
   onClose: () => void;
 }) {
+  const { currency } = useCurrency();
   const initialStrategy = trade ? strategies.find(strategy => strategy.id === trade.strategyId) : strategies.find(strategy => strategy.status === "active") || strategies[0];
   const [strategyId, setStrategyId] = useState(initialStrategy?.id || 0);
   const versions = useListStrategyVersions(strategyId, { query: { enabled: !!strategyId, queryKey: getListStrategyVersionsQueryKey(strategyId) } });
@@ -168,7 +167,7 @@ function TradeEditor({
           <option value="">Not specified</option><option value="percent">Percent</option><option value="amount">Amount</option><option value="r">R multiple</option>
         </select>
       </Field>
-      <Field label="Risk amount"><input className="input" type="number" step="any" name="riskAmount" defaultValue={trade?.riskAmount ?? ""} /></Field>
+      <Field label={`Risk amount (${currency})`}><input className="input" type="number" step="any" name="riskAmount" defaultValue={trade?.riskAmount ?? ""} /></Field>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Field label="Opened at"><input className="input" type="datetime-local" name="openedAt" defaultValue={dateTimeInput(trade?.openedAt)} /></Field>

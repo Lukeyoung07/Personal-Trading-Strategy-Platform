@@ -15,6 +15,7 @@ import {
   type Strategy,
   type Trade,
 } from "@workspace/api-client-react";
+import { useCurrency } from "@/lib/currency";
 
 type FilterState = {
   strategyId: string;
@@ -26,14 +27,6 @@ type FilterState = {
 };
 
 const emptyFilters: FilterState = { strategyId: "", strategyVersionId: "", marketId: "", side: "", from: "", to: "" };
-
-function money(value?: number | null) {
-  return value == null ? "—" : `${value < 0 ? "−" : ""}$${Math.abs(value).toFixed(2)}`;
-}
-
-function signedMoney(value?: number | null) {
-  return value == null ? "—" : `${value > 0 ? "+" : ""}${money(value)}`;
-}
 
 function monthLabel(month: string) {
   return new Date(`${month}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -118,6 +111,8 @@ function Calendar({
   selectedDate: string | null;
   onSelect: (date: string) => void;
 }) {
+  const { formatMoney } = useCurrency();
+  const signedMoney = (value?: number | null) => value == null ? "—" : `${value > 0 ? "+" : ""}${formatMoney(value)}`;
   const cells = useMemo(() => {
     const first = new Date(`${month}-01T12:00:00`);
     const count = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
@@ -132,7 +127,7 @@ function Calendar({
       const day = byDate.get(date);
       const pnl = day?.pnl ?? 0;
       const isFuture = new Date(`${date}T23:59:59`) > new Date();
-      return <button type="button" key={date} disabled={!day} onClick={() => onSelect(date)} className={`journal-day ${day ? toneForPnl(pnl) : "journal-day-quiet"} ${isFuture ? "journal-day-future" : ""} ${selectedDate === date ? "journal-day-selected" : ""}`} aria-label={`${dayLabel(date)}${day ? `, ${money(pnl)}` : ", no realized trades"}`}>
+      return <button type="button" key={date} disabled={!day} onClick={() => onSelect(date)} className={`journal-day ${day ? toneForPnl(pnl) : "journal-day-quiet"} ${isFuture ? "journal-day-future" : ""} ${selectedDate === date ? "journal-day-selected" : ""}`} aria-label={`${dayLabel(date)}${day ? `, ${formatMoney(pnl)}` : ", no realized trades"}`}>
         <span className="mono text-[11px]">{Number(date.slice(-2))}</span>
         {day && <><span className="journal-day-pnl">{signedMoney(pnl)}</span><span className="text-[10px] text-muted-foreground">{day.tradeCount} {day.tradeCount === 1 ? "trade" : "trades"}</span></>}
       </button>;
@@ -159,6 +154,8 @@ function CumulativeChart({ points }: { points: { date: string; cumulativePnl: nu
 }
 
 function DayDetail({ day, trades, onClose, onSaved }: { day: JournalDay; trades: Trade[]; onClose: () => void; onSaved: () => void }) {
+  const { formatMoney } = useCurrency();
+  const signedMoney = (value?: number | null) => value == null ? "—" : `${value > 0 ? "+" : ""}${formatMoney(value)}`;
   const [note, setNote] = useState(day.note || "");
   const saveNote = useUpdateJournalDayNote();
   const queryClient = useQueryClient();
@@ -174,15 +171,17 @@ function DayDetail({ day, trades, onClose, onSaved }: { day: JournalDay; trades:
       <div><div className="label">Net P/L</div><div className={`mono text-sm font-semibold ${toneForPnl(day.pnl)}`}>{signedMoney(day.pnl)}</div></div>
       <div><div className="label">Trades</div><div className="mono text-sm">{day.tradeCount}</div></div>
       <div><div className="label">Win rate</div><div className="mono text-sm">{day.winRate == null ? "—" : `${day.winRate.toFixed(1)}%`}</div></div>
-      <div><div className="label">Best / worst</div><div className="mono text-sm">{money(day.bestTrade)} / {money(day.worstTrade)}</div></div>
+      <div><div className="label">Best / worst</div><div className="mono text-sm">{formatMoney(day.bestTrade)} / {formatMoney(day.worstTrade)}</div></div>
     </div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-xs text-muted-foreground"><div>Winning trades <span className="text-foreground ml-1">{day.winningTrades}</span> · losing <span className="text-foreground ml-1">{day.losingTrades}</span></div><div>Average winner <span className="text-primary ml-1">{money(day.averageWinner)}</span> · loser <span className="text-destructive ml-1">{money(day.averageLoser)}</span></div></div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-xs text-muted-foreground"><div>Winning trades <span className="text-foreground ml-1">{day.winningTrades}</span> · losing <span className="text-foreground ml-1">{day.losingTrades}</span></div><div>Average winner <span className="text-primary ml-1">{formatMoney(day.averageWinner)}</span> · loser <span className="text-destructive ml-1">{formatMoney(day.averageLoser)}</span></div></div>
     <div className="border-t border-border mt-5 pt-5"><div className="eyebrow">Trades on this day</div>{trades.length ? <div className="mt-3 divide-y divide-border rounded-md border border-border overflow-hidden">{trades.map(trade => <div key={trade.id} className="flex items-center gap-3 px-3 py-3 text-xs"><div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${trade.side === "long" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>{trade.side === "long" ? <TrendingUp size={13} /> : <TrendingDown size={13} />}</div><div className="min-w-0 flex-1"><div className="font-semibold truncate">{trade.marketSymbol || "Unassigned market"} · {trade.side}</div><div className="text-[11px] text-muted-foreground mt-1">{trade.strategyName || "Unknown strategy"} · v{trade.strategyVersionNumber ?? "—"} · {trade.closedAt ? new Date(trade.closedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "Created date fallback"}</div></div><span className={`mono font-semibold ${toneForPnl(trade.pnl || 0)}`}>{signedMoney(trade.pnl)}</span></div>)}</div> : <p className="text-xs text-muted-foreground mt-3">No realized trades match the active filters on this date.</p>}</div>
     <div className="border-t border-border mt-5 pt-5"><label className="label" htmlFor="journal-day-note">Day note</label><textarea id="journal-day-note" className="textarea" maxLength={2000} value={note} onChange={event => setNote(event.target.value)} placeholder="What did you notice about this day?" /><div className="flex items-center justify-between mt-3"><span className="text-[11px] text-muted-foreground">{note.length}/2000 · Separate from individual trade notes.</span><button type="button" className="btn btn-primary" onClick={save} disabled={saveNote.isPending}><Save size={14} /> {saveNote.isPending ? "Saving…" : "Save day note"}</button></div>{saveNote.isError && <div className="text-xs text-destructive mt-3">The note could not be saved. Try again.</div>}</div>
   </div>;
 }
 
 function VersionTable({ versions }: { versions: PerformanceVersion[] }) {
+  const { formatMoney } = useCurrency();
+  const signedMoney = (value?: number | null) => value == null ? "—" : `${value > 0 ? "+" : ""}${formatMoney(value)}`;
   return <div className="panel overflow-hidden"><div className="p-5 md:p-6 border-b border-border"><div className="eyebrow">Attribution</div><h2 className="font-semibold mt-2">Exact strategy-version performance</h2><p className="text-xs text-muted-foreground mt-2">Historical trades stay attached to the saved version used at entry.</p></div>{versions.length ? <div className="table-wrap"><table><thead><tr><th>Strategy / version</th><th>Trades</th><th>Win rate</th><th>Net P/L</th></tr></thead><tbody>{versions.map(version => <tr key={version.strategyVersionId}><td><div className="font-semibold">{version.strategyName}</div><div className="mono text-[11px] text-muted-foreground mt-1">v{version.versionNumber}</div></td><td className="mono">{version.tradeCount}<span className="text-muted-foreground ml-2 text-[10px]">{version.winningTrades}W / {version.losingTrades}L</span></td><td className="mono">{version.winRate == null ? "—" : `${version.winRate.toFixed(1)}%`}</td><td className={`mono font-semibold ${toneForPnl(version.netPnl || 0)}`}>{signedMoney(version.netPnl)}</td></tr>)}</tbody></table></div> : <div className="p-8 text-sm text-muted-foreground">No exact strategy-version attribution for this review.</div>}</div>;
 }
 
@@ -199,6 +198,8 @@ export function JournalPerformance({
   markets: { id: number; symbol: string }[];
   trades: Trade[];
 }) {
+  const { formatMoney } = useCurrency();
+  const signedMoney = (value?: number | null) => value == null ? "—" : `${value > 0 ? "+" : ""}${formatMoney(value)}`;
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const strategyId = Number(filters.strategyId) || undefined;

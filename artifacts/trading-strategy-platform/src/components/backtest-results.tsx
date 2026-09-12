@@ -24,17 +24,13 @@ import {
   type BacktestStatistics,
   type BacktestTrade,
 } from "@workspace/api-client-react";
+import { useCurrency } from "@/lib/currency";
 
 type BacktestResultsPanelProps = {
   backtestId: number;
   onBack: () => void;
   onViewStrategy?: (strategyId: number, strategyVersionId: number) => void;
   onRunAgain?: (backtest: BacktestResults["backtest"]) => void;
-};
-
-const money = (value: number | null | undefined) => {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  return `${value < 0 ? "−" : ""}$${Math.abs(value).toFixed(2)}`;
 };
 
 const number = (value: number | null | undefined, digits = 2) => {
@@ -151,6 +147,7 @@ function EquityCurve({
   statistics: BacktestStatistics;
   selectedTradeId: number | null;
 }) {
+  const { formatMoney } = useCurrency();
   const points = statistics.equityCurve;
   const width = 900;
   const height = 285;
@@ -176,14 +173,14 @@ function EquityCurve({
           {horizontalGuides.map((guide) => (
             <g key={guide}>
               <line x1={padding.left} x2={width - padding.right} y1={y(guide)} y2={y(guide)} stroke="hsl(var(--border))" strokeDasharray="3 5" />
-              <text x={padding.left - 10} y={y(guide) + 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="var(--app-font-mono)">{money(guide)}</text>
+              <text x={padding.left - 10} y={y(guide) + 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="var(--app-font-mono)">{formatMoney(guide)}</text>
             </g>
           ))}
           <line x1={padding.left} x2={width - padding.right} y1={baseline} y2={baseline} stroke="hsl(var(--muted-foreground) / .55)" />
           {points.length > 1 && <path d={path} fill="none" stroke="hsl(var(--primary))" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
           {points.map((point, index) => (
             <g key={`${point.timestamp}-${index}`}>
-              <title>{`${dateTime(point.timestamp)} · ${money(point.equity)}`}</title>
+              <title>{`${dateTime(point.timestamp)} · ${formatMoney(point.equity)}`}</title>
               <circle
                 cx={x(index)}
                 cy={y(point.equity)}
@@ -307,6 +304,7 @@ function TradeTable({
   selectedTradeId: number | null;
   onSelect: (trade: BacktestTrade) => void;
 }) {
+  const { formatMoney } = useCurrency();
   return (
     <div className="panel table-wrap" data-testid="table-backtest-trades">
       <div className="min-w-[760px]">
@@ -328,7 +326,7 @@ function TradeTable({
               <span className={`tag w-fit ${trade.side === "long" ? "tag-active" : "tag-draft"}`}>{trade.side === "long" ? "BUY" : "SELL"}</span>
               <span><strong className="block mono text-xs">{number(trade.entryPrice)}</strong><small className="text-[10px] text-muted-foreground">{dateTime(trade.entryTime)}</small></span>
               <span><strong className="block mono text-xs">{number(trade.exitPrice)}</strong><small className="text-[10px] text-muted-foreground">{dateTime(trade.exitTime)}</small></span>
-              <span className={`mono text-xs font-medium ${valueClass(trade.pnl)}`}>{money(trade.pnl)}</span>
+              <span className={`mono text-xs font-medium ${valueClass(trade.pnl)}`}>{formatMoney(trade.pnl)}</span>
               <span className={`tag w-fit ${trade.pnl > 0 ? "tag-active" : trade.pnl < 0 ? "tag-archived" : "tag-draft"}`}>{trade.pnl > 0 ? "WIN" : trade.pnl < 0 ? "LOSS" : "FLAT"}</span>
               <span className="text-[10px] text-muted-foreground">{shortDate(trade.entryTime)} → {shortDate(trade.exitTime)}</span>
             </button>
@@ -340,6 +338,7 @@ function TradeTable({
 }
 
 function TradeDetails({ trade }: { trade: BacktestTrade | null }) {
+  const { formatMoney } = useCurrency();
   if (!trade) return null;
   const rows = [
     ["Entry time", dateTime(trade.entryTime)],
@@ -358,7 +357,7 @@ function TradeDetails({ trade }: { trade: BacktestTrade | null }) {
           <div className="eyebrow">Selected trade</div>
           <h3 className="font-semibold mt-2">Trade {trade.id} · {trade.side}</h3>
         </div>
-        <div className={`metric-value text-xl ${valueClass(trade.pnl)}`}>{money(trade.pnl)}</div>
+        <div className={`metric-value text-xl ${valueClass(trade.pnl)}`}>{formatMoney(trade.pnl)}</div>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-4 mt-5 pt-5 border-t border-border">
         {rows.map(([label, value]) => (
@@ -402,6 +401,7 @@ function Assumptions({ backtest }: { backtest: BacktestResults["backtest"] }) {
 }
 
 export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRunAgain }: BacktestResultsPanelProps) {
+  const { formatMoney } = useCurrency();
   const query = useGetBacktestResults(backtestId, {
     query: { enabled: Number.isFinite(backtestId), retry: false, queryKey: getGetBacktestResultsQueryKey(backtestId) },
   });
@@ -525,14 +525,14 @@ export function BacktestResultsPanel({ backtestId, onBack, onViewStrategy, onRun
            <section id="backtest-result-performance">
             <SectionHeading eyebrow="Performance" title="What the recorded trades did" icon={BarChart3} detail="All values below are returned by the backtest result; no costs or signals are inferred." />
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-              <StatCard label="Net P/L" value={money(statistics.totalPnl)} positive={(statistics.totalPnl ?? 0) > 0 ? true : (statistics.totalPnl ?? 0) < 0 ? false : undefined} detail={`${statistics.winningTrades} wins · ${statistics.losingTrades} losses`} />
+              <StatCard label="Net P/L" value={formatMoney(statistics.totalPnl)} positive={(statistics.totalPnl ?? 0) > 0 ? true : (statistics.totalPnl ?? 0) < 0 ? false : undefined} detail={`${statistics.winningTrades} wins · ${statistics.losingTrades} losses`} />
               <StatCard label="Win rate" value={statistics.winRate === null ? "—" : `${number(statistics.winRate, 1)}%`} detail={`${trades.length} completed trades`} />
                <StatCard label="Profit factor" value={statistics.profitFactor === null && statistics.winningTrades > 0 && statistics.losingTrades === 0 ? "∞" : number(statistics.profitFactor)} detail="Gross wins / gross losses" />
-              <StatCard label="Max drawdown" value={money(statistics.maximumDrawdown)} positive={statistics.maximumDrawdown && statistics.maximumDrawdown > 0 ? false : undefined} detail="Peak-to-trough" />
-              <StatCard label="Avg winner" value={money(statistics.averageWinningTrade)} positive={statistics.averageWinningTrade !== null && statistics.averageWinningTrade > 0} />
-              <StatCard label="Avg loser" value={money(statistics.averageLosingTrade)} positive={statistics.averageLosingTrade !== null && statistics.averageLosingTrade < 0 ? false : undefined} />
-               <StatCard label="Largest winner" value={money(statistics.largestWinningTrade)} positive={statistics.largestWinningTrade !== null && statistics.largestWinningTrade > 0} />
-               <StatCard label="Largest loser" value={money(statistics.largestLosingTrade)} positive={statistics.largestLosingTrade !== null && statistics.largestLosingTrade < 0 ? false : undefined} />
+              <StatCard label="Max drawdown" value={formatMoney(statistics.maximumDrawdown)} positive={statistics.maximumDrawdown && statistics.maximumDrawdown > 0 ? false : undefined} detail="Peak-to-trough" />
+              <StatCard label="Avg winner" value={formatMoney(statistics.averageWinningTrade)} positive={statistics.averageWinningTrade !== null && statistics.averageWinningTrade > 0} />
+              <StatCard label="Avg loser" value={formatMoney(statistics.averageLosingTrade)} positive={statistics.averageLosingTrade !== null && statistics.averageLosingTrade < 0 ? false : undefined} />
+               <StatCard label="Largest winner" value={formatMoney(statistics.largestWinningTrade)} positive={statistics.largestWinningTrade !== null && statistics.largestWinningTrade > 0} />
+               <StatCard label="Largest loser" value={formatMoney(statistics.largestLosingTrade)} positive={statistics.largestLosingTrade !== null && statistics.largestLosingTrade < 0 ? false : undefined} />
             </div>
             <div className="panel p-4 md:p-6 mt-4">
               <EquityCurve statistics={statistics} selectedTradeId={selectedTradeId} />

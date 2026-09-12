@@ -18,6 +18,7 @@ import {
   type StrategyVersion,
   type StrategyVersionCondition,
 } from "@workspace/api-client-react";
+import { useCurrency } from "@/lib/currency";
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return <div className="fixed inset-0 z-[70] bg-black/65 flex items-end sm:items-center justify-center p-0 sm:p-5" onMouseDown={event => event.target === event.currentTarget && onClose()}>
@@ -48,6 +49,7 @@ function versionTitle(version: StrategyVersion) {
 }
 
 function SnapshotSummary({ version, compact = false }: { version: StrategyVersion; compact?: boolean }) {
+  const { formatMoney } = useCurrency();
   return <div className="space-y-4">
     <div className={`grid grid-cols-2 ${compact ? "" : "md:grid-cols-4"} gap-3`}>
       <Summary label="Market" value={version.marketSymbol || "Not set"} />
@@ -58,8 +60,8 @@ function SnapshotSummary({ version, compact = false }: { version: StrategyVersio
     <div className={`grid grid-cols-2 ${compact ? "" : "md:grid-cols-4"} gap-3`}>
       <Summary label="Trades" value={String(version.tradeCount)} />
       <Summary label="Win rate" value={metric(version.winRate, "%")} />
-      <Summary label="Net P&L" value={metric(version.netPnl)} />
-      <Summary label="Average P&L" value={metric(version.averagePnl)} />
+      <Summary label="Net P&L" value={version.netPnl == null ? "Not enough data" : formatMoney(version.netPnl)} />
+      <Summary label="Average P&L" value={version.averagePnl == null ? "Not enough data" : formatMoney(version.averagePnl)} />
     </div>
     <div className={`grid grid-cols-1 ${compact ? "" : "md:grid-cols-2"} gap-3`}>
       <Rule label="Risk management" value={version.riskManagementRules || version.riskRules} />
