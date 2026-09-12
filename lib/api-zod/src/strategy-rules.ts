@@ -8,6 +8,86 @@ export const SUPPORTED_RULE_PRESETS = [
   { value: "always", label: "Always true", rule: "always" },
 ] as const;
 
+import type { ExecutableConceptParameters } from "./executable-concepts";
+
+export type UniversalRuleStage = "entry" | "confirmation" | "invalidation" | "exit";
+export type UniversalRuleDirection = "long" | "short" | "both";
+export type UniversalRuleExecutionStatus = "executable" | "review_required";
+export type UniversalRuleValidationStatus = "valid" | "review_required";
+export type UniversalRuleSource = "user_request" | "model" | "builder" | "legacy";
+export type UniversalRuleRelationshipType = "after" | "followed_by" | "while" | "and" | "or";
+
+export type UniversalRuleProvenance = {
+  source: UniversalRuleSource;
+  detectedText: string;
+  requestedConcept: string | null;
+  canonicalConcept: string;
+};
+
+export type UniversalRuleValidation = {
+  valid: boolean;
+  status: UniversalRuleValidationStatus;
+  reasons: string[];
+  warnings: string[];
+};
+
+export type UniversalRuleRelationship = {
+  type: UniversalRuleRelationshipType;
+  targetRuleIndex: number | null;
+  supported: boolean;
+  reason: string | null;
+};
+
+export type UniversalStrategyRule = {
+  canonicalRuleType: ExecutableConceptParameters["kind"] | "legacy_expression" | "unsupported" | null;
+  conceptName: string;
+  direction: UniversalRuleDirection;
+  timeframe: string | null;
+  parameters: Record<string, unknown> | null;
+  stage: UniversalRuleStage;
+  provenance: UniversalRuleProvenance;
+  executionStatus: UniversalRuleExecutionStatus;
+  validation: UniversalRuleValidation;
+  relationship?: UniversalRuleRelationship;
+};
+
+export type UniversalRiskRule = {
+  type: "stop_loss_percentage" | "take_profit_percentage" | "risk_per_trade_percentage" | "take_profit_r_multiple" | "risk_reward_multiple" | "structural_stop";
+  value: number | null;
+  unit: "percent" | "r" | "reference";
+  reference: string | null;
+  executionStatus: UniversalRuleExecutionStatus;
+  validation: UniversalRuleValidation;
+};
+
+export function normalizeStrategyTimeframe(value: string | null | undefined): string | null {
+  const raw = String(value || "").trim();
+  const suffixMatch = raw.match(/^(\d+(?:\.\d+)?)\s*(m|min|minute|minutes|h|hr|hour|hours|d|day|days|w|week|weeks)$/i);
+  const prefixMatch = raw.match(/^(m|h|d|w)\s*(\d+(?:\.\d+)?)$/i);
+  if (!suffixMatch && !prefixMatch) return null;
+  const amount = Number(suffixMatch?.[1] || prefixMatch?.[2]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const unit = suffixMatch?.[2] || prefixMatch?.[1];
+  if (!unit) return null;
+  const normalizedUnit = unit.toLowerCase();
+  const suffix = normalizedUnit.startsWith("m") ? "M" : normalizedUnit.startsWith("h") ? "H" : normalizedUnit.startsWith("d") ? "D" : "W";
+  return `${amount}${suffix}`;
+}
+
+export function universalValidation(
+  executable: boolean,
+  reasons: string[] = [],
+  warnings: string[] = [],
+): UniversalRuleValidation {
+  const uniqueReasons = [...new Set(reasons.filter(Boolean))];
+  return {
+    valid: executable && uniqueReasons.length === 0,
+    status: executable && uniqueReasons.length === 0 ? "valid" : "review_required",
+    reasons: uniqueReasons,
+    warnings: [...new Set(warnings.filter(Boolean))],
+  };
+}
+
 export function normalizeHistoricalRule(rule: string) {
   return rule.trim().toLowerCase().replace(/[()[\],]/g, " ").replace(/\s+/g, " ");
 }

@@ -10,6 +10,21 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
+function mockStrategyDraft(strategyDraft: Record<string, unknown>) {
+  process.env.OPENROUTER_API_KEY = "test-key";
+  globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+    choices: [{
+      message: {
+        content: JSON.stringify({
+          reply: "Prepared the requested strategy draft.",
+          intent: "strategy_proposal",
+          strategyDraft,
+        }),
+      },
+    }],
+  }), { status: 200, headers: { "content-type": "application/json" } }));
+}
+
 describe("AI Trading Assistant provider boundary", () => {
   it("returns an honest unavailable response when the server credential is missing", async () => {
     delete process.env.OPENROUTER_API_KEY;
@@ -1347,5 +1362,131 @@ Risk/Reward: 2:1`,
 
     expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual(["Fair Value Gap"]);
     expect(response.strategyDraft?.conditions[0].authorization.status).toBe("explicit");
+  });
+
+  it("normalizes Gold/M5 wording, EMA 20/50 parameters, and New York kill-zone aliases", async () => {
+    mockStrategyDraft({
+      name: "Gold moving-average session strategy",
+      description: "An EMA crossover during the New York session.",
+      direction: "long",
+      marketSymbol: "Gold",
+      timeframes: ["M5"],
+      conditions: [
+        { name: "EMA 20/50 cross", stage: "entry", requirement: "required", conceptName: "Exponential Moving Average", timeframe: "M5", direction: "long", triggerRules: "model cross" },
+        { name: "New York kill zone", stage: "confirmation", requirement: "required", conceptName: "New York kill zone", timeframe: "M5", direction: "long", triggerRules: "model session" },
+      ],
+      riskManagementRules: null,
+    });
+
+    const response = await answerAssistant({
+      message: "Create a Gold M5 long strategy using a 20/50 EMA cross during the New York kill zone.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.marketSymbol).toBe("XAUUSD");
+    expect(response.strategyDraft?.timeframes.map(value => value.toLowerCase())).toContain("5m");
+    expect(response.strategyDraft?.conditions.map(condition => condition.canonicalRuleType)).toEqual(["indicator", "session"]);
+    expect(response.strategyDraft?.conditions[0].parameters).toMatchObject({
+      kind: "indicator",
+      indicator: "ema",
+      period: 20,
+      fastPeriod: 20,
+      slowPeriod: 50,
+      comparison: "cross_above",
+    });
+    expect(response.strategyDraft?.conditions[1].parameters).toMatchObject({
+      kind: "session",
+      session: "new_york",
+      timezone: "America/New_York",
+    });
+    expect(response.strategyDraft?.conditions.every(condition => condition.provenance?.detectedText)).toBe(true);
+  });
+
+  it("separates executable percentage risk from review-only R targets and structural stops", async () => {
+    mockStrategyDraft({
+      name: "Displacement FVG strategy",
+      description: "A displacement followed by an FVG retest.",
+      direction: "long",
+      marketSymbol: "XAUUSD",
+      timeframes: ["5m"],
+      conditions: [
+        { name: "Bullish displacement", stage: "entry", requirement: "required", conceptName: "Displacement", timeframe: "5m", direction: "long", triggerRules: "model displacement" },
+        { name: "Bullish FVG retest", stage: "confirmation", requirement: "required", conceptName: "FVG Retest", timeframe: "5m", direction: "long", triggerRules: "model retest" },
+      ],
+      riskManagementRules: null,
+    });
+
+    const response = await answerAssistant({
+      message: "Build Gold/M5 with bullish displacement followed by FVG retest, 1% stop loss and 2R target.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.riskRules).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "stop_loss_percentage", value: 1, executionStatus: "executable" }),
+      expect.objectContaining({ type: "take_profit_r_multiple", value: 2, executionStatus: "executable" }),
+    ]));
+    expect(response.strategyDraft?.conditions[1].relationship).toMatchObject({
+      type: "followed_by",
+      supported: true,
+      targetRuleIndex: 0,
+    });
+    expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
+
+    mockStrategyDraft({
+      name: "Undefined R target",
+      description: "An R target without a stop.",
+      direction: "long",
+      marketSymbol: "XAUUSD",
+      timeframes: ["5m"],
+      conditions: [
+        { name: "FVG", stage: "entry", requirement: "required", conceptName: "Fair Value Gap", timeframe: "5m", direction: "long", triggerRules: "formation" },
+      ],
+      riskManagementRules: null,
+    });
+    const undefinedStop = await answerAssistant({
+      message: "Build a 5m XAUUSD strategy using FVG with a 2R target.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+    expect(undefinedStop.strategyDraft?.riskRules?.[0]).toMatchObject({
+      type: "take_profit_r_multiple",
+      executionStatus: "review_required",
+    });
+    expect(undefinedStop.strategyDraft?.compatibility.compatible).toBe(false);
+  });
+
+  it("preserves unsupported concepts and structural stops instead of inventing executable rules", async () => {
+    mockStrategyDraft({
+      name: "Review required strategy",
+      description: "An unsupported concept with a structural stop.",
+      direction: "long",
+      marketSymbol: "XAUUSD",
+      timeframes: ["5m"],
+      conditions: [
+        { name: "Unsupported order-flow signal", stage: "entry", requirement: "required", conceptName: "Order Flow Imbalance", timeframe: "5m", direction: "long", triggerRules: "model signal" },
+        { name: "FVG retest", stage: "confirmation", requirement: "required", conceptName: "FVG Retest", timeframe: "5m", direction: "long", triggerRules: "model retest" },
+      ],
+      riskManagementRules: null,
+    });
+    const response = await answerAssistant({
+      message: "Build an XAUUSD 5m strategy using order-flow imbalance followed by FVG retest with a stop below the FVG.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions.some(condition =>
+      condition.provenance?.requestedConcept?.toLowerCase().includes("order-flow imbalance"),
+    )).toBe(true);
+    expect(response.strategyDraft?.conditions.some(condition => condition.executionStatus === "review_required")).toBe(true);
+    expect(response.strategyDraft?.riskRules).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "structural_stop",
+        executionStatus: "review_required",
+        reference: "fair_value_gap",
+      }),
+    ]));
+    expect(response.strategyDraft?.compatibility.compatible).toBe(false);
   });
 });

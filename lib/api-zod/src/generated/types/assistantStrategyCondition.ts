@@ -5,8 +5,12 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { AssistantRuleProvenance } from './assistantRuleProvenance';
+import type { AssistantRuleRelationship } from './assistantRuleRelationship';
+import type { AssistantRuleValidation } from './assistantRuleValidation';
 import type { AssistantStrategyConditionAuthorization } from './assistantStrategyConditionAuthorization';
 import type { AssistantStrategyConditionDirection } from './assistantStrategyConditionDirection';
+import type { AssistantStrategyConditionExecutionStatus } from './assistantStrategyConditionExecutionStatus';
 import type { AssistantStrategyConditionParameters } from './assistantStrategyConditionParameters';
 import type { AssistantStrategyConditionRequirement } from './assistantStrategyConditionRequirement';
 import type { AssistantStrategyConditionStage } from './assistantStrategyConditionStage';
@@ -23,5 +27,11 @@ export interface AssistantStrategyCondition {
   parameters: AssistantStrategyConditionParameters;
   ruleSupported: boolean;
   supported?: boolean;
+  /** @nullable */
+  canonicalRuleType?: string | null;
+  executionStatus?: AssistantStrategyConditionExecutionStatus;
+  provenance?: AssistantRuleProvenance;
+  validation?: AssistantRuleValidation;
+  relationship?: AssistantRuleRelationship;
   authorization: AssistantStrategyConditionAuthorization;
 }

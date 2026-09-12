@@ -2820,8 +2820,69 @@ components:
         parameters: { type: ["object", "null"], additionalProperties: true }
         ruleSupported: { type: boolean }
         supported: { type: boolean }
+        canonicalRuleType: { type: ["string", "null"] }
+        executionStatus:
+          type: string
+          enum: [executable, review_required]
+        provenance:
+          $ref: "#/components/schemas/AssistantRuleProvenance"
+        validation:
+          $ref: "#/components/schemas/AssistantRuleValidation"
+        relationship:
+          $ref: "#/components/schemas/AssistantRuleRelationship"
         authorization:
           $ref: "#/components/schemas/AssistantStrategyConditionAuthorization"
+    AssistantRuleProvenance:
+      type: object
+      required: [source, detectedText, requestedConcept, canonicalConcept]
+      properties:
+        source:
+          type: string
+          enum: [user_request, model, builder, legacy]
+        detectedText: { type: string }
+        requestedConcept: { type: ["string", "null"] }
+        canonicalConcept: { type: string }
+    AssistantRuleValidation:
+      type: object
+      required: [valid, status, reasons]
+      properties:
+        valid: { type: boolean }
+        status:
+          type: string
+          enum: [valid, review_required]
+        reasons:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+    AssistantRuleRelationship:
+      type: object
+      required: [type, targetRuleIndex, supported]
+      properties:
+        type:
+          type: string
+          enum: [after, followed_by, while, and, or]
+        targetRuleIndex: { type: ["integer", "null"] }
+        supported: { type: boolean }
+        reason: { type: ["string", "null"] }
+    AssistantRiskRule:
+      type: object
+      required: [type, value, unit, executionStatus, validation]
+      properties:
+        type:
+          type: string
+          enum: [stop_loss_percentage, take_profit_percentage, risk_per_trade_percentage, take_profit_r_multiple, risk_reward_multiple, structural_stop]
+        value: { type: ["number", "null"] }
+        unit:
+          type: string
+          enum: [percent, r, reference]
+        reference: { type: ["string", "null"] }
+        executionStatus:
+          type: string
+          enum: [executable, review_required]
+        validation:
+          $ref: "#/components/schemas/AssistantRuleValidation"
     AssistantStrategyConditionAuthorization:
       type: object
       required: [source, status, requestedConcept, canonicalConcept, matchedText]
@@ -2868,6 +2929,10 @@ components:
           items:
             $ref: "#/components/schemas/AssistantConceptReference"
         riskManagementRules: { type: ["string", "null"] }
+        riskRules:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantRiskRule"
         authorization:
           $ref: "#/components/schemas/AssistantStrategyDraftAuthorization"
         compatibility:

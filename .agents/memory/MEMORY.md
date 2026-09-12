@@ -26,3 +26,4 @@
 - [Dukascopy current-period boundary](dukascopy-current-period-boundary.md) — current/future requests can return 400 “From time is too late”; preserve provider reason and cached coverage instead of shortening.
 - [Executable concept completeness](executable-concept-completeness.md) — a new executable concept must keep registry, candle requirements, shared evaluation, monitoring, UI, and cross-layer tests aligned.
 - [Session evaluator contract](session-evaluator-contract.md) — sessions use explicit IANA local windows with DST-aware membership and half-open end boundaries.
+- [Universal assistant rule contract](universal-assistant-rule-contract.md) — assistant drafts carry typed canonical metadata additively; risk stays separate and unsupported temporal operators remain review-required.

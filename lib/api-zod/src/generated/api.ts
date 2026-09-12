@@ -66,6 +66,26 @@ export const ChatAssistantResponse = zod.object({
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "ruleSupported": zod.boolean(),
   "supported": zod.boolean().optional(),
+  "canonicalRuleType": zod.string().nullish(),
+  "executionStatus": zod.enum(['executable', 'review_required']).optional(),
+  "provenance": zod.object({
+  "source": zod.enum(['user_request', 'model', 'builder', 'legacy']),
+  "detectedText": zod.string(),
+  "requestedConcept": zod.string().nullable(),
+  "canonicalConcept": zod.string()
+}).optional(),
+  "validation": zod.object({
+  "valid": zod.boolean(),
+  "status": zod.enum(['valid', 'review_required']),
+  "reasons": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()).optional()
+}).optional(),
+  "relationship": zod.object({
+  "type": zod.enum(['after', 'followed_by', 'while', 'and', 'or']),
+  "targetRuleIndex": zod.number().int().nullable(),
+  "supported": zod.boolean(),
+  "reason": zod.string().nullish()
+}).optional(),
   "authorization": zod.object({
   "source": zod.enum(['user_request']),
   "status": zod.enum(['explicit', 'required_for_concept', 'review_required']),
@@ -80,6 +100,19 @@ export const ChatAssistantResponse = zod.object({
   "explanation": zod.string()
 })).optional(),
   "riskManagementRules": zod.string().nullable(),
+  "riskRules": zod.array(zod.object({
+  "type": zod.enum(['stop_loss_percentage', 'take_profit_percentage', 'risk_per_trade_percentage', 'take_profit_r_multiple', 'risk_reward_multiple', 'structural_stop']),
+  "value": zod.number().nullable(),
+  "unit": zod.enum(['percent', 'r', 'reference']),
+  "reference": zod.string().nullish(),
+  "executionStatus": zod.enum(['executable', 'review_required']),
+  "validation": zod.object({
+  "valid": zod.boolean(),
+  "status": zod.enum(['valid', 'review_required']),
+  "reasons": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()).optional()
+})
+})).optional(),
   "authorization": zod.object({
   "originalRequest": zod.string(),
   "requestedConcepts": zod.array(zod.object({

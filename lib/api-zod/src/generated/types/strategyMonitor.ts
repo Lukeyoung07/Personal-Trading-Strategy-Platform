@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { StrategyMonitorCondition } from './strategyMonitorCondition';
-import type { StrategyMonitorMonitoringStatus } from './strategyMonitorMonitoringStatus';
 import type { StrategyMonitorMarketDataState } from './strategyMonitorMarketDataState';
+import type { StrategyMonitorMonitoringStatus } from './strategyMonitorMonitoringStatus';
 import type { StrategyMonitorOverallStatus } from './strategyMonitorOverallStatus';
 import type { StrategyMonitorResetStatus } from './strategyMonitorResetStatus';
 

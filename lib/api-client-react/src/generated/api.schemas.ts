@@ -257,6 +257,19 @@ export interface StrategyMonitoringEvaluationRequest {
   sourceId?: number | null;
 }
 
+export type StrategyMonitorMarketDataState = typeof StrategyMonitorMarketDataState[keyof typeof StrategyMonitorMarketDataState];
+
+
+export const StrategyMonitorMarketDataState = {
+  live: 'live',
+  stale: 'stale',
+  market_closed: 'market_closed',
+  disconnected: 'disconnected',
+  missing: 'missing',
+  error: 'error',
+  ambiguous: 'ambiguous',
+} as const;
+
 export type StrategyMonitorConditionRequirement = typeof StrategyMonitorConditionRequirement[keyof typeof StrategyMonitorConditionRequirement];
 
 
@@ -306,18 +319,6 @@ export const StrategyMonitorMonitoringStatus = {
   monitoring: 'monitoring',
   paused: 'paused',
   error: 'error',
-} as const;
-
-export type StrategyMonitorMarketDataState = typeof StrategyMonitorMarketDataState[keyof typeof StrategyMonitorMarketDataState];
-
-export const StrategyMonitorMarketDataState = {
-  live: 'live',
-  stale: 'stale',
-  market_closed: 'market_closed',
-  disconnected: 'disconnected',
-  missing: 'missing',
-  error: 'error',
-  ambiguous: 'ambiguous',
 } as const;
 
 export type StrategyMonitorOverallStatus = typeof StrategyMonitorOverallStatus[keyof typeof StrategyMonitorOverallStatus];
@@ -2265,6 +2266,67 @@ export const AssistantStrategyConditionDirection = {
  */
 export type AssistantStrategyConditionParameters = { [key: string]: unknown } | null;
 
+export type AssistantStrategyConditionExecutionStatus = typeof AssistantStrategyConditionExecutionStatus[keyof typeof AssistantStrategyConditionExecutionStatus];
+
+
+export const AssistantStrategyConditionExecutionStatus = {
+  executable: 'executable',
+  review_required: 'review_required',
+} as const;
+
+export type AssistantRuleProvenanceSource = typeof AssistantRuleProvenanceSource[keyof typeof AssistantRuleProvenanceSource];
+
+
+export const AssistantRuleProvenanceSource = {
+  user_request: 'user_request',
+  model: 'model',
+  builder: 'builder',
+  legacy: 'legacy',
+} as const;
+
+export interface AssistantRuleProvenance {
+  source: AssistantRuleProvenanceSource;
+  detectedText: string;
+  /** @nullable */
+  requestedConcept: string | null;
+  canonicalConcept: string;
+}
+
+export type AssistantRuleValidationStatus = typeof AssistantRuleValidationStatus[keyof typeof AssistantRuleValidationStatus];
+
+
+export const AssistantRuleValidationStatus = {
+  valid: 'valid',
+  review_required: 'review_required',
+} as const;
+
+export interface AssistantRuleValidation {
+  valid: boolean;
+  status: AssistantRuleValidationStatus;
+  reasons: string[];
+  warnings?: string[];
+}
+
+export type AssistantRuleRelationshipType = typeof AssistantRuleRelationshipType[keyof typeof AssistantRuleRelationshipType];
+
+
+export const AssistantRuleRelationshipType = {
+  after: 'after',
+  followed_by: 'followed_by',
+  while: 'while',
+  and: 'and',
+  or: 'or',
+} as const;
+
+export interface AssistantRuleRelationship {
+  type: AssistantRuleRelationshipType;
+  /** @nullable */
+  targetRuleIndex: number | null;
+  supported: boolean;
+  /** @nullable */
+  reason?: string | null;
+}
+
 export type AssistantStrategyConditionAuthorizationSource = typeof AssistantStrategyConditionAuthorizationSource[keyof typeof AssistantStrategyConditionAuthorizationSource];
 
 
@@ -2301,7 +2363,53 @@ export interface AssistantStrategyCondition {
   parameters: AssistantStrategyConditionParameters;
   ruleSupported: boolean;
   supported?: boolean;
+  /** @nullable */
+  canonicalRuleType?: string | null;
+  executionStatus?: AssistantStrategyConditionExecutionStatus;
+  provenance?: AssistantRuleProvenance;
+  validation?: AssistantRuleValidation;
+  relationship?: AssistantRuleRelationship;
   authorization: AssistantStrategyConditionAuthorization;
+}
+
+export type AssistantRiskRuleType = typeof AssistantRiskRuleType[keyof typeof AssistantRiskRuleType];
+
+
+export const AssistantRiskRuleType = {
+  stop_loss_percentage: 'stop_loss_percentage',
+  take_profit_percentage: 'take_profit_percentage',
+  risk_per_trade_percentage: 'risk_per_trade_percentage',
+  take_profit_r_multiple: 'take_profit_r_multiple',
+  risk_reward_multiple: 'risk_reward_multiple',
+  structural_stop: 'structural_stop',
+} as const;
+
+export type AssistantRiskRuleUnit = typeof AssistantRiskRuleUnit[keyof typeof AssistantRiskRuleUnit];
+
+
+export const AssistantRiskRuleUnit = {
+  percent: 'percent',
+  r: 'r',
+  reference: 'reference',
+} as const;
+
+export type AssistantRiskRuleExecutionStatus = typeof AssistantRiskRuleExecutionStatus[keyof typeof AssistantRiskRuleExecutionStatus];
+
+
+export const AssistantRiskRuleExecutionStatus = {
+  executable: 'executable',
+  review_required: 'review_required',
+} as const;
+
+export interface AssistantRiskRule {
+  type: AssistantRiskRuleType;
+  /** @nullable */
+  value: number | null;
+  unit: AssistantRiskRuleUnit;
+  /** @nullable */
+  reference?: string | null;
+  executionStatus: AssistantRiskRuleExecutionStatus;
+  validation: AssistantRuleValidation;
 }
 
 export interface AssistantCompatibility {
@@ -2347,6 +2455,7 @@ export interface AssistantStrategyDraft {
   conceptsUsed?: AssistantConceptReference[];
   /** @nullable */
   riskManagementRules: string | null;
+  riskRules?: AssistantRiskRule[];
   authorization: AssistantStrategyDraftAuthorization;
   compatibility: AssistantCompatibility;
 }

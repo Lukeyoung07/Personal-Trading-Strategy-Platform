@@ -6,4 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type StrategyMonitorMarketDataState = 'live' | 'stale' | 'market_closed' | 'disconnected' | 'missing' | 'error' | 'ambiguous';
+export type StrategyMonitorMarketDataState = typeof StrategyMonitorMarketDataState[keyof typeof StrategyMonitorMarketDataState];
+
+
+export const StrategyMonitorMarketDataState = {
+  live: 'live',
+  stale: 'stale',
+  market_closed: 'market_closed',
+  disconnected: 'disconnected',
+  missing: 'missing',
+  error: 'error',
+  ambiguous: 'ambiguous',
+} as const;

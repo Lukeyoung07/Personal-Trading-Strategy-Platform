@@ -19,6 +19,9 @@ import {
   executableConceptKind,
   executableConceptLabel,
   normalizeExecutableParameters,
+  normalizeStrategyTimeframe,
+  universalValidation,
+  type UniversalRiskRule,
   type ChatAssistantBody,
 } from "@workspace/api-zod";
 import { calculateBacktestStatistics } from "./backtest-results";
@@ -100,6 +103,91 @@ function compatibleRiskRules(rules: string | null | undefined) {
   const hasTakeProfit = /(?:take[- ]profit|tp)\s*[:=]?\s*\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%\s*(?:take[- ]profit|tp)/i.test(rules);
   const hasRiskReward = /(?:risk[\/ -]?reward|r\s*:\s*r)\s*[:=]?\s*\d+(?:\.\d+)?\s*R\b/i.test(rules);
   return hasStopLoss || hasTakeProfit || (hasRiskReward && hasStopLoss);
+}
+
+function riskRule(
+  type: UniversalRiskRule["type"],
+  value: number | null,
+  unit: UniversalRiskRule["unit"],
+  executionStatus: UniversalRiskRule["executionStatus"],
+  reasons: string[] = [],
+  reference: string | null = null,
+): UniversalRiskRule {
+  return {
+    type,
+    value,
+    unit,
+    reference,
+    executionStatus,
+    validation: universalValidation(executionStatus === "executable", reasons),
+  };
+}
+
+function parseRiskRules(value: string | null | undefined, requestMessage?: string): UniversalRiskRule[] {
+  const text = `${value || ""} ${requestMessage || ""}`.trim();
+  if (!text) return [];
+  const rules: UniversalRiskRule[] = [];
+  const add = (rule: UniversalRiskRule) => {
+    const key = `${rule.type}:${rule.value}:${rule.reference || ""}`;
+    if (!rules.some(existing => `${existing.type}:${existing.value}:${existing.reference || ""}` === key)) rules.push(rule);
+  };
+  const percent = (pattern: RegExp, type: UniversalRiskRule["type"]) => {
+    for (const match of text.matchAll(pattern)) {
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) add(riskRule(type, value, "percent", "executable"));
+    }
+  };
+  percent(/(?:stop[- ]loss|sl)\s*(?:at|of|[:=])?\s*(\d+(?:\.\d+)?)\s*%/gi, "stop_loss_percentage");
+  percent(/(\d+(?:\.\d+)?)\s*%\s*(?:stop[- ]loss|sl)\b/gi, "stop_loss_percentage");
+  percent(/(?:take[- ]profit|tp)\s*(?:at|of|[:=])?\s*(\d+(?:\.\d+)?)\s*%/gi, "take_profit_percentage");
+  percent(/(\d+(?:\.\d+)?)\s*%\s*(?:take[- ]profit|tp)\b/gi, "take_profit_percentage");
+  percent(/(?:risk\s*per\s*trade|percentage\s*risk|risk)\s*[:=]\s*(\d+(?:\.\d+)?)\s*%/gi, "risk_per_trade_percentage");
+  const rMultiplePatterns = [
+    /(?:take[- ]profit|tp|target)\s*(?:at|of|is|:|=)?\s*(\d+(?:\.\d+)?)\s*R\b/gi,
+    /(\d+(?:\.\d+)?)\s*R\s*(?:take[- ]profit|tp|target)\b/gi,
+    /(?:risk[\/ -]?reward|r\s*:\s*r)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*R\b/gi,
+  ];
+  for (const pattern of rMultiplePatterns) {
+    for (const match of text.matchAll(pattern)) {
+      const value = Number(match[1]);
+      if (!Number.isFinite(value)) continue;
+      const type = /risk[\/ -]?reward|r\s*:\s*r/i.test(match[0])
+        ? "risk_reward_multiple"
+        : "take_profit_r_multiple";
+      add(riskRule(type, value, "r", "review_required", [
+        "An R-multiple target requires a defining stop-loss before it can be executed.",
+      ]));
+    }
+  }
+  const structuralMatch = text.match(/\b(?:stop|stop[- ]loss)\s+(?:below|above)\s+(?:the\s+)?(?:fvg|fair value gap)\b/i);
+  if (structuralMatch) {
+    add(riskRule(
+      "structural_stop",
+      null,
+      "reference",
+      "review_required",
+      ["Structural stops are preserved for review and are not converted into an invented percentage."],
+      "fair_value_gap",
+    ));
+  }
+  const hasExecutableStop = rules.some(rule => rule.type === "stop_loss_percentage");
+  return rules.map(rule => {
+    if (!["take_profit_r_multiple", "risk_reward_multiple"].includes(rule.type)) return rule;
+    if (hasExecutableStop) {
+      return {
+        ...rule,
+        executionStatus: "executable" as const,
+        validation: universalValidation(true),
+      };
+    }
+    return {
+      ...rule,
+      executionStatus: "review_required" as const,
+      validation: universalValidation(false, [
+        "An R-multiple target requires a defining stop-loss before it can be executed.",
+      ]),
+    };
+  });
 }
 
 type UnsupportedConceptDefinition = {
@@ -204,11 +292,19 @@ function unsupportedConceptForText(value: string): UnsupportedConceptDefinition 
 
 function compatibilityForDraft(draft: any) {
   const conditions = Array.isArray(draft?.conditions) ? draft.conditions : [];
+  const nonConditionConcepts = new Set([
+    "risk reward",
+    "percentage risk",
+    "position sizing",
+    "maximum risk per trade",
+    "stop loss",
+    "take profit",
+  ]);
   const unsupported: string[] = conditions
     .filter((condition: any) => condition?.supported !== true || (
       !supportedRule(normalizeConditionRule(condition))
       && !normalizeExecutableParameters(condition?.conceptName, condition?.parameters)
-    ))
+    ) || condition?.executionStatus === "review_required" || condition?.validation?.valid === false)
     .map((condition: any) => String(
       condition?.authorization?.status === "review_required"
         ? condition.authorization.canonicalConcept || condition.authorization.requestedConcept
@@ -217,6 +313,7 @@ function compatibilityForDraft(draft: any) {
   const unsupportedConcepts = Array.isArray(draft?.conceptsUsed)
     ? draft.conceptsUsed
       .filter((concept: any) => concept && concept.supported === false)
+      .filter((concept: any) => !nonConditionConcepts.has(catalogKey(String(concept.name || ""))))
       .filter((concept: any) => !conditions.some((condition: any) => {
         const conditionName = catalogKey(String(condition?.conceptName || ""));
         const conceptName = catalogKey(String(concept.name || ""));
@@ -229,6 +326,11 @@ function compatibilityForDraft(draft: any) {
     unsupported.unshift("No entry condition has been added");
   }
   if (!compatibleRiskRules(draft?.riskManagementRules)) unsupported.push("The current risk rules");
+  if (Array.isArray(draft?.riskRules)) {
+    draft.riskRules
+      .filter((rule: any) => rule?.executionStatus === "review_required" || rule?.validation?.valid === false)
+      .forEach((rule: any) => unsupported.push(rule?.validation?.reasons?.[0] || "The current risk rules"));
+  }
   return { compatible: unsupported.length === 0, unsupportedConditions: [...new Set<string>(unsupported)] };
 }
 
@@ -355,6 +457,7 @@ function explicitConceptPhraseMatches(message: string) {
       .replace(/\s+(?:strategy|setup|system|process|confirmation|entry|condition|rules?)\s*$/i, "")
       .trim();
     if (!cleaned || cleaned.length < 3 || cleaned.length > 80) return;
+    if (/(?:stop[- ]loss|take[- ]profit|risk[\/ -]?reward|r\s*:\s*r|target\s+\d+(?:\.\d+)?\s*R|\d+(?:\.\d+)?\s*R\s*(?:target|take[- ]profit|tp)|percentage\s+risk|risk\s+per\s+trade)/i.test(cleaned)) return;
     if (/^(?:strategy|setup|system|rules?|risk management|long|short|both|directions?|bullish|bearish|explicit|required|optional|entry|exit|confirmation|invalidation|condition)(?:\s+(?:strategy|setup|system|rules?|directions?|entry|exit|confirmation|invalidation|condition))?$/i.test(cleaned)) return;
     if (!matches.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) matches.push(cleaned);
   };
@@ -484,7 +587,12 @@ function canonicalConceptName(value: string) {
 function requestedConceptAuthorizations(message: string): RequestedConceptAuthorization[] {
   const byCanonical = new Map<string, RequestedConceptAuthorization>();
   const add = (requestedConcept: string, matchedText: string, supported: boolean, explanation: string) => {
-    const canonicalConcept = canonicalConceptName(requestedConcept);
+    let canonicalConcept = canonicalConceptName(requestedConcept);
+    if (canonicalConcept === "Kill Zones") {
+      if (/\bnew\s+york\s+(?:session\s+)?kill\s+zone\b/i.test(message)) canonicalConcept = "New York Session";
+      else if (/\blondon\s+(?:session\s+)?kill\s+zone\b/i.test(message)) canonicalConcept = "London Session";
+      else if (/\b(?:asia|asian)\s+(?:session\s+)?kill\s+zone\b/i.test(message)) canonicalConcept = "Asian Session";
+    }
     if (!canonicalConcept) return;
     const key = catalogKey(canonicalConcept);
     const existing = byCanonical.get(key);
@@ -597,12 +705,24 @@ function requestedParameters(conceptName: string, message: string, condition: an
   const kind = executableConceptKind(conceptName);
   if (kind === "indicator") {
     const indicator = String((input.indicator || conceptName || "")).toLowerCase();
+    const periodPair = descriptor.match(/\b(?:ema|sma|moving\s+average)\s*(\d+)\s*(?:\/|and|&)\s*(\d+)\b|\b(\d+)\s*(?:\/|and|&)\s*(\d+)\s*(?:ema|sma|moving\s+average)\b/i);
     const periodMatch = descriptor.match(/(?:\b(?:ema|exponential\s+moving\s+average|sma|simple\s+moving\s+average|rsi|macd)\s*(?:\(\s*)?(\d+)|\b(\d+)\s*(?:ema|sma|rsi|macd)\b)/i);
     if (periodMatch) input.period = Number(periodMatch[1] || periodMatch[2]);
+    if (periodPair) {
+      const fastPeriod = Number(periodPair[1] || periodPair[3]);
+      const slowPeriod = Number(periodPair[2] || periodPair[4]);
+      if (Number.isFinite(fastPeriod) && Number.isFinite(slowPeriod)) {
+        input.period = fastPeriod;
+        input.fastPeriod = fastPeriod;
+        input.slowPeriod = slowPeriod;
+      }
+    }
     const crossAbove = /\bcross(?:es|ing)?\s+(?:above|over)\b/i.test(descriptor);
     const crossBelow = /\bcross(?:es|ing)?\s+(?:below|under)\b/i.test(descriptor);
+    const cross = /\bcross(?:es|ing)?\b|\bcrossover\b|\bcross\b/i.test(descriptor);
     if (crossAbove) input.comparison = "cross_above";
     else if (crossBelow) input.comparison = "cross_below";
+    else if (cross) input.comparison = "cross_above";
     else if (/\b(?:rsi|relative\s+strength\s+index)\b[^.!?]{0,40}\b(?:below|under|less\s+than)\s*(\d+(?:\.\d+)?)/i.test(descriptor)) {
       const threshold = descriptor.match(/\b(?:rsi|relative\s+strength\s+index)\b[^.!?]{0,40}\b(?:below|under|less\s+than)\s*(\d+(?:\.\d+)?)/i)?.[1];
       input.comparison = "below";
@@ -653,6 +773,66 @@ function requestedParameters(conceptName: string, message: string, condition: an
   return normalizeExecutableParameters(conceptName, input);
 }
 
+function relationshipForRequest(message: string, conditionIndex: number): any | undefined {
+  if (conditionIndex < 1) return undefined;
+  const relationship = /\bfollowed\s+by\b/i.test(message)
+    ? "followed_by"
+    : /\bafter\b/i.test(message)
+      ? "after"
+      : /\bwhile\b/i.test(message)
+        ? "while"
+        : /\bor\b/i.test(message)
+          ? "or"
+          : /\band\b/i.test(message)
+            ? "and"
+            : null;
+  if (!relationship) return undefined;
+  const supported = relationship === "and"
+    || (relationship === "followed_by" && /\b(?:displacement|higher[- ]timeframe|multi[- ]timeframe|htf)\b[^.!?]{0,100}\b(?:fvg|fair\s+value\s+gap)\b/i.test(message));
+  return {
+    type: relationship,
+    targetRuleIndex: conditionIndex - 1,
+    supported,
+    reason: supported ? null : "The current evaluator preserves this relationship for review but does not execute it as a temporal or disjunctive operator.",
+  };
+}
+
+function universalRuleMetadata(
+  condition: any,
+  conceptName: string,
+  parameters: Record<string, unknown> | null,
+  supported: boolean,
+  matchedText: string,
+  requestMessage: string,
+  conditionIndex: number,
+) {
+  const normalizedRule = normalizeConditionRule(condition);
+  const canonicalRuleType = parameters && typeof parameters === "object" && "kind" in parameters
+    ? String(parameters.kind)
+    : supportedRule(normalizedRule) ? "legacy_expression" : "unsupported";
+  const reasons: string[] = [];
+  if (!supported) reasons.push("The requested wording does not have a deterministic canonical evaluator.");
+  const relationship = relationshipForRequest(requestMessage, conditionIndex);
+  if (relationship && !relationship.supported) reasons.push(relationship.reason);
+  const timeframe = normalizeStrategyTimeframe(condition?.timeframe);
+  if (condition?.timeframe && condition.timeframe !== "Not specified" && !timeframe) {
+    reasons.push(`Timeframe “${String(condition.timeframe)}” could not be normalized without guessing.`);
+  }
+  const executable = supported && reasons.length === 0;
+  return {
+    canonicalRuleType,
+    executionStatus: executable ? "executable" : "review_required",
+    provenance: {
+      source: "user_request",
+      detectedText: matchedText || String(condition?.conceptName || conceptName),
+      requestedConcept: matchedText || null,
+      canonicalConcept: conceptName,
+    },
+    validation: universalValidation(executable, reasons),
+    ...(relationship ? { relationship } : {}),
+  };
+}
+
 function stageForRequestedConcept(conceptName: string, message: string, fallback = "entry") {
   const conceptKey = catalogKey(conceptName);
   const nearby = new RegExp(`(?:${conceptKey.replace(/\s+/g, "\\s+")})[^.!?]{0,50}\\b(confirmation|exit|invalidation)\\b|\\b(confirmation|exit|invalidation)\\b[^.!?]{0,50}(?:${conceptKey.replace(/\s+/g, "\\s+")})`, "i");
@@ -671,7 +851,7 @@ function syntheticRequestedCondition(
   const parameters = requestedParameters(conceptName, message);
   const supported = Boolean(parameters);
   const direction = requestedDirection(message, draft.direction);
-  return {
+  const condition = {
     name: !supported
       ? executableConceptLabel(conceptName) || conceptName
       : parameters?.kind === "fair_value_gap" && parameters.interaction === "retest"
@@ -687,6 +867,18 @@ function syntheticRequestedCondition(
     ruleSupported: supported,
     supported,
     authorization: conditionAuthorization({ conceptName }, authorizations),
+  };
+  return {
+    ...condition,
+    ...universalRuleMetadata(
+      condition,
+      condition.conceptName,
+      parameters as Record<string, unknown> | null,
+      supported,
+      condition.authorization?.matchedText || conceptName,
+      message,
+      index,
+    ),
   };
 }
 
@@ -744,7 +936,7 @@ function reconcileRequestedConditions(draft: any, message: string) {
         || (timeframes.length === 1 ? timeframes[0] : condition.timeframe)
         || timeframes[requestedIndex]
         || "Not specified";
-      return {
+      const nextCondition = {
         ...condition,
         conceptName,
         timeframe: conditionTimeframe,
@@ -755,12 +947,24 @@ function reconcileRequestedConditions(draft: any, message: string) {
         supported: Boolean(parameters) || condition.supported === true,
         authorization: conditionAuthorization({ ...condition, conceptName }, authorizations),
       };
+      return {
+        ...nextCondition,
+        ...universalRuleMetadata(
+          nextCondition,
+          conceptName,
+          parameters as Record<string, unknown> | null,
+          Boolean(parameters) || nextCondition.supported === true,
+          nextCondition.authorization?.matchedText || conceptName,
+          message,
+          requestedIndex,
+        ),
+      };
     });
   });
   const seen = new Set<string>();
   return matched
     .flatMap(condition => directionalizeCondition(condition, direction, message))
-    .filter(condition => {
+     .filter(condition => {
       const key = JSON.stringify([
         condition.conceptName,
         condition.stage,
@@ -770,7 +974,7 @@ function reconcileRequestedConditions(draft: any, message: string) {
       ]);
       if (seen.has(key)) return false;
       seen.add(key);
-      return true;
+       return true;
     });
 }
 
@@ -860,6 +1064,11 @@ function matchCatalogConcept(value: string, catalog: BuilderCatalog): string | n
 function matchCatalogTimeframe(value: string, catalog: BuilderCatalog): string | null {
   const key = catalogKey(value).replace(/\b(minutes?|mins?)\b/g, "m").replace(/\bhours?\b/g, "h").replace(/\bdays?\b/g, "d");
   if (!key) return null;
+  const normalized = normalizeStrategyTimeframe(value);
+  if (normalized) {
+    const normalizedMatch = catalog.timeframes.find(timeframe => normalizeStrategyTimeframe(timeframe) === normalized);
+    if (normalizedMatch) return normalizedMatch;
+  }
   const exact = catalog.timeframes.find(timeframe => catalogKey(timeframe) === key);
   if (exact) return exact;
   const compact = key.replace(/\s+/g, "");
@@ -945,7 +1154,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
     : draft;
   const warnings: string[] = [];
   const mappedConditions = requestedDraft.conditions || [];
-  const conditions = mappedConditions.map((condition: any) => {
+  const conditions = mappedConditions.map((condition: any, conditionIndex: number) => {
     const conceptName = matchCatalogConcept(String(condition.conceptName || ""), catalog);
     const timeframe = matchCatalogTimeframe(String(condition.timeframe || ""), catalog);
     if (!conceptName) warnings.push(`Concept “${String(condition.conceptName || "Unnamed concept")}” is not in the Trading Concept Library.`);
@@ -963,7 +1172,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
       )
       ? existingAuthorization
       : null;
-    return {
+    const nextCondition = {
       ...condition,
       conceptName: conceptName || String(condition.conceptName || "Unmapped concept").slice(0, 160),
       timeframe: timeframe || String(condition.timeframe || "Not specified").slice(0, 40),
@@ -975,6 +1184,18 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
         || Boolean(normalizeExecutableParameters(conceptName, condition.parameters))
       ),
       authorization: recomputedAuthorization || preservedAuthorization,
+    };
+    return {
+      ...nextCondition,
+      ...universalRuleMetadata(
+        nextCondition,
+        nextCondition.conceptName,
+        nextCondition.parameters as Record<string, unknown> | null,
+        nextCondition.supported === true,
+        nextCondition.authorization?.matchedText || nextCondition.conceptName,
+        requestMessage || "",
+        conditionIndex,
+      ),
     };
   }).filter((condition: any) => {
     if (requestMessage && !condition.authorization) return false;
@@ -1039,6 +1260,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
     conceptsUsed,
     authorization: draftAuthorization(requestMessage || "", requestAuthorizations),
     riskManagementRules: normalizeRiskRules(draft.riskManagementRules, requestMessage),
+    riskRules: parseRiskRules(normalizeRiskRules(draft.riskManagementRules, requestMessage), requestMessage),
   };
   const compatibility = compatibilityForDraft(next);
   return {
@@ -1055,7 +1277,7 @@ function normalizeModelResponse(model: any, requestMessage = ""): any {
   if (!model || typeof model.reply !== "string" || !model.reply.trim()) return null;
   const draft = model.strategyDraft && typeof model.strategyDraft === "object" ? model.strategyDraft : null;
   const requestAuthorizations = requestedConceptAuthorizations(requestMessage);
-  const conditions = draft && Array.isArray(draft.conditions) ? draft.conditions.map((condition: any) => {
+  const conditions = draft && Array.isArray(draft.conditions) ? draft.conditions.map((condition: any, conditionIndex: number) => {
     const normalizedRule = normalizeConditionRule(condition);
     const rawConceptName = String(condition?.conceptName || "Assistant draft").slice(0, 160);
     const unsupportedConcept = unsupportedConceptForText(rawConceptName);
@@ -1067,7 +1289,7 @@ function normalizeModelResponse(model: any, requestMessage = ""): any {
         : null
     );
     const parameters = normalizeExecutableParameters(rawConceptName, executableInput);
-    return {
+    const nextCondition = {
       name: String(condition?.name || "Assistant condition").slice(0, 160),
       stage: ["entry", "confirmation", "invalidation", "exit"].includes(condition?.stage) ? condition.stage : "entry",
       requirement: condition?.requirement === "optional" ? "optional" : "required",
@@ -1090,6 +1312,18 @@ function normalizeModelResponse(model: any, requestMessage = ""): any {
         matchedText: "",
       },
     };
+    return {
+      ...nextCondition,
+      ...universalRuleMetadata(
+        nextCondition,
+        nextCondition.conceptName,
+        parameters as Record<string, unknown> | null,
+        nextCondition.supported,
+        nextCondition.authorization.matchedText,
+        requestMessage,
+        conditionIndex,
+      ),
+    };
   }).slice(0, 20) : [];
   const conceptsUsed = draft ? normalizeConcepts(draft.conceptsUsed, conditions) : [];
   const compatibility = draft
@@ -1104,6 +1338,7 @@ function normalizeModelResponse(model: any, requestMessage = ""): any {
     conditions,
     conceptsUsed,
     riskManagementRules: draft.riskManagementRules ? String(draft.riskManagementRules).slice(0, 400) : null,
+    riskRules: parseRiskRules(draft.riskManagementRules, requestMessage),
     authorization: draftAuthorization(requestMessage, requestAuthorizations),
     compatibility,
   } : null;

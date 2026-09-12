@@ -1069,6 +1069,7 @@ function AssistantDraftReview({ draft, action }: { draft: AssistantStrategyDraft
   const entryConditions = conditions.filter(condition => condition.stage === "entry" || condition.stage === "confirmation");
   const exitConditions = conditions.filter(condition => condition.stage === "exit" || condition.stage === "invalidation");
   const unsupported = draft.compatibility.unsupportedConditions;
+  const riskReview = draft.riskRules?.filter(rule => rule.executionStatus === "review_required") || [];
   return <section className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-4 md:p-5" data-testid="assistant-draft-builder-preview">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
       <div>
@@ -1090,6 +1091,15 @@ function AssistantDraftReview({ draft, action }: { draft: AssistantStrategyDraft
       <Summary label="Timeframes" value={draft.timeframes.length ? draft.timeframes.join(", ") : "Open"} />
       <Summary label="Risk rules" value={draft.riskManagementRules || "Not set"} />
     </div>
+    {draft.riskRules && draft.riskRules.length > 0 && <div className="mt-4 rounded-md border border-border p-3" data-testid="assistant-draft-risk-rules">
+      <div className="eyebrow">Canonical risk rules</div>
+      <div className="flex flex-wrap gap-2 mt-3">
+        {draft.riskRules.map((rule, index) => <span key={`${rule.type}-${rule.value}-${index}`} className={`tag ${rule.executionStatus === "executable" ? "tag-active" : "border-amber-500/40 text-amber-200"}`}>
+          {rule.type.replaceAll("_", " ")}{rule.value == null ? "" : ` · ${rule.value}${rule.unit === "percent" ? "%" : rule.unit === "r" ? "R" : ""}`}
+        </span>)}
+      </div>
+      {riskReview.length > 0 && <p className="text-[11px] text-amber-200 mt-2 leading-relaxed">{riskReview.flatMap(rule => rule.validation.reasons).join(" ")}</p>}
+    </div>}
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
       <div className="rounded-md border border-border p-3" data-testid="assistant-draft-entry-conditions">
         <div className="eyebrow">Entry conditions</div>
@@ -1109,15 +1119,27 @@ function AssistantDraftReview({ draft, action }: { draft: AssistantStrategyDraft
 }
 
 function DraftCondition({ condition }: { condition: AssistantStrategyDraft["conditions"][number] }) {
+  const reviewRequired = condition.executionStatus === "review_required"
+    || condition.validation?.valid === false
+    || condition.supported === false;
+  const typedParameters = condition.parameters && typeof condition.parameters === "object"
+    ? JSON.stringify(condition.parameters)
+    : null;
   return <div className="rounded-md bg-secondary/50 p-3">
     <div className="flex flex-wrap items-center gap-2">
       <span className="tag tag-active">{condition.stage}</span>
       <span className="tag tag-draft">{condition.requirement}</span>
-      {!condition.supported && <span className="tag border-amber-500/40 text-amber-200">{condition.ruleSupported ? "Concept review" : "Rule review"}</span>}
+      <span className={`tag ${reviewRequired ? "border-amber-500/40 text-amber-200" : "tag-active"}`}>
+        {reviewRequired ? "Review required" : "Executable"}
+      </span>
     </div>
     <div className="text-xs font-semibold mt-2">{condition.name}</div>
-    <div className="text-[11px] text-primary mt-1">{condition.conceptName} · {condition.direction}</div>
+    <div className="text-[11px] text-primary mt-1">{condition.conceptName} · {condition.direction} · {condition.canonicalRuleType || "legacy rule"} · {condition.timeframe}</div>
+    {typedParameters && <div className="text-[10px] text-muted-foreground mt-2 break-all">Parameters: {typedParameters}</div>}
+    {condition.relationship && <div className="text-[10px] text-primary mt-1">Relationship: {condition.relationship.type.replaceAll("_", " ")}{condition.relationship.targetRuleIndex == null ? "" : ` → rule ${condition.relationship.targetRuleIndex + 1}`} · {condition.relationship.supported ? "executable" : "review required"}</div>}
+    {condition.provenance?.detectedText && <div className="text-[10px] text-muted-foreground mt-1">Detected: “{condition.provenance.detectedText}” · source: {condition.provenance.source}</div>}
     <div className="text-[11px] text-muted-foreground mt-2 leading-relaxed">{condition.triggerRules}</div>
+    {condition.validation?.reasons?.length ? <div className="text-[10px] text-amber-200 mt-2 leading-relaxed">{condition.validation.reasons.join(" ")}</div> : null}
   </div>;
 }
 
