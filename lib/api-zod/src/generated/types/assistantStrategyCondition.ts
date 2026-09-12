@@ -5,6 +5,7 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { AssistantStrategyConditionAuthorization } from './assistantStrategyConditionAuthorization';
 import type { AssistantStrategyConditionDirection } from './assistantStrategyConditionDirection';
 import type { AssistantStrategyConditionParameters } from './assistantStrategyConditionParameters';
 import type { AssistantStrategyConditionRequirement } from './assistantStrategyConditionRequirement';
@@ -22,4 +23,5 @@ export interface AssistantStrategyCondition {
   parameters: AssistantStrategyConditionParameters;
   ruleSupported: boolean;
   supported?: boolean;
+  authorization: AssistantStrategyConditionAuthorization;
 }

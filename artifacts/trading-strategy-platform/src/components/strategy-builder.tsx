@@ -352,7 +352,7 @@ function StrategyForm({ strategy, markets, concepts, timeframes, onClose, onSave
       alertRules: String(form.get("alertRules") || "") || null,
     };
      const initialConditions = !strategy && initialDraft
-       ? initialDraft.conditions.flatMap(condition => {
+       ? authorizedDraftConditions(initialDraft).flatMap(condition => {
          const concept = concepts.find(item => item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase());
          if (!concept) return [];
          return [{
@@ -999,9 +999,24 @@ function ConceptsCard({ concepts }: { concepts: TradingConcept[] }) {
   </Panel>;
 }
 
+function isAuthorizedDraftCondition(draft: AssistantStrategyDraft, condition: AssistantStrategyDraft["conditions"][number]) {
+  const authorization = condition.authorization;
+  if (!authorization || authorization.source !== "user_request" || !authorization.matchedText) return false;
+  return draft.authorization.originalRequest.length > 0
+    && draft.authorization.requestedConcepts.some(requested =>
+      requested.requestedConcept === authorization.requestedConcept
+      && requested.matchedText === authorization.matchedText,
+    );
+}
+
+function authorizedDraftConditions(draft: AssistantStrategyDraft) {
+  return draft.conditions.filter(condition => isAuthorizedDraftCondition(draft, condition));
+}
+
 function AssistantDraftReview({ draft, action }: { draft: AssistantStrategyDraft; action: "review" | "save-version" }) {
-  const entryConditions = draft.conditions.filter(condition => condition.stage === "entry" || condition.stage === "confirmation");
-  const exitConditions = draft.conditions.filter(condition => condition.stage === "exit" || condition.stage === "invalidation");
+  const conditions = authorizedDraftConditions(draft);
+  const entryConditions = conditions.filter(condition => condition.stage === "entry" || condition.stage === "confirmation");
+  const exitConditions = conditions.filter(condition => condition.stage === "exit" || condition.stage === "invalidation");
   const unsupported = draft.compatibility.unsupportedConditions;
   return <section className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-4 md:p-5" data-testid="assistant-draft-builder-preview">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -1095,7 +1110,7 @@ export function StrategyBuilder() {
   const savedStrategy = (strategy: Strategy) => {
     setSelectedStrategyId(strategy.id);
     if (!assistantDraft) return;
-    const unmatched = assistantDraft.conditions.filter(condition =>
+    const unmatched = authorizedDraftConditions(assistantDraft).filter(condition =>
       !concepts.data?.some(item => item.name.trim().toLowerCase() === condition.conceptName.trim().toLowerCase()),
     );
     queryClient.invalidateQueries({ queryKey: getListStrategyConditionsQueryKey(strategy.id) });

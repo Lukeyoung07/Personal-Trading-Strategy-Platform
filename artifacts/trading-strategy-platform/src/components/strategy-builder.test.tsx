@@ -18,6 +18,36 @@ const state = vi.hoisted(() => ({
   },
 }));
 
+function authorizedDraft<T extends { conditions?: any[] }>(draft: T) {
+  const conditions = Array.isArray(draft.conditions) ? draft.conditions : [];
+  const requestedConcepts = [...new Map(conditions.map(condition => [
+    condition.conceptName,
+    {
+      requestedConcept: condition.conceptName,
+      canonicalConcept: condition.conceptName,
+      matchedText: condition.conceptName,
+      supported: condition.supported !== false,
+    },
+  ])).values()];
+  return {
+    ...draft,
+    conditions: conditions.map(condition => ({
+      ...condition,
+      authorization: {
+        source: "user_request",
+        status: condition.supported === false ? "review_required" : "explicit",
+        requestedConcept: condition.conceptName,
+        canonicalConcept: condition.conceptName,
+        matchedText: condition.conceptName,
+      },
+    })),
+    authorization: {
+      originalRequest: "Test strategy request",
+      requestedConcepts,
+    },
+  };
+}
+
 vi.mock("@workspace/api-client-react", () => ({
   getGetDashboardSummaryQueryKey: () => ["dashboard-summary"],
   getListMarketsQueryKey: () => ["markets"],
@@ -115,7 +145,7 @@ describe("StrategyBuilder", () => {
         status: "available",
         provider: "openrouter/free",
         reply: "The requested concepts were mapped to the current library.",
-        strategyDraft: {
+         strategyDraft: authorizedDraft({
           name: "Gold Liquidity Reversal",
           description: "A reversal hypothesis.",
           direction: "both",
@@ -129,7 +159,7 @@ describe("StrategyBuilder", () => {
           conceptsUsed: [{ name: "Invented Filter", supported: false, explanation: "Needs review." }],
           riskManagementRules: "risk: 1%; risk/reward: 2R",
           compatibility: { compatible: false, unsupportedConditions: ["Unmapped filter", "Invented Filter"] },
-        },
+         }),
       });
     });
 
@@ -198,7 +228,7 @@ describe("StrategyBuilder", () => {
     state.strategies = [strategy];
     state.markets = [{ id: 25, symbol: "XAUUSD", assetClass: "metals" }];
     window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=save-version");
-    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(authorizedDraft(draft)));
 
     render(<StrategyBuilder />);
 
@@ -236,7 +266,7 @@ describe("StrategyBuilder", () => {
       options.onSuccess?.({ ...strategy, id: 9, name: "Momentum handoff" });
     });
     window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=review");
-    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(authorizedDraft(draft)));
 
     render(<StrategyBuilder />);
     fireEvent.click(screen.getByTestId("button-save-builder-strategy"));
@@ -276,7 +306,7 @@ describe("StrategyBuilder", () => {
     };
     state.markets = [{ id: 25, symbol: "XAUUSD", assetClass: "metals" }];
     window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=review");
-    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(authorizedDraft(draft)));
 
     render(<StrategyBuilder />);
 
@@ -305,7 +335,7 @@ describe("StrategyBuilder", () => {
     const view = render(<StrategyBuilder />);
 
     expect(screen.getByTestId("input-builder-strategy-name")).toHaveValue("");
-    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(authorizedDraft(draft)));
     window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=review");
     view.rerender(<StrategyBuilder />);
 
@@ -326,7 +356,7 @@ describe("StrategyBuilder", () => {
       compatibility: { compatible: true, unsupportedConditions: [] },
     };
     window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=review");
-    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(authorizedDraft(draft)));
     const view = render(<StrategyBuilder />);
 
     expect(screen.getByTestId("select-builder-market")).toHaveValue("");

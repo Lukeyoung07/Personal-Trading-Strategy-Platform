@@ -807,4 +807,241 @@ Risk/Reward: 2:1`,
       testCase.verify(response);
     }
   });
+
+  it("rejects every model-suggested concept that is not authorized by a simple request", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the requested RSI strategy.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "RSI strategy",
+              description: "A simple oversold setup.",
+              direction: "long",
+              marketSymbol: "XAUUSD",
+              timeframes: ["15m"],
+              conditions: [
+                { name: "RSI below 30", stage: "entry", requirement: "required", conceptName: "RSI", timeframe: "15m", direction: "long", triggerRules: "RSI below 30" },
+                { name: "FVG retest", stage: "confirmation", requirement: "required", conceptName: "FVG", timeframe: "15m", direction: "long", triggerRules: "Fair Value Gap retest" },
+                { name: "Liquidity sweep", stage: "confirmation", requirement: "required", conceptName: "Liquidity Sweep", timeframe: "15m", direction: "long", triggerRules: "close back inside" },
+                { name: "Order block", stage: "confirmation", requirement: "required", conceptName: "Order Block", timeframe: "15m", direction: "long", triggerRules: "order block retest" },
+              ],
+              conceptsUsed: [
+                { name: "RSI", supported: true, explanation: "Requested." },
+                { name: "Fair Value Gap", supported: true, explanation: "Model suggestion." },
+                { name: "Liquidity Sweep", supported: true, explanation: "Model suggestion." },
+                { name: "Order Block", supported: false, explanation: "Model suggestion." },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const message = "Build a 15m XAUUSD long strategy using RSI below 30.";
+    const response = await answerAssistant({
+      message,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions).toHaveLength(1);
+    expect(response.strategyDraft?.conditions[0]).toMatchObject({
+      conceptName: "RSI",
+      parameters: { indicator: "rsi", comparison: "below", threshold: 30 },
+      authorization: {
+        source: "user_request",
+        status: "explicit",
+        requestedConcept: "RSI",
+        canonicalConcept: "RSI",
+        matchedText: "RSI",
+      },
+    });
+    expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).toEqual(["RSI"]);
+    expect(response.strategyDraft?.authorization).toEqual({
+      originalRequest: message,
+      requestedConcepts: [{
+        requestedConcept: "RSI",
+        canonicalConcept: "RSI",
+        matchedText: "RSI",
+        supported: true,
+      }],
+    });
+  });
+
+  it("keeps complex multi-concept drafts limited to explicitly requested ICT and SMC concepts", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared the multi-timeframe strategy.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "Structure and FVG strategy",
+              description: "A higher-timeframe structure setup with a lower-timeframe retest.",
+              direction: "long",
+              marketSymbol: "XAUUSD",
+              timeframes: ["1H", "5m"],
+              conditions: [
+                { name: "MSS", stage: "entry", requirement: "required", conceptName: "MSS", timeframe: "1H", direction: "long", triggerRules: "market structure shift" },
+                { name: "FVG retest", stage: "confirmation", requirement: "required", conceptName: "FVG Retest", timeframe: "5m", direction: "long", triggerRules: "retest" },
+                { name: "SMT divergence", stage: "confirmation", requirement: "required", conceptName: "SMT Divergence", timeframe: "5m", direction: "long", triggerRules: "correlation divergence" },
+                { name: "Order block retest", stage: "confirmation", requirement: "required", conceptName: "Order Block Retest", timeframe: "5m", direction: "long", triggerRules: "retest" },
+                { name: "Premium", stage: "confirmation", requirement: "optional", conceptName: "Premium", timeframe: "1H", direction: "long", triggerRules: "premium range" },
+                { name: "Liquidity sweep", stage: "confirmation", requirement: "optional", conceptName: "Liquidity Sweep", timeframe: "5m", direction: "long", triggerRules: "close back inside" },
+              ],
+              conceptsUsed: [
+                { name: "MSS", supported: true, explanation: "Requested." },
+                { name: "FVG", supported: true, explanation: "Requested." },
+                { name: "SMT Divergence", supported: false, explanation: "Suggested." },
+                { name: "Order Block", supported: false, explanation: "Suggested." },
+                { name: "Premium", supported: true, explanation: "Suggested." },
+                { name: "Liquidity Sweep", supported: true, explanation: "Suggested." },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const message = "Create a 1H market structure shift with a 5m Fair Value Gap retest strategy for XAUUSD.";
+    const response = await answerAssistant({
+      message,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual([
+      "Market Structure Shift",
+      "Fair Value Gap",
+    ]);
+    expect(response.strategyDraft?.conditions.every(condition =>
+      condition.authorization.source === "user_request"
+      && condition.authorization.status === "explicit",
+    )).toBe(true);
+    expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).toEqual(expect.arrayContaining([
+      "Market Structure Shift",
+      "Fair Value Gap",
+      "Multi-timeframe analysis",
+    ]));
+    expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).not.toEqual(expect.arrayContaining([
+      "SMT Divergence",
+      "Order Block",
+      "Premium",
+      "Liquidity Sweep",
+    ]));
+    expect(response.strategyDraft?.authorization.originalRequest).toBe(message);
+  });
+
+  it("preserves an explicitly requested unsupported concept only as review-required", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "SMT divergence needs review before it can be backtested.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "SMT strategy",
+              description: "A requested unsupported concept.",
+              direction: "both",
+              marketSymbol: "XAUUSD",
+              timeframes: ["5m"],
+              conditions: [
+                { name: "SMT divergence", stage: "entry", requirement: "required", conceptName: "SMT Divergence", timeframe: "5m", direction: "both", triggerRules: "correlated market divergence" },
+                { name: "FVG", stage: "confirmation", requirement: "required", conceptName: "FVG", timeframe: "5m", direction: "both", triggerRules: "retest" },
+                { name: "BOS", stage: "confirmation", requirement: "required", conceptName: "BOS", timeframe: "5m", direction: "both", triggerRules: "break of structure" },
+              ],
+              conceptsUsed: [
+                { name: "SMT Divergence", supported: false, explanation: "Requested." },
+                { name: "FVG", supported: true, explanation: "Suggested." },
+                { name: "BOS", supported: true, explanation: "Suggested." },
+              ],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const message = "Build a strategy using SMT divergence.";
+    const response = await answerAssistant({
+      message,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions).toHaveLength(1);
+    expect(response.strategyDraft?.conditions[0]).toMatchObject({
+      conceptName: "SMT Divergence",
+      supported: false,
+      authorization: {
+        source: "user_request",
+        status: "review_required",
+        requestedConcept: "SMT Divergence",
+        canonicalConcept: "SMT Divergence",
+        matchedText: "SMT divergence",
+      },
+    });
+    expect(response.strategyDraft?.compatibility.compatible).toBe(false);
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("SMT Divergence");
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).not.toEqual(expect.arrayContaining([
+      "Fair Value Gap",
+      "Break of Structure",
+    ]));
+  });
+
+  it("authorizes arbitrary unsupported concepts only when their exact phrase appears in the request", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            reply: "Prepared a review-required volatility squeeze draft.",
+            intent: "strategy_proposal",
+            strategyDraft: {
+              name: "Volatility squeeze strategy",
+              description: "A custom unsupported concept.",
+              direction: "long",
+              marketSymbol: null,
+              timeframes: ["15m"],
+              conditions: [
+                { name: "Volatility squeeze", stage: "entry", requirement: "required", conceptName: "Volatility Squeeze", timeframe: "15m", direction: "long", triggerRules: "custom model rule" },
+                { name: "Volatility squeeze retest", stage: "confirmation", requirement: "required", conceptName: "Volatility Squeeze Retest", timeframe: "15m", direction: "long", triggerRules: "custom model rule" },
+                { name: "SMT divergence", stage: "confirmation", requirement: "optional", conceptName: "SMT Divergence", timeframe: "15m", direction: "long", triggerRules: "custom model rule" },
+              ],
+              conceptsUsed: [],
+              riskManagementRules: null,
+            },
+          }),
+        },
+      }],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+
+    const message = "Build a 15m long strategy using volatility squeeze.";
+    const response = await answerAssistant({
+      message,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions).toHaveLength(1);
+    expect(response.strategyDraft?.conditions[0]).toMatchObject({
+      conceptName: "Volatility Squeeze",
+      supported: false,
+      authorization: {
+        source: "user_request",
+        status: "review_required",
+        requestedConcept: "volatility squeeze",
+        matchedText: "volatility squeeze",
+      },
+    });
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).not.toContain("Volatility Squeeze Retest");
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).not.toContain("SMT Divergence");
+  });
 });

@@ -2802,7 +2802,7 @@ components:
           $ref: "#/components/schemas/AssistantContext"
     AssistantStrategyCondition:
       type: object
-      required: [name, stage, requirement, conceptName, timeframe, direction, triggerRules, parameters, ruleSupported]
+      required: [name, stage, requirement, conceptName, timeframe, direction, triggerRules, parameters, ruleSupported, authorization]
       properties:
         name: { type: string }
         stage:
@@ -2820,6 +2820,17 @@ components:
         parameters: { type: ["object", "null"], additionalProperties: true }
         ruleSupported: { type: boolean }
         supported: { type: boolean }
+        authorization:
+          $ref: "#/components/schemas/AssistantStrategyConditionAuthorization"
+    AssistantStrategyConditionAuthorization:
+      type: object
+      required: [source, status, requestedConcept, canonicalConcept, matchedText]
+      properties:
+        source: { type: string, enum: [user_request] }
+        status: { type: string, enum: [explicit, required_for_concept, review_required] }
+        requestedConcept: { type: string }
+        canonicalConcept: { type: string }
+        matchedText: { type: string }
     AssistantCompatibility:
       type: object
       required: [compatible, unsupportedConditions]
@@ -2837,7 +2848,7 @@ components:
         explanation: { type: string }
     AssistantStrategyDraft:
       type: object
-      required: [name, description, direction, marketSymbol, timeframes, conditions, riskManagementRules, compatibility]
+      required: [name, description, direction, marketSymbol, timeframes, conditions, riskManagementRules, authorization, compatibility]
       properties:
         name: { type: string }
         description: { type: string }
@@ -2857,8 +2868,27 @@ components:
           items:
             $ref: "#/components/schemas/AssistantConceptReference"
         riskManagementRules: { type: ["string", "null"] }
+        authorization:
+          $ref: "#/components/schemas/AssistantStrategyDraftAuthorization"
         compatibility:
           $ref: "#/components/schemas/AssistantCompatibility"
+    AssistantStrategyDraftAuthorization:
+      type: object
+      required: [originalRequest, requestedConcepts]
+      properties:
+        originalRequest: { type: string }
+        requestedConcepts:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssistantStrategyDraftAuthorizationConcept"
+    AssistantStrategyDraftAuthorizationConcept:
+      type: object
+      required: [requestedConcept, canonicalConcept, matchedText, supported]
+      properties:
+        requestedConcept: { type: string }
+        canonicalConcept: { type: string }
+        matchedText: { type: string }
+        supported: { type: boolean }
     AssistantBacktestSetup:
       type: object
       required: [strategyId, versionId, instrumentId, timeframeId, startDate, endDate]

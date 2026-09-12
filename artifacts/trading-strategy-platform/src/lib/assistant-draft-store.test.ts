@@ -11,6 +11,10 @@ const draft = {
   conditions: [],
   conceptsUsed: [],
   riskManagementRules: null,
+  authorization: {
+    originalRequest: "Storage test request",
+    requestedConcepts: [],
+  },
   compatibility: { compatible: false, unsupportedConditions: ["Review required"] },
 } as AssistantStrategyDraft;
 
@@ -27,7 +31,7 @@ describe("assistant draft storage", () => {
     sessionStorage.clear();
   });
 
-  it("stores a validated, expiring envelope while preserving legacy raw drafts", () => {
+  it("stores only drafts carrying their original request authorization", () => {
     setPendingAssistantDraft(draft);
     const stored = JSON.parse(sessionStorage.getItem("assistant-strategy-draft") || "{}");
     expect(stored.draft.name).toBe(draft.name);
@@ -35,6 +39,12 @@ describe("assistant draft storage", () => {
 
     sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
     expect(getPendingAssistantDraft()).toEqual(draft);
+
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify({
+      ...draft,
+      authorization: undefined,
+    }));
+    expect(getPendingAssistantDraft()).toBeNull();
   });
 
   it("clears corrupt, oversized, and expired storage instead of trusting it", () => {

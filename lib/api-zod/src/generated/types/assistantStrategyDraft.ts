@@ -8,6 +8,7 @@
 import type { AssistantCompatibility } from './assistantCompatibility';
 import type { AssistantConceptReference } from './assistantConceptReference';
 import type { AssistantStrategyCondition } from './assistantStrategyCondition';
+import type { AssistantStrategyDraftAuthorization } from './assistantStrategyDraftAuthorization';
 import type { AssistantStrategyDraftDirection } from './assistantStrategyDraftDirection';
 
 export interface AssistantStrategyDraft {
@@ -21,5 +22,6 @@ export interface AssistantStrategyDraft {
   conceptsUsed?: AssistantConceptReference[];
   /** @nullable */
   riskManagementRules: string | null;
+  authorization: AssistantStrategyDraftAuthorization;
   compatibility: AssistantCompatibility;
 }

@@ -2265,6 +2265,30 @@ export const AssistantStrategyConditionDirection = {
  */
 export type AssistantStrategyConditionParameters = { [key: string]: unknown } | null;
 
+export type AssistantStrategyConditionAuthorizationSource = typeof AssistantStrategyConditionAuthorizationSource[keyof typeof AssistantStrategyConditionAuthorizationSource];
+
+
+export const AssistantStrategyConditionAuthorizationSource = {
+  user_request: 'user_request',
+} as const;
+
+export type AssistantStrategyConditionAuthorizationStatus = typeof AssistantStrategyConditionAuthorizationStatus[keyof typeof AssistantStrategyConditionAuthorizationStatus];
+
+
+export const AssistantStrategyConditionAuthorizationStatus = {
+  explicit: 'explicit',
+  required_for_concept: 'required_for_concept',
+  review_required: 'review_required',
+} as const;
+
+export interface AssistantStrategyConditionAuthorization {
+  source: AssistantStrategyConditionAuthorizationSource;
+  status: AssistantStrategyConditionAuthorizationStatus;
+  requestedConcept: string;
+  canonicalConcept: string;
+  matchedText: string;
+}
+
 export interface AssistantStrategyCondition {
   name: string;
   stage: AssistantStrategyConditionStage;
@@ -2277,6 +2301,7 @@ export interface AssistantStrategyCondition {
   parameters: AssistantStrategyConditionParameters;
   ruleSupported: boolean;
   supported?: boolean;
+  authorization: AssistantStrategyConditionAuthorization;
 }
 
 export interface AssistantCompatibility {
@@ -2299,6 +2324,18 @@ export const AssistantStrategyDraftDirection = {
   both: 'both',
 } as const;
 
+export interface AssistantStrategyDraftAuthorizationConcept {
+  requestedConcept: string;
+  canonicalConcept: string;
+  matchedText: string;
+  supported: boolean;
+}
+
+export interface AssistantStrategyDraftAuthorization {
+  originalRequest: string;
+  requestedConcepts: AssistantStrategyDraftAuthorizationConcept[];
+}
+
 export interface AssistantStrategyDraft {
   name: string;
   description: string;
@@ -2310,6 +2347,7 @@ export interface AssistantStrategyDraft {
   conceptsUsed?: AssistantConceptReference[];
   /** @nullable */
   riskManagementRules: string | null;
+  authorization: AssistantStrategyDraftAuthorization;
   compatibility: AssistantCompatibility;
 }
 

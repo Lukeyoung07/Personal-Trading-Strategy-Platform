@@ -5,4 +5,5 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+
 export type StrategyMonitorMarketDataState = 'live' | 'stale' | 'market_closed' | 'disconnected' | 'missing' | 'error' | 'ambiguous';

@@ -36,6 +36,32 @@ type AssistantInput = typeof ChatAssistantBody._output;
 type AssistantContext = AssistantInput["context"];
 type AssistantResponse = typeof ChatAssistantResponse._output;
 
+type RequestedConceptAuthorization = {
+  requestedConcept: string;
+  canonicalConcept: string;
+  matchedText: string;
+  supported: boolean;
+  explanation: string;
+};
+
+type ConditionAuthorization = {
+  source: "user_request";
+  status: "explicit" | "required_for_concept" | "review_required";
+  requestedConcept: string;
+  canonicalConcept: string;
+  matchedText: string;
+};
+
+type DraftAuthorization = {
+  originalRequest: string;
+  requestedConcepts: Array<{
+    requestedConcept: string;
+    canonicalConcept: string;
+    matchedText: string;
+    supported: boolean;
+  }>;
+};
+
 function supportedRule(rule: string | null | undefined) {
   const normalized = normalizeSupportedRule(rule);
   if (!normalized) return false;
@@ -177,7 +203,11 @@ function compatibilityForDraft(draft: any) {
       !supportedRule(normalizeConditionRule(condition))
       && !normalizeExecutableParameters(condition?.conceptName, condition?.parameters)
     ))
-    .map((condition: any) => String(condition?.name || condition?.triggerRules || "Unnamed condition"));
+    .map((condition: any) => String(
+      condition?.authorization?.status === "review_required"
+        ? condition.authorization.canonicalConcept || condition.authorization.requestedConcept
+        : condition?.name || condition?.triggerRules || "Unnamed condition",
+    ));
   const unsupportedConcepts = Array.isArray(draft?.conceptsUsed)
     ? draft.conceptsUsed
       .filter((concept: any) => concept && concept.supported === false)
@@ -248,11 +278,12 @@ function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName
 }
 
 function conceptsRequestedInMessage(message: string) {
-  const requested: Array<{ name: string; supported: boolean; explanation: string }> = [];
+  const requested: Array<{ name: string; supported: boolean; explanation: string; matchedText: string }> = [];
   const seen = new Set<string>();
   for (const concept of UNSUPPORTED_CONCEPTS) {
     if (concept.name === "Retest" && /(?:fvg|fair\s+value\s+gap)[^.!?]{0,60}\bretests?\b/i.test(message)) continue;
-    if (!concept.pattern.test(message) || seen.has(concept.name)) continue;
+    const match = message.match(concept.pattern);
+    if (!match || seen.has(concept.name)) continue;
     const executableKind = executableConceptKind(concept.name);
     if (executableKind) {
        const name = executableConceptLabel(concept.name) || EXECUTABLE_CONCEPT_DEFINITIONS[executableKind].label;
@@ -262,6 +293,7 @@ function conceptsRequestedInMessage(message: string) {
         name,
         supported: true,
         explanation: "Mapped to the existing structured executable concept definition.",
+        matchedText: match[0],
       });
       continue;
     }
@@ -272,48 +304,78 @@ function conceptsRequestedInMessage(message: string) {
       explanation: concept.name === "Multi-timeframe analysis"
         ? "The engine evaluates each executable condition on its configured timeframe and aligns completed candles without look-ahead."
         : concept.explanation || "Understood by the assistant, but not currently executable by historical backtesting.",
+      matchedText: match[0],
     });
   }
   if (/\bhigher[- ]timeframe\b|\blower[- ]timeframe\b|\b\d+\s*h\b.*\b\d+\s*m\b|\bmulti[- ]timeframe\b/i.test(message) && !seen.has("Multi-timeframe analysis")) {
+    const match = message.match(/\bhigher[- ]timeframe\b|\blower[- ]timeframe\b|\b\d+\s*h\b.*\b\d+\s*m\b|\bmulti[- ]timeframe\b/i);
     requested.push({
       name: "Multi-timeframe analysis",
       supported: true,
       explanation: "The engine evaluates each executable condition on its configured timeframe and aligns completed candles without look-ahead.",
+      matchedText: match?.[0] || "multi-timeframe",
     });
   }
   return requested;
 }
 
+const REQUESTED_EXECUTABLE_CONCEPT_PATTERNS: Array<[RegExp, string]> = [
+  [/\bliquidity\s+sweep(?:s|ed|ing)?\b/i, "Liquidity Sweep"],
+  [/\b(?:fvg|fair\s+value\s+gap)(?:s|es)?\b/i, "Fair Value Gap"],
+  [/\b(?:bos|break of structure)\b/i, "Break of Structure"],
+  [/\b(?:choch|change of character)\b/i, "Change of Character"],
+  [/\b(?:mss|market structure shift)\b/i, "Market Structure Shift"],
+  [/\b(?:bullish|bearish)\s+(?:higher[- ]timeframe\s+)?structure\b/i, "Market Structure Shift"],
+  [/\b(?:bullish|bearish)\s+candle\b|\bcandle\s+(?:direction|strategy)\b/i, "Candle Direction"],
+  [/\b(?:ema|exponential moving average)\b/i, "EMA"],
+  [/\b(?:sma|simple moving average)\b/i, "SMA"],
+  [/\brsi\b/i, "RSI"],
+  [/\bmacd\b/i, "MACD"],
+  [/\bvwap\b/i, "VWAP"],
+  [/\batr|average true range\b/i, "ATR"],
+  [/\bbullish engulfing\b/i, "Bullish Engulfing"],
+  [/\bbearish engulfing\b/i, "Bearish Engulfing"],
+  [/\bpin bar\b/i, "Pin Bar"],
+  [/\binside bar\b/i, "Inside Bar"],
+  [/\bbreakout(?:\s+retest)?\b/i, "Breakout"],
+  [/\bprevious day high\b/i, "Previous Day High"],
+  [/\bprevious day low\b/i, "Previous Day Low"],
+  [/\bprevious week high\b/i, "Previous Week High"],
+  [/\bprevious week low\b/i, "Previous Week Low"],
+  [/\bequal highs?\b/i, "Equal Highs"],
+  [/\bequal lows?\b/i, "Equal Lows"],
+];
+
+function requestedExecutableConceptMatches(message: string) {
+  return REQUESTED_EXECUTABLE_CONCEPT_PATTERNS.flatMap(([pattern, name]) => {
+    const match = message.match(pattern);
+    return match ? [{ name, matchedText: match[0] }] : [];
+  });
+}
+
 function requestedExecutableConcepts(message: string) {
   const requested: string[] = [];
-  const concepts: Array<[RegExp, string]> = [
-    [/\bliquidity\s+sweep(?:s|ed|ing)?\b/i, "Liquidity Sweep"],
-    [/\b(?:fvg|fair\s+value\s+gap)(?:s|es)?\b/i, "Fair Value Gap"],
-    [/\b(?:bos|break of structure)\b/i, "Break of Structure"],
-    [/\b(?:choch|change of character)\b/i, "Change of Character"],
-    [/\b(?:mss|market structure shift)\b/i, "Market Structure Shift"],
-    [/\b(?:bullish|bearish)\s+(?:higher[- ]timeframe\s+)?structure\b/i, "Market Structure Shift"],
-    [/\b(?:bullish|bearish)\s+candle\b|\bcandle\s+(?:direction|strategy)\b/i, "Candle Direction"],
-    [/\b(?:ema|exponential moving average)\b/i, "EMA"],
-    [/\b(?:sma|simple moving average)\b/i, "SMA"],
-    [/\brsi\b/i, "RSI"],
-    [/\bmacd\b/i, "MACD"],
-    [/\bvwap\b/i, "VWAP"],
-    [/\batr|average true range\b/i, "ATR"],
-    [/\bbullish engulfing\b/i, "Bullish Engulfing"],
-    [/\bbearish engulfing\b/i, "Bearish Engulfing"],
-    [/\bpin bar\b/i, "Pin Bar"],
-    [/\binside bar\b/i, "Inside Bar"],
-    [/\bbreakout(?:\s+retest)?\b/i, "Breakout"],
-    [/\bprevious day high\b/i, "Previous Day High"],
-    [/\bprevious day low\b/i, "Previous Day Low"],
-    [/\bprevious week high\b/i, "Previous Week High"],
-    [/\bprevious week low\b/i, "Previous Week Low"],
-    [/\bequal highs?\b/i, "Equal Highs"],
-    [/\bequal lows?\b/i, "Equal Lows"],
-  ];
-  for (const [pattern, name] of concepts) if (pattern.test(message) && !requested.includes(name)) requested.push(name);
+  for (const { name } of requestedExecutableConceptMatches(message)) if (!requested.includes(name)) requested.push(name);
   return requested;
+}
+
+function explicitConceptPhraseMatches(message: string) {
+  const matches: string[] = [];
+  const add = (value: string) => {
+    const cleaned = value
+      .replace(/^[\s,;:.-]*(?:a|an|the|my|this)\s+/i, "")
+      .replace(/^\d+(?:\.\d+)?\s*(?:m|min|minute|h|hr|hour|d|day|w|week)s?\s+/i, "")
+      .replace(/\s+(?:strategy|setup|system|process|confirmation|entry|condition|rules?)\s*$/i, "")
+      .trim();
+    if (!cleaned || cleaned.length < 3 || cleaned.length > 80) return;
+    if (/^(?:strategy|setup|system|rules?|risk management|long|short|both|directions?|bullish|bearish|explicit|required|optional|entry|exit|confirmation|invalidation|condition)(?:\s+(?:strategy|setup|system|rules?|directions?|entry|exit|confirmation|invalidation|condition))?$/i.test(cleaned)) return;
+    if (!matches.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) matches.push(cleaned);
+  };
+  for (const match of message.matchAll(/\b(?:concept|condition)\s*:\s*([^\n;]+)/gi)) add(match[1]);
+  for (const match of message.matchAll(/\b(?:using|with|based on|including|combining with|combined with)\s+([^.!?\n]+)/gi)) {
+    for (const phrase of match[1].split(/\s+(?:and|then|followed by|plus|with)\s+|[,;]/i)) add(phrase);
+  }
+  return matches;
 }
 
 function exactHtfBiasRetestRequest(message: string) {
@@ -328,13 +390,22 @@ function requestTimeframeValues(message: string) {
     .map(match => match[0].replace(/\s+/g, "").toUpperCase());
 }
 
-function mappedHtfBiasRetestConditions(conditions: any[], message: string) {
+function mappedHtfBiasRetestConditions(
+  conditions: any[],
+  message: string,
+  authorizations: RequestedConceptAuthorization[],
+) {
   if (!exactHtfBiasRetestRequest(message)) return null;
   const requestedTimeframes = requestTimeframeValues(message);
   const htfCondition = conditions.find(condition => /\b(?:htf|higher[- ]timeframe|bias|structure)\b/i.test(`${condition?.name || ""} ${condition?.conceptName || ""}`));
   const fvgCondition = conditions.find(condition => /\b(?:fvg|fair\s+value\s+gap|retest)\b/i.test(`${condition?.name || ""} ${condition?.conceptName || ""} ${condition?.triggerRules || ""}`));
   const higherTimeframe = String(htfCondition?.timeframe || requestedTimeframes[0] || "1H");
   const lowerTimeframe = String(fvgCondition?.timeframe || requestedTimeframes[1] || requestedTimeframes[0] || "5M");
+  const structureAuthorization = authorizations.find(authorization =>
+    ["higher timeframe bias", "market structure shift"].includes(catalogKey(authorization.canonicalConcept)),
+  );
+  const fvgAuthorization = authorizations.find(authorization => catalogKey(authorization.canonicalConcept) === "fair value gap");
+  if (!structureAuthorization || !fvgAuthorization) return null;
   const sides = [
     { direction: "long", polarity: "bullish", label: "Bullish" },
     { direction: "short", polarity: "bearish", label: "Bearish" },
@@ -363,6 +434,11 @@ function mappedHtfBiasRetestConditions(conditions: any[], message: string) {
         parameters: structureParameters,
         ruleSupported: Boolean(structureParameters),
         supported: Boolean(structureParameters),
+        authorization: conditionAuthorization(
+          { conceptName: "Market Structure Shift" },
+          authorizations,
+          { requestedConcept: structureAuthorization.requestedConcept, status: "required_for_concept" },
+        ),
       },
       {
         name: `${side.label} Fair Value Gap Retest`,
@@ -375,6 +451,7 @@ function mappedHtfBiasRetestConditions(conditions: any[], message: string) {
         parameters: fvgParameters,
         ruleSupported: Boolean(fvgParameters),
         supported: Boolean(fvgParameters),
+        authorization: conditionAuthorization({ conceptName: "Fair Value Gap" }, authorizations),
       },
     ];
   });
@@ -412,19 +489,112 @@ function requestedConceptNames(message: string) {
   });
 }
 
+function canonicalConceptName(value: string) {
+  const normalized = String(value || "").trim();
+  return executableConceptLabel(normalized) || unsupportedConceptForText(normalized)?.name || normalized;
+}
+
+function requestedConceptAuthorizations(message: string): RequestedConceptAuthorization[] {
+  const byCanonical = new Map<string, RequestedConceptAuthorization>();
+  const add = (requestedConcept: string, matchedText: string, supported: boolean, explanation: string) => {
+    const canonicalConcept = canonicalConceptName(requestedConcept);
+    if (!canonicalConcept) return;
+    const key = catalogKey(canonicalConcept);
+    const existing = byCanonical.get(key);
+    if (existing) {
+      if (!existing.matchedText && matchedText) existing.matchedText = matchedText;
+      return;
+    }
+    byCanonical.set(key, {
+      requestedConcept,
+      canonicalConcept,
+      matchedText: matchedText || requestedConcept,
+      supported,
+      explanation,
+    });
+  };
+
+  for (const concept of conceptsRequestedInMessage(message)) {
+    add(concept.name, concept.matchedText, concept.supported, concept.explanation);
+  }
+  for (const concept of requestedExecutableConceptMatches(message)) {
+    const canonical = canonicalConceptName(concept.name);
+    const definition = executableConceptKind(canonical)
+      ? EXECUTABLE_CONCEPT_DEFINITIONS[executableConceptKind(canonical)!]
+      : null;
+    add(
+      concept.name,
+      concept.matchedText,
+      Boolean(executableConceptKind(canonical)),
+      definition?.description || "Mapped to the existing structured executable concept definition.",
+    );
+  }
+  for (const phrase of explicitConceptPhraseMatches(message)) {
+    const canonical = canonicalConceptName(phrase);
+    add(
+      phrase,
+      phrase,
+      Boolean(executableConceptKind(canonical)),
+      executableConceptKind(canonical)
+        ? "Mapped to the existing structured executable concept definition."
+        : "Explicitly requested, but not currently executable by the historical Builder.",
+    );
+  }
+  return [...byCanonical.values()].sort((left, right) => {
+    const leftIndex = message.toLowerCase().indexOf(left.matchedText.toLowerCase());
+    const rightIndex = message.toLowerCase().indexOf(right.matchedText.toLowerCase());
+    return (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex) - (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex);
+  });
+}
+
+function conditionAuthorization(
+  condition: any,
+  authorizations: RequestedConceptAuthorization[],
+  forced?: { requestedConcept: string; status: ConditionAuthorization["status"] },
+): ConditionAuthorization | null {
+  const candidateValues = [condition?.conceptName, condition?.name]
+    .map(value => String(value || "").trim())
+    .filter(Boolean);
+  const match = forced
+    ? authorizations.find(authorization => authorization.requestedConcept === forced.requestedConcept)
+    : authorizations.find(authorization => candidateValues.some(value =>
+      catalogKey(canonicalConceptName(value)) === catalogKey(authorization.canonicalConcept)
+      || catalogKey(value) === catalogKey(authorization.requestedConcept),
+    ));
+  if (!match) return null;
+  return {
+    source: "user_request",
+    status: forced?.status || (match.supported ? "explicit" : "review_required"),
+    requestedConcept: match.requestedConcept,
+    canonicalConcept: canonicalConceptName(condition?.conceptName || condition?.name || match.canonicalConcept),
+    matchedText: match.matchedText,
+  };
+}
+
+function draftAuthorization(message: string, authorizations = requestedConceptAuthorizations(message)): DraftAuthorization {
+  return {
+    originalRequest: message,
+    requestedConcepts: authorizations.map(authorization => ({
+      requestedConcept: authorization.requestedConcept,
+      canonicalConcept: authorization.canonicalConcept,
+      matchedText: authorization.matchedText,
+      supported: authorization.supported,
+    })),
+  };
+}
+
 function conditionMatchesConcept(condition: any, requestedName: string) {
-  const requestedLabel = executableConceptLabel(requestedName);
   const candidateValues = [
     condition?.conceptName,
     condition?.name,
-    condition?.triggerRules,
   ].map(value => String(value || ""));
-  if (requestedLabel && candidateValues.some(value => executableConceptLabel(value) === requestedLabel)) return true;
-  const requestedKey = catalogKey(requestedName);
-  if (requestedKey === "candle direction" && candidateValues.some(value => /\b(?:bullish|bearish)\s+candle\b/i.test(value))) return true;
+  const requestedKey = catalogKey(canonicalConceptName(requestedName));
   return candidateValues.some(value => {
-    const key = catalogKey(value);
-    return key === requestedKey || key.includes(requestedKey) || requestedKey.includes(key);
+    const key = catalogKey(canonicalConceptName(value));
+    return key === requestedKey || (
+      Boolean(executableConceptKind(requestedName))
+      && (key.includes(requestedKey) || requestedKey.includes(key))
+    );
   });
 }
 
@@ -477,7 +647,13 @@ function stageForRequestedConcept(conceptName: string, message: string, fallback
   return ["entry", "confirmation", "invalidation", "exit"].includes(fallback) ? fallback : "entry";
 }
 
-function syntheticRequestedCondition(conceptName: string, draft: any, message: string, index: number) {
+function syntheticRequestedCondition(
+  conceptName: string,
+  draft: any,
+  message: string,
+  index: number,
+  authorizations: RequestedConceptAuthorization[],
+) {
   const parameters = requestedParameters(conceptName, message);
   const supported = Boolean(parameters);
   const direction = requestedDirection(message, draft.direction);
@@ -496,6 +672,7 @@ function syntheticRequestedCondition(conceptName: string, draft: any, message: s
     parameters,
     ruleSupported: supported,
     supported,
+    authorization: conditionAuthorization({ conceptName }, authorizations),
   };
 }
 
@@ -526,15 +703,26 @@ function directionalizeCondition(condition: any, direction: string, message: str
 
 function reconcileRequestedConditions(draft: any, message: string) {
   const originalConditions = Array.isArray(draft.conditions) ? draft.conditions : [];
-  const mappedHtfRetest = mappedHtfBiasRetestConditions(originalConditions, message);
+  const authorizations = requestedConceptAuthorizations(message);
+  const mappedHtfRetest = mappedHtfBiasRetestConditions(originalConditions, message, authorizations);
   if (mappedHtfRetest) return mappedHtfRetest;
-  const requested = requestedConceptNames(message);
+  const requested = authorizations
+    .filter(authorization => ![
+      "multi timeframe analysis",
+      "risk reward",
+      "percentage risk",
+      "position sizing",
+      "maximum risk per trade",
+      "stop loss",
+      "take profit",
+    ].includes(catalogKey(authorization.canonicalConcept)))
+    .map(authorization => authorization.canonicalConcept);
   if (!requested.length) return [];
   const timeframes = requestedTimeframes(message);
   const direction = requestedDirection(message, draft.direction);
   const matched = requested.flatMap((requestedName, requestedIndex) => {
     const matching = originalConditions.filter((condition: any) => conditionMatchesConcept(condition, requestedName));
-    if (!matching.length) return [syntheticRequestedCondition(requestedName, draft, message, requestedIndex)];
+    if (!matching.length) return [syntheticRequestedCondition(requestedName, draft, message, requestedIndex, authorizations)];
     return matching.map((condition: any) => {
       const conceptName = executableConceptLabel(condition.conceptName) || condition.conceptName || requestedName;
       const parameters = requestedParameters(conceptName, message, condition);
@@ -551,6 +739,7 @@ function reconcileRequestedConditions(draft: any, message: string) {
         triggerRules: parameters ? executableConceptTriggerRules(parameters) : condition.triggerRules,
         ruleSupported: condition.ruleSupported === true || Boolean(parameters),
         supported: Boolean(parameters) || condition.supported === true,
+        authorization: conditionAuthorization({ ...condition, conceptName }, authorizations),
       };
     });
   });
@@ -728,6 +917,7 @@ async function builderCatalog(): Promise<BuilderCatalog> {
 
 function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, requestMessage?: string) {
   if (!draft) return draft;
+  const requestAuthorizations = requestMessage ? requestedConceptAuthorizations(requestMessage) : [];
   const requestedDraft = requestMessage
     ? addMissingRequestedExecutableConditions(draft, requestMessage)
     : draft;
@@ -738,6 +928,19 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
     const timeframe = matchCatalogTimeframe(String(condition.timeframe || ""), catalog);
     if (!conceptName) warnings.push(`Concept “${String(condition.conceptName || "Unnamed concept")}” is not in the Trading Concept Library.`);
     if (condition.timeframe && !timeframe) warnings.push(`Timeframe “${String(condition.timeframe)}” is not in the active Builder timeframes.`);
+    const recomputedAuthorization = requestMessage
+      ? conditionAuthorization({ ...condition, conceptName: conceptName || condition.conceptName }, requestAuthorizations)
+      : null;
+    const existingAuthorization = condition?.authorization;
+    const preservedAuthorization = existingAuthorization?.source === "user_request"
+      && typeof existingAuthorization.requestedConcept === "string"
+      && typeof existingAuthorization.matchedText === "string"
+      && requestAuthorizations.some(authorization =>
+        authorization.requestedConcept === existingAuthorization.requestedConcept
+        && authorization.matchedText === existingAuthorization.matchedText,
+      )
+      ? existingAuthorization
+      : null;
     return {
       ...condition,
       conceptName: conceptName || String(condition.conceptName || "Unmapped concept").slice(0, 160),
@@ -749,8 +952,10 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
         condition.supported === true
         || Boolean(normalizeExecutableParameters(conceptName, condition.parameters))
       ),
+      authorization: recomputedAuthorization || preservedAuthorization,
     };
   }).filter((condition: any) => {
+    if (requestMessage && !condition.authorization) return false;
     if (requestMessage && !/(?:\bexit\b|\binvalidation\b|\bclose\b|\bstop[- ]loss\b|\btake[- ]profit\b|\btarget\b|\btp\b|\bsl\b)/i.test(requestMessage)) {
       return condition.stage !== "exit" && condition.stage !== "invalidation";
     }
@@ -761,17 +966,39 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
   if (draft.marketSymbol && !marketSymbol) warnings.push(`Market “${String(draft.marketSymbol)}” is not in the active market catalog.`);
   if (!String(draft.name || "").trim()) warnings.push("Strategy name needs review.");
   if (!["long", "short", "both"].includes(draft.direction)) warnings.push("Strategy direction needs review.");
-  const conditionConceptKeys = conditions.map((condition: any) => catalogKey(String(condition.conceptName || "")));
-  const requestedConceptKeys = requestMessage
-    ? conceptsRequestedInMessage(requestMessage).map(concept => catalogKey(concept.name))
-    : [];
-  const retainedConcepts = Array.isArray(draft.conceptsUsed)
-    ? draft.conceptsUsed.filter((concept: any) => {
-      const key = catalogKey(String(typeof concept === "string" ? concept : concept?.name || ""));
-      return conditionConceptKeys.some((conditionKey: string) => conditionKey === key || conditionKey.includes(key) || key.includes(conditionKey))
-        || requestedConceptKeys.some((requestedKey: string) => requestedKey === key || requestedKey.includes(key) || key.includes(requestedKey));
-    })
-    : [];
+  const retainedConcepts = [
+    ...requestAuthorizations
+      .filter(authorization => authorization.canonicalConcept !== "")
+      .map(authorization => {
+        const modelConcept = Array.isArray(draft.conceptsUsed)
+          ? draft.conceptsUsed.find((concept: any) => {
+            const name = String(typeof concept === "string" ? concept : concept?.name || "");
+            return catalogKey(canonicalConceptName(name)) === catalogKey(authorization.canonicalConcept);
+          })
+          : null;
+        return {
+          name: authorization.canonicalConcept,
+          supported: authorization.supported,
+          explanation: typeof modelConcept === "object" && modelConcept?.explanation
+            ? String(modelConcept.explanation)
+            : authorization.explanation,
+        };
+      }),
+    ...conditions.map((condition: any) => ({
+      name: condition.conceptName,
+      supported: condition.supported === true,
+      explanation: condition.supported === true
+        ? "Represented by the current historical rule set."
+        : "Explicitly requested and preserved for review.",
+    })),
+    ...requestAuthorizations
+      .filter(authorization => catalogKey(authorization.canonicalConcept) === "multi timeframe analysis")
+      .map(authorization => ({
+        name: authorization.canonicalConcept,
+        supported: authorization.supported,
+        explanation: authorization.explanation,
+      })),
+  ];
   const conceptsUsed = normalizeConcepts(retainedConcepts, conditions);
   const requestedFrameValues = requestMessage ? requestedTimeframes(requestMessage) : [];
   const timeframes = (requestedFrameValues.length
@@ -788,6 +1015,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
     timeframes,
     conditions,
     conceptsUsed,
+    authorization: draftAuthorization(requestMessage || "", requestAuthorizations),
     riskManagementRules: normalizeRiskRules(draft.riskManagementRules, requestMessage),
   };
   const compatibility = compatibilityForDraft(next);
@@ -801,9 +1029,10 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
   };
 }
 
-function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | "provider"> | null {
+function normalizeModelResponse(model: any, requestMessage = ""): any {
   if (!model || typeof model.reply !== "string" || !model.reply.trim()) return null;
   const draft = model.strategyDraft && typeof model.strategyDraft === "object" ? model.strategyDraft : null;
+  const requestAuthorizations = requestedConceptAuthorizations(requestMessage);
   const conditions = draft && Array.isArray(draft.conditions) ? draft.conditions.map((condition: any) => {
     const normalizedRule = normalizeConditionRule(condition);
     const rawConceptName = String(condition?.conceptName || "Assistant draft").slice(0, 160);
@@ -831,6 +1060,13 @@ function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | 
       parameters,
       ruleSupported: ruleIsSupported || Boolean(parameters),
       supported: (ruleIsSupported || Boolean(parameters)) && !unsupportedConcept,
+      authorization: conditionAuthorization(condition, requestAuthorizations) || {
+        source: "user_request",
+        status: "review_required",
+        requestedConcept: "",
+        canonicalConcept: canonicalConceptName(rawConceptName),
+        matchedText: "",
+      },
     };
   }).slice(0, 20) : [];
   const conceptsUsed = draft ? normalizeConcepts(draft.conceptsUsed, conditions) : [];
@@ -846,6 +1082,7 @@ function normalizeModelResponse(model: any): Omit<AssistantResponse, "status" | 
     conditions,
     conceptsUsed,
     riskManagementRules: draft.riskManagementRules ? String(draft.riskManagementRules).slice(0, 400) : null,
+    authorization: draftAuthorization(requestMessage, requestAuthorizations),
     compatibility,
   } : null;
   return {
@@ -919,6 +1156,7 @@ function fallbackDraftForUnsupportedRequest(message: string, reply: string) {
       explanation,
     }],
     riskManagementRules: null,
+    authorization: draftAuthorization(message),
     compatibility: {
       compatible: false,
       unsupportedConditions: [conditionName, concept.name],
@@ -1112,13 +1350,13 @@ Return JSON only with this shape:
     "direction": "long | short | both",
     "marketSymbol": "string or null",
     "timeframes": ["string"],
-     "conditions": [{"name":"string","stage":"entry|confirmation|invalidation|exit","requirement":"required|optional","conceptName":"string","timeframe":"string","direction":"long|short|both","triggerRules":"exact supported rule or descriptive unsupported rule","parameters":null}],
+  "conditions": [{"name":"string","stage":"entry|confirmation|invalidation|exit","requirement":"required|optional","conceptName":"string","timeframe":"string","direction":"long|short|both","triggerRules":"exact supported rule or descriptive unsupported rule","parameters":null}],
     "conceptsUsed": [{"name":"string","supported":true,"explanation":"string"}],
-    "riskManagementRules": "string or null"
+  "riskManagementRules": "string or null"
   },
   "backtestSetup": null or {"strategyId": number|null,"versionId":number|null,"instrumentId":number|null,"timeframeId":number|null,"startDate":"ISO string|null","endDate":"ISO string|null"}
 }
- When proposing a strategy, include a draft even if one requested condition is unsupported; explain that limitation in reply. Keep unsupported concepts as named conditions, but distinguish that from whether the triggerRules value is one of the supported historical rules. Do not add exit conditions, stop loss, take profit, risk values, or indicator parameters unless the user explicitly requested them. For each condition, preserve an explicitly requested direction; otherwise use the strategy direction. For result explanations, use only actual numbers from context.
+  When proposing a strategy, include a draft even if one requested condition is unsupported; explain that limitation in reply. Keep unsupported concepts as named conditions, but distinguish that from whether the triggerRules value is one of the supported historical rules. Do not add exit conditions, stop loss, take profit, risk values, or indicator parameters unless the user explicitly requested them. For each condition, preserve an explicitly requested direction; otherwise use the strategy direction. Treat model suggestions as non-authoritative: only concepts present in the user's latest request may become conditions. The server will attach the authorization trace, so do not invent authorization data. For result explanations, use only actual numbers from context.
 ${CONCEPT_GUIDE}
 
 Builder catalog and current workspace context:
@@ -1207,7 +1445,7 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
     }
     const payload = await upstream.json() as any;
     const content = typeof payload?.choices?.[0]?.message?.content === "string" ? payload.choices[0].message.content : "";
-    const parsed = normalizeModelResponse(parseModelJson(content));
+    const parsed = normalizeModelResponse(parseModelJson(content), input.message);
     if (!parsed) throw new Error("OpenRouter returned an invalid assistant response.");
     if (isStrategyDraftRequest(input.message) && !parsed.strategyDraft) {
       const fallbackDraft = fallbackDraftForUnsupportedRequest(input.message, parsed.reply);
@@ -1216,9 +1454,14 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
         (context.builderCatalog || { concepts: [], markets: [], timeframes: [] }) as BuilderCatalog,
         input.message,
       );
-      parsed.strategyDraft = validatedFallback;
+      const finalFallback = validateDraftAgainstCatalog(
+        validatedFallback,
+        (context.builderCatalog || { concepts: [], markets: [], timeframes: [] }) as BuilderCatalog,
+        input.message,
+      );
+      parsed.strategyDraft = finalFallback;
       parsed.intent = "strategy_proposal";
-      parsed.compatibility = validatedFallback.compatibility;
+      parsed.compatibility = finalFallback.compatibility;
     } else if (parsed.strategyDraft) {
       const enrichedDraft = enrichDraftConcepts(parsed.strategyDraft, input.message);
       const validatedDraft = validateDraftAgainstCatalog(
@@ -1226,10 +1469,15 @@ export async function answerAssistant(input: AssistantInput): Promise<AssistantR
         (context.builderCatalog || { concepts: [], markets: [], timeframes: [] }) as BuilderCatalog,
         input.message,
       );
-      parsed.strategyDraft = validatedDraft;
-      parsed.compatibility = validatedDraft.compatibility;
-      if (validatedDraft.compatibility.unsupportedConditions.length > enrichedDraft.compatibility.unsupportedConditions.length) {
-        parsed.reply = `${parsed.reply}\n\nNeeds review: ${validatedDraft.compatibility.unsupportedConditions.slice(enrichedDraft.compatibility.unsupportedConditions.length).join(" ")}`;
+      const finalDraft = validateDraftAgainstCatalog(
+        validatedDraft,
+        (context.builderCatalog || { concepts: [], markets: [], timeframes: [] }) as BuilderCatalog,
+        input.message,
+      );
+      parsed.strategyDraft = finalDraft;
+      parsed.compatibility = finalDraft.compatibility;
+      if (finalDraft.compatibility.unsupportedConditions.length > enrichedDraft.compatibility.unsupportedConditions.length) {
+        parsed.reply = `${parsed.reply}\n\nNeeds review: ${finalDraft.compatibility.unsupportedConditions.slice(enrichedDraft.compatibility.unsupportedConditions.length).join(" ")}`;
       }
     }
     const backtestSetup = parsed.backtestSetup ? {

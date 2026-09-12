@@ -65,7 +65,14 @@ export const ChatAssistantResponse = zod.object({
   "triggerRules": zod.string(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "ruleSupported": zod.boolean(),
-  "supported": zod.boolean().optional()
+  "supported": zod.boolean().optional(),
+  "authorization": zod.object({
+  "source": zod.enum(['user_request']),
+  "status": zod.enum(['explicit', 'required_for_concept', 'review_required']),
+  "requestedConcept": zod.string(),
+  "canonicalConcept": zod.string(),
+  "matchedText": zod.string()
+})
 })),
   "conceptsUsed": zod.array(zod.object({
   "name": zod.string(),
@@ -73,6 +80,15 @@ export const ChatAssistantResponse = zod.object({
   "explanation": zod.string()
 })).optional(),
   "riskManagementRules": zod.string().nullable(),
+  "authorization": zod.object({
+  "originalRequest": zod.string(),
+  "requestedConcepts": zod.array(zod.object({
+  "requestedConcept": zod.string(),
+  "canonicalConcept": zod.string(),
+  "matchedText": zod.string(),
+  "supported": zod.boolean()
+}))
+}),
   "compatibility": zod.object({
   "compatible": zod.boolean(),
   "unsupportedConditions": zod.array(zod.string())
@@ -584,8 +600,8 @@ export const ListStrategyMonitorsResponseItem = zod.object({
   "reasonCode": zod.string().nullable(),
   "reason": zod.string().nullable(),
   "lastEvaluationAt": zod.coerce.date().nullable(),
-  "lastMarketDataAt": zod.coerce.date().nullable()
-  ,"lastCandleOpenTime": zod.coerce.date().nullable()
+  "lastMarketDataAt": zod.coerce.date().nullable(),
+  "lastCandleOpenTime": zod.coerce.date().nullable()
 }))
 })
 export const ListStrategyMonitorsResponse = zod.array(ListStrategyMonitorsResponseItem)

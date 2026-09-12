@@ -9,8 +9,24 @@ let pendingDraft: AssistantStrategyDraft | null = null;
 function isDraft(value: unknown): value is AssistantStrategyDraft {
   if (!value || typeof value !== "object") return false;
   const draft = value as Partial<AssistantStrategyDraft>;
+  const authorization = draft.authorization;
+  const requestedConcepts = authorization?.requestedConcepts;
+  const conditions = draft.conditions;
   return typeof draft.name === "string"
-    && Array.isArray(draft.conditions);
+    && Array.isArray(conditions)
+    && typeof authorization?.originalRequest === "string"
+    && authorization.originalRequest.length > 0
+    && Array.isArray(requestedConcepts)
+    && conditions.every(condition => {
+      const conditionAuthorization = condition.authorization;
+      return conditionAuthorization?.source === "user_request"
+        && typeof conditionAuthorization.requestedConcept === "string"
+        && typeof conditionAuthorization.matchedText === "string"
+        && requestedConcepts.some(requested =>
+          requested.requestedConcept === conditionAuthorization.requestedConcept
+          && requested.matchedText === conditionAuthorization.matchedText,
+        );
+    });
 }
 
 export function setPendingAssistantDraft(draft: AssistantStrategyDraft) {
