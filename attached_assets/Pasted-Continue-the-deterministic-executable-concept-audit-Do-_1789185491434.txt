@@ -1,0 +1,163 @@
+Continue the deterministic executable-concept audit.
+
+Do NOT create a strategy or backtest.
+
+Do NOT modify existing trading data.
+
+Implement the next two follow-up items completely and generically:
+
+1. FAILED BREAKOUT
+2. TIMEZONE/DST-AWARE SESSION INFRASTRUCTURE
+
+FAILED BREAKOUT:
+
+Implement a canonical deterministic Failed Breakout concept.
+
+Definition:
+
+Bullish failed breakout:
+- A confirmed resistance level exists.
+- A closed candle closes above that resistance.
+- Within a configurable number of subsequent closed candles, price closes back below the resistance.
+- The failed breakout is confirmed on that closing candle.
+
+Bearish failed breakout:
+- A confirmed support level exists.
+- A closed candle closes below that support.
+- Within a configurable number of subsequent closed candles, price closes back above the support.
+- The failed breakout is confirmed on that closing candle.
+
+Use the existing canonical Support/Resistance evaluator and level-generation logic.
+
+Parameters must be typed and configurable:
+- Direction
+- Level type
+- Maximum bars to failure
+- Timeframe
+- Any existing support/resistance parameters required by the canonical evaluator
+
+Do not use future candles to determine the initial breakout.
+
+Do not use subjective "false breakout" interpretation.
+
+The same evaluator must be used by:
+- Strategy Builder
+- Backtesting
+- Strategy Monitoring
+- Build with AI
+
+TIMEZONE/DST-AWARE SESSION INFRASTRUCTURE:
+
+Create generic timezone-aware session handling.
+
+It must support:
+- London Session
+- New York Session
+- Asian Session
+- Kill Zones using the same session infrastructure
+
+Sessions must use IANA timezone identifiers rather than hard-coded UTC offsets.
+
+Handle daylight-saving-time transitions correctly.
+
+Do not hard-code UTC+0, UTC+1, UTC-4, etc.
+
+The infrastructure should calculate whether a candle timestamp falls inside the configured session based on:
+- Session timezone
+- Start local time
+- End local time
+- Trading date
+
+Expose typed parameters for:
+- Session
+- Start time
+- End time
+- IANA timezone
+
+Make session evaluation deterministic for historical backtests and live monitoring.
+
+IMPORTANT:
+
+Do not assume that "New York Session" means a particular fixed UTC window.
+
+Do not assume that "London Session" means a particular fixed UTC window.
+
+The session's timezone and local start/end times must be explicit.
+
+Build with AI must only create a session condition when the user's request contains enough information to determine the session configuration.
+
+If the user explicitly requests a named session but does not provide custom times, use the canonical session definition configured in the system.
+
+Do not silently invent custom times.
+
+AFTER IMPLEMENTATION:
+
+For Failed Breakout:
+- Add Builder controls
+- Add canonical registry
+- Add parameter normalization
+- Add Build with AI mapping
+- Add authorization
+- Add backtest evaluator
+- Add monitoring evaluator
+- Add strategy-version parameter display
+- Add regression tests
+
+For sessions:
+- Add canonical session registry
+- Add Builder controls
+- Add Build with AI mapping
+- Add backtest evaluator
+- Add monitoring evaluator
+- Add DST regression tests
+- Test dates both inside and outside DST periods
+- Test the DST transition boundaries
+
+END-TO-END:
+
+Create disposable tests proving:
+
+Build with AI
+→ Draft
+→ Builder
+→ Strategy Version
+→ Backtest compatibility
+→ Monitoring
+
+works for:
+
+1. Failed Breakout
+2. New York Session
+3. London Session
+4. Asian Session
+5. Kill Zone
+
+Do not create permanent strategies.
+
+Do not modify existing strategies, versions, trades, backtests, alerts, or monitoring records.
+
+FINAL REPORT:
+
+For each concept report:
+
+- Status before
+- Status after
+- Exact deterministic definition
+- Parameters
+- Builder support
+- Build with AI support
+- Backtest support
+- Monitoring support
+- Tests added
+
+Also report any concepts that remain Review Required and explain exactly why.
+
+Run:
+- API tests
+- Frontend tests
+- Typechecks
+- Production builds
+- git diff --check
+- Browser verification
+
+Do not stop after implementing only one item. Complete the full task or clearly report any architectural blocker.
