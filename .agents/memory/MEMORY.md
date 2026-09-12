@@ -28,3 +28,4 @@
 - [Session evaluator contract](session-evaluator-contract.md) — sessions use explicit IANA local windows with DST-aware membership and half-open end boundaries.
 - [Universal assistant rule contract](universal-assistant-rule-contract.md) — assistant drafts carry typed canonical metadata additively; risk stays separate and unsupported temporal operators remain review-required.
 - [Canonical condition snapshots](canonical-condition-snapshots.md) — strategy conditions and immutable version snapshots retain registry identity and evaluator context additively.
+- [Breakout concept boundary](breakout-concept-boundary.md) — objective previous-candle high/low rules use one Breakout evaluator with directional polarity.

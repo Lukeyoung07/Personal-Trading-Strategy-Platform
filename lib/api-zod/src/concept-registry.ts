@@ -213,6 +213,7 @@ const ALIASES: Record<string, string[]> = {
   "Sell-Side Liquidity": ["Sell Side Liquidity", "SSL"],
   "Equal Highs": ["Equal High"], "Equal Lows": ["Equal Low"],
   "Break and Retest": ["Breakout Retest"], "Failed Breakout": ["False Breakout"],
+  "Breakout": ["Long Breakout", "Short Breakout"],
   "Wick Rejection": ["Rejection Candle"], "50% Equilibrium": ["50 Equilibrium"],
   "Kill Zones": ["Kill Zone"], "London Session": ["London"],
   "New York Session": ["NY", "NY Session"], "Asian Session": ["Asia", "Asia Session"],

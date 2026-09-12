@@ -248,8 +248,8 @@ describe("AI Trading Assistant provider boundary", () => {
            lookback: 5,
          },
        },
-       {
-         conceptName: "Fair Value Gap",
+         {
+           conceptName: "FVG Retest",
          stage: "confirmation",
          direction: "both",
          timeframe: "5m",
@@ -268,7 +268,7 @@ describe("AI Trading Assistant provider boundary", () => {
      expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
   });
 
-  it("maps the exact HTF bias plus FVG retest request to paired canonical executable conditions", async () => {
+  it("keeps an explicitly requested HTF bias review-required beside an executable FVG retest", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
       choices: [{
@@ -317,37 +317,28 @@ describe("AI Trading Assistant provider boundary", () => {
       parameters: condition.parameters,
     }))).toEqual([
       {
-        conceptName: "Market Structure Shift",
+        conceptName: "Higher Timeframe Bias",
         stage: "entry",
-        direction: "long",
+        direction: "both",
         timeframe: "1h",
-        parameters: { kind: "market_structure", signal: "mss", polarity: "bullish", lookback: 10 },
+        parameters: null,
       },
       {
-        conceptName: "Fair Value Gap",
+        conceptName: "FVG Retest",
         stage: "confirmation",
-        direction: "long",
+        direction: "both",
         timeframe: "5m",
-        parameters: { kind: "fair_value_gap", polarity: "bullish", interaction: "retest", lookback: 20, minimumGap: 0 },
-      },
-      {
-        conceptName: "Market Structure Shift",
-        stage: "entry",
-        direction: "short",
-        timeframe: "1h",
-        parameters: { kind: "market_structure", signal: "mss", polarity: "bearish", lookback: 10 },
-      },
-      {
-        conceptName: "Fair Value Gap",
-        stage: "confirmation",
-        direction: "short",
-        timeframe: "5m",
-        parameters: { kind: "fair_value_gap", polarity: "bearish", interaction: "retest", lookback: 20, minimumGap: 0 },
+        parameters: { kind: "fair_value_gap", polarity: "auto", interaction: "retest", lookback: 20, minimumGap: 0 },
       },
     ]);
-    expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
+    expect(response.strategyDraft?.conditions[0]).toMatchObject({
+      executionStatus: "review_required",
+      authorization: { status: "review_required", canonicalConcept: "Higher Timeframe Bias" },
+    });
+    expect(response.strategyDraft?.compatibility.compatible).toBe(false);
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("Higher Timeframe Bias");
     expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).not.toContain("Retest");
-    expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Higher-timeframe bias");
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Market Structure Shift");
   });
 
   it("transfers structured TRADEX fields, directions, and requested risk settings", async () => {
@@ -499,7 +490,7 @@ Risk/Reward: 2:1`,
               conceptsUsed: [{
                  name: "EMA Cross",
                 supported: true,
-                explanation: "The model should not be able to override this guardrail.",
+        explanation: "Mapped to the existing structured executable concept definition.",
               }],
               riskManagementRules: null,
             },
@@ -517,7 +508,7 @@ Risk/Reward: 2:1`,
       expect(response.strategyDraft?.conceptsUsed).toEqual(expect.arrayContaining([{
         name: "EMA",
        supported: true,
-       explanation: "The model should not be able to override this guardrail.",
+        explanation: "Mapped to the existing structured executable concept definition.",
      }]));
       expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("EMA crossover");
   });
@@ -549,7 +540,7 @@ Risk/Reward: 2:1`,
        supported: true,
        explanation: "Mapped to the structured historical detector; review its parameters before saving.",
      }]);
-    expect(response.strategyDraft?.compatibility.compatible).toBe(false);
+    expect(response.strategyDraft?.compatibility.compatible).toBe(true);
   });
 
   it("preserves explicitly requested concepts even when the model omits their canonical names", async () => {
@@ -593,12 +584,12 @@ Risk/Reward: 2:1`,
     });
 
     expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).toEqual(expect.arrayContaining([
-       "Fair Value Gap",
-      "Higher-timeframe bias",
-      "Multi-timeframe analysis",
+      "Fair Value Gap",
+      "Higher Timeframe Bias",
+      "Multi-Timeframe Analysis",
     ]));
     expect(response.strategyDraft?.compatibility.unsupportedConditions).toEqual(expect.arrayContaining([
-      "Higher-timeframe bias",
+      "Higher Timeframe Bias",
     ]));
      expect(response.strategyDraft?.compatibility.unsupportedConditions).not.toContain("Fair Value Gap");
   });
@@ -608,7 +599,7 @@ Risk/Reward: 2:1`,
      const requests = [
        { message: "Build me a liquidity sweep strategy.", expected: ["Liquidity Sweep"], unsupported: [] },
        { message: "Create an XAUUSD strategy using an FVG.", expected: ["Fair Value Gap"], unsupported: [] },
-       { message: "Use a 4H bullish bias and 15M entry.", expected: ["Higher-timeframe bias", "Multi-timeframe analysis"], unsupported: ["Higher-timeframe bias"] },
+       { message: "Use a 4H bullish bias and 15M entry.", expected: ["Higher Timeframe Bias", "Multi-Timeframe Analysis"], unsupported: ["Higher Timeframe Bias"] },
         { message: "Build an SMC strategy using BOS and an order block.", expected: ["Break of Structure", "Order Block"], unsupported: ["Order Block"] },
         { message: "Use the 20 EMA as confirmation.", expected: ["EMA"], unsupported: [] },
         { message: "Create a strategy using premium and discount.", expected: ["Premium", "Discount"], unsupported: [] },
@@ -643,7 +634,7 @@ Risk/Reward: 2:1`,
       });
 
       expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).toEqual(expect.arrayContaining(request.expected));
-      expect(response.strategyDraft?.compatibility.compatible).toBe(false);
+      expect(response.strategyDraft?.compatibility.compatible).toBe(request.unsupported.length > 0 ? false : true);
        if (request.unsupported.length) {
          expect(response.strategyDraft?.compatibility.unsupportedConditions).toEqual(expect.arrayContaining(request.unsupported));
        }
@@ -724,7 +715,7 @@ Risk/Reward: 2:1`,
             parameters: condition.parameters,
           }))).toEqual([
             {
-              conceptName: "Fair Value Gap",
+              conceptName: "FVG Retest",
               stage: "confirmation",
               timeframe: "5m",
               parameters: { kind: "fair_value_gap", polarity: "bullish", interaction: "retest", lookback: 20, minimumGap: 0 },
@@ -733,7 +724,7 @@ Risk/Reward: 2:1`,
               conceptName: "Market Structure Shift",
               stage: "entry",
               timeframe: "1h",
-              parameters: { kind: "market_structure", signal: "bos", polarity: "bullish", lookback: 10 },
+              parameters: { kind: "market_structure", signal: "mss", polarity: "bullish", lookback: 10 },
             },
           ]);
         },
@@ -933,7 +924,7 @@ Risk/Reward: 2:1`,
 
     expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual([
       "Market Structure Shift",
-      "Fair Value Gap",
+      "FVG Retest",
     ]);
     expect(response.strategyDraft?.conditions.every(condition =>
       condition.authorization.source === "user_request"
@@ -941,8 +932,8 @@ Risk/Reward: 2:1`,
     )).toBe(true);
     expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).toEqual(expect.arrayContaining([
       "Market Structure Shift",
-      "Fair Value Gap",
-      "Multi-timeframe analysis",
+      "FVG Retest",
+      "Multi-Timeframe Analysis",
     ]));
     expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).not.toEqual(expect.arrayContaining([
       "SMT Divergence",
@@ -1102,7 +1093,7 @@ Risk/Reward: 2:1`,
 
     expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual([
       "Displacement",
-      "Fair Value Gap",
+      "FVG Retest",
     ]);
     expect(response.strategyDraft?.conditions.map(condition => condition.parameters)).toEqual([
       {
@@ -1196,7 +1187,7 @@ Risk/Reward: 2:1`,
 
     expect(response.strategyDraft?.conditions).toHaveLength(1);
     expect(response.strategyDraft?.conditions[0]).toMatchObject({
-      conceptName: "Rejection",
+      conceptName: "Wick Rejection",
       supported: true,
       parameters: {
         kind: "rejection",
@@ -1207,7 +1198,7 @@ Risk/Reward: 2:1`,
       authorization: {
         source: "user_request",
         status: "explicit",
-        canonicalConcept: "Rejection",
+        canonicalConcept: "Wick Rejection",
       },
     });
     expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
@@ -1303,7 +1294,7 @@ Risk/Reward: 2:1`,
 
     expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual([
       "Continuation",
-      "Fair Value Gap",
+      "FVG Retest",
     ]);
     expect(response.strategyDraft?.conditions[0]).toMatchObject({
       supported: false,
@@ -1360,7 +1351,7 @@ Risk/Reward: 2:1`,
       context: { page: "/strategy-builder" },
     });
 
-    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual(["Fair Value Gap"]);
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual(["Bullish FVG"]);
     expect(response.strategyDraft?.conditions[0].authorization.status).toBe("explicit");
   });
 
@@ -1386,7 +1377,7 @@ Risk/Reward: 2:1`,
 
     expect(response.strategyDraft?.marketSymbol).toBe("XAUUSD");
     expect(response.strategyDraft?.timeframes.map(value => value.toLowerCase())).toContain("5m");
-    expect(response.strategyDraft?.conditions.map(condition => condition.canonicalRuleType)).toEqual(["indicator", "session"]);
+    expect(response.strategyDraft?.conditions.map(condition => condition.canonicalRuleType)).toEqual(["indicator", "indicator", "session"]);
     expect(response.strategyDraft?.conditions[0].parameters).toMatchObject({
       kind: "indicator",
       indicator: "ema",
@@ -1395,7 +1386,7 @@ Risk/Reward: 2:1`,
       slowPeriod: 50,
       comparison: "cross_above",
     });
-    expect(response.strategyDraft?.conditions[1].parameters).toMatchObject({
+    expect(response.strategyDraft?.conditions[2].parameters).toMatchObject({
       kind: "session",
       session: "new_york",
       timezone: "America/New_York",
@@ -1488,5 +1479,73 @@ Risk/Reward: 2:1`,
       }),
     ]));
     expect(response.strategyDraft?.compatibility.compatible).toBe(false);
+  });
+
+  it("keeps the exact two-sided breakout request limited to breakout rules and percentage targets", async () => {
+    mockStrategyDraft({
+      name: "XAUUSD breakout strategy",
+      description: "",
+      direction: "both",
+      marketSymbol: null,
+      timeframes: ["5m"],
+      conditions: [
+        { name: "Long Breakout", stage: "entry", requirement: "required", conceptName: "Breakout", timeframe: "5m", direction: "long", triggerRules: "Price closes above the previous candle high" },
+        { name: "Short Breakout", stage: "entry", requirement: "required", conceptName: "Breakout", timeframe: "5m", direction: "short", triggerRules: "Price closes below the previous candle low" },
+      ],
+      riskManagementRules: "Stop loss: 1%. Take profit: 2%.",
+    });
+
+    const response = await answerAssistant({
+      message: "Create a simple XAUUSD 5m strategy. Long: Price closes above the previous candle high. Short: Price closes below the previous candle low. Stop loss: 1%. Take profit: 2%. Use only these rules. Do not add any other concepts.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.marketSymbol).toBe("XAUUSD");
+    expect(response.strategyDraft?.timeframes.map(value => value.toLowerCase())).toEqual(["5m"]);
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual(["Breakout", "Breakout"]);
+    expect(response.strategyDraft?.conditions.map(condition => condition.direction)).toEqual(["long", "short"]);
+    expect(response.strategyDraft?.conditions.map(condition => condition.parameters)).toEqual([
+      expect.objectContaining({ kind: "price_action", pattern: "breakout", polarity: "bullish" }),
+      expect.objectContaining({ kind: "price_action", pattern: "breakout", polarity: "bearish" }),
+    ]);
+    expect(response.strategyDraft?.conditions.every(condition => condition.executionStatus === "executable")).toBe(true);
+    expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
+    expect(response.strategyDraft?.riskManagementRules).toBe("stop-loss: 1%; take-profit: 2%");
+    expect(response.strategyDraft?.conceptsUsed?.map(concept => concept.name)).not.toEqual(expect.arrayContaining([
+      "EMA", "SMA", "RSI", "FVG", "FVG Retest", "Displacement", "Liquidity Sweep", "SMT Divergence",
+    ]));
+  });
+
+  it("preserves Judas Swing for review and keeps executable liquidity separate", async () => {
+    mockStrategyDraft({
+      name: "Judas Swing review",
+      description: "",
+      direction: "long",
+      marketSymbol: "XAUUSD",
+      timeframes: ["5m"],
+      conditions: [
+        { name: "Judas Swing", stage: "entry", requirement: "required", conceptName: "Judas Swing", timeframe: "5m", direction: "long", triggerRules: "model session reversal" },
+        { name: "Liquidity Sweep", stage: "confirmation", requirement: "required", conceptName: "Liquidity Sweep", timeframe: "5m", direction: "long", triggerRules: "model sweep" },
+      ],
+      riskManagementRules: null,
+    });
+
+    const response = await answerAssistant({
+      message: "Create an XAUUSD 5m strategy using a Liquidity Sweep followed by a Judas Swing.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual(["Liquidity Sweep", "Judas Swing"]);
+    expect(response.strategyDraft?.conditions[0]).toMatchObject({ executionStatus: "executable", supported: true });
+    expect(response.strategyDraft?.conditions[1]).toMatchObject({
+      executionStatus: "review_required",
+      supported: false,
+      authorization: { canonicalConcept: "Judas Swing", status: "review_required" },
+    });
+    expect(response.strategyDraft?.compatibility.compatible).toBe(false);
+    expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("Judas Swing");
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).not.toContain("Market Structure Shift");
   });
 });

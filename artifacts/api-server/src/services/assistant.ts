@@ -289,15 +289,16 @@ function unsupportedConceptForText(value: string): UnsupportedConceptDefinition 
   if (catalogKey(value) === "multi timeframe analysis") return null;
   if (["bullish candle", "bearish candle", "candle direction"].includes(catalogKey(value))) return null;
   if (executableConceptKind(value)) return null;
-  const legacy = UNSUPPORTED_CONCEPTS.find(concept => concept.pattern.test(value));
-  if (legacy) return legacy;
   const canonical = resolveTradingConcept(value);
-  if (!canonical || canonical.status === "executable") return null;
-  return {
-    pattern: /$^/,
-    name: canonical.name,
-    explanation: canonical.statusReason,
-  };
+  if (canonical) {
+    if (canonical.status === "executable") return null;
+    return {
+      pattern: /$^/,
+      name: canonical.name,
+      explanation: canonical.statusReason,
+    };
+  }
+  return UNSUPPORTED_CONCEPTS.find(concept => concept.pattern.test(value)) || null;
 }
 
 function compatibilityForDraft(draft: any) {
@@ -349,14 +350,22 @@ function knownUnsupportedConcept(name: string) {
   return unsupportedConceptForText(name) !== null;
 }
 
-function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName: string; supported: boolean }>) {
+function normalizeConcepts(rawConcepts: unknown, conditions: Array<{ conceptName: string; supported: boolean }>, message = "") {
   const concepts = new Map<string, { name: string; supported: boolean; explanation: string }>();
+  const requestedKeys = new Set([
+    ...conditions.map(condition => catalogKey(canonicalConceptName(condition.conceptName))),
+    ...conceptsRequestedInMessage(message).map(concept => catalogKey(canonicalConceptName(concept.name))),
+  ]);
   const addConcept = (raw: any, fallbackName?: string) => {
     const rawName = String(typeof raw === "string" ? raw : raw?.name || fallbackName || "").trim().slice(0, 120);
     if (!rawName) return;
+    const rawCanonical = canonicalConceptName(rawName);
+    const rawKey = catalogKey(rawCanonical);
+    const matchesCondition = conditions.some(condition => catalogKey(canonicalConceptName(condition.conceptName)) === rawKey);
+    if (!matchesCondition && !requestedKeys.has(rawKey)) return;
     const isMultiTimeframe = catalogKey(rawName) === "multi timeframe analysis";
     const unsupportedConcept = isMultiTimeframe ? null : unsupportedConceptForText(rawName);
-    const name = unsupportedConcept?.name || executableConceptLabel(rawName) || rawName;
+    const name = unsupportedConcept?.name || rawCanonical;
     const matchingConditions = conditions.filter(condition =>
       condition.conceptName.toLowerCase() === rawName.toLowerCase() ||
       condition.conceptName.toLowerCase() === name.toLowerCase(),
@@ -460,10 +469,19 @@ function requestedExecutableConceptMatches(message: string) {
       if (/\bwick\s+rejection\b/i.test(message) && match.name === "Rejection") return false;
       return !(match.name === "Rejection" && /\bstrong\s+rejection\b/i.test(message));
     });
+  const inferredBreakouts = [
+    message.match(/(?:price\s+)?closes?\s+(?:above|over)\s+(?:the\s+)?previous\s+candle(?:'s)?\s+high/i),
+    message.match(/(?:price\s+)?closes?\s+(?:below|under)\s+(?:the\s+)?previous\s+candle(?:'s)?\s+low/i),
+  ].map((match, index) => match
+    ? { name: index === 0 ? "Long Breakout" : "Short Breakout", matchedText: match[0] }
+    : null)
+    .filter((match): match is { name: string; matchedText: string } => Boolean(match));
   const candleMatch = message.match(/\b(?:bullish|bearish)\s+candle\b|\bcandle\s+(?:direction|strategy)\b/i);
-  return candleMatch
-    ? [...executableMatches, { name: "Candle Direction", matchedText: candleMatch[0] }]
-    : executableMatches;
+  return [
+    ...executableMatches,
+    ...inferredBreakouts,
+    ...(candleMatch ? [{ name: "Candle Direction", matchedText: candleMatch[0] }] : []),
+  ];
 }
 
 function requestedExecutableConcepts(message: string) {
@@ -482,7 +500,7 @@ function explicitConceptPhraseMatches(message: string) {
       .trim();
     if (!cleaned || cleaned.length < 3 || cleaned.length > 80) return;
     if (/(?:stop[- ]loss|take[- ]profit|risk[\/ -]?reward|r\s*:\s*r|target\s+\d+(?:\.\d+)?\s*R|\d+(?:\.\d+)?\s*R\s*(?:target|take[- ]profit|tp)|percentage\s+risk|risk\s+per\s+trade)/i.test(cleaned)) return;
-    if (/^(?:strategy|setup|system|rules?|risk management|long|short|both|directions?|bullish|bearish|explicit|required|optional|entry|exit|confirmation|invalidation|condition)(?:\s+(?:strategy|setup|system|rules?|directions?|entry|exit|confirmation|invalidation|condition))?$/i.test(cleaned)) return;
+    if (/^(?:strategy|setup|system|rules?|risk management|long|short|both|directions?|bullish|bearish|bias|main setup|explicit|required|optional|entry|exit|confirmation|invalidation|condition)(?:\s+(?:strategy|setup|system|rules?|directions?|entry|exit|confirmation|invalidation|condition))?$/i.test(cleaned)) return;
     if (!matches.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) matches.push(cleaned);
   };
   for (const match of message.matchAll(/\b(?:concept|condition)\s*:\s*([^\n;]+)/gi)) add(match[1]);
@@ -559,7 +577,9 @@ function requestedConceptAuthorizations(message: string): RequestedConceptAuthor
       else if (/\b(?:asia|asian)\s+(?:session\s+)?kill\s+zone\b/i.test(message)) canonicalConcept = "Asian Session";
     }
     if (!canonicalConcept) return;
-    const key = catalogKey(canonicalConcept);
+    const directionalBreakout = canonicalConcept === "Breakout"
+      && /^(?:long|short)\s+breakout$/i.test(requestedConcept.trim());
+    const key = `${catalogKey(canonicalConcept)}${directionalBreakout ? `:${catalogKey(requestedConcept)}` : ""}`;
     if (["FVG Retest", "FVG Fill"].includes(canonicalConcept)) {
       byCanonical.delete(catalogKey("Fair Value Gap"));
     }
@@ -598,6 +618,14 @@ function requestedConceptAuthorizations(message: string): RequestedConceptAuthor
       resolveTradingConcept(canonical)?.status === "executable" || Boolean(executableConceptKind(canonical)),
       resolveTradingConcept(canonical)?.definition || "Explicitly requested, but not currently executable by the historical Builder.",
     );
+  }
+  const fvgVariants = new Set(["Bullish FVG", "Bearish FVG", "FVG Retest", "FVG Fill"]);
+  if ([...byCanonical.values()].some(authorization => fvgVariants.has(authorization.canonicalConcept))) {
+    byCanonical.delete(catalogKey("Fair Value Gap"));
+  }
+  if ([...byCanonical.values()].some(authorization => ["FVG Retest", "FVG Fill"].includes(authorization.canonicalConcept))) {
+    byCanonical.delete(catalogKey("Bullish FVG"));
+    byCanonical.delete(catalogKey("Bearish FVG"));
   }
   return [...byCanonical.values()].sort((left, right) => {
     const leftIndex = message.toLowerCase().indexOf(left.matchedText.toLowerCase());
@@ -643,13 +671,17 @@ function draftAuthorization(message: string, authorizations = requestedConceptAu
 }
 
 function conditionMatchesConcept(condition: any, requestedName: string) {
-  const candidateValues = [
-    condition?.conceptName,
-    condition?.name,
-  ].map(value => String(value || ""));
+  const conditionConceptName = String(condition?.conceptName || "");
+  const candidateValues = ["candle direction", "bullish candle", "bearish candle"].includes(catalogKey(conditionConceptName)) || !conditionConceptName
+    ? [conditionConceptName, String(condition?.name || "")]
+    : [conditionConceptName];
   const requestedKey = catalogKey(canonicalConceptName(requestedName));
   return candidateValues.some(value => {
-    const key = catalogKey(canonicalConceptName(value));
+    const key = catalogKey(
+      ["candle direction", "bullish candle", "bearish candle"].includes(catalogKey(value))
+        ? "Candle Direction"
+        : canonicalConceptName(value),
+    );
     return key === requestedKey || (
       Boolean(executableConceptKind(requestedName))
       && (key.includes(requestedKey) || requestedKey.includes(key))
@@ -699,9 +731,10 @@ function requestedParameters(conceptName: string, message: string, condition: an
     if (indicator === "rsi" && input.comparison === "below" && input.threshold == null) input.threshold = 30;
   }
   if (kind === "fair_value_gap") {
-    if (/\bretests?\b|\bfill\b/i.test(descriptor)) input.interaction = "retest";
-    if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
-    if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
+    const fvgDescriptor = descriptor.match(/(?:bullish|bearish)?\s*(?:fvg|fair\s+value\s+gap)\b[^.!?]{0,60}/i)?.[0] || "";
+    if (/\bretests?\b|\bfill\b/i.test(fvgDescriptor)) input.interaction = "retest";
+    if (/\bbullish\b/i.test(fvgDescriptor)) input.polarity = "bullish";
+    if (/\bbearish\b/i.test(fvgDescriptor)) input.polarity = "bearish";
   }
   if (kind === "market_structure") {
     if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
@@ -714,6 +747,13 @@ function requestedParameters(conceptName: string, message: string, condition: an
   if (kind === "rejection") {
     if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
     if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
+  }
+  if (kind === "price_action") {
+    const localDescriptor = `${condition?.name || ""} ${condition?.conceptName || ""}`;
+    if (/\b(?:long|bullish)\b/i.test(localDescriptor)) input.polarity = "bullish";
+    else if (/\b(?:short|bearish)\b/i.test(localDescriptor)) input.polarity = "bearish";
+    else if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
+    else if (/\bbearish\b/i.test(descriptor)) input.polarity = "bearish";
   }
   if (kind === "failed_breakout") {
     if (/\bbullish\b/i.test(descriptor)) input.polarity = "bullish";
@@ -821,7 +861,11 @@ function syntheticRequestedCondition(
       : parameters?.kind === "fair_value_gap" && parameters.interaction === "retest"
       ? "Fair Value Gap Retest"
       : `${canonicalExecutableName(conceptName)} condition`,
-    stage: stageForRequestedConcept(conceptName, message, conceptName === "Fair Value Gap" ? "confirmation" : "entry"),
+    stage: stageForRequestedConcept(
+      conceptName,
+      message,
+      ["Fair Value Gap", "FVG Retest", "FVG Fill"].includes(conceptName) ? "confirmation" : "entry",
+    ),
     requirement: "required",
     conceptName: canonicalExecutableName(conceptName),
     timeframe: requestedTimeframes(message)[index] || requestedTimeframes(message)[0] || "Not specified",
@@ -874,7 +918,7 @@ function directionalizeCondition(condition: any, direction: string, message: str
 function reconcileRequestedConditions(draft: any, message: string) {
   const originalConditions = Array.isArray(draft.conditions) ? draft.conditions : [];
   const authorizations = requestedConceptAuthorizations(message);
-  const requested = [...new Set(authorizations
+  const requested = authorizations
     .filter(authorization => ![
       "multi timeframe analysis",
       "risk reward",
@@ -884,7 +928,7 @@ function reconcileRequestedConditions(draft: any, message: string) {
       "stop loss",
       "take profit",
     ].includes(catalogKey(authorization.canonicalConcept)))
-    .map(authorization => canonicalConceptName(authorization.canonicalConcept)))];
+    .map(authorization => canonicalConceptName(authorization.canonicalConcept));
   if (!requested.length) return [];
   const timeframes = requestedTimeframes(message);
   const direction = requestedDirection(message, draft.direction);
@@ -892,7 +936,11 @@ function reconcileRequestedConditions(draft: any, message: string) {
     const matching = originalConditions.filter((condition: any) => conditionMatchesConcept(condition, requestedName));
     if (!matching.length) return [syntheticRequestedCondition(requestedName, draft, message, requestedIndex, authorizations)];
     return matching.map((condition: any) => {
-      const conceptName = canonicalExecutableName(condition.conceptName || requestedName);
+      const matchedRequestedName = requested.find(candidate => conditionMatchesConcept(condition, candidate)) || requestedName;
+      const sourceConceptName = catalogKey(String(condition.conceptName || "")) === "candle direction"
+        ? matchedRequestedName
+        : condition.conceptName || matchedRequestedName;
+      const conceptName = canonicalExecutableName(sourceConceptName);
       const parameters = requestedParameters(conceptName, message, condition);
       const conditionTimeframe = timeframes.find(value => catalogKey(value) === catalogKey(String(condition.timeframe || "")))
         || (timeframes.length === 1 ? timeframes[0] : condition.timeframe)
@@ -948,7 +996,7 @@ function enrichDraftConcepts(draft: any, message: string) {
   const conceptsUsed = normalizeConcepts([
     ...(Array.isArray(draft.conceptsUsed) ? draft.conceptsUsed : []),
     ...conceptsRequestedInMessage(message),
-  ], draft.conditions || []);
+  ], draft.conditions || [], message);
   return {
     ...draft,
     conceptsUsed,
@@ -988,35 +1036,17 @@ function catalogKey(value: string) {
     .replace(/\s+/g, " ");
 }
 
-const CONCEPT_ALIASES: Record<string, string[]> = {
-  "fair value gap": ["fvg", "imbalance"],
-  "inverse fair value gap": ["ifvg"],
-  "break of structure": ["bos"],
-  "change of character": ["choch"],
-  "market structure shift": ["mss"],
-  "higher timeframe bias": ["htf"],
-  "lower timeframe confirmation": ["ltf"],
-  "power of 3 / amd": ["amd", "power of 3", "power of three"],
-  "order block": ["ob"],
-  "smt divergence": ["smt"],
-  ema: ["ema", "exponential moving average"],
-  sma: ["sma", "simple moving average"],
-};
-
 function matchCatalogConcept(value: string, catalog: BuilderCatalog): string | null {
   const key = catalogKey(value);
   if (!key) return null;
   if (key === "candle direction") return "Candle Direction";
+  const canonical = resolveTradingConcept(value)?.name;
+  if (canonical) {
+    const canonicalMatch = catalog.concepts.find(concept => catalogKey(concept.name) === catalogKey(canonical));
+    if (canonicalMatch) return canonicalMatch.name;
+  }
   const exact = catalog.concepts.find(concept => catalogKey(concept.name) === key);
   if (exact) return exact.name;
-  const aliasTarget = Object.entries(CONCEPT_ALIASES).find(([, aliases]) => aliases.some(alias => {
-    const aliasKey = catalogKey(alias);
-    return aliasKey === key || key.includes(aliasKey);
-  }))?.[0];
-  if (aliasTarget) {
-    const aliased = catalog.concepts.find(concept => catalogKey(concept.name) === catalogKey(aliasTarget));
-    if (aliased) return aliased.name;
-  }
   const contained = catalog.concepts.find(concept => {
     const conceptKey = catalogKey(concept.name);
     return conceptKey.length > 5 && (key.includes(conceptKey) || conceptKey.includes(key));
@@ -1207,7 +1237,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
         explanation: authorization.explanation,
       })),
   ];
-  const conceptsUsed = normalizeConcepts(retainedConcepts, conditions);
+  const conceptsUsed = normalizeConcepts(retainedConcepts, conditions, requestMessage || "");
   const requestedFrameValues = requestMessage ? requestedTimeframes(requestMessage) : [];
   const timeframes = (requestedFrameValues.length
     ? requestedFrameValues

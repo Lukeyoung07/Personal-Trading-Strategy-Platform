@@ -777,4 +777,51 @@ describe("historical backtest engine", () => {
     expect(result.trades).toHaveLength(1);
     expect(result.trades[0].side).toBe("short");
   });
+
+  it("opens independent later trades after an earlier position closes", () => {
+    const result = runHistoricalBacktest({
+      direction: "long",
+      entryRules: null,
+      exitRules: null,
+      riskRules: null,
+      conditions: [
+        {
+          name: "Bullish entry",
+          conceptName: null,
+          timeframe: "5m",
+          stage: "entry",
+          direction: "long",
+          requirement: "required",
+          triggerRules: "close > open",
+          parameters: null,
+          invalidationRules: null,
+          conceptDetectionRules: null,
+        },
+        {
+          name: "Bearish exit",
+          conceptName: null,
+          timeframe: "5m",
+          stage: "exit",
+          direction: "long",
+          requirement: "required",
+          triggerRules: "close < open",
+          parameters: null,
+          invalidationRules: null,
+          conceptDetectionRules: null,
+        },
+      ],
+    }, [
+      candle(0, { open: 100, close: 101 }),
+      candle(1, { open: 101, close: 102 }),
+      candle(2, { open: 102, close: 101 }),
+      candle(3, { open: 100, close: 100 }),
+      candle(4, { open: 100, close: 101 }),
+      candle(5, { open: 101, close: 102 }),
+    ]);
+
+    expect(result.trades).toHaveLength(2);
+    expect(result.trades.map(trade => trade.entryPrice)).toEqual([101, 101]);
+    expect(result.trades[0].exitReason).toBe("exit_condition:Bearish exit");
+    expect(result.trades[1].exitReason).toBe("end_of_period");
+  });
 });
