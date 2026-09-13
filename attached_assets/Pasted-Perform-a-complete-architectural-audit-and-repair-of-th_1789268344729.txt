@@ -1,0 +1,519 @@
+Perform a complete architectural audit and repair of the ENTIRE Trading Strategy Builder system.
+
+Do not treat this as another individual concept fix.
+
+The goal is to make the Trading Concept Library the single source of truth for the entire strategy lifecycle:
+
+Trading Concept Library
+→ Build with AI
+→ Draft
+→ Builder
+→ Strategy
+→ Immutable Version
+→ Backtesting
+→ Monitoring
+
+The system must behave consistently for completely new strategies without requiring prompt-specific exceptions.
+
+IMPORTANT:
+Do not create a new hard-coded list of concepts.
+Do not fix this by adding more forbidden words.
+Do not fix individual examples one at a time.
+Do not create strategy-specific exceptions.
+
+Find and fix the underlying architecture.
+
+==================================================
+1. SINGLE SOURCE OF TRUTH
+==================================================
+
+The canonical Trading Concept Library must be the authoritative definition of every concept.
+
+Every concept must have:
+
+- Stable canonical ID
+- Canonical name
+- Aliases
+- Directional variants where applicable
+- Definition
+- Parameters
+- Parameter validation
+- Required timeframe
+- Required market/data inputs
+- Executor/evaluator type
+- Executable status
+- Review reason when unsupported
+- Relationship capabilities where applicable
+
+All downstream systems must resolve concepts through this registry.
+
+There must not be separate competing concept definitions in:
+- assistant.ts
+- Builder
+- backtesting
+- monitoring
+- strategy creation
+- version creation
+- compatibility validation
+
+Remove or migrate duplicate concept interpretation logic where necessary.
+
+==================================================
+2. BUILDER
+==================================================
+
+Audit the entire Strategy Builder.
+
+The Builder must construct structured conditions from canonical concept IDs and typed parameters.
+
+A condition must not be identified only by display name.
+
+Each condition should preserve:
+
+- canonical concept ID
+- canonical name
+- direction
+- timeframe
+- typed parameters
+- relationship metadata
+- execution status
+- validation state
+
+The Builder must never silently transform one concept into another.
+
+For example:
+
+- FVG must remain FVG.
+- FVG Retest must remain FVG Retest.
+- Displacement must remain Displacement.
+- Breakout must remain Breakout.
+- EMA Cross must remain EMA Cross.
+
+Directional aliases must resolve to the same canonical concept while preserving direction.
+
+For example:
+
+Bullish Breakout
+Bearish Breakout
+
+must both use canonical Breakout with the correct polarity.
+
+Do not create fake unsupported concepts such as "Short Breakout".
+
+==================================================
+3. BUILD WITH AI
+==================================================
+
+Audit the complete Build with AI pipeline.
+
+The user's positive request is the authorization boundary.
+
+The pipeline must:
+
+1. Parse the user's actual request.
+2. Extract actual requested trading concepts.
+3. Resolve them against the canonical registry.
+4. Preserve typed parameters.
+5. Preserve direction.
+6. Preserve timeframe.
+7. Preserve explicit relationships.
+8. Preserve explicit risk rules.
+9. Reject unauthorized model-generated concepts.
+10. Produce the final structured draft.
+
+The model must NOT be able to inject concepts merely because they appeared in generated prose.
+
+The final structured draft must be authoritative.
+
+Do NOT parse the generated explanation back into trading conditions.
+
+Do NOT allow:
+- previous drafts
+- session state
+- default templates
+- examples
+- old Builder state
+- unrelated model output
+
+to add conditions to a new strategy.
+
+==================================================
+4. NEGATION AND META LANGUAGE
+==================================================
+
+The parser must distinguish actual trading requests from instructions about the application.
+
+These must NEVER become trading concepts:
+
+- Trading Concept Library
+- historical backtesting
+- Builder
+- strategy
+- trading
+- ICT
+- SMC
+- review-required
+- executable
+- backtest
+- monitoring
+- "use only supported concepts"
+- "use the canonical registry"
+- "do not invent concepts"
+- "do not add..."
+- "existing Trading Concept Library"
+- "historical backtesting engine"
+
+Likewise, a concept mentioned only in a prohibition must not be added.
+
+Example:
+
+"Use Breakout. Do not add EMA, RSI, FVG or Displacement."
+
+must produce only Breakout.
+
+==================================================
+5. CONCEPT RELATIONSHIPS
+==================================================
+
+Create a structured relationship model.
+
+Do not rely on plain text to represent relationships.
+
+Support relationships such as:
+
+- AND
+- OR
+- followed_by
+- after
+- before
+- within
+- retest_of
+- confirmation_of
+- invalidates
+- requires
+
+Relationships must be validated against the canonical concepts involved.
+
+Example:
+
+"bullish displacement followed by bullish FVG retest"
+
+must preserve:
+
+Displacement
+→ followed_by
+→ Bullish FVG Retest
+
+It must not silently add unrelated concepts.
+
+==================================================
+6. EXECUTABLE VS REVIEW REQUIRED
+==================================================
+
+Create one authoritative compatibility decision.
+
+A concept is:
+
+EXECUTABLE
+
+only when the canonical registry provides a deterministic evaluator and all required parameters/data are available.
+
+Otherwise:
+
+REVIEW_REQUIRED
+
+with an exact reason.
+
+The compatibility checker must run against the FINAL reconciled structured strategy.
+
+Never calculate Review Required from:
+- raw model output
+- generated prose
+- unfiltered model conditions
+- previous session state
+- unrelated concepts
+
+If every final requested condition is executable:
+
+Review Required = EMPTY.
+
+Do not display Review Required.
+
+If a requested concept is unsupported:
+
+show only that requested unsupported concept.
+
+Do not show unrelated concepts.
+
+==================================================
+7. BACKTESTING
+==================================================
+
+Backtesting must consume the exact canonical structured conditions created by Builder.
+
+Do not create a second interpretation of the strategy.
+
+Every executable condition must use its canonical evaluator.
+
+Verify:
+
+- closed candle behaviour
+- timeframe correctness
+- parameter correctness
+- long/short polarity
+- condition relationships
+- multiple independent trades
+- no accidental one-trade limit
+- no accidental cooldown
+- correct entry/exit behaviour
+
+A strategy should produce the same logical signal whether evaluated through Builder validation, historical backtesting or monitoring.
+
+==================================================
+8. MONITORING
+==================================================
+
+Monitoring must use the same canonical evaluator definitions as backtesting wherever possible.
+
+Verify that:
+
+- the same condition parameters are used
+- the same timeframe is used
+- the same polarity is used
+- the same relationship logic is used
+- open candles are handled correctly
+- missing data is handled consistently
+
+==================================================
+9. RISK MANAGEMENT
+==================================================
+
+Risk rules must remain separate from trading concepts.
+
+Support the canonical structured forms already implemented, including:
+
+- percentage stop loss
+- percentage take profit
+- R-multiple targets where a valid stop defines 1R
+
+Do not convert structural descriptions into invented numeric rules.
+
+Do not allow risk-management prose to become a trading concept.
+
+==================================================
+10. VERSIONING
+==================================================
+
+Verify:
+
+Build with AI
+→ Draft
+→ Builder
+→ Strategy
+→ v1
+
+and then:
+
+Builder modification
+→ v2
+
+The v1 snapshot must remain unchanged.
+
+Every version must preserve:
+
+- canonical concept IDs
+- parameters
+- direction
+- timeframe
+- relationships
+- risk rules
+- executable/review state
+
+==================================================
+11. STATE ISOLATION
+==================================================
+
+This is critical.
+
+Run two completely different Build with AI requests consecutively.
+
+Example:
+
+Request A:
+EMA + RSI + FVG
+
+Request B:
+Breakout only
+
+Request B must contain ZERO EMA, RSI or FVG conditions.
+
+Then reverse them.
+
+Repeat the same request multiple times.
+
+No conditions may accumulate.
+
+Clear stale draft/session/frontend state appropriately.
+
+==================================================
+12. REQUIRED TEST MATRIX
+==================================================
+
+Add automated tests for:
+
+1. Breakout only
+2. Breakout long + short
+3. FVG
+4. FVG Retest
+5. Displacement
+6. Displacement + FVG Retest
+7. Liquidity Sweep + Displacement
+8. EMA Cross
+9. RSI
+10. Multiple concepts
+11. Unsupported concept
+12. Mixed supported + unsupported concepts
+13. Negated concepts
+14. Meta instructions
+15. ICT/SMC wording
+16. Risk rules
+17. Consecutive different requests
+18. Repeated identical requests
+19. Directional aliases
+20. Relationship operators
+21. Multiple independent backtest trades
+22. Version snapshot integrity
+23. Monitoring using the same version
+24. Final Review Required calculation
+
+==================================================
+13. REQUIRED END-TO-END TEST
+==================================================
+
+Create disposable integration tests covering:
+
+Build with AI
+→ Draft
+→ Builder
+→ Strategy
+→ v1
+→ Backtest
+→ Monitoring
+
+Verify the exact canonical structured condition payload at EVERY stage.
+
+The same concept must remain the same concept.
+
+No conditions may be added.
+
+No conditions may disappear.
+
+No parameters may change.
+
+No direction may change.
+
+No timeframe may change.
+
+No relationship may change.
+
+==================================================
+14. REGRESSION TEST
+==================================================
+
+The following request must produce exactly:
+
+Market:
+XAUUSD
+
+Direction:
+BOTH
+
+Timeframe:
+5m
+
+Entry:
+Breakout LONG
+Breakout SHORT
+
+Risk:
+Stop Loss 1%
+Take Profit 2%
+
+Review Required:
+EMPTY
+
+The following concepts must NOT appear anywhere in the final structured draft:
+
+EMA
+SMA
+RSI
+FVG
+FVG Retest
+Displacement
+Liquidity Sweep
+SMT Divergence
+Higher Timeframe Bias
+AMD / Power of 3
+Sessions
+
+They are prohibited/irrelevant to this request.
+
+==================================================
+15. VERIFICATION
+==================================================
+
+After implementation run:
+
+- full API tests
+- frontend tests
+- registry tests
+- Builder tests
+- assistant tests
+- backtesting tests
+- monitoring tests
+- lifecycle integration tests
+- workspace typechecks
+- API production build
+- frontend production build
+- git diff --check
+
+Then perform live browser verification of:
+
+- Trading Concept Library
+- Build with AI
+- Strategy Builder
+- Strategy Library
+- Strategy Version
+- Backtesting
+- Monitoring
+
+Verify there are no browser application errors.
+
+Do not modify existing permanent trading records.
+
+Use disposable fixtures for integration testing.
+
+==================================================
+SUCCESS CRITERIA
+==================================================
+
+The system is complete only when:
+
+1. The Concept Library is the single source of truth.
+2. Builder and AI produce the same canonical structured conditions.
+3. Unsupported concepts are preserved only when explicitly requested.
+4. Unauthorized concepts cannot enter the final draft.
+5. Review Required is calculated only from final authorized conditions.
+6. Supported concepts never incorrectly appear as Review Required.
+7. New requests cannot inherit conditions from old requests.
+8. Relationships are represented structurally.
+9. Backtesting uses the same canonical evaluators.
+10. Monitoring uses the same canonical evaluators.
+11. Versions preserve exact immutable condition snapshots.
+12. Multiple independent trades remain supported.
+13. No prompt-specific exceptions are required.
+14. A completely new strategy can be created without needing another code change.
+
+Do not stop after fixing one example.
+
+The objective is to make the Strategy Builder architecture reliable for ANY future strategy composed from the canonical Trading Concept Library.
