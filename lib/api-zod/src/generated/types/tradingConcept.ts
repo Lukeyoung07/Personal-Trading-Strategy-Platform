@@ -5,6 +5,8 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { TradingConceptCanonicalDefinition } from './tradingConceptCanonicalDefinition';
+import type { TradingConceptCanonicalStatus } from './tradingConceptCanonicalStatus';
 
 export interface TradingConcept {
   id: number;
@@ -23,12 +25,12 @@ export interface TradingConcept {
   /** @nullable */
   registryVersion: string | null;
   /** @nullable */
-  canonicalStatus: 'executable' | 'review_required' | null;
+  canonicalStatus: TradingConceptCanonicalStatus;
   /** @nullable */
   executorKind: string | null;
   /** @nullable */
   aliases: string[] | null;
   /** @nullable */
-  canonicalDefinition: Record<string, unknown> | null;
+  canonicalDefinition: TradingConceptCanonicalDefinition;
   createdAt: Date;
 }

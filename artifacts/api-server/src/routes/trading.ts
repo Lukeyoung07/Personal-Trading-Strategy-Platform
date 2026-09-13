@@ -111,6 +111,20 @@ function conditionParameters(conceptName: string | null | undefined, value: unkn
   return parameters;
 }
 
+function canonicalDefinitionWithState(definition: unknown, state: unknown) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return definition ?? null;
+  const base = definition && typeof definition === "object" && !Array.isArray(definition)
+    ? definition as Record<string, unknown>
+    : {};
+  return { ...base, conditionState: state };
+}
+
+function canonicalStateFromDefinition(definition: unknown) {
+  if (!definition || typeof definition !== "object" || Array.isArray(definition)) return null;
+  const state = (definition as Record<string, unknown>).conditionState;
+  return state && typeof state === "object" && !Array.isArray(state) ? state : null;
+}
+
 const DEFAULT_CONCEPTS = [
   ["MARKET STRUCTURE", "Higher High"],
   ["MARKET STRUCTURE", "Higher Low"],
@@ -961,6 +975,7 @@ async function buildVersionConditionSnapshots(
       canonicalStatus: concept?.canonicalStatus ?? null,
       executorKind: concept?.executorKind ?? null,
       canonicalDefinition: concept?.canonicalDefinition ?? null,
+      canonicalState: canonicalStateFromDefinition(condition.canonicalDefinition),
       stage: condition.stage,
       name: condition.name,
       description: condition.description,
@@ -1029,6 +1044,7 @@ router.post("/strategies", async (req, res): Promise<void> => {
         direction: strategy.direction,
         timeframes: strategy.timeframes,
         riskManagementRules: strategy.riskManagementRules,
+        riskSnapshot: strategy.riskSnapshot,
         resetRules: strategy.resetRules,
         alertRules: strategy.alertRules,
       }).returning();
@@ -1040,8 +1056,9 @@ router.post("/strategies", async (req, res): Promise<void> => {
           .where(eq(tradingConceptsTable.id, inputCondition.conceptId));
         if (!concept) throw new Error("Concept not found.");
         const parameters = conditionParameters(concept.name, inputCondition.parameters);
+        const { canonicalState, ...conditionInput } = inputCondition;
         const [condition] = await tx.insert(strategyConditionsTable).values({
-          ...inputCondition,
+          ...conditionInput,
           strategyId: strategy.id,
           conditionOrder: index + 1,
           parameters,
@@ -1049,7 +1066,7 @@ router.post("/strategies", async (req, res): Promise<void> => {
           registryVersion: concept.registryVersion,
           canonicalStatus: concept.canonicalStatus,
           executorKind: concept.executorKind,
-          canonicalDefinition: concept.canonicalDefinition,
+          canonicalDefinition: canonicalDefinitionWithState(concept.canonicalDefinition, canonicalState),
         }).returning();
         persistedConditions.push(condition);
       }
@@ -1149,6 +1166,7 @@ router.post("/strategies/:strategyId/duplicate", async (req, res): Promise<void>
       direction: source.direction,
       timeframes: source.timeframes,
       riskManagementRules: source.riskManagementRules,
+      riskSnapshot: source.riskSnapshot,
       resetRules: source.resetRules,
       alertRules: source.alertRules,
     }).returning();
@@ -1165,6 +1183,7 @@ router.post("/strategies/:strategyId/duplicate", async (req, res): Promise<void>
       direction: strategy.direction,
       timeframes: strategy.timeframes,
       riskManagementRules: strategy.riskManagementRules,
+      riskSnapshot: strategy.riskSnapshot,
       resetRules: strategy.resetRules,
       alertRules: strategy.alertRules,
     }).returning();
@@ -1265,6 +1284,7 @@ router.post("/strategies/:strategyId/versions", async (req, res): Promise<void> 
         direction: current.direction,
         timeframes: current.timeframes,
         riskManagementRules: current.riskManagementRules,
+        riskSnapshot: body.data.riskSnapshot ?? current.riskSnapshot,
         resetRules: current.resetRules,
         alertRules: current.alertRules,
       })
@@ -1308,6 +1328,7 @@ async function activateVersionSnapshot(strategyId: number, versionId: number) {
       direction: version.direction,
       timeframes: version.timeframes,
       riskManagementRules: version.riskManagementRules,
+      riskSnapshot: version.riskSnapshot,
       resetRules: version.resetRules,
       alertRules: version.alertRules,
       updatedAt: new Date(),
@@ -1390,6 +1411,7 @@ router.post("/strategies/:strategyId/versions/:versionId/clone", async (req, res
       direction: source.direction,
       timeframes: source.timeframes,
       riskManagementRules: source.riskManagementRules,
+      riskSnapshot: source.riskSnapshot,
       resetRules: source.resetRules,
       alertRules: source.alertRules,
     }).returning();
@@ -1432,6 +1454,7 @@ router.post("/strategies/:strategyId/versions/:versionId/clone", async (req, res
       direction: source.direction,
       timeframes: source.timeframes,
       riskManagementRules: source.riskManagementRules,
+      riskSnapshot: source.riskSnapshot,
       resetRules: source.resetRules,
       alertRules: source.alertRules,
       updatedAt: new Date(),
@@ -1483,7 +1506,11 @@ router.get("/strategies/:strategyId/versions/:versionId/conditions", async (req,
     .where(eq(strategyVersionConditionsTable.strategyVersionId, params.data.versionId))
     .orderBy(asc(strategyVersionConditionsTable.conditionOrder));
   const withConcepts = await Promise.all(rows.map(async condition => {
-    return { ...condition, order: condition.conditionOrder };
+    return {
+      ...condition,
+      canonicalState: canonicalStateFromDefinition(condition.canonicalDefinition),
+      order: condition.conditionOrder,
+    };
   }));
   res.json(ListStrategyVersionConditionsResponse.parse(withConcepts));
 });
@@ -1497,6 +1524,7 @@ async function strategyConditionView(condition: typeof strategyConditionsTable.$
     ...condition,
     conceptName: concept?.name ?? "Missing concept",
     conceptCategory: concept?.category ?? null,
+    canonicalState: canonicalStateFromDefinition(condition.canonicalDefinition),
     order: condition.conditionOrder,
   };
 }
@@ -1543,10 +1571,11 @@ router.post("/strategies/:strategyId/conditions", async (req, res): Promise<void
     .select({ conditionOrder: max(strategyConditionsTable.conditionOrder) })
     .from(strategyConditionsTable)
     .where(eq(strategyConditionsTable.strategyId, params.data.strategyId));
+  const { canonicalState, ...conditionInput } = body.data;
   const [created] = await db
     .insert(strategyConditionsTable)
     .values({
-      ...body.data,
+      ...conditionInput,
       parameters,
       strategyId: params.data.strategyId,
       conditionOrder: Number(latest?.conditionOrder ?? 0) + 1,
@@ -1554,7 +1583,7 @@ router.post("/strategies/:strategyId/conditions", async (req, res): Promise<void
       registryVersion: concept.registryVersion,
       canonicalStatus: concept.canonicalStatus,
       executorKind: concept.executorKind,
-      canonicalDefinition: concept.canonicalDefinition,
+      canonicalDefinition: canonicalDefinitionWithState(concept.canonicalDefinition, canonicalState),
     })
     .returning();
   res.status(201).json(CreateStrategyConditionResponse.parse(await strategyConditionView(created)));
@@ -1614,17 +1643,21 @@ router.patch("/strategies/:strategyId/conditions/:conditionId", async (req, res)
     res.status(400).json({ error: error instanceof Error ? error.message : "Condition parameters are invalid." });
     return;
   }
+  const { canonicalState, ...conditionInput } = body.data;
   const [updated] = await db
     .update(strategyConditionsTable)
     .set({
-      ...body.data,
+      ...conditionInput,
       parameters,
       updatedAt: new Date(),
       canonicalId: concept.canonicalId,
       registryVersion: concept.registryVersion,
       canonicalStatus: concept.canonicalStatus,
       executorKind: concept.executorKind,
-      canonicalDefinition: concept.canonicalDefinition,
+      canonicalDefinition: canonicalDefinitionWithState(
+        concept.canonicalDefinition,
+        canonicalState ?? canonicalStateFromDefinition(existing.canonicalDefinition),
+      ),
     })
     .where(and(eq(strategyConditionsTable.id, params.data.conditionId), eq(strategyConditionsTable.strategyId, params.data.strategyId)))
     .returning();

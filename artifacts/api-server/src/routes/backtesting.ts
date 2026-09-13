@@ -97,6 +97,9 @@ function engineCondition(condition: typeof strategyVersionConditionsTable.$infer
     requirement: condition.requirement as BacktestCondition["requirement"],
     triggerRules: condition.triggerRules,
     parameters: condition.parameters,
+    canonicalState: condition.canonicalDefinition && typeof condition.canonicalDefinition === "object"
+      ? (condition.canonicalDefinition as Record<string, unknown>).conditionState as BacktestCondition["canonicalState"]
+      : null,
     invalidationRules: condition.invalidationRules,
     conceptDetectionRules: condition.conceptDetectionRules,
   };

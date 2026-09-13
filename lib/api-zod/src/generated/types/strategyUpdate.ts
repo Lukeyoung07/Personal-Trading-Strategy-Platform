@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { StrategyUpdateDirection } from './strategyUpdateDirection';
+import type { StrategyUpdateRiskSnapshot } from './strategyUpdateRiskSnapshot';
 import type { StrategyUpdateStatus } from './strategyUpdateStatus';
 
 export interface StrategyUpdate {
@@ -22,6 +23,8 @@ export interface StrategyUpdate {
   timeframes?: string[];
   /** @nullable */
   riskManagementRules?: string | null;
+  /** @nullable */
+  riskSnapshot?: StrategyUpdateRiskSnapshot;
   /** @nullable */
   resetRules?: string | null;
   /** @nullable */

@@ -1756,6 +1756,7 @@ components:
           items:
             $ref: "#/components/schemas/StrategyConditionInput"
         riskManagementRules: { type: ["string", "null"] }
+        riskSnapshot: { type: ["object", "null"], additionalProperties: true }
         resetRules: { type: ["string", "null"] }
         alertRules: { type: ["string", "null"] }
     StrategyDuplicateInput:
@@ -1779,11 +1780,12 @@ components:
           type: array
           items: { type: string }
         riskManagementRules: { type: ["string", "null"] }
+        riskSnapshot: { type: ["object", "null"], additionalProperties: true }
         resetRules: { type: ["string", "null"] }
         alertRules: { type: ["string", "null"] }
     StrategyVersion:
       type: object
-      required: [id, strategyId, versionNumber, isActive, label, name, description, thesis, entryRules, exitRules, riskRules, notes, marketId, marketSymbol, assetClass, direction, timeframes, riskManagementRules, resetRules, alertRules, conditionCount, tradeCount, winRate, netPnl, averagePnl, createdAt]
+      required: [id, strategyId, versionNumber, isActive, label, name, description, thesis, entryRules, exitRules, riskRules, notes, marketId, marketSymbol, assetClass, direction, timeframes, riskManagementRules, riskSnapshot, resetRules, alertRules, conditionCount, tradeCount, winRate, netPnl, averagePnl, createdAt]
       properties:
         id: { type: integer }
         strategyId: { type: integer }
@@ -1807,6 +1809,7 @@ components:
           type: array
           items: { type: string }
         riskManagementRules: { type: ["string", "null"] }
+        riskSnapshot: { type: ["object", "null"], additionalProperties: true }
         resetRules: { type: ["string", "null"] }
         alertRules: { type: ["string", "null"] }
         conditionCount: { type: integer }
@@ -1823,6 +1826,7 @@ components:
         entryRules: { type: ["string", "null"] }
         exitRules: { type: ["string", "null"] }
         riskRules: { type: ["string", "null"] }
+        riskSnapshot: { type: ["object", "null"], additionalProperties: true }
         notes: { type: ["string", "null"] }
     StrategyVersionCloneInput:
       type: object
@@ -1830,7 +1834,7 @@ components:
         label: { type: ["string", "null"] }
     StrategyVersionCondition:
       type: object
-      required: [id, strategyVersionId, conceptId, conceptName, conceptCategory, conceptDescription, conceptDetectionRules, conceptInvalidationRules, canonicalId, registryVersion, canonicalStatus, executorKind, canonicalDefinition, stage, name, description, timeframe, direction, requirement, order, triggerRules, parameters, invalidationRules, resetBehavior, createdAt]
+      required: [id, strategyVersionId, conceptId, conceptName, conceptCategory, conceptDescription, conceptDetectionRules, conceptInvalidationRules, canonicalId, registryVersion, canonicalStatus, executorKind, canonicalDefinition, canonicalState, stage, name, description, timeframe, direction, requirement, order, triggerRules, parameters, invalidationRules, resetBehavior, createdAt]
       properties:
         id: { type: integer }
         strategyVersionId: { type: integer }
@@ -1845,6 +1849,7 @@ components:
         canonicalStatus: { type: ["string", "null"] }
         executorKind: { type: ["string", "null"] }
         canonicalDefinition: { type: ["object", "null"], additionalProperties: true }
+        canonicalState: { type: ["object", "null"], additionalProperties: true }
         stage:
           type: string
           enum: [entry, confirmation, invalidation, exit]
@@ -1865,7 +1870,7 @@ components:
         createdAt: { type: string, format: date-time }
     StrategyCondition:
       type: object
-      required: [id, strategyId, conceptId, conceptName, conceptCategory, canonicalId, registryVersion, canonicalStatus, executorKind, canonicalDefinition, stage, name, description, timeframe, direction, requirement, order, triggerRules, parameters, invalidationRules, resetBehavior, createdAt, updatedAt]
+      required: [id, strategyId, conceptId, conceptName, conceptCategory, canonicalId, registryVersion, canonicalStatus, executorKind, canonicalDefinition, canonicalState, stage, name, description, timeframe, direction, requirement, order, triggerRules, parameters, invalidationRules, resetBehavior, createdAt, updatedAt]
       properties:
         id: { type: integer }
         strategyId: { type: integer }
@@ -1877,6 +1882,7 @@ components:
         canonicalStatus: { type: ["string", "null"] }
         executorKind: { type: ["string", "null"] }
         canonicalDefinition: { type: ["object", "null"], additionalProperties: true }
+        canonicalState: { type: ["object", "null"], additionalProperties: true }
         stage:
           type: string
           enum: [entry, confirmation, invalidation, exit]
@@ -1917,6 +1923,7 @@ components:
           default: required
         triggerRules: { type: ["string", "null"] }
         parameters: { type: ["object", "null"], additionalProperties: true }
+        canonicalState: { type: ["object", "null"], additionalProperties: true }
         invalidationRules: { type: ["string", "null"] }
         resetBehavior: { type: ["string", "null"] }
     StrategyConditionUpdate:
@@ -1937,6 +1944,7 @@ components:
           enum: [required, optional]
         triggerRules: { type: ["string", "null"] }
         parameters: { type: ["object", "null"], additionalProperties: true }
+        canonicalState: { type: ["object", "null"], additionalProperties: true }
         invalidationRules: { type: ["string", "null"] }
         resetBehavior: { type: ["string", "null"] }
     StrategyConditionReorderInput:

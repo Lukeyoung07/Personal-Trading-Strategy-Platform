@@ -447,6 +447,9 @@ export class StrategyMonitoringEngine {
           stage: condition.stage as "entry" | "confirmation" | "invalidation" | "exit",
           triggerRules: condition.triggerRules,
           parameters: condition.parameters,
+          canonicalState: condition.canonicalDefinition && typeof condition.canonicalDefinition === "object"
+            ? (condition.canonicalDefinition as Record<string, unknown>).conditionState as BacktestCondition["canonicalState"]
+            : null,
           invalidationRules: condition.invalidationRules,
           conceptDetectionRules: condition.conceptDetectionRules,
         } satisfies BacktestCondition & { id: number; conceptId: number; timeframe: string; order: number };

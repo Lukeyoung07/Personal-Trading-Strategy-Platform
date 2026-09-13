@@ -5,6 +5,7 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { StrategyConditionInputCanonicalState } from './strategyConditionInputCanonicalState';
 import type { StrategyConditionInputDirection } from './strategyConditionInputDirection';
 import type { StrategyConditionInputParameters } from './strategyConditionInputParameters';
 import type { StrategyConditionInputRequirement } from './strategyConditionInputRequirement';
@@ -26,6 +27,8 @@ export interface StrategyConditionInput {
   triggerRules?: string | null;
   /** @nullable */
   parameters?: StrategyConditionInputParameters;
+  /** @nullable */
+  canonicalState?: StrategyConditionInputCanonicalState;
   /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */

@@ -6,7 +6,7 @@ import {
 
 describe("canonical trading concept registry", () => {
   it("covers the complete built-in library without duplicate canonical IDs or labels", () => {
-    expect(TRADING_CONCEPT_REGISTRY).toHaveLength(130);
+    expect(TRADING_CONCEPT_REGISTRY).toHaveLength(134);
 
     const ids = TRADING_CONCEPT_REGISTRY.map(definition => definition.canonicalId);
     expect(new Set(ids).size).toBe(ids.length);

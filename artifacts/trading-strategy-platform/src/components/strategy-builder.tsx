@@ -352,6 +352,18 @@ function StrategyForm({ strategy, markets, concepts, timeframes, onClose, onSave
        direction: strategy ? strategy.direction : String(form.get("direction") || initialDraft?.direction || "both") as "long" | "short" | "both",
        timeframes: savedTimeframes,
        riskManagementRules: strategy ? strategy.riskManagementRules : String(form.get("riskManagementRules") || initialDraft?.riskManagementRules || "") || null,
+       riskSnapshot: !strategy && initialDraft?.riskRules?.length
+         ? {
+           rules: initialDraft.riskRules,
+           executionStatus: initialDraft.riskRules.some(rule => rule.executionStatus === "review_required") ? "review_required" : "executable",
+           validation: {
+             valid: initialDraft.riskRules.every(rule => rule.validation.valid),
+             status: initialDraft.riskRules.some(rule => rule.executionStatus === "review_required") ? "review_required" : "valid",
+             reasons: initialDraft.riskRules.flatMap(rule => rule.validation.reasons),
+             warnings: initialDraft.riskRules.flatMap(rule => rule.validation.warnings),
+           },
+         }
+         : null,
       resetRules: String(form.get("resetRules") || "") || null,
       alertRules: String(form.get("alertRules") || "") || null,
     };
@@ -374,6 +386,25 @@ function StrategyForm({ strategy, markets, concepts, timeframes, onClose, onSave
            requirement: condition.requirement,
            triggerRules: condition.triggerRules || null,
            parameters: condition.parameters || null,
+           canonicalState: {
+             canonicalId: concept.canonicalId ?? canonical?.canonicalId ?? null,
+             registryVersion: concept.registryVersion ?? canonical?.registryVersion ?? null,
+             evaluatorVersion: canonical?.evaluatorVersion ?? null,
+             executorKind: concept.executorKind ?? canonical?.executorKind ?? null,
+             conceptName: concept.name,
+             parameters: condition.parameters || {},
+             direction: condition.direction || baseData.direction,
+             timeframe: condition.timeframe || savedTimeframes[0] || "Not specified",
+             relationship: condition.relationship || null,
+             provenance: condition.provenance || "builder",
+             executionStatus: condition.executionStatus || (canonical?.status === "executable" ? "executable" : "review_required"),
+             validation: condition.validation || {
+               valid: canonical?.status === "executable",
+               status: canonical?.status === "executable" ? "valid" : "review_required",
+               reasons: canonical?.status === "executable" ? [] : [canonical?.statusReason || "This condition requires review before execution."],
+               warnings: [],
+             },
+           },
            invalidationRules: null,
            resetBehavior: null,
          }];

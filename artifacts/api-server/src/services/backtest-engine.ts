@@ -4,6 +4,7 @@ import {
   normalizeExecutableParameters,
   resolveTradingConcept,
   type ExecutableConceptParameters,
+  type CanonicalConditionSnapshot,
 } from "@workspace/api-zod";
 
 export type BacktestSide = "long" | "short";
@@ -30,6 +31,7 @@ export interface BacktestCondition {
   parameters?: unknown;
   invalidationRules: string | null;
   conceptDetectionRules: string | null;
+  canonicalState?: CanonicalConditionSnapshot | null;
 }
 
 export interface BacktestStrategy {
@@ -156,6 +158,11 @@ function evaluateRule(rule: string, candle: HistoricalCandle, previous: Historic
 }
 
 function executableParameters(condition: BacktestCondition): ExecutableConceptParameters | null {
+  const saved = condition.canonicalState;
+  if (saved) {
+    if (saved.executionStatus !== "executable" || !saved.executorKind || !saved.parameters) return null;
+    return { ...saved.parameters, kind: saved.executorKind } as ExecutableConceptParameters;
+  }
   const conceptName = condition.conceptName || condition.name;
   const definition = resolveTradingConcept(conceptName);
   if (definition && definition.status !== "executable") return null;
@@ -163,6 +170,7 @@ function executableParameters(condition: BacktestCondition): ExecutableConceptPa
 }
 
 function isReviewRequiredConcept(condition: BacktestCondition) {
+  if (condition.canonicalState) return condition.canonicalState.executionStatus !== "executable";
   const conceptName = condition.conceptName || condition.name;
   const definition = resolveTradingConcept(conceptName);
   if (["bullish candle", "bearish candle", "candle direction"].includes(

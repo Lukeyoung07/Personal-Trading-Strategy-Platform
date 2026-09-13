@@ -5,6 +5,7 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { StrategyVersionInputRiskSnapshot } from './strategyVersionInputRiskSnapshot';
 
 export interface StrategyVersionInput {
   /** @nullable */
@@ -17,6 +18,8 @@ export interface StrategyVersionInput {
   exitRules?: string | null;
   /** @nullable */
   riskRules?: string | null;
+  /** @nullable */
+  riskSnapshot?: StrategyVersionInputRiskSnapshot;
   /** @nullable */
   notes?: string | null;
 }

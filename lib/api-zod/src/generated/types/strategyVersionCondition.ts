@@ -5,6 +5,8 @@
  * Broker-independent trading strategy workspace API
  * OpenAPI spec version: 0.1.0
  */
+import type { StrategyVersionConditionCanonicalDefinition } from './strategyVersionConditionCanonicalDefinition';
+import type { StrategyVersionConditionCanonicalState } from './strategyVersionConditionCanonicalState';
 import type { StrategyVersionConditionDirection } from './strategyVersionConditionDirection';
 import type { StrategyVersionConditionParameters } from './strategyVersionConditionParameters';
 import type { StrategyVersionConditionRequirement } from './strategyVersionConditionRequirement';
@@ -32,7 +34,9 @@ export interface StrategyVersionCondition {
   /** @nullable */
   executorKind: string | null;
   /** @nullable */
-  canonicalDefinition: Record<string, unknown> | null;
+  canonicalDefinition: StrategyVersionConditionCanonicalDefinition;
+  /** @nullable */
+  canonicalState: StrategyVersionConditionCanonicalState;
   stage: StrategyVersionConditionStage;
   name: string;
   /** @nullable */

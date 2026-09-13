@@ -1,3 +1,5 @@
+import { resolveTradingConcept, TRADING_CONCEPT_REGISTRY } from "./concept-registry";
+
 export type LiquiditySweepParameters = {
   kind: "liquidity_sweep";
   level: "previous_candle" | "lookback_extreme";
@@ -194,103 +196,12 @@ export const DEFAULT_SESSION_PARAMETERS: SessionParameters = {
 const keyForConcept = (name: string) => name.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
 
 export function executableConceptLabel(name: string | null | undefined): string | null {
-  const key = keyForConcept(name || "");
-  if (key.includes("liquidity sweep")) return "Liquidity Sweep";
-  if (key.includes("inverse fair value gap") || key === "ifvg" || key.endsWith(" ifvg")) return "Inverse Fair Value Gap";
-  if (key.includes("fair value gap") || key === "fvg" || key.includes("fvg ") || key.endsWith(" fvg")) return "Fair Value Gap";
-  if (key.includes("break of structure") || key === "bos") return "Break of Structure";
-  if (key.includes("change of character") || key === "choch") return "Change of Character";
-   if (key.includes("market structure shift") || key === "mss" || key === "htf structure" || key.includes("higher timeframe structure") || key === "bullish structure" || key === "bearish structure") return "Market Structure Shift";
-  if (key.includes("higher high") || key === "hh") return "Higher High";
-  if (key.includes("higher low") || key === "hl") return "Higher Low";
-  if (key.includes("lower high") || key === "lh") return "Lower High";
-  if (key.includes("lower low") || key === "ll") return "Lower Low";
-  if (key.includes("swing high")) return "Swing High";
-  if (key.includes("swing low")) return "Swing Low";
-  if (key.includes("buy side")) return "Buy-Side Liquidity";
-  if (key.includes("sell side")) return "Sell-Side Liquidity";
-  if (key.includes("equal high")) return "Equal Highs";
-  if (key.includes("equal low")) return "Equal Lows";
-  if (key.includes("previous day high")) return "Previous Day High";
-  if (key.includes("previous day low")) return "Previous Day Low";
-  if (key.includes("previous week high")) return "Previous Week High";
-  if (key.includes("previous week low")) return "Previous Week Low";
-  if (key.includes("ema")) return "EMA";
-  if (key.includes("sma")) return "SMA";
-  if (key.includes("rsi")) return "RSI";
-  if (key.includes("macd")) return "MACD";
-  if (key.includes("vwap")) return "VWAP";
-  if (key.includes("atr")) return "ATR";
-  if (key.includes("breakout retest") || key.includes("break and retest")) return "Breakout Retest";
-  if (key === "failed breakout" || key.includes("failed breakout") || key === "false breakout") return "Failed Breakout";
-  if (key === "breakout") return "Breakout";
-  if (key.includes("bullish engulfing")) return "Bullish Engulfing";
-  if (key.includes("bearish engulfing")) return "Bearish Engulfing";
-  if (key.includes("pin bar")) return "Pin Bar";
-  if (key.includes("inside bar")) return "Inside Bar";
-  if (key === "rejection" || key === "wick rejection" || key === "rejection candle" || key === "bullish rejection" || key === "bearish rejection") return "Rejection";
-  if (key === "support") return "Support";
-  if (key === "resistance") return "Resistance";
-  if (key === "premium") return "Premium";
-  if (key === "discount") return "Discount";
-  if (key.includes("equilibrium")) return "Equilibrium";
-  if (key === "displacement" || key.includes("displacement")) return "Displacement";
-  if (key.includes("kill zone")) return "Kill Zones";
-  if (key.includes("new york") || key.includes("ny ") || key === "ny") return "New York Session";
-  if (key.includes("london")) return "London Session";
-  if (key.includes("asian") || key === "asia") return "Asian Session";
-  if (key === "session") return "Session";
-  return null;
+  const definition = resolveTradingConcept(name);
+  return definition?.status === "executable" ? definition.name : null;
 }
 
 export function executableConceptKind(name: string | null | undefined): ExecutableConceptParameters["kind"] | null {
-  const key = keyForConcept(name || "");
-  if (key.includes("liquidity sweep")) return "liquidity_sweep";
-  if (
-    key.includes("break of structure") || key === "bos" ||
-    key.includes("change of character") || key === "choch" ||
-     key.includes("market structure shift") || key === "mss" || key === "htf structure" || key.includes("higher timeframe structure") || key === "bullish structure" || key === "bearish structure" ||
-    key === "higher high" || key === "hh" || key === "higher low" || key === "hl" ||
-    key === "lower high" || key === "lh" || key === "lower low" || key === "ll" ||
-    key === "swing high" || key === "swing low"
-  ) return "market_structure";
-  if (
-    key === "buy side liquidity" || key === "buy side" || key === "sell side liquidity" || key === "sell side" ||
-    key === "equal highs" || key === "equal high" || key === "equal lows" || key === "equal low" ||
-    key === "previous day high" || key === "previous day low" ||
-    key === "previous week high" || key === "previous week low"
-  ) return "liquidity_level";
-  if (
-    key === "fvg" ||
-    key.startsWith("fvg ") ||
-    key.includes("fair value gap") ||
-    key.includes("bullish fvg") ||
-    key.includes("bearish fvg")
-  ) return "fair_value_gap";
-  if (key.includes("inverse fair value gap") || key === "ifvg" || key === "bullish ifvg" || key === "bearish ifvg") return "fair_value_gap";
-  if (
-    key === "ema" || key.startsWith("ema ") || key === "exponential moving average" || key.startsWith("exponential moving average ") ||
-    key === "sma" || key.startsWith("sma ") || key === "simple moving average" || key.startsWith("simple moving average ") ||
-    key === "ema cross" || key === "ema crossover" || key === "sma cross" || key === "sma crossover" ||
-    key.includes("price above ema") || key.includes("price below ema") ||
-    key === "rsi" || key.startsWith("rsi ") || key === "rsi overbought" || key === "rsi oversold" ||
-    key === "macd" || key.startsWith("macd ") || key === "macd cross" || key === "vwap" || key === "atr" || key.startsWith("atr ")
-  ) return "indicator";
-  if (
-    key === "breakout" || key === "breakout retest" || key === "break and retest" ||
-    key === "bullish engulfing" || key === "bearish engulfing" || key === "pin bar" ||
-    key === "inside bar" || key === "support" || key === "resistance"
-  ) return "price_action";
-  if (key === "rejection" || key === "wick rejection" || key === "rejection candle" || key === "bullish rejection" || key === "bearish rejection") return "rejection";
-  if (key === "premium" || key === "discount" || key === "equilibrium" || key === "50 equilibrium") return "range_location";
-  if (key === "displacement" || key.includes("displacement")) return "displacement";
-  if (key === "failed breakout" || key.includes("failed breakout") || key === "false breakout") return "failed_breakout";
-  if (
-    key === "session" || key.includes("london session") || key.includes("new york session") ||
-    key.includes("asian session") || key === "asia session" || key.includes("kill zone") ||
-    key.includes("london") || key.includes("new york") || key === "ny" || key.includes("ny session") || key.includes("asian") || key === "asia"
-  ) return "session";
-  return null;
+  return resolveTradingConcept(name)?.executorKind ?? null;
 }
 
 function integerInRange(value: unknown, minimum: number, maximum: number): value is number {
@@ -317,8 +228,8 @@ function validIanaTimezone(value: unknown): value is string {
 
 function sessionNameForConcept(conceptName: string): SessionName {
   const key = keyForConcept(conceptName);
-  if (key.includes("kill zone")) return "kill_zone";
   if (key.includes("new york") || key === "ny" || key.includes("ny session")) return "new_york";
+  if (key.includes("kill zone")) return "kill_zone";
   if (key.includes("asian") || key === "asia" || key.includes("asia session")) return "asian";
   return "london";
 }
@@ -573,63 +484,30 @@ export function executableConceptTriggerRules(parameters: ExecutableConceptParam
   return `Range location: ${parameters.location}`;
 }
 
-export const EXECUTABLE_CONCEPT_DEFINITIONS = {
-  liquidity_sweep: {
-    label: "Liquidity Sweep",
-    description: "The candle takes a prior liquidity level and closes back inside it.",
-    aliases: ["liquidity sweep"],
-  },
-  fair_value_gap: {
-    label: "Fair Value Gap",
-    description: "A three-candle imbalance, evaluated as formation or a later retest.",
-    aliases: ["fair value gap", "fvg", "bullish fvg", "bearish fvg", "fvg retest", "fvg fill", "ifvg", "bullish ifvg", "bearish ifvg"],
-  },
-  market_structure: {
-    label: "Market Structure",
-    description: "Causal rolling structure levels identify swings, HH/HL/LH/LL, and directional breaks.",
-    aliases: ["higher high", "higher low", "lower high", "lower low", "break of structure", "bos", "change of character", "choch", "market structure shift", "mss", "htf structure", "swing high", "swing low"],
-  },
-  liquidity_level: {
-    label: "Liquidity Level",
-    description: "Historical prior, equal, day, and week levels derived from completed OHLC candles.",
-    aliases: ["buy-side liquidity", "sell-side liquidity", "equal highs", "equal lows", "previous day high", "previous day low", "previous week high", "previous week low"],
-  },
-  indicator: {
-    label: "Technical Indicator",
-    description: "EMA, SMA, RSI, MACD, VWAP, and ATR calculations from historical OHLC data.",
-    aliases: ["ema", "sma", "rsi", "rsi overbought", "rsi oversold", "macd", "macd cross", "vwap", "atr", "ema cross", "sma cross", "price above ema", "price below ema"],
-  },
-  price_action: {
-    label: "Price Action",
-    description: "Deterministic candle patterns and rolling-range breakouts from OHLC data.",
-    aliases: ["breakout", "break and retest", "breakout retest", "bullish engulfing", "bearish engulfing", "pin bar", "inside bar", "support", "resistance"],
-  },
-  range_location: {
-    label: "Range Location",
-    description: "Premium, discount, or equilibrium relative to an established rolling high-low range.",
-    aliases: ["premium", "discount", "equilibrium", "50% equilibrium"],
-  },
-  displacement: {
-    label: "Displacement",
-    description: "A directional candle whose body is at least a configured multiple of prior ATR and closes near its directional extreme.",
-    aliases: ["displacement", "bullish displacement", "bearish displacement"],
-  },
-  rejection: {
-    label: "Rejection",
-    description: "A directional candle with a configurable wick fraction and close location.",
-    aliases: ["rejection", "wick rejection", "rejection candle", "bullish rejection", "bearish rejection"],
-  },
-  failed_breakout: {
-    label: "Failed Breakout",
-    description: "A confirmed support or resistance breakout that closes back through the same level within a bounded number of closed candles.",
-    aliases: ["failed breakout", "false breakout"],
-  },
-  session: {
-    label: "Session",
-    description: "A candle timestamp falls inside a configured IANA-timezone session window with DST-aware local boundaries.",
-    aliases: ["london session", "new york session", "ny session", "asian session", "asia session", "kill zone", "kill zones"],
-  },
-} as const;
+const executableDefinitionEntries = new Map<ExecutableConceptParameters["kind"], {
+  label: string;
+  description: string;
+  aliases: string[];
+}>();
+for (const definition of TRADING_CONCEPT_REGISTRY) {
+  if (!definition.executorKind || definition.status !== "executable") continue;
+  const existing = executableDefinitionEntries.get(definition.executorKind);
+  executableDefinitionEntries.set(definition.executorKind, {
+    label: existing?.label ?? definition.name,
+    description: existing?.description ?? definition.definition,
+    aliases: [...new Set([
+      ...(existing?.aliases ?? []),
+      definition.name,
+      ...definition.aliases,
+    ])],
+  });
+}
 
-export const EXECUTABLE_CONCEPT_REQUEST_ALIASES = Object.values(EXECUTABLE_CONCEPT_DEFINITIONS)
-  .flatMap(definition => definition.aliases);
+export const EXECUTABLE_CONCEPT_DEFINITIONS = Object.fromEntries(executableDefinitionEntries) as Record<
+  ExecutableConceptParameters["kind"],
+  { label: string; description: string; aliases: string[] }
+>;
+
+export const EXECUTABLE_CONCEPT_REQUEST_ALIASES = TRADING_CONCEPT_REGISTRY
+  .filter(definition => definition.status === "executable")
+  .flatMap(definition => [definition.name, ...definition.aliases]);

@@ -7,6 +7,7 @@
  */
 import type { StrategyConditionInput } from './strategyConditionInput';
 import type { StrategyInputDirection } from './strategyInputDirection';
+import type { StrategyInputRiskSnapshot } from './strategyInputRiskSnapshot';
 import type { StrategyInputStatus } from './strategyInputStatus';
 
 export interface StrategyInput {
@@ -24,6 +25,8 @@ export interface StrategyInput {
   conditions?: StrategyConditionInput[];
   /** @nullable */
   riskManagementRules?: string | null;
+  /** @nullable */
+  riskSnapshot?: StrategyInputRiskSnapshot;
   /** @nullable */
   resetRules?: string | null;
   /** @nullable */

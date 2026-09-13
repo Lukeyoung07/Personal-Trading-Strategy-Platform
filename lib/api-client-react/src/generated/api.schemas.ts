@@ -446,6 +446,11 @@ export const StrategyInputDirection = {
   both: 'both',
 } as const;
 
+/**
+ * @nullable
+ */
+export type StrategyInputRiskSnapshot = { [key: string]: unknown } | null;
+
 export type StrategyConditionInputStage = typeof StrategyConditionInputStage[keyof typeof StrategyConditionInputStage];
 
 
@@ -478,6 +483,11 @@ export const StrategyConditionInputRequirement = {
  */
 export type StrategyConditionInputParameters = { [key: string]: unknown } | null;
 
+/**
+ * @nullable
+ */
+export type StrategyConditionInputCanonicalState = { [key: string]: unknown } | null;
+
 export interface StrategyConditionInput {
   /** @minimum 1 */
   conceptId: number;
@@ -494,6 +504,8 @@ export interface StrategyConditionInput {
   triggerRules?: string | null;
   /** @nullable */
   parameters?: StrategyConditionInputParameters;
+  /** @nullable */
+  canonicalState?: StrategyConditionInputCanonicalState;
   /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */
@@ -515,6 +527,8 @@ export interface StrategyInput {
   conditions?: StrategyConditionInput[];
   /** @nullable */
   riskManagementRules?: string | null;
+  /** @nullable */
+  riskSnapshot?: StrategyInputRiskSnapshot;
   /** @nullable */
   resetRules?: string | null;
   /** @nullable */
@@ -547,6 +561,11 @@ export const StrategyUpdateDirection = {
   both: 'both',
 } as const;
 
+/**
+ * @nullable
+ */
+export type StrategyUpdateRiskSnapshot = { [key: string]: unknown } | null;
+
 export interface StrategyUpdate {
   /** @minLength 1 */
   name?: string;
@@ -562,6 +581,8 @@ export interface StrategyUpdate {
   /** @nullable */
   riskManagementRules?: string | null;
   /** @nullable */
+  riskSnapshot?: StrategyUpdateRiskSnapshot;
+  /** @nullable */
   resetRules?: string | null;
   /** @nullable */
   alertRules?: string | null;
@@ -575,6 +596,11 @@ export const StrategyVersionDirection = {
   short: 'short',
   both: 'both',
 } as const;
+
+/**
+ * @nullable
+ */
+export type StrategyVersionRiskSnapshot = { [key: string]: unknown } | null;
 
 export interface StrategyVersion {
   id: number;
@@ -607,6 +633,8 @@ export interface StrategyVersion {
   /** @nullable */
   riskManagementRules: string | null;
   /** @nullable */
+  riskSnapshot: StrategyVersionRiskSnapshot;
+  /** @nullable */
   resetRules: string | null;
   /** @nullable */
   alertRules: string | null;
@@ -621,6 +649,11 @@ export interface StrategyVersion {
   createdAt: string;
 }
 
+/**
+ * @nullable
+ */
+export type StrategyVersionInputRiskSnapshot = { [key: string]: unknown } | null;
+
 export interface StrategyVersionInput {
   /** @nullable */
   label?: string | null;
@@ -633,6 +666,8 @@ export interface StrategyVersionInput {
   /** @nullable */
   riskRules?: string | null;
   /** @nullable */
+  riskSnapshot?: StrategyVersionInputRiskSnapshot;
+  /** @nullable */
   notes?: string | null;
 }
 
@@ -640,6 +675,16 @@ export interface StrategyVersionCloneInput {
   /** @nullable */
   label?: string | null;
 }
+
+/**
+ * @nullable
+ */
+export type StrategyVersionConditionCanonicalDefinition = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type StrategyVersionConditionCanonicalState = { [key: string]: unknown } | null;
 
 export type StrategyVersionConditionStage = typeof StrategyVersionConditionStage[keyof typeof StrategyVersionConditionStage];
 
@@ -695,7 +740,9 @@ export interface StrategyVersionCondition {
   /** @nullable */
   executorKind: string | null;
   /** @nullable */
-  canonicalDefinition: { [key: string]: unknown } | null;
+  canonicalDefinition: StrategyVersionConditionCanonicalDefinition;
+  /** @nullable */
+  canonicalState: StrategyVersionConditionCanonicalState;
   stage: StrategyVersionConditionStage;
   name: string;
   /** @nullable */
@@ -714,6 +761,16 @@ export interface StrategyVersionCondition {
   resetBehavior: string | null;
   createdAt: string;
 }
+
+/**
+ * @nullable
+ */
+export type StrategyConditionCanonicalDefinition = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type StrategyConditionCanonicalState = { [key: string]: unknown } | null;
 
 export type StrategyConditionStage = typeof StrategyConditionStage[keyof typeof StrategyConditionStage];
 
@@ -763,7 +820,9 @@ export interface StrategyCondition {
   /** @nullable */
   executorKind: string | null;
   /** @nullable */
-  canonicalDefinition: { [key: string]: unknown } | null;
+  canonicalDefinition: StrategyConditionCanonicalDefinition;
+  /** @nullable */
+  canonicalState: StrategyConditionCanonicalState;
   stage: StrategyConditionStage;
   name: string;
   /** @nullable */
@@ -816,6 +875,11 @@ export const StrategyConditionUpdateRequirement = {
  */
 export type StrategyConditionUpdateParameters = { [key: string]: unknown } | null;
 
+/**
+ * @nullable
+ */
+export type StrategyConditionUpdateCanonicalState = { [key: string]: unknown } | null;
+
 export interface StrategyConditionUpdate {
   /** @minimum 1 */
   conceptId?: number;
@@ -833,6 +897,8 @@ export interface StrategyConditionUpdate {
   /** @nullable */
   parameters?: StrategyConditionUpdateParameters;
   /** @nullable */
+  canonicalState?: StrategyConditionUpdateCanonicalState;
+  /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */
   resetBehavior?: string | null;
@@ -842,6 +908,22 @@ export interface StrategyConditionReorderInput {
   /** @items.minimum 1 */
   conditionIds: number[];
 }
+
+/**
+ * @nullable
+ */
+export type TradingConceptCanonicalStatus = typeof TradingConceptCanonicalStatus[keyof typeof TradingConceptCanonicalStatus] | null;
+
+
+export const TradingConceptCanonicalStatus = {
+  executable: 'executable',
+  review_required: 'review_required',
+} as const;
+
+/**
+ * @nullable
+ */
+export type TradingConceptCanonicalDefinition = { [key: string]: unknown } | null;
 
 export interface TradingConcept {
   id: number;
@@ -860,13 +942,13 @@ export interface TradingConcept {
   /** @nullable */
   registryVersion: string | null;
   /** @nullable */
-  canonicalStatus: 'executable' | 'review_required' | null;
+  canonicalStatus: TradingConceptCanonicalStatus;
   /** @nullable */
   executorKind: string | null;
   /** @nullable */
   aliases: string[] | null;
   /** @nullable */
-  canonicalDefinition: Record<string, unknown> | null;
+  canonicalDefinition: TradingConceptCanonicalDefinition;
   createdAt: string;
 }
 

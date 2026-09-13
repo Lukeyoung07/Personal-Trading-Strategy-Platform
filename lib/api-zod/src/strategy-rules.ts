@@ -15,7 +15,18 @@ export type UniversalRuleDirection = "long" | "short" | "both";
 export type UniversalRuleExecutionStatus = "executable" | "review_required";
 export type UniversalRuleValidationStatus = "valid" | "review_required";
 export type UniversalRuleSource = "user_request" | "model" | "builder" | "legacy";
-export type UniversalRuleRelationshipType = "after" | "followed_by" | "while" | "and" | "or";
+export type UniversalRuleRelationshipType =
+  | "and"
+  | "or"
+  | "after"
+  | "before"
+  | "within"
+  | "followed_by"
+  | "retest_of"
+  | "confirmation_of"
+  | "invalidates"
+  | "requires"
+  | "while";
 
 export type UniversalRuleProvenance = {
   source: UniversalRuleSource;
@@ -34,6 +45,8 @@ export type UniversalRuleValidation = {
 export type UniversalRuleRelationship = {
   type: UniversalRuleRelationshipType;
   targetRuleIndex: number | null;
+  targetCanonicalId?: string | null;
+  parameters?: Record<string, unknown> | null;
   supported: boolean;
   reason: string | null;
 };
@@ -59,6 +72,57 @@ export type UniversalRiskRule = {
   executionStatus: UniversalRuleExecutionStatus;
   validation: UniversalRuleValidation;
 };
+
+export type CanonicalConditionSnapshot = {
+  canonicalId: string | null;
+  registryVersion: string | null;
+  evaluatorVersion: string | null;
+  executorKind: ExecutableConceptParameters["kind"] | null;
+  conceptName: string;
+  parameters: Record<string, unknown> | null;
+  direction: UniversalRuleDirection;
+  timeframe: string | null;
+  relationship: UniversalRuleRelationship | null;
+  provenance: UniversalRuleProvenance;
+  executionStatus: UniversalRuleExecutionStatus;
+  validation: UniversalRuleValidation;
+};
+
+export type CanonicalRiskSnapshot = {
+  rules: UniversalRiskRule[];
+  executionStatus: UniversalRuleExecutionStatus;
+  validation: UniversalRuleValidation;
+};
+
+export function canonicalConditionSnapshot(input: {
+  canonicalId?: string | null;
+  registryVersion?: string | null;
+  evaluatorVersion?: string | null;
+  executorKind?: ExecutableConceptParameters["kind"] | null;
+  conceptName: string;
+  parameters?: Record<string, unknown> | null;
+  direction: UniversalRuleDirection;
+  timeframe?: string | null;
+  relationship?: UniversalRuleRelationship | null;
+  provenance: UniversalRuleProvenance;
+  executionStatus: UniversalRuleExecutionStatus;
+  validation: UniversalRuleValidation;
+}): CanonicalConditionSnapshot {
+  return {
+    canonicalId: input.canonicalId ?? null,
+    registryVersion: input.registryVersion ?? null,
+    evaluatorVersion: input.evaluatorVersion ?? null,
+    executorKind: input.executorKind ?? null,
+    conceptName: input.conceptName,
+    parameters: input.parameters ?? null,
+    direction: input.direction,
+    timeframe: input.timeframe ?? null,
+    relationship: input.relationship ?? null,
+    provenance: input.provenance,
+    executionStatus: input.executionStatus,
+    validation: input.validation,
+  };
+}
 
 export function normalizeStrategyTimeframe(value: string | null | undefined): string | null {
   const raw = String(value || "").trim();

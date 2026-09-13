@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { StrategyVersionDirection } from './strategyVersionDirection';
+import type { StrategyVersionRiskSnapshot } from './strategyVersionRiskSnapshot';
 
 export interface StrategyVersion {
   id: number;
@@ -37,6 +38,8 @@ export interface StrategyVersion {
   timeframes: string[];
   /** @nullable */
   riskManagementRules: string | null;
+  /** @nullable */
+  riskSnapshot: StrategyVersionRiskSnapshot;
   /** @nullable */
   resetRules: string | null;
   /** @nullable */

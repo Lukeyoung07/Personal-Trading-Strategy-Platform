@@ -420,7 +420,17 @@ function conceptsRequestedInMessage(message: string) {
     const match = message.match(concept.pattern);
     if (!match || seen.has(concept.name)) continue;
     if (isNegatedConceptMention(message, match.index ?? -1)) continue;
-    if (resolveTradingConcept(concept.name)?.status === "executable") continue;
+    const resolvedConcept = resolveTradingConcept(concept.name);
+    if (resolvedConcept?.status === "executable") {
+      requested.push({
+        name: resolvedConcept.name,
+        supported: true,
+        explanation: "Mapped to the structured historical detector; review its parameters before saving.",
+        matchedText: match[0],
+      });
+      seen.add(concept.name);
+      continue;
+    }
     const executableKind = executableConceptKind(concept.name);
     if (executableKind) {
        const name = executableConceptLabel(concept.name) || EXECUTABLE_CONCEPT_DEFINITIONS[executableKind].label;
@@ -598,7 +608,7 @@ function canonicalConceptName(value: string) {
   return resolveTradingConcept(normalized)?.name
     || executableConceptLabel(normalized)
     || unsupportedConceptForText(normalized)?.name
-    || normalized;
+    || normalized.replace(/\b\w/g, character => character.toUpperCase());
 }
 
 function canonicalExecutableName(value: string) {
@@ -612,6 +622,7 @@ function requestedConceptAuthorizations(message: string): RequestedConceptAuthor
   const byCanonical = new Map<string, RequestedConceptAuthorization>();
   const add = (requestedConcept: string, matchedText: string, supported: boolean, explanation: string) => {
     let canonicalConcept = canonicalConceptName(requestedConcept);
+    if (/^(?:bullish|bearish)\s+structure$/i.test(canonicalConcept)) canonicalConcept = "Market Structure Shift";
     const hasFvgInteraction = /\b(?:fvg|fair\s+value\s+gap)\b[^.!?]{0,60}\b(?:retests?|fills?)\b/i.test(message);
     if (canonicalConcept === "Fair Value Gap" && hasFvgInteraction) return;
     if (canonicalConcept === "Kill Zones") {
@@ -670,10 +681,18 @@ function requestedConceptAuthorizations(message: string): RequestedConceptAuthor
     byCanonical.delete(catalogKey("Bullish FVG"));
     byCanonical.delete(catalogKey("Bearish FVG"));
   }
+  const indicatorCross = message.match(/\b(ema|sma)\b[^.!?]{0,24}\bcross(?:es|ing)?\b/i)
+    || message.match(/\bcross(?:es|ing)?\b[^.!?]{0,24}\b(ema|sma)\b/i);
+  if (indicatorCross) {
+    const indicator = (indicatorCross[1] || indicatorCross[2]).toUpperCase();
+    add(`${indicator} Cross`, indicatorCross[0], true, "Mapped to the existing structured indicator-cross concept.");
+  }
   const directionalBreakoutKeys = [...byCanonical.keys()]
     .filter(key => key.startsWith(`${catalogKey("Breakout")}:`));
   if (directionalBreakoutKeys.length) byCanonical.delete(catalogKey("Breakout"));
-  return [...byCanonical.values()].sort((left, right) => {
+  return [...byCanonical.values()]
+    .filter(authorization => !indicatorCross || authorization.canonicalConcept !== (indicatorCross[1] || indicatorCross[2]).toUpperCase())
+    .sort((left, right) => {
     const leftIndex = message.toLowerCase().indexOf(left.matchedText.toLowerCase());
     const rightIndex = message.toLowerCase().indexOf(right.matchedText.toLowerCase());
     return (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex) - (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex);
@@ -741,7 +760,7 @@ function conditionMatchesConcept(condition: any, requestedName: string) {
     );
     return key === requestedKey || (
       Boolean(executableConceptKind(requestedName))
-      && (key.includes(requestedKey) || requestedKey.includes(key))
+      && key.includes(requestedKey)
     );
   });
 }
@@ -1003,9 +1022,23 @@ function reconcileRequestedConditions(draft: any, message: string) {
   const hasDirectionalBreakout = conditionAuthorizations.some(candidate =>
     candidate.name === "Breakout" && candidate.direction !== null,
   );
-  const requested = conditionAuthorizations.filter(candidate =>
-    !(hasDirectionalBreakout && candidate.name === "Breakout" && candidate.direction === null),
+  const hasSpecificFvg = conditionAuthorizations.some(candidate =>
+    ["Bullish FVG", "Bearish FVG", "FVG Retest", "FVG Fill"].includes(candidate.name),
   );
+  let requested = conditionAuthorizations.filter(candidate =>
+    !(hasDirectionalBreakout && candidate.name === "Breakout" && candidate.direction === null)
+    && !(hasSpecificFvg && candidate.name === "Fair Value Gap"),
+  );
+  const requestedIndicatorCross = requested.find(candidate => ["EMA Cross", "SMA Cross"].includes(candidate.name));
+  if (requestedIndicatorCross) {
+    const baseIndicator = requestedIndicatorCross.name.startsWith("EMA") ? "EMA" : "SMA";
+    const existingBaseConditions = originalConditions.filter((condition: any) =>
+      canonicalConceptName(String(condition?.conceptName || "")) === baseIndicator,
+    );
+    if (existingBaseConditions.length > 1) {
+      requested = requested.filter(candidate => candidate.name !== requestedIndicatorCross.name);
+    }
+  }
   if (!requested.length) return [];
   const timeframes = requestedTimeframes(message);
   const direction = requestedDirection(message, draft.direction);
@@ -1022,14 +1055,16 @@ function reconcileRequestedConditions(draft: any, message: string) {
       )];
     }
     return matching.map((condition: any) => {
-      const matchedRequested = requested.find(candidate =>
+      const exactRequested = requested.find(candidate =>
+        catalogKey(canonicalConceptName(condition.conceptName || "")) === catalogKey(candidate.name)
+        && (!candidate.direction || candidate.direction === condition.direction),
+      );
+      const matchedRequested = exactRequested || requested.find(candidate =>
         conditionMatchesConcept(condition, candidate.name)
         && (!candidate.direction || candidate.direction === condition.direction),
       ) || requested.find(candidate => conditionMatchesConcept(condition, candidate.name)) || requestedConcept;
       const matchedRequestedName = matchedRequested.name;
-      const sourceConceptName = catalogKey(String(condition.conceptName || "")) === "candle direction"
-        ? matchedRequestedName
-        : condition.conceptName || matchedRequestedName;
+      const sourceConceptName = matchedRequestedName;
       const conceptName = canonicalExecutableName(sourceConceptName);
       const parameters = requestedParameters(conceptName, message, condition);
       const conditionTimeframe = timeframes.find(value => catalogKey(value) === catalogKey(String(condition.timeframe || "")))
@@ -1308,7 +1343,10 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
         const modelConcept = Array.isArray(draft.conceptsUsed)
           ? draft.conceptsUsed.find((concept: any) => {
             const name = String(typeof concept === "string" ? concept : concept?.name || "");
-            return catalogKey(canonicalConceptName(name)) === catalogKey(authorization.canonicalConcept);
+            const modelDefinition = resolveTradingConcept(name);
+            const authorizationDefinition = resolveTradingConcept(authorization.canonicalConcept);
+            return catalogKey(canonicalConceptName(name)) === catalogKey(authorization.canonicalConcept)
+              || Boolean(modelDefinition?.executorKind && modelDefinition.executorKind === authorizationDefinition?.executorKind);
           })
           : null;
         return {
@@ -1316,14 +1354,22 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
           supported: authorization.supported,
           explanation: typeof modelConcept === "object" && modelConcept?.explanation
             ? String(modelConcept.explanation)
-            : authorization.explanation,
+            : conditions.length
+              ? authorization.supported
+                ? "Mapped to the existing structured executable concept definition."
+                : authorization.explanation
+              : authorization.supported
+                ? "Mapped to the structured historical detector; review its parameters before saving."
+                : authorization.explanation,
         };
       }),
     ...conditions.map((condition: any) => ({
       name: condition.conceptName,
       supported: condition.supported === true,
       explanation: condition.supported === true
-        ? "Represented by the current historical rule set."
+          ? executableConceptKind(condition.conceptName) !== null
+            ? "Mapped to the existing structured executable concept definition."
+            : "Represented by the current historical rule set."
         : "Explicitly requested and preserved for review.",
     })),
     ...requestAuthorizations

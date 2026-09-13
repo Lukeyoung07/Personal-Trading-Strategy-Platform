@@ -1,7 +1,4 @@
-import {
-  normalizeExecutableParameters,
-  type ExecutableConceptParameters,
-} from "./executable-concepts";
+import type { ExecutableConceptParameters } from "./executable-concepts";
 
 export type CanonicalConceptStatus = "executable" | "review_required";
 export type CanonicalConceptDirection = "long" | "short" | "both";
@@ -107,6 +104,10 @@ const LIBRARY_ROWS: readonly ConceptSeed[] = [
   ["PREMIUM / DISCOUNT", "Discount Entry"],
   ["PRICE ACTION", "Bullish Candle"],
   ["PRICE ACTION", "Bearish Candle"],
+  ["PRICE ACTION", "Bullish Engulfing"],
+  ["PRICE ACTION", "Bearish Engulfing"],
+  ["PRICE ACTION", "Pin Bar"],
+  ["PRICE ACTION", "Inside Bar"],
   ["PRICE ACTION", "Rejection"],
   ["PRICE ACTION", "Strong Rejection"],
   ["PRICE ACTION", "Wick Rejection"],
@@ -188,7 +189,9 @@ const EXECUTABLE_KINDS: Record<string, CanonicalExecutorKind> = {
   "Displacement": "displacement", "Premium": "range_location",
   "Discount": "range_location", "Equilibrium": "range_location",
   "50% Equilibrium": "range_location", "Rejection": "rejection",
-  "Wick Rejection": "rejection", "Breakout": "price_action",
+  "Wick Rejection": "rejection", "Bullish Rejection": "rejection", "Bearish Rejection": "rejection",
+  "Breakout": "price_action", "Bullish Engulfing": "price_action", "Bearish Engulfing": "price_action",
+  "Pin Bar": "price_action", "Inside Bar": "price_action",
   "Break and Retest": "price_action", "Failed Breakout": "failed_breakout",
   "Support": "price_action", "Resistance": "price_action",
   "Kill Zones": "session", "London Session": "session",
@@ -204,7 +207,7 @@ const ALIASES: Record<string, string[]> = {
   "Higher High": ["HH"], "Higher Low": ["HL"], "Lower High": ["LH"], "Lower Low": ["LL"],
   "Break of Structure": ["BOS"], "Change of Character": ["CHoCH"],
   "Market Structure Shift": ["MSS"], "Liquidity Sweep": ["Sweep", "Liquidity Sweeps"],
-  "Fair Value Gap": ["FVG"], "Bullish FVG": ["Bullish Fair Value Gap"],
+  "Fair Value Gap": ["FVG", "Fair Value Gap (FVG)"], "Bullish FVG": ["Bullish Fair Value Gap"],
   "Bearish FVG": ["Bearish Fair Value Gap"], "FVG Fill": ["Fair Value Gap Fill", "Fair Value Gap Fills"],
   "FVG Retest": ["Fair Value Gap Retest", "Fair Value Gap Retests", "FVG Retests"], "Inverse Fair Value Gap": ["IFVG"],
   "Bullish IFVG": ["Bullish Inverse Fair Value Gap"],
@@ -214,9 +217,13 @@ const ALIASES: Record<string, string[]> = {
   "Equal Highs": ["Equal High"], "Equal Lows": ["Equal Low"],
   "Break and Retest": ["Breakout Retest"], "Failed Breakout": ["False Breakout"],
   "Breakout": ["Long Breakout", "Short Breakout"],
+  "Rejection": ["Bullish Rejection", "Bearish Rejection"],
   "Wick Rejection": ["Rejection Candle"], "50% Equilibrium": ["50 Equilibrium"],
   "Kill Zones": ["Kill Zone"], "London Session": ["London"],
-  "New York Session": ["NY", "NY Session"], "Asian Session": ["Asia", "Asia Session"],
+  "New York Session": ["NY", "NY Session", "New York Kill Zone"],
+  "Asian Session": ["Asia", "Asia Session"],
+  "EMA": ["Exponential Moving Average", "Exponential Moving Average (EMA)"],
+  "SMA": ["Simple Moving Average", "Simple Moving Average (SMA)"],
   "EMA Cross": ["EMA Crossover"], "SMA Cross": ["SMA Crossover"],
   "Price Above EMA": ["Price Above Exponential Moving Average"],
   "Price Below EMA": ["Price Below Exponential Moving Average"],
@@ -374,12 +381,6 @@ export function tradingConceptMetadata(name: string) {
     detectionRules: definition.entryBehavior,
     invalidationRules: definition.invalidationBehavior,
   };
-}
-
-export function tradingConceptDefaults(name: string): ExecutableConceptParameters | null {
-  const definition = resolveTradingConcept(name);
-  if (!definition?.executorKind) return null;
-  return normalizeExecutableParameters(name, undefined);
 }
 
 export function canonicalConceptStatus(name: string | null | undefined): CanonicalConceptStatus | null {
