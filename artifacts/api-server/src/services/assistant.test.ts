@@ -25,6 +25,48 @@ function mockStrategyDraft(strategyDraft: Record<string, unknown>) {
   }), { status: 200, headers: { "content-type": "application/json" } }));
 }
 
+const AUDIT_PROMPT = `Build a continuation strategy for XAUUSD, both directions.
+
+Trend filter: Break of Structure on the 1-hour timeframe establishes the trend direction.
+
+Entry, 5-minute timeframe, all of the following in sequence:
+1. Liquidity Sweep of the pullback's recent high or low, against the 1-hour trend direction.
+2. Displacement immediately after the sweep, in the direction of the 1-hour trend.
+3. Fair Value Gap formed by that displacement. Enter on formation.
+4. Break of Structure on the 5-minute timeframe, confirming the pullback has ended and price is resuming the 1-hour trend.
+
+Session: New York session only.
+
+Risk management:
+- Stop loss beyond the liquidity sweep's extreme, structural, not a fixed percentage.
+- Take profit at the next external liquidity level in the trend direction (previous day high or low, or equal highs/lows).
+- Only take the trade if the take-profit distance is at least 1.5 times the stop-loss distance.
+
+Do not use EMA, RSI, MACD, or any indicator-based confirmation.
+Do not use Order Blocks or Breaker Blocks.`;
+
+function mockAuditedStrategyDraft() {
+  mockStrategyDraft({
+    name: "XAUUSD continuation",
+    description: "A continuation strategy following a higher-timeframe trend.",
+    direction: "both",
+    marketSymbol: "XAUUSD",
+    timeframes: ["1h", "5m"],
+    conditions: [
+      { name: "1H Break of Structure trend filter", stage: "entry", requirement: "required", conceptName: "Break of Structure", timeframe: "1h", direction: "both", parameters: { kind: "market_structure", signal: "bos", polarity: "auto", lookback: 2 }, triggerRules: "establishes trend direction" },
+      { name: "Liquidity Sweep", stage: "entry", requirement: "required", conceptName: "Liquidity Sweep", timeframe: "1h", direction: "both", parameters: { kind: "liquidity_sweep", sweepSide: "auto", level: "lookback_extreme", lookback: 5 }, triggerRules: "sweeps the pullback high or low" },
+      { name: "Pullback", stage: "entry", requirement: "required", conceptName: "Pullback", timeframe: "1h", direction: "both", triggerRules: "recent pullback high or low" },
+      { name: "Displacement", stage: "entry", requirement: "required", conceptName: "Displacement", timeframe: "1h", direction: "both", parameters: { kind: "displacement", polarity: "auto", atrPeriod: 14, minimumBodyAtr: 1.5, minimumCloseLocation: 0.7 }, triggerRules: "immediately after the sweep" },
+      { name: "Fair Value Gap", stage: "entry", requirement: "required", conceptName: "Fair Value Gap", timeframe: "1h", direction: "both", parameters: { kind: "fair_value_gap", interaction: "formation", polarity: "auto" }, triggerRules: "formed by the displacement" },
+      { name: "5m Break of Structure", stage: "entry", requirement: "required", conceptName: "Break of Structure", timeframe: "1h", direction: "both", parameters: { kind: "market_structure", signal: "bos", polarity: "auto", lookback: 2 }, triggerRules: "confirms the pullback has ended" },
+      { name: "New York Session", stage: "entry", requirement: "required", conceptName: "New York Session", timeframe: "1h", direction: "both", triggerRules: "New York session only" },
+      { name: "Previous Day High", stage: "entry", requirement: "required", conceptName: "Previous Day High", timeframe: "1h", direction: "both", triggerRules: "next external liquidity level" },
+      { name: "Equal Highs", stage: "entry", requirement: "required", conceptName: "Equal Highs", timeframe: "1h", direction: "both", triggerRules: "next external liquidity level" },
+    ],
+    riskManagementRules: null,
+  });
+}
+
 describe("AI Trading Assistant provider boundary", () => {
   it("returns an honest unavailable response when the server credential is missing", async () => {
     delete process.env.OPENROUTER_API_KEY;
@@ -1959,6 +2001,88 @@ Risk/Reward: 2:1`,
       expect.objectContaining({ type: "risk_reward_multiple", value: 2, executionStatus: "executable" }),
     ]));
     expect(response.strategyDraft?.compatibility.compatible).toBe(false);
+  });
+
+  it("does not apply direction_from to every condition when the prompt mentions a trend filter", async () => {
+    mockAuditedStrategyDraft();
+
+    const response = await answerAssistant({
+      message: AUDIT_PROMPT,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions.filter(condition => condition.relationship?.type === "direction_from")).toEqual([]);
+  });
+
+  it("does not promote descriptive pullback wording into a standalone condition", async () => {
+    mockAuditedStrategyDraft();
+
+    const response = await answerAssistant({
+      message: AUDIT_PROMPT,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect((response.strategyDraft?.conditions || []).map(condition => condition.conceptName)).not.toContain("Pullback");
+    expect((response.strategyDraft?.conceptsUsed || []).map(concept => concept.name)).not.toContain("Pullback");
+  });
+
+  it("preserves structural stop, external-liquidity target, and minimum reward-to-risk rules", async () => {
+    mockAuditedStrategyDraft();
+
+    const response = await answerAssistant({
+      message: AUDIT_PROMPT,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    const rules = response.strategyDraft?.riskRules || [];
+    expect(rules.some(rule => rule.type === "stop_loss_percentage")).toBe(false);
+    expect(rules).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "structural_stop",
+        executionStatus: "review_required",
+        reference: "liquidity_sweep_extreme",
+      }),
+      expect.objectContaining({
+        type: "risk_reward_multiple",
+        value: 1.5,
+      }),
+    ]));
+    expect(rules.some(rule => rule.executionStatus === "review_required" && rule.reference === "external_liquidity")).toBe(true);
+  });
+
+  it("stages the true entry sequence separately from displacement and structure confirmation", async () => {
+    mockAuditedStrategyDraft();
+
+    const response = await answerAssistant({
+      message: AUDIT_PROMPT,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    const conditions = response.strategyDraft?.conditions || [];
+    expect(conditions.find(condition => condition.conceptName === "Liquidity Sweep")?.stage).toBe("entry");
+    expect(conditions.find(condition => condition.conceptName === "Displacement")?.stage).toBe("confirmation");
+    expect(conditions.filter(condition => condition.conceptName === "Break of Structure")).toHaveLength(2);
+    expect(conditions.filter(condition => condition.conceptName === "Break of Structure").every(condition => condition.stage === "confirmation")).toBe(true);
+  });
+
+  it("keeps conditions in the timeframe scope of the containing 5-minute entry block", async () => {
+    mockAuditedStrategyDraft();
+
+    const response = await answerAssistant({
+      message: AUDIT_PROMPT,
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    const conditions = response.strategyDraft?.conditions || [];
+    expect(conditions.find(condition => condition.name.startsWith("1H Break"))?.timeframe).toBe("1h");
+    for (const conceptName of ["Liquidity Sweep", "Displacement", "Fair Value Gap", "New York Session", "Previous Day High", "Equal Highs"]) {
+      expect(conditions.find(condition => condition.conceptName === conceptName)?.timeframe).toBe("5m");
+    }
   });
 
   it.each(["Support", "Resistance", "Buy-Side Liquidity", "Sell-Side Liquidity"])(

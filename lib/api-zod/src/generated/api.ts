@@ -106,7 +106,7 @@ export const ChatAssistantResponse = zod.object({
 })).optional(),
   "riskManagementRules": zod.string().nullable(),
   "riskRules": zod.array(zod.object({
-  "type": zod.enum(['stop_loss_percentage', 'take_profit_percentage', 'risk_per_trade_percentage', 'take_profit_r_multiple', 'risk_reward_multiple', 'structural_stop']),
+  "type": zod.enum(['stop_loss_percentage', 'take_profit_percentage', 'risk_per_trade_percentage', 'take_profit_r_multiple', 'risk_reward_multiple', 'structural_stop', 'structural_target']),
   "value": zod.number().nullable(),
   "unit": zod.enum(['percent', 'r', 'reference']),
   "reference": zod.string().nullish(),

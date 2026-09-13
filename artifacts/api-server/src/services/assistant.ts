@@ -161,15 +161,27 @@ function parseRiskRules(value: string | null | undefined, requestMessage?: strin
       ]));
     }
   }
-  const structuralMatch = text.match(/\b(?:stop|stop[- ]loss)\s+(?:below|above)\s+(?:the\s+)?(?:fvg|fair value gap)\b/i);
-  if (structuralMatch) {
+  const structuralStopMatch = text.match(/\b(?:stop|stop[- ]loss)\b[^.!?]{0,180}\b(?:liquidity\s+sweep(?:['’]s)?\s+extreme|sweep(?:['’]s)?\s+extreme)\b/i);
+  const fvgStructuralStopMatch = text.match(/\b(?:stop|stop[- ]loss)\s+(?:below|above)\s+(?:the\s+)?(?:fvg|fair value gap)\b/i);
+  if (structuralStopMatch || fvgStructuralStopMatch) {
     add(riskRule(
       "structural_stop",
       null,
       "reference",
       "review_required",
       ["Structural stops are preserved for review and are not converted into an invented percentage."],
-      "fair_value_gap",
+      structuralStopMatch ? "liquidity_sweep_extreme" : "fair_value_gap",
+    ));
+  }
+  const structuralTargetMatch = text.match(/\b(?:take[- ]profit|tp|target)\b[^.!?]{0,220}\b(?:external\s+liquidity|previous\s+day\s+(?:high|low)|equal\s+highs?(?:\s*\/\s*|\s+or\s+)lows?)\b/i);
+  if (structuralTargetMatch) {
+    add(riskRule(
+      "structural_target",
+      null,
+      "reference",
+      "review_required",
+      ["Structural targets are preserved for review and are not converted into an invented percentage."],
+      "external_liquidity",
     ));
   }
   const hasExecutableStop = rules.some(rule => rule.type === "stop_loss_percentage");
@@ -449,12 +461,17 @@ function isNestedConceptMention(message: string, index: number, conceptName: str
     message.lastIndexOf(";", index - 1),
   ) + 1;
   const before = message.slice(sentenceStart, index);
-  const connectorMatch = [...before.matchAll(/(?:\busing\b|\bwith\b|\baround\b|\bnear\b|\bfrom\b|\boff\b|\bbased\s+on\b|\bdefined\s+by\b|\bbelonging\s+to\b|\bparameters?\s+for\b|\bwhere\b|\bthat\s+(?:sweeps?|closes?|forms?|uses?))\b/gi)].at(-1);
+  const connectorMatch = [...before.matchAll(/(?:\busing\b|\bwith\b|\baround\b|\bnear\b|\bfrom\b|\boff\b|\bof\b|\bbased\s+on\b|\bdefined\s+by\b|\bbelonging\s+to\b|\bparameters?\s+for\b|\bwhere\b|\bthat\s+(?:sweeps?|closes?|forms?|uses?))\b/gi)].at(-1);
   if (!connectorMatch) return false;
   const connectorEnd = (connectorMatch.index ?? 0) + connectorMatch[0].length;
   const nestedText = before.slice(connectorEnd);
   if (/\b\d+(?:\.\d+)?[\s-]*(?:m|min|minute|h|hr|hour|d|day|w|week)s?\b/i.test(nestedText)) return false;
   if (/\b(?:followed\s+by|after|then)\b/i.test(nestedText)) return false;
+  const possessiveQualifier = new RegExp(
+    `^\\s*(?:the\\s+)?${escapeConceptPattern(conceptName)}(?:['’]s|\\s+(?:high|low|extreme))\\b`,
+    "i",
+  );
+  if (connectorMatch[0].trim().toLowerCase() === "of" && possessiveQualifier.test(nestedText)) return true;
   const parentMentions = canonicalConceptMentions(before.slice(0, connectorMatch.index ?? 0));
   if (!parentMentions.length) return false;
   const parent = parentMentions.at(-1)?.definition;
@@ -850,6 +867,66 @@ function requestedTimeframes(message: string) {
   return requestTimeframeValues(message).filter((value, index, values) => values.indexOf(value) === index);
 }
 
+function scopedEntryTimeframe(message: string) {
+  const match = message.match(/\bentry\s*,?\s*(\d+(?:\.\d+)?[\s-]*(?:m|min|minute|h|hr|hour|d|day|w|week)s?)\s+timeframe\b/i);
+  return match?.[1]?.replace(/[\s-]+/g, "").toUpperCase() || null;
+}
+
+function conceptMentionPositions(message: string, conceptName: string) {
+  const definition = resolveTradingConcept(conceptName);
+  const labels = [...new Set([conceptName, ...(definition?.aliases || [])])]
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length)
+    .map(escapeConceptPattern)
+    .join("|");
+  if (!labels) return [];
+  return [...message.matchAll(new RegExp(`\\b(?:${labels})\\b`, "gi"))]
+    .map(match => match.index ?? -1)
+    .filter(index => index >= 0)
+    .sort((left, right) => left - right);
+}
+
+function requestTimeframeForCondition(
+  condition: any,
+  conceptName: string,
+  message: string,
+  occurrenceIndex: number,
+  fallback: string | null,
+) {
+  const entryTimeframe = scopedEntryTimeframe(message);
+  const entryHeader = entryTimeframe
+    ? message.search(/\bentry\s*,?\s*\d+(?:\.\d+)?[\s-]*(?:m|min|minute|h|hr|hour|d|day|w|week)s?\s+timeframe\b/i)
+    : -1;
+  const entryEndCandidates = [
+    message.search(/\n\s*session\s*:/i),
+    message.search(/\n\s*risk management\s*:/i),
+    message.search(/\n\s*do not use\b/i),
+  ].filter(index => index > entryHeader);
+  const entryEnd = entryEndCandidates.length ? Math.min(...entryEndCandidates) : message.length;
+  const positions = conceptMentionPositions(message, conceptName);
+  const mentionIndex = positions[occurrenceIndex] ?? -1;
+  if (entryTimeframe && mentionIndex >= entryHeader && mentionIndex < entryEnd) return entryTimeframe;
+
+  const descriptor = `${condition?.name || ""} ${condition?.conceptName || ""}`;
+  const descriptorTimeframe = descriptor.match(/\b(\d+(?:\.\d+)?[\s-]*(?:m|min|minute|h|hr|hour|d|day|w|week)s?)\b/i)?.[1];
+  if (descriptorTimeframe && mentionIndex < 0) return descriptorTimeframe.replace(/[\s-]+/g, "").toUpperCase();
+
+  if (
+    entryTimeframe
+    && ["New York Session", "London Session", "Asian Session", "Previous Day High", "Previous Day Low", "Equal Highs", "Equal Lows"].includes(conceptName)
+  ) {
+    return entryTimeframe;
+  }
+
+  if (mentionIndex >= 0) {
+    const nearby = message.slice(Math.max(0, mentionIndex - 32), mentionIndex + 100)
+      .match(/\b(?:on|using)\s+(?:the\s+)?(\d+(?:\.\d+)?[\s-]*(?:m|min|minute|h|hr|hour|d|day|w|week)s?)\b/i);
+    if (nearby?.[1]) return nearby[1].replace(/[\s-]+/g, "").toUpperCase();
+  }
+
+  return fallback;
+}
+
 function requestedParameters(conceptName: string, message: string, condition: any = {}) {
   const input = {
     ...(condition?.parameters && typeof condition.parameters === "object" ? condition.parameters : {}),
@@ -1032,8 +1109,7 @@ function stageForRequestedConcept(conceptName: string, message: string, fallback
 }
 
 function normalizeConditionStages(conditions: any[], message: string) {
-  const hasEntry = conditions.some(condition => condition.stage === "entry");
-  if (hasEntry || !conditions.length) return conditions;
+  if (!conditions.length) return conditions;
 
   const hasLiquiditySweep = conditions.some(condition => executableConceptKind(condition.conceptName) === "liquidity_sweep");
   const hasDisplacement = conditions.some(condition => executableConceptKind(condition.conceptName) === "displacement");
@@ -1045,10 +1121,13 @@ function normalizeConditionStages(conditions: any[], message: string) {
     if (executableConceptKind(condition.conceptName) === "liquidity_sweep") {
       return { ...condition, stage: "entry" };
     }
-    if (hasDisplacement || condition.stage === "confirmation") {
+    if (
+      hasDisplacement
+      && ["displacement", "market_structure", "fair_value_gap"].includes(executableConceptKind(condition.conceptName) || "")
+    ) {
       return { ...condition, stage: "confirmation" };
     }
-    return { ...condition, stage: "confirmation" };
+    return condition;
   });
 }
 
@@ -1061,8 +1140,20 @@ function requestsDirectionInheritance(message: string) {
   );
 }
 
+function conditionRequestsDirectionInheritance(condition: any) {
+  const descriptor = `${condition?.name || ""} ${condition?.conceptName || ""} ${condition?.triggerRules || ""}`;
+  return (
+    /\b(?:inherit|inherited|derive|derived|direction\s+from|bias\s+from|polarity\s+from)\b/i.test(descriptor)
+    || /\b(?:follow|match|align|same\s+as)\b[\s\S]{0,60}\b(?:bias|trend|direction|polarity)\b/i.test(descriptor)
+  );
+}
+
 function applyDirectionInheritanceReview(conditions: any[], message: string) {
   if (!requestsDirectionInheritance(message) || conditions.length < 2) return conditions;
+  const targetConditions = new Set(
+    conditions.filter(condition => conditionRequestsDirectionInheritance(condition)),
+  );
+  if (!targetConditions.size) return conditions;
   const sourceIndex = conditions.findIndex(condition =>
     executableConceptKind(condition.conceptName) === "market_structure"
     || /\b(?:bias|trend|structure|higher\s+timeframe|htf)\b/i.test(String(condition.conceptName || "")),
@@ -1072,7 +1163,12 @@ function applyDirectionInheritanceReview(conditions: any[], message: string) {
     : conditions;
   const resolvedSourceIndex = sourceIndex >= 0 ? 0 : null;
   return orderedConditions.map((condition, index) => {
-    if (index === resolvedSourceIndex || condition.stage === "exit" || condition.stage === "invalidation") return condition;
+    if (
+      index === resolvedSourceIndex
+      || !targetConditions.has(condition)
+      || condition.stage === "exit"
+      || condition.stage === "invalidation"
+    ) return condition;
     const parameters = condition.parameters && typeof condition.parameters === "object"
       ? { ...condition.parameters }
       : null;
@@ -1235,7 +1331,7 @@ function reconcileRequestedConditions(draft: any, message: string) {
         requestedConcept.direction || undefined,
       )];
     }
-    return matching.map((condition: any) => {
+    return matching.map((condition: any, matchingIndex: number) => {
       const exactRequested = requested.find(candidate =>
         catalogKey(canonicalConceptName(condition.conceptName || "")) === catalogKey(candidate.name)
         && (!candidate.direction || candidate.direction === condition.direction),
@@ -1248,8 +1344,13 @@ function reconcileRequestedConditions(draft: any, message: string) {
       const sourceConceptName = matchedRequestedName;
       const conceptName = canonicalExecutableName(sourceConceptName);
       const parameters = requestedParameters(conceptName, message, condition);
-      const conditionTimeframe = timeframes.find(value => catalogKey(value) === catalogKey(String(condition.timeframe || "")))
-        || (timeframes.length === 1 ? timeframes[0] : condition.timeframe)
+      const conditionTimeframe = requestTimeframeForCondition(
+        condition,
+        matchedRequestedName,
+        message,
+        matchingIndex,
+        timeframes.length === 1 ? timeframes[0] : condition.timeframe,
+      )
         || timeframes[requestedIndex]
         || "Not specified";
       const nextCondition = {
@@ -1434,6 +1535,13 @@ function normalizeRiskRules(value: string | null | undefined, requestMessage?: s
   if (/\b(?:stop|stop[- ]loss)\s+(?:below|above)\s+(?:the\s+)?(?:fvg|fair value gap)\b/i.test(requestMessage)) {
     requestedRules.push("stop-loss: structural FVG boundary (review required)");
   }
+  if (/\bstop[- ]loss\b[^.!?]{0,180}\b(?:liquidity\s+sweep(?:['’]s)?\s+extreme|sweep(?:['’]s)?\s+extreme)\b/i.test(requestMessage)) {
+    requestedRules.push("stop-loss: structural liquidity sweep extreme (review required)");
+  }
+  if (/\b(?:take[- ]profit|tp|target)\b[^.!?]{0,220}\b(?:external\s+liquidity|previous\s+day\s+(?:high|low)|equal\s+highs?(?:\s*\/\s*|\s+or\s+)lows?)\b/i.test(requestMessage)) {
+    requestedRules.push("take-profit: structural external liquidity (review required)");
+  }
+  addMatch(/(?:at least|minimum(?:\s+of)?)\s+(\d+(?:\.\d+)?)\s*(?:times|x)\s+(?:the\s+)?(?:stop[- ]loss|risk)\b/i, value => `risk/reward: ${value}R`);
   if (requestedRules.length) return [...new Set(requestedRules)].join("; ");
   return null;
 }

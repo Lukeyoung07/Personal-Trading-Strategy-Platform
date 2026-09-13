@@ -68,7 +68,7 @@ export type UniversalStrategyRule = {
 };
 
 export type UniversalRiskRule = {
-  type: "stop_loss_percentage" | "take_profit_percentage" | "risk_per_trade_percentage" | "take_profit_r_multiple" | "risk_reward_multiple" | "structural_stop";
+  type: "stop_loss_percentage" | "take_profit_percentage" | "risk_per_trade_percentage" | "take_profit_r_multiple" | "risk_reward_multiple" | "structural_stop" | "structural_target";
   value: number | null;
   unit: "percent" | "r" | "reference";
   reference: string | null;

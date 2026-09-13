@@ -2940,7 +2940,7 @@ components:
       properties:
         type:
           type: string
-          enum: [stop_loss_percentage, take_profit_percentage, risk_per_trade_percentage, take_profit_r_multiple, risk_reward_multiple, structural_stop]
+          enum: [stop_loss_percentage, take_profit_percentage, risk_per_trade_percentage, take_profit_r_multiple, risk_reward_multiple, structural_stop, structural_target]
         value: { type: ["number", "null"] }
         unit:
           type: string

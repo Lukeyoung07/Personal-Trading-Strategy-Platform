@@ -16,4 +16,5 @@ export const AssistantRiskRuleType = {
   take_profit_r_multiple: 'take_profit_r_multiple',
   risk_reward_multiple: 'risk_reward_multiple',
   structural_stop: 'structural_stop',
+  structural_target: 'structural_target',
 } as const;
