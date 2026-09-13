@@ -1,0 +1,174 @@
+FULL ARCHITECTURAL REBUILD: Trading Concept Library + Strategy Builder
+
+This is a complete rebuild of concept resolution across this app, not a patch.
+Before changing anything, inspect the existing codebase: database schema, API routes,
+Build with AI flow, Strategy Builder, strategy/version models, backtesting engine,
+monitoring engine, and existing tests. Understand the current architecture fully
+before writing new code.
+
+=== PRIMARY OBJECTIVE ===
+
+Replace the current fragile concept-resolution architecture with a deterministic
+canonical concept system. Every stage must consume the SAME canonical concept
+definitions — no separate interpretation in Build with AI vs Builder vs Backtesting
+vs Monitoring.
+
+Flow:
+USER → BUILD WITH AI → intent extraction → canonical concept resolution →
+canonical strategy draft → BUILDER → strategy → immutable version →
+BACKTEST / MONITORING (shared evaluators)
+
+=== 1. TRADING CONCEPT REGISTRY (single source of truth) ===
+
+Give every registry entry a `kind` field: concept | parameter_value | risk_rule |
+execution_requirement | metadata_only. Only `kind: concept` entries can ever become
+a Builder condition — enforce this structurally, not by convention.
+
+Each concept entry needs: stable canonical ID, canonical name, aliases, category,
+description, direction support, supported timeframes, required data, parameters
+(with types/defaults/validation), executable vs review_required status, evaluator
+type, canonical machine-readable definition, allowed direction/variant metadata
+(e.g. one Breakout concept with a direction variant, not separate Long/Short/Bullish
+Breakout concepts), relationship support, backtest/monitoring support.
+
+Add a `valid_as_parameter_of` field: a list of parent concept IDs (+ which parameter
+slot) this concept can nest under. E.g. Sell-Side Liquidity declares it's a valid
+directional parameter of Liquidity Sweep. This is what lets nesting be registry DATA
+instead of resolver code — adding a new nesting relationship later never requires
+touching the parser.
+
+=== 2. CONCEPT RESOLUTION PIPELINE ===
+
+Build a deterministic pipeline, not a single-pass keyword scan:
+
+STAGE 1 — Span extraction only. Tag every span matching a registry concept, alias,
+or parameter keyword, PLUS tag structural tokens: subordinating connectors (using,
+with, around, via, based on), sequencing tokens (followed by, then, before, after),
+negation markers (do not, except, not), and instruction/meta language. No decisions
+yet — just a flat list of tagged spans.
+
+STAGE 2 — Role classification, in this priority order:
+  1. Negated → preceded by negation marker → drop, record as explicit exclusion.
+  2. Nested/parameter-of → follows a subordinating connector whose left side is
+     itself a resolved concept, AND the right-hand concept's `valid_as_parameter_of`
+     includes that parent → attach as a parameter, do NOT emit as its own condition.
+     If no valid_as_parameter_of path exists, DROP it as unsupported descriptive
+     language and surface "ignored: no parameterization path for X on Y" — never
+     silently promote it to standalone.
+  3. Relationship operand → connected to another resolved concept via a sequencing
+     token → both remain standalone top-level concepts, emit a relationship edge
+     (source, target, ordering, max bars between if supported) instead of two
+     independent conditions.
+  4. Execution/data requirement → `kind: execution_requirement` in the registry
+     (closed candles, timeframe, "historical backtesting," "Builder," etc.) →
+     never becomes a condition, full stop.
+  5. Standalone concept → default, only reached if none of the above apply.
+
+Only produce Builder conditions from concepts that survive resolution — the AI must
+never create a condition just because a phrase sounds like a trading term. Reject/
+mark REVIEW_REQUIRED anything that can't be resolved against the registry; never
+invent a concept or silently substitute a different one for something unsupported
+(e.g. "Judas Swing" → REVIEW_REQUIRED with a clear reason, never silently replaced
+with Breakout/Liquidity Sweep/etc.).
+
+Do NOT implement this as a growing blacklist of banned words ("if prompt contains
+'support' then ignore it"). The classification must come from structure (spans +
+connectors + registry metadata), not string matching against a list of examples.
+
+=== 3. PARAMETERS, DIRECTION, TIMEFRAME, RISK — ALL STRUCTURED METADATA ===
+
+- Parameters (EMA period, RSI threshold, Liquidity Sweep lookback, Displacement ATR
+  multiplier, etc.) live on the concept condition, never as separate concepts.
+- Direction (LONG/SHORT/BOTH/NEUTRAL) is structured metadata on the condition, not
+  encoded via fake concept names.
+- Timeframe (1m/5m/15m/1h/etc.) is structured metadata, never a concept.
+- Risk rules (stop loss %, take profit %, R:R) are a completely separate category
+  from concepts — never appear in the Trading Concept Library, never become a
+  condition. R:R alone without a defining SL % must be rejected (no objective 1R).
+
+=== 4. EXECUTABLE VS REVIEW_REQUIRED ===
+
+Explicit status per concept, enforced by Builder/Backtesting/Monitoring:
+- EXECUTABLE: Builder can create it, Backtesting/Monitoring can evaluate it.
+- REVIEW_REQUIRED: visible in the library and in Build with AI output, Builder shows
+  it as review-required, but Backtesting and Monitoring must refuse to execute it —
+  never approximate it as something else.
+
+=== 5. STRATEGY VERSIONS (immutability) ===
+
+On save, copy the full canonical metadata (concept ID, definition, parameters,
+direction, timeframe, relationships, evaluator type, status, risk rules) into the
+immutable version snapshot. Future registry changes must never silently alter what
+an existing historical version means. Do not corrupt, rewrite, or reset existing
+strategies/versions/trades/backtest records — additive, backwards-compatible
+migrations only.
+
+=== 6. BACKTESTING & MONITORING ===
+
+Both must consume the exact same canonical conditions and evaluator logic — no
+second interpretation of a concept in either engine. Signals evaluate on completed/
+closed candles per the concept's canonical definition, deterministically, no
+runtime-invented behavior. Backtesting must support multiple independent trades
+across the full historical period — no artificial one-trade-per-day/per-backtest
+limit or cooldown unless the strategy explicitly specifies one; every eligible
+completed candle gets evaluated.
+
+=== 7. CURRENCY ===
+
+Default display currency is GBP (£) throughout — P/L, account values, risk calcs,
+trade results, performance. Don't hardcode $. Don't change underlying numeric
+calculations to do this, only display formatting/config.
+
+=== 8. REQUIRED TEST COVERAGE ===
+
+Add regression tests for at minimum:
+A. Simple executable concept: "XAUUSD 5m Breakout, both directions" → only Breakout.
+B. Concept + prohibitions: "Use Breakout. Do not use EMA, RSI or FVG." → only Breakout.
+C. Parameterized concept: "Use EMA 20." → EMA, period=20 (not "20" or "another concept").
+D. Parent concept vocabulary: "Use Liquidity Sweep." → only Liquidity Sweep (no Buy/
+   Sell-Side Liquidity, Support, Resistance, ATR, Closed Candles).
+E. Nested parameter: "Liquidity Sweep using sell-side liquidity" → Liquidity Sweep +
+   sell-side parameter, NOT a separate Sell-Side Liquidity condition.
+F. Relationship: "Liquidity Sweep followed by Displacement" → both concepts +
+   relationship=FOLLOWED_BY, not flattened into unrelated conditions.
+G. Unsupported concept: "Use Judas Swing" → Judas Swing, REVIEW_REQUIRED, with reason.
+H. Meta instruction: "Only use concepts from the Trading Concept Library" → no
+   concept called "Trading Concept Library."
+I. Risk only: "1% stop loss and 2% take profit" → risk metadata only, no concepts.
+J. Direction: "both directions" → direction=BOTH.
+K. Timeframe: "5-minute" → timeframe=5m, not a concept.
+L. Multiple trades: run a historical breakout strategy, verify >1 trade generated.
+M. Version immutability: change Builder conditions after v1 exists, confirm v1
+   snapshot is unchanged.
+N. Backtest/monitoring parity: same candle sequence → equivalent signals from both.
+O. Registry integrity: every executable concept has a valid evaluator, valid
+   parameters, valid status, stable ID.
+P. Concept pollution: a long prompt mixing examples, prohibitions, explanations,
+   parameters, internal vocabulary, and instructions → only explicitly requested
+   concepts become conditions.
+
+=== 9. WHAT NOT TO DO ===
+
+- No prompt-specific if/else patches ("if prompt contains X, ignore it").
+- No blacklist-of-words approach — classification must come from structure.
+- No inventing concepts, parameters, or approximations for unsupported requests.
+- No destructive migrations, database resets, or corruption of historical records.
+- No publishing or deploying to production — development environment only.
+
+=== EXECUTION ===
+
+Implement this directly in the repo: schema/migrations, registry data, resolver
+pipeline, Builder, Build with AI, backtesting engine, monitoring engine, API/types/
+frontend layers that reference concepts, and the full test suite above. Then:
+1. Run all tests and typechecks.
+2. Run production builds (API + frontend).
+3. Test the full Build with AI → Builder → Version → Backtest → Monitoring lifecycle
+   end to end, including the "Liquidity Sweep followed by Displacement" case that
+   previously failed.
+4. Check for concept pollution on a long mixed prompt.
+5. Verify multiple-trade backtesting still works.
+6. Verify version immutability.
+7. Verify GBP display.
+8. Report exactly what was changed, file by file, and report any remaining
+   limitations honestly — do not claim completion unless every item above is
+   actually verified working.
