@@ -1,0 +1,43 @@
+Build real structural stop-loss and take-profit execution so strategies using structural risk rules (stop beyond a swept extreme, target at the next external liquidity level) can actually run historical backtests and live monitoring — not just display as review_required.
+
+AUDIT FIRST
+
+Before writing code, check and report back:
+1. Do the current Liquidity Sweep and liquidity_level evaluators (backtest-engine.ts, strategy-monitoring.ts) already return the specific price/level that satisfied the condition (e.g. the exact high/low that was swept, the exact previous-day-high price), or do they only return a boolean match?
+2. How is a trade's entry price currently determined and stored per backtest trade record?
+3. Does the immutable strategy version snapshot have a place to record which condition a risk rule's reference points to?
+
+Report findings before proceeding to implementation.
+
+REQUIRED BEHAVIOR
+
+1. Evaluators for conditions that inherently produce a specific price level (Liquidity Sweep, and every liquidity_level variant: previous day/week high/low, equal highs/lows, etc.) must expose that concrete price alongside their boolean match result, so downstream logic can reference it.
+
+2. Add real execution for two risk rule types that currently exist only as review_required placeholders:
+   - `structural_stop` referencing a specific entry condition (e.g. the Liquidity Sweep in this strategy) — compute the stop price as the swept extreme's price at the time that condition triggered, optionally with a small configurable buffer for spread/slippage. Default buffer = 0 unless the user specifies one.
+   - `structural_target` referencing a specific condition (e.g. a liquidity_level condition, or "the next external liquidity level in the trend direction" generally) — compute the target price as that condition's detected level price.
+   
+   Both must become status: executable once a valid reference is resolved, with a real evaluatorVersion, following the same pattern as other executable risk rules in the registry. If the reference can't be resolved (e.g. user says "beyond the sweep" but there's no Liquidity Sweep condition in the strategy), keep it review_required with an honest explanation — don't fall back to inventing a percentage.
+
+3. `risk_reward_multiple` validation (e.g. "at least 1.5x") must be evaluated using the concrete computed stop/target distances at the time of each trade, not a static check. If a candidate trade doesn't meet the minimum R:R once the actual structural levels are known, the trade must be skipped/rejected, not entered and flagged after the fact.
+
+4. Backtesting and monitoring must share this exact same structural-stop/target resolution logic — same evaluator, same computation, no second interpretation in either engine.
+
+5. Strategy version immutability: the version snapshot must record which specific condition each structural risk rule references, so future registry or condition changes cannot retroactively change what a historical version's stop/target meant.
+
+TEST REQUIREMENTS
+
+Using this fixture strategy (XAUUSD continuation: 1h BOS trend filter, 5m Liquidity Sweep → Displacement → FVG → 5m BOS entry sequence, NY session, structural stop beyond sweep extreme, structural target at next external liquidity level, minimum 1.5R):
+
+1. Confirm the structural_stop and structural_target risk rules resolve to status: executable once conditions are properly referenced.
+2. Run a real historical backtest and confirm it executes (not review_required-blocked) and produces trades with concrete stop/target prices tied to actual historical sweep/liquidity levels, not invented percentages.
+3. Confirm a candidate setup that meets all entry conditions but fails the 1.5R minimum (because the actual structural distance is too tight) is correctly skipped, not entered.
+4. Confirm backtest and monitoring compute an identical stop/target price for the same historical setup (parity test).
+5. Confirm version immutability: create a version, then verify a later registry change to Liquidity Sweep's default parameters does not alter what the already-created version's structural stop referenced.
+
+CONSTRAINTS
+
+- Do not touch unrelated parts of the registry, resolver, or Builder UI.
+- Do not delete or reset any existing strategies, versions, trades, or backtest records.
+- Do not invent a percentage-based fallback anywhere in this feature — if a structural reference can't be resolved, it stays review_required.
+- Report back per requirement above: what was found in the audit, what was built, test names and pass/fail, and full test suite/typecheck/build results.
