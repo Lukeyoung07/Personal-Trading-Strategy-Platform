@@ -1,0 +1,238 @@
+FIX REQUESTS + FEATURE ADDITION + SYSTEMIC IMPROVEMENTS
+Please work through these in order.
+
+=== 1. BUG: "Maximum call stack size exceeded" when reviewing a large backtest ===
+
+Clicking "Review result" on a completed backtest reliably and reproducibly
+throws:
+
+  Something went wrong
+  This part of the app hit an error. The rest of the app is still running.
+  Maximum call stack size exceeded
+
+Confirmed reproducible every time on: "XAUUSD 5m Bearish BOS + Liquidity Sweep
++ Displacement" backtest over a custom 3-year range (24 Jun 2023 – 1 Sept 2026,
+91,000 candles, 14 trades, 42.9% win rate, £144.07 P/L). The backtest itself
+completes and reports summary results successfully — only opening the detailed
+review page fails.
+
+Separately: when this error fired, it did not stay contained to "this part of
+the app" as its own message claimed — the entire app preview stopped working
+and required a full page refresh to recover, not just the review panel.
+
+Please:
+- Reproduce this on a large-range backtest (multi-year / 90,000+ candles).
+- Confirm whether smaller backtests (e.g. ~13-month, ~40,000 candles) still
+  open their review pages correctly, to confirm this is scale-related rather
+  than a general regression.
+- Identify the recursive or deeply-nested operation causing the stack overflow
+  — likely candidates: candle-by-candle recursive evaluation logic,
+  relationship/window state tracking recursing per candle instead of
+  iterating, or recursive JSON serialization/rendering building the review
+  page from a large trade/candle dataset.
+- Fix the underlying recursive logic (convert to iterative where needed)
+  rather than increasing stack size or truncating displayed data as a
+  workaround — I need to reliably review multi-year backtests going forward.
+- Separately fix the error boundary so a crash in the review panel is actually
+  contained to that panel, matching what its own error message claims, instead
+  of taking down the entire app preview and requiring a manual refresh.
+- Add a regression test using a large synthetic dataset (100,000+ candles) to
+  confirm the review page renders without error, so this doesn't silently
+  reappear as backtests get larger.
+
+=== 2. BUG: Entry/Confirmation miscategorization ===
+
+In a strategy named "XAUUSD 5m Bullish Liquidity Sweep and Displacement," all
+three conditions (1h Bullish Break of Structure, 5m Bullish Liquidity Sweep,
+5m Bullish Displacement) were placed under "Confirmation" with "Entry: None
+added." This does not match the correct pattern seen in every other working
+strategy I've built (e.g. "XAUUSD 5m Liquidity Sweep and Displacement" and the
+bearish version of this same strategy), where Liquidity Sweep is Entry and
+Displacement is Confirmation.
+
+Please:
+- Explain why this specific draft categorized all three conditions as
+  Confirmation with an empty Entry stage.
+- Tell me honestly whether the backtest I already ran on this strategy (12
+  trades, 16.7% win rate, -£273.14) is valid, or whether an empty Entry stage
+  means the engine evaluated something other than what I intended — if it's
+  invalid, say so plainly rather than treating it as usable data.
+- Fix the categorization logic so this pattern (HTF bias condition + Liquidity
+  Sweep + Displacement) is consistently split into Entry (Liquidity Sweep) and
+  Confirmation (Displacement, and the HTF bias condition) the same way it
+  already works correctly for the non-HTF version, regardless of direction
+  (long/short/both).
+- Add a regression test: the same strategy request with "bullish" and "bearish"
+  swapped should produce identical condition categorization (same Entry/
+  Confirmation structure), differing only in direction/polarity values.
+
+=== 3. BUG: silent direction hardcoding instead of review_required ===
+
+When I asked for a strategy where the 5m entry direction should be inherited
+from a 1h Break of Structure bias condition (i.e. "make the Liquidity Sweep
+and Displacement match whatever direction the 1h bias currently is"), the
+resolver silently hardcoded both conditions to bearish polarity and displayed
+the strategy-level Direction as "both" — producing a draft that looked like it
+fulfilled the request but actually only ever represents one fixed direction.
+
+Since direction cannot currently be dynamically inherited from another
+condition's outcome (confirmed unsupported), any request that implies this
+must instead mark the affected conditions as `review_required`, with a reason
+such as: "direction cannot be dynamically linked to another condition's
+outcome — this concept currently requires a fixed direction per condition."
+Do not guess or silently default to one direction.
+
+Add a regression test: a prompt requesting bias-dependent/inherited direction
+across two conditions must return review_required with an accurate reason, and
+must NOT return an executable draft with one direction silently chosen.
+
+=== 4. BUG: risk-reward rule disappearing when mixed with a review-required concept ===
+
+In a draft using Judas Swing (review_required) + Displacement (executable), I
+requested "1% stop loss and 2R risk-reward." The resulting risk rules only
+showed "stop loss percentage · 1%" — the 2R risk-reward rule was missing
+entirely, even though a defining 1% stop loss was provided (which should make
+2R valid, the same way it resolved correctly in my working Breakout strategy).
+
+Please determine and fix why:
+(a) the 2R rule was silently dropped from resolution, or
+(b) it was stored but not rendered in the risk rules UI, or
+(c) an unrelated review-required condition (Judas Swing) is incorrectly
+    affecting the validity of unrelated risk rules, which must be resolved
+    completely independently of condition status per the existing
+    architecture (risk rules and concepts are supposed to be fully separate).
+
+Add a regression test: a strategy mixing one review-required concept and one
+executable concept, with a valid SL% + R:R risk rule, must still show BOTH
+risk rules correctly, unaffected by the review-required concept's status.
+
+=== 5. MISSING TEST: cross-timeframe FOLLOWED_BY regression coverage ===
+
+Cross-timeframe FOLLOWED_BY (e.g. 1h source condition → 5m target condition)
+is implemented — maxBarsBetween counts against the target condition's own
+candle series — but has no dedicated regression test. Add one:
+- 1h source condition, 5m target condition, FOLLOWED_BY with maxBarsBetween=20.
+- Confirm the window is correctly measured in 5m target bars (~100 minutes),
+  not 1h bars and not a raw duration conversion.
+- Confirm correct behavior at the boundary (target fires exactly at bar 20 vs
+  bar 21 after source).
+
+=== 6. FEATURE: direction inheritance between conditions (direction_from) ===
+
+Add a new relationship type, `direction_from`, allowing a target condition's
+direction/polarity to be resolved dynamically from a source condition's
+outcome at evaluation time, instead of being fixed when the strategy is
+created.
+
+Example: "1h Break of Structure as bias, 5m Liquidity Sweep and Displacement
+should match the 1h bias direction" should produce:
+- 1h Break of Structure: direction = both (detects either bullish or bearish)
+- 5m Liquidity Sweep + Displacement: direction = inherited via direction_from,
+  source = the Break of Structure condition
+
+Backtesting: at each candle, evaluate the source condition's most recently
+established direction (bullish or bearish bias). Only evaluate the target
+condition using that current direction. If the source condition has not yet
+established a bias, the target condition must not fire in either direction.
+
+Monitoring: identical mechanism — track the most recent source-condition
+direction as persistent state, and only evaluate the target condition against
+that current direction, updating whenever the source flips.
+
+This must combine correctly with:
+- existing FOLLOWED_BY temporal ordering (both relationship types may apply to
+  the same condition pair simultaneously)
+- existing cross-timeframe maxBarsBetween logic (see item 5 above — the
+  regression test for that should exist before or alongside this feature)
+
+Implement generically via registry metadata (e.g. a flag like
+`producesDirectionalOutcome: true` on concepts such as Break of Structure,
+Change of Character, Market Structure Shift, HTF Structure), NOT hardcoded to
+one specific concept name.
+
+Add regression tests:
+A. Source bullish → target only fires bullish, never bearish, until source flips.
+B. Source bearish → target only fires bearish.
+C. Source has not fired yet → target never fires in either direction.
+D. Source flips mid-sequence → target correctly switches direction from that
+   point forward.
+E. Cross-timeframe case (1h source, 5m target) combined with direction_from
+   AND maxBarsBetween ordering — confirm both constraints apply together.
+F. direction_from combined with an explicit prohibition elsewhere in the same
+   prompt (e.g. "do not use EMA") — confirm no interference.
+
+=== 7. SYSTEMIC IMPROVEMENT: fail loud, not silently plausible ===
+
+Several of the bugs above (items 2-4) share a root cause: when the resolver
+can't fully satisfy a request, it has been producing a draft that LOOKS
+complete and correct rather than surfacing that something was assumed,
+dropped, or approximated. This needs a structural fix, not three separate
+patches.
+
+Add a validation/audit pass that runs on every generated draft, BEFORE it's
+shown to the user, checking for known "silent failure" shapes:
+
+- A condition stage (Entry/Confirmation/Exit) that a strategy's structure
+  would normally require is empty when concepts were actually detected and
+  categorized elsewhere (as in item 2) — flag this as a structural warning,
+  not a silent pass.
+- A requested risk rule (SL/TP/R:R) that was mentioned in the user's request
+  but does not appear in the final resolved risk rules — flag as a warning:
+  "You requested a risk-reward rule but it did not resolve. Reason: [X]" —
+  rather than just omitting it with no explanation.
+- A condition whose direction/polarity was set to a specific fixed value
+  (long/short) when the user's phrasing implied it should be derived,
+  conditional, or dynamic — flag as review_required (per item 3) rather than
+  silently picking one.
+- Any other case where the resolver had to make an assumption not explicitly
+  and unambiguously stated by the user (e.g. applying a default parameter
+  value, defaulting an unspecified window like maxBarsBetween) — these are
+  fine to apply, but must be visibly surfaced in the draft UI (as you already
+  do correctly for "within 20 bars (default)"), not buried only in raw
+  parameter JSON that a non-technical user won't read.
+
+The goal: every assumption or gap gets surfaced in the draft summary users
+actually look at (the top-level card, not just the expanded Review Strategy
+view), so nothing that would materially change the user's decision to
+create/backtest the strategy is invisible.
+
+=== 8. SYSTEMIC IMPROVEMENT: structural parity checks ===
+
+Item 2's bug (bullish and bearish versions of the same strategy request
+producing different Entry/Confirmation structures) suggests there's no
+existing check that two direction-symmetric requests produce isomorphic
+condition structures. Add a standing regression pattern (not a one-off test)
+that applies going forward to any new concept or relationship type added to
+the registry:
+
+For any strategy request containing a direction (bullish/bearish, long/short),
+generating the same request with the direction flipped must produce identical
+condition categorization (same stages, same relationship structure, same
+number of conditions) and differ ONLY in direction/polarity fields. Bake this
+into the test suite as a reusable helper, not a single hardcoded test case,
+so future concepts automatically get this check for free.
+
+=== 9. SYSTEMIC IMPROVEMENT: a living regression fixture from real usage ===
+
+Rather than only testing hand-picked example prompts, save the actual strategy
+requests from this conversation (the working Breakout, the working Sweep +
+Displacement, the bearish HTF version, and the fixed bullish HTF version once
+corrected) as a small permanent fixture suite that runs on every future change
+to the resolver, registry, backtesting engine, or monitoring engine. This
+catches silent regressions on strategies that are known-good today, before I
+discover them by re-testing manually days or weeks later. Report which of
+these fixture strategies pass/fail after every future change, not just
+aggregate test counts.
+
+=== GENERAL ===
+
+Do not implement any of the above as prompt-specific patches or hardcoded
+one-off fixes — each must be a generic, registry-driven or structurally
+enforced fix consistent with the existing architecture. After implementing,
+run all tests and typechecks, run both production builds, and report exact
+test counts before/after, plus confirmation that items 1-5 don't regress any
+existing working strategy (especially the original Breakout and the working
+Liquidity Sweep + Displacement / bearish HTF strategies).
+
+Do not run this against production, do not reset any database, do not modify
+existing saved strategies or version snapshots.
