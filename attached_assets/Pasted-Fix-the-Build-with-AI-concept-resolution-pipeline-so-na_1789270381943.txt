@@ -1,0 +1,259 @@
+Fix the Build with AI concept-resolution pipeline so natural-language strategy instructions cannot be incorrectly converted into additional trading concepts or cause canonical executable concepts to become review-required.
+
+This is a SYSTEM-LEVEL FIX, not a prompt-specific exception.
+
+Use the canonical Trading Concept Library as the ONLY authority for whether something is a trading concept.
+
+PROBLEM REPRODUCTION:
+
+This legitimate request:
+
+"Create a backtestable XAUUSD strategy using Liquidity Sweep and Displacement. The Liquidity Sweep must occur before Displacement. Use closed candles. Use 1% stop loss and 2% take profit."
+
+incorrectly produced review-required items:
+
+- Sell-Side Liquidity condition
+- Support condition
+- Buy-Side Liquidity condition
+- Resistance condition
+- Closed Candles
+- Displacement
+- Concept "Closed Candles" is not in the Trading Concept Library
+
+This must be fixed generically.
+
+REQUIRED BEHAVIOUR:
+
+1. Canonical concept resolution
+
+Every extracted concept must first be resolved against the canonical Trading Concept Library.
+
+The AI must NOT treat ordinary trading vocabulary as a separate concept merely because it appears in a strategy description.
+
+For example:
+
+- "closed candles" = execution/data requirement, NOT a trading concept.
+- "support level" inside a Liquidity Sweep definition = parameter/level source of Liquidity Sweep, NOT automatically a separate Support concept.
+- "resistance level" inside a Liquidity Sweep definition = parameter/level source of Liquidity Sweep, NOT automatically a separate Resistance concept.
+- "buy-side liquidity" inside a Liquidity Sweep definition = part of the Liquidity Sweep rule/parameterization, NOT automatically a separate Buy-Side Liquidity entry condition.
+- "sell-side liquidity" inside a Liquidity Sweep definition = part of the Liquidity Sweep rule/parameterization, NOT automatically a separate Sell-Side Liquidity entry condition.
+
+Do NOT create separate concepts unless the user explicitly requests them as standalone conditions.
+
+2. Nested concept language
+
+The system must distinguish between:
+
+A) A concept explicitly requested as a strategy condition.
+
+Example:
+"Use Liquidity Sweep."
+
+This creates one Liquidity Sweep condition.
+
+B) Terms used to describe how that concept works.
+
+Example:
+"price sweeps sell-side liquidity and closes back above the level."
+
+This remains part of the Liquidity Sweep definition/parameters.
+
+It must NOT create:
+
+- Sell-Side Liquidity
+- Support
+- another Liquidity condition
+
+unless those are explicitly requested as independent strategy conditions.
+
+3. Execution instructions are NOT concepts
+
+Create a robust classification between:
+
+- trading concepts
+- concept parameters
+- relationship operators
+- execution/data requirements
+- risk-management rules
+- metadata/instructions
+
+Examples that must never become concepts by themselves:
+
+- closed candles
+- closed 5-minute candles
+- historical backtesting
+- backtest
+- monitoring
+- Builder
+- Trading Concept Library
+- timeframe
+- market
+- direction
+- entry
+- confirmation
+- exit
+- risk management
+- stop loss
+- take profit
+- percentage
+- ATR when it is a parameter belonging to Displacement
+- support/resistance when they are used to define a Liquidity Sweep
+- buy-side/sell-side liquidity when they are used to define a Liquidity Sweep
+
+4. Canonical executable status
+
+If the canonical registry says a concept is executable, Build with AI must not downgrade it to review_required simply because its natural-language explanation contains other trading vocabulary.
+
+For this test:
+
+Displacement must resolve to the canonical executable Displacement concept.
+
+Liquidity Sweep must resolve to the canonical executable Liquidity Sweep concept.
+
+The final draft should contain:
+
+- Liquidity Sweep
+- Displacement
+- their requested relationship
+- 1% stop loss
+- 2% take profit
+
+Nothing else.
+
+5. Relationship preservation
+
+"Liquidity Sweep followed by Displacement" must be represented as a relationship between the two canonical concepts.
+
+Do not create additional concepts from the words used to describe that relationship.
+
+The system must distinguish:
+
+"Liquidity Sweep followed by Displacement"
+
+from:
+
+"Liquidity Sweep AND Support AND Sell-Side Liquidity AND Displacement"
+
+The first is what the user requested.
+
+6. Do not solve this with prompt-specific filtering
+
+Do NOT add a special-case rule specifically for:
+
+- this XAUUSD strategy
+- Liquidity Sweep
+- Displacement
+- Support
+- Resistance
+- Buy-Side Liquidity
+- Sell-Side Liquidity
+
+Instead implement a generic concept-resolution architecture that works for every concept in the canonical registry.
+
+The resolver should understand whether a recognized concept name is:
+
+- explicitly requested as a standalone condition
+- nested inside another concept's definition
+- being used as a parameter
+- being used as execution metadata
+- being used as ordinary descriptive language
+
+7. Existing functionality must remain intact
+
+Do not break:
+
+- canonical aliases
+- directional variants
+- risk-rule separation
+- timeframe parsing
+- negation/prohibition handling
+- Build with AI authorization
+- Builder persistence
+- immutable version metadata
+- backtesting
+- monitoring
+- multiple independent trades
+
+8. Add regression tests
+
+Add tests covering at minimum:
+
+- Liquidity Sweep alone
+- Displacement alone
+- Liquidity Sweep + Displacement
+- Liquidity Sweep followed by Displacement
+- Liquidity Sweep using sell-side liquidity
+- Liquidity Sweep using buy-side liquidity
+- Liquidity Sweep using support/resistance terminology
+- "closed candles"
+- "closed 5-minute candles"
+- Displacement with ATR parameters
+- explicit standalone Support
+- explicit standalone Resistance
+- explicit standalone Buy-Side Liquidity
+- explicit standalone Sell-Side Liquidity
+- negated concepts
+- unsupported concepts
+- mixed supported/unsupported requests
+
+The important distinction is:
+
+"Use Liquidity Sweep using sell-side liquidity"
+
+must produce Liquidity Sweep with the appropriate parameterization.
+
+"Use Sell-Side Liquidity"
+
+must produce a standalone Sell-Side Liquidity concept.
+
+Likewise:
+
+"Use Liquidity Sweep around support"
+
+must not automatically produce a standalone Support condition.
+
+"Use Support"
+
+must produce a standalone Support concept if Support is available in the canonical registry.
+
+9. Verify the original failing request
+
+After implementing the fix, run the exact request that exposed the bug and confirm that it produces only:
+
+Liquidity Sweep
+Displacement
+
+plus the requested relationship and risk rules.
+
+It must NOT produce:
+
+- Sell-Side Liquidity condition
+- Support condition
+- Buy-Side Liquidity condition
+- Resistance condition
+- Closed Candles
+- unrelated concepts
+
+It must also NOT mark Displacement as review-required if the canonical registry says Displacement is executable.
+
+10. Full verification
+
+Run:
+
+- API tests
+- frontend tests
+- assistant/parser tests
+- workspace typechecks
+- production builds
+- git diff --check
+- workflow restart
+- live Builder verification
+- browser console verification
+
+Do not create or modify real trading records.
+
+Use disposable fixtures for lifecycle testing.
+
+Do not modify existing strategies, versions, trades, backtests, alerts, monitoring records, or historical data.
+
+This must be a generic architectural correction to concept resolution, not another prompt-specific patch.
