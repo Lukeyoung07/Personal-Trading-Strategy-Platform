@@ -1,0 +1,126 @@
+IMPLEMENT EXECUTABLE RELATIONSHIP ORDERING (FOLLOWED_BY)
+
+Context: relationships between conditions (e.g. "Liquidity Sweep followed by
+Displacement") are currently saved as metadata only. They are not enforced by
+backtesting or monitoring — both conditions are evaluated independently and
+combined with plain AND logic, with no temporal ordering and no bar-distance
+constraint. This needs to become a real, executable temporal operator.
+
+=== 1. SCHEMA CHANGE ===
+
+Add `maxBarsBetween` to the relationship schema (currently: type, targetRuleIndex,
+supported, reason).
+
+- `maxBarsBetween`: integer, optional.
+- If the user specifies a window ("within 10 candles", "within 1 hour on 5m" → convert
+  to bar count), use that value.
+- If the user does not specify a window, default to 20 bars and mark the relationship
+  as supported using that default — do not leave it unbounded and do not mark it
+  review_required purely for lacking an explicit window. Show the applied default
+  clearly in the Builder UI (e.g. "followed by → within 20 bars (default)") so it's
+  never a hidden assumption.
+- Once this is implemented, `FOLLOWED_BY` relationships between two executable
+  concepts should no longer be marked review_required — only relationship types that
+  remain genuinely unimplemented should keep that status.
+
+=== 2. BACKTESTING ENGINE ===
+
+In `engineCondition()` (artifacts/api-server/src/routes/backtesting.ts), copy the
+`relationship` field through — it is currently dropped.
+
+In `evaluateConditions()`, replace the flat AND evaluation for any pair of conditions
+linked by a `followed_by` relationship with temporal logic:
+
+- Track the bar index at which the source condition (targetRuleIndex) becomes true.
+- The target condition (the one declaring the relationship) only counts as satisfied
+  if it becomes true within `maxBarsBetween` bars AFTER the source condition's bar.
+- If the target condition becomes true before the source condition, or outside the
+  window, it does not satisfy the relationship — do not treat it as a match.
+- If the source condition never occurs, the target condition alone must not trigger
+  a signal.
+- Preserve support for multiple independent trades — the ordering constraint applies
+  per candidate setup, it should not collapse the strategy into a single trade per
+  backtest.
+- If `relationship.supported === false` for a relationship type genuinely not yet
+  implemented, the backtest validator must reject the condition explicitly (same
+  pattern as the existing review_required concept rejection) rather than silently
+  evaluating it as an unordered AND. Never fall back to unordered AND for a
+  relationship that claims to be executable but isn't actually implemented.
+
+=== 3. MONITORING ENGINE ===
+
+Wire the saved relationship into the existing dependency framework. Built-in
+detectors currently return an empty `dependencies()` array — for conditions with a
+`followed_by` relationship, the detector must return the source condition as a
+dependency of the target condition.
+
+- The monitoring loop must not evaluate the target condition as "met" unless the
+  source condition became true within the saved `maxBarsBetween` window.
+- Use the same temporal window logic as backtesting — do not implement a second,
+  divergent interpretation of `followed_by` for live monitoring.
+- If the source condition's trigger falls outside the window, the target condition
+  resets to waiting for a new source trigger rather than staying permanently
+  satisfied or permanently blocked.
+
+=== 4. ASSISTANT / BUILD WITH AI ===
+
+Update `relationshipForRequest()` so that when it detects "followed by" phrasing:
+
+- It also looks for an explicit bar/time window in the request (e.g. "within 10
+  candles", "within 30 minutes" — convert using the strategy's timeframe) and sets
+  `maxBarsBetween` accordingly.
+- If no window is given, it still sets `supported: true` with the default
+  `maxBarsBetween` (per section 1) rather than `supported: false` — since this is
+  now an executable feature, not a review-only one.
+
+=== 5. TESTING ===
+
+Add regression tests for:
+
+A. Two executable concepts with `followed_by` and no explicit window → relationship
+   uses default maxBarsBetween, marked supported (not review_required).
+B. Two executable concepts with `followed_by` and explicit window ("within 10
+   candles") → maxBarsBetween = 10, correctly parsed.
+C. Backtest: target condition becomes true within the window after source → trade
+   generated.
+D. Backtest: target condition becomes true BEFORE source → no trade generated for
+   that occurrence.
+E. Backtest: target condition becomes true AFTER the window closes → no trade
+   generated for that occurrence.
+F. Backtest: source never occurs → target alone never generates a trade.
+G. Backtest: multiple independent qualifying sequences across the historical period
+   → multiple trades generated (relationship logic must not collapse this to one
+   trade per backtest).
+H. Monitoring: source condition triggers, target condition triggers within window →
+   dependency framework reports the setup as met.
+I. Monitoring: source triggers, window closes with no target trigger → condition
+   resets to waiting, not stuck as either permanently met or blocked.
+J. A relationship type that is genuinely unimplemented (supported: false) is
+   explicitly rejected by the backtest validator, not silently evaluated as
+   unordered AND.
+K. Rerun the original "Liquidity Sweep followed by Displacement, both directions,
+   XAUUSD 5m, 1% SL, 2% TP" strategy end-to-end and confirm the relationship is
+   now supported (not review_required) and actually enforces ordering in a backtest.
+
+=== 6. DO NOT ===
+
+- Do not remove or weaken the existing review_required rejection for conditions
+  whose underlying CONCEPT (not relationship) is unsupported — that behavior is
+  correct and must stay.
+- Do not implement this only for backtesting and leave monitoring using the old
+  independent-evaluation behavior, or vice versa — both must share the same
+  temporal logic.
+- Do not silently reset or reinterpret existing saved strategies/versions that
+  already contain a `followed_by` relationship — existing immutable version
+  snapshots must keep their original recorded metadata; only newly created
+  strategies/versions get the new supported/maxBarsBetween behavior. If you need
+  a migration to backfill a sane default onto existing snapshots, make it additive
+  and non-destructive, and report exactly what it does before running it.
+- Do not run this against production or reset any database.
+
+After implementing, run all new and existing tests, typechecks, and both production
+builds, then report:
+1. Whether the K test case above now shows the relationship as supported with
+   ordering actually enforced (not just present in metadata).
+2. The exact test counts (before vs after).
+3. Any relationship types or edge cases still left as review_required, and why.
