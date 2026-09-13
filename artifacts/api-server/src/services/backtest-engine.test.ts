@@ -782,6 +782,82 @@ describe("historical backtest engine", () => {
     expect(result.trades[0].side).toBe("short");
   });
 
+  it("counts a cross-timeframe followed_by window on the target timeframe", () => {
+    const relationship = {
+      type: "followed_by" as const,
+      targetRuleIndex: 0,
+      maxBarsBetween: 2,
+      supported: true,
+      reason: null,
+    };
+    const strategy = {
+      direction: "long" as const,
+      entryRules: null,
+      exitRules: null,
+      riskRules: null,
+      conditions: [
+        {
+          name: "1H source",
+          conceptName: null,
+          timeframe: "1H",
+          stage: "entry" as const,
+          direction: "long" as const,
+          requirement: "required" as const,
+          triggerRules: "close > open",
+          parameters: null,
+          relationship: null,
+          invalidationRules: null,
+          conceptDetectionRules: null,
+        },
+        {
+          name: "5m target",
+          conceptName: null,
+          timeframe: "5m",
+          stage: "confirmation" as const,
+          direction: "long" as const,
+          requirement: "required" as const,
+          triggerRules: "close < open",
+          parameters: null,
+          relationship,
+          invalidationRules: null,
+          conceptDetectionRules: null,
+        },
+      ],
+    };
+    const htf: HistoricalCandle[] = [{
+      openTime: new Date("2026-01-01T09:00:00Z"),
+      closeTime: new Date("2026-01-01T10:00:00Z"),
+      open: 100,
+      high: 102,
+      low: 99,
+      close: 101,
+      volume: 1,
+      isClosed: true,
+    }];
+    const ltf = (targetIndex: number, length = targetIndex + 2) => Array.from({ length }, (_, index) => ({
+      openTime: new Date(Date.UTC(2026, 0, 1, 9, 55 + index * 5)),
+      closeTime: new Date(Date.UTC(2026, 0, 1, 10, index * 5)),
+      open: 100,
+      high: 101,
+      low: 99,
+      close: index === targetIndex ? 99 : 100,
+      volume: 1,
+      isClosed: true,
+    }));
+
+    const withinWindow = runHistoricalBacktest(strategy, {
+      executionTimeframe: "5m",
+      series: [{ code: "5m", candles: ltf(1, 3) }, { code: "1H", candles: htf }],
+    });
+    const outsideWindow = runHistoricalBacktest(strategy, {
+      executionTimeframe: "5m",
+      series: [{ code: "5m", candles: ltf(3, 5) }, { code: "1H", candles: htf }],
+    });
+
+    expect(withinWindow.trades).toHaveLength(1);
+    expect(outsideWindow.trades).toEqual([]);
+  });
+
   it("opens independent later trades after an earlier position closes", () => {
     const result = runHistoricalBacktest({
       direction: "long",

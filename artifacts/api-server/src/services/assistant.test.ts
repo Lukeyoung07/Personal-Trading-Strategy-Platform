@@ -1887,6 +1887,80 @@ Risk/Reward: 2:1`,
     expect(response.strategyDraft?.conditions[1].executionStatus).toBe("executable");
   });
 
+  it.each(["bullish", "bearish"])(
+    "normalizes the HTF bias plus sweep and displacement stages for %s requests",
+    async polarity => {
+      mockStrategyDraft({
+        name: `${polarity} HTF sequence`,
+        description: "A higher-timeframe structure condition followed by lower-timeframe confirmation.",
+        direction: polarity === "bullish" ? "long" : "short",
+        marketSymbol: "XAUUSD",
+        timeframes: ["1h", "5m"],
+        conditions: [
+          { name: `${polarity} Break of Structure`, stage: "confirmation", requirement: "required", conceptName: "Break of Structure", timeframe: "1h", direction: polarity === "bullish" ? "long" : "short", parameters: { kind: "market_structure", signal: "bos", polarity, lookback: 2 } },
+          { name: `${polarity} Liquidity Sweep`, stage: "confirmation", requirement: "required", conceptName: "Liquidity Sweep", timeframe: "5m", direction: polarity === "bullish" ? "long" : "short", parameters: { kind: "liquidity_sweep", sweepSide: polarity === "bullish" ? "sell_side" : "buy_side", level: "lookback_extreme", lookback: 5 } },
+          { name: `${polarity} Displacement`, stage: "confirmation", requirement: "required", conceptName: "Displacement", timeframe: "5m", direction: polarity === "bullish" ? "long" : "short", parameters: { kind: "displacement", polarity, atrPeriod: 14, minimumBodyAtr: 1.5, minimumCloseLocation: 0.7 } },
+        ],
+        riskManagementRules: "1% stop loss and 2% take profit",
+      });
+
+      const response = await answerAssistant({
+        message: `Build a 1h XAUUSD ${polarity} Break of Structure bias followed by a 5m ${polarity} Liquidity Sweep and ${polarity} Displacement. Use a 1% stop loss and 2% take profit.`,
+        messages: [],
+        context: { page: "/strategy-builder" },
+      });
+
+      expect(response.strategyDraft?.conditions.map(condition => condition.stage)).toEqual([
+        "confirmation",
+        "entry",
+        "confirmation",
+      ]);
+      expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual([
+        "Break of Structure",
+        "Liquidity Sweep",
+        "Displacement",
+      ]);
+      expect(response.strategyDraft?.compatibility.compatible).toBe(true);
+    },
+  );
+
+  it("marks dependent-direction requests for review instead of choosing a target polarity", async () => {
+    mockStrategyDraft({
+      name: "Bias-led displacement",
+      description: "The lower-timeframe condition should inherit direction from the higher-timeframe bias.",
+      direction: "both",
+      marketSymbol: "XAUUSD",
+      timeframes: ["1h", "5m"],
+      conditions: [
+        { name: "HTF bias", stage: "confirmation", requirement: "required", conceptName: "Break of Structure", timeframe: "1h", direction: "both", parameters: { kind: "market_structure", signal: "bos", polarity: "auto", lookback: 2 } },
+        { name: "Follow the bias with displacement", stage: "entry", requirement: "required", conceptName: "Displacement", timeframe: "5m", direction: "long", parameters: { kind: "displacement", polarity: "bullish", atrPeriod: 14, minimumBodyAtr: 1.5, minimumCloseLocation: 0.7 } },
+      ],
+      riskManagementRules: "1% stop loss and 2R risk-reward target",
+    });
+
+    const response = await answerAssistant({
+      message: "Build a strategy where the 5m displacement inherits direction from the 1h bias. Use a 1% stop loss and 2R risk-reward target.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    const target = response.strategyDraft?.conditions.find(condition => condition.conceptName === "Displacement");
+    expect(target?.executionStatus).toBe("review_required");
+    expect(target?.direction).toBe("both");
+    expect(target?.parameters).toMatchObject({ polarity: "auto" });
+    expect(target?.relationship).toMatchObject({
+      type: "direction_from",
+      targetRuleIndex: 0,
+      supported: false,
+    });
+    expect(target?.validation?.reasons?.some(reason => reason.includes("inherited"))).toBe(true);
+    expect(response.strategyDraft?.riskRules).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "stop_loss_percentage", value: 1, executionStatus: "executable" }),
+      expect.objectContaining({ type: "risk_reward_multiple", value: 2, executionStatus: "executable" }),
+    ]));
+    expect(response.strategyDraft?.compatibility.compatible).toBe(false);
+  });
+
   it.each(["Support", "Resistance", "Buy-Side Liquidity", "Sell-Side Liquidity"])(
     "keeps standalone %s as an explicitly requested concept",
     async conceptName => {

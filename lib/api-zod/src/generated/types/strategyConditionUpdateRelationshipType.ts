@@ -15,4 +15,5 @@ export const StrategyConditionUpdateRelationshipType = {
   followed_by: 'followed_by',
   before: 'before',
   after: 'after',
+  direction_from: 'direction_from',
 } as const;

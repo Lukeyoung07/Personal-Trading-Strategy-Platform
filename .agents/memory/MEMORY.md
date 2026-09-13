@@ -30,4 +30,5 @@
 - [Universal assistant rule contract](universal-assistant-rule-contract.md) — assistant drafts carry typed canonical metadata additively; risk stays separate and unsupported temporal operators remain review-required.
 - [Canonical condition snapshots](canonical-condition-snapshots.md) — strategy conditions and immutable version snapshots retain registry identity and evaluator context additively.
 - [Assistant canonical reconciliation](assistant-canonical-reconciliation.md) — user-authorized canonical concepts control drafts; model labels only supply parameters, with specific aliases resolved before review fallback.
+- [Dynamic direction inheritance](assistant-direction-inheritance.md) — inherited target direction stays review-required until an explicit source relationship is resolved; executable sources must precede targets.
 - [Breakout concept boundary](breakout-concept-boundary.md) — objective previous-candle high/low rules use one Breakout evaluator with directional polarity.

@@ -15,4 +15,5 @@ export const AssistantRuleRelationshipType = {
   while: 'while',
   and: 'and',
   or: 'or',
+  direction_from: 'direction_from',
 } as const;

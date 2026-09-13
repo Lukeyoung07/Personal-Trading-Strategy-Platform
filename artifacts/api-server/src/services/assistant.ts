@@ -147,6 +147,7 @@ function parseRiskRules(value: string | null | undefined, requestMessage?: strin
     /(?:take[- ]profit|tp|target)\s*(?:at|of|is|:|=)?\s*(\d+(?:\.\d+)?)\s*R\b/gi,
     /(\d+(?:\.\d+)?)\s*R\s*(?:take[- ]profit|tp|target)\b/gi,
     /(?:risk[\/ -]?reward|r\s*:\s*r)\s*[:=]?\s*(\d+(?:\.\d+)?)\s*R\b/gi,
+    /(\d+(?:\.\d+)?)\s*R\s*(?:risk[\/ -]?reward|r\s*:\s*r)\b/gi,
   ];
   for (const pattern of rMultiplePatterns) {
     for (const match of text.matchAll(pattern)) {
@@ -1030,6 +1031,72 @@ function stageForRequestedConcept(conceptName: string, message: string, fallback
   return ["entry", "confirmation", "invalidation", "exit"].includes(fallback) ? fallback : "entry";
 }
 
+function normalizeConditionStages(conditions: any[], message: string) {
+  const hasEntry = conditions.some(condition => condition.stage === "entry");
+  if (hasEntry || !conditions.length) return conditions;
+
+  const hasLiquiditySweep = conditions.some(condition => executableConceptKind(condition.conceptName) === "liquidity_sweep");
+  const hasDisplacement = conditions.some(condition => executableConceptKind(condition.conceptName) === "displacement");
+  const hasSequenceLanguage = /\b(?:followed\s+by|then|after|once|confirmation)\b/i.test(message);
+  if (!hasSequenceLanguage || !hasLiquiditySweep) return conditions;
+
+  return conditions.map(condition => {
+    if (condition.stage === "exit" || condition.stage === "invalidation") return condition;
+    if (executableConceptKind(condition.conceptName) === "liquidity_sweep") {
+      return { ...condition, stage: "entry" };
+    }
+    if (hasDisplacement || condition.stage === "confirmation") {
+      return { ...condition, stage: "confirmation" };
+    }
+    return { ...condition, stage: "confirmation" };
+  });
+}
+
+const DIRECTION_INHERITANCE_REASON = "Direction is requested to be inherited from another condition; the source-to-target direction relationship needs review before execution.";
+
+function requestsDirectionInheritance(message: string) {
+  return (
+    /\b(?:inherit|inherited|derive|derived|match|matches|align|aligned|same\s+as|according\s+to|whatever|depending\s+on)\b[\s\S]{0,100}\b(?:direction|bias|polarity|bullish|bearish|long|short)\b/i.test(message)
+    || /\b(?:direction|bias|polarity)\b[\s\S]{0,80}\b(?:from|of)\b[\s\S]{0,80}\b(?:condition|signal|bias|structure|sweep|displacement)\b/i.test(message)
+  );
+}
+
+function applyDirectionInheritanceReview(conditions: any[], message: string) {
+  if (!requestsDirectionInheritance(message) || conditions.length < 2) return conditions;
+  const sourceIndex = conditions.findIndex(condition =>
+    executableConceptKind(condition.conceptName) === "market_structure"
+    || /\b(?:bias|trend|structure|higher\s+timeframe|htf)\b/i.test(String(condition.conceptName || "")),
+  );
+  const orderedConditions = sourceIndex > 0
+    ? [conditions[sourceIndex], ...conditions.filter((_, index) => index !== sourceIndex)]
+    : conditions;
+  const resolvedSourceIndex = sourceIndex >= 0 ? 0 : null;
+  return orderedConditions.map((condition, index) => {
+    if (index === resolvedSourceIndex || condition.stage === "exit" || condition.stage === "invalidation") return condition;
+    const parameters = condition.parameters && typeof condition.parameters === "object"
+      ? { ...condition.parameters }
+      : null;
+    if (parameters && "polarity" in parameters) parameters.polarity = "auto";
+    if (parameters && "sweepSide" in parameters) parameters.sweepSide = "auto";
+    return {
+      ...condition,
+      direction: "both",
+      parameters,
+      triggerRules: parameters ? executableConceptTriggerRules(parameters) : condition.triggerRules,
+      executionStatus: "review_required",
+      validation: universalValidation(false, [DIRECTION_INHERITANCE_REASON]),
+      relationship: {
+        ...(condition.relationship || {}),
+        type: "direction_from",
+        targetRuleIndex: resolvedSourceIndex,
+        targetCanonicalId: resolvedSourceIndex == null ? null : orderedConditions[resolvedSourceIndex]?.canonicalId || null,
+        supported: false,
+        reason: DIRECTION_INHERITANCE_REASON,
+      },
+    };
+  });
+}
+
 function syntheticRequestedCondition(
   conceptName: string,
   draft: any,
@@ -1218,8 +1285,12 @@ function reconcileRequestedConditions(draft: any, message: string) {
     });
   });
   const seen = new Set<string>();
-  return matched
+  const reconciled = applyDirectionInheritanceReview(
+    normalizeConditionStages(matched, message)
     .flatMap(condition => directionalizeCondition(condition, direction, message))
+    , message,
+  );
+  return reconciled
      .filter(condition => {
       const key = JSON.stringify([
         condition.conceptName,
@@ -1445,6 +1516,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
     }
     return true;
   });
+  const normalizedConditions = applyDirectionInheritanceReview(conditions, requestMessage || "");
   const requestedMarket = requestMessage?.match(/\b(?:XAUUSD|USTEC|US30|NAS100|SPX500|EURUSD|GBPUSD|USDJPY|BTCUSD|ETHUSD|gold|spot\s+gold|nasdaq)\b/i)?.[0] || null;
   const marketSymbol = matchCatalogMarket(draft.marketSymbol || requestedMarket, catalog);
   if (draft.marketSymbol && !marketSymbol) warnings.push(`Market “${String(draft.marketSymbol)}” is not in the active market catalog.`);
@@ -1477,7 +1549,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
                 : authorization.explanation,
         };
       }),
-    ...conditions.map((condition: any) => ({
+    ...normalizedConditions.map((condition: any) => ({
       name: condition.conceptName,
       supported: condition.supported === true,
       explanation: condition.supported === true
@@ -1494,7 +1566,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
         explanation: authorization.explanation,
       })),
   ];
-  const conceptsUsed = normalizeConcepts(retainedConcepts, conditions, requestMessage || "");
+  const conceptsUsed = normalizeConcepts(retainedConcepts, normalizedConditions, requestMessage || "");
   const requestedFrameValues = requestMessage ? requestedTimeframes(requestMessage) : [];
   const timeframes = (requestedFrameValues.length
     ? requestedFrameValues
@@ -1508,7 +1580,7 @@ function validateDraftAgainstCatalog(draft: any, catalog: BuilderCatalog, reques
     ...requestedDraft,
     marketSymbol,
     timeframes,
-    conditions,
+    conditions: normalizedConditions,
     conceptsUsed,
     authorization: draftAuthorization(requestMessage || "", requestAuthorizations),
     riskManagementRules: normalizeRiskRules(draft.riskManagementRules, requestMessage),

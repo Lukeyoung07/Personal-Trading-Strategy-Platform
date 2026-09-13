@@ -35,4 +35,21 @@ describe("backtest result statistics", () => {
     expect(result.maximumDrawdown).toBeNull();
     expect(result.equityCurve).toEqual([{ timestamp: startDate, equity: 0, tradeId: null }]);
   });
+
+  it("calculates statistics for large result sets without spreading into the call stack", () => {
+    const trades = Array.from({ length: 200_000 }, (_, index) => ({
+      id: index + 1,
+      entryTime: new Date(startDate.getTime() + index * 60_000),
+      exitTime: new Date(startDate.getTime() + (index + 1) * 60_000),
+      pnl: index % 2 === 0 ? 1 : -1,
+    }));
+
+    expect(() => calculateBacktestStatistics(trades, startDate)).not.toThrow();
+    const result = calculateBacktestStatistics(trades, startDate);
+    expect(result.winningTrades).toBe(100_000);
+    expect(result.losingTrades).toBe(100_000);
+    expect(result.largestWinningTrade).toBe(1);
+    expect(result.largestLosingTrade).toBe(-1);
+    expect(result.equityCurve).toHaveLength(200_001);
+  });
 });

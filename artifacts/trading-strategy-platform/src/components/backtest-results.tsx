@@ -68,6 +68,36 @@ const valueClass = (value: number | null | undefined) => {
   return value > 0 ? "text-primary" : "text-destructive";
 };
 
+function finiteRange(values: Iterable<number>) {
+  let minimum = 0;
+  let maximum = 0;
+  let seen = false;
+  for (const value of values) {
+    if (!Number.isFinite(value)) continue;
+    if (!seen) {
+      minimum = value;
+      maximum = value;
+      seen = true;
+      continue;
+    }
+    minimum = Math.min(minimum, value);
+    maximum = Math.max(maximum, value);
+  }
+  return seen
+    ? { minimum: Math.min(0, minimum), maximum: Math.max(0, maximum) }
+    : { minimum: 0, maximum: 1 };
+}
+
+function evenlySample<T>(values: T[], maximum: number) {
+  if (values.length <= maximum) return values;
+  if (maximum <= 1) return values.length ? [values[values.length - 1]] : [];
+  const result: T[] = [];
+  for (let index = 0; index < maximum; index += 1) {
+    result.push(values[Math.round((index / (maximum - 1)) * (values.length - 1))]);
+  }
+  return result;
+}
+
 function LoadingResults() {
   return (
     <div className="space-y-5" data-testid="backtest-results-loading">
@@ -153,8 +183,7 @@ function EquityCurve({
   const height = 285;
   const padding = { top: 22, right: 20, bottom: 34, left: 56 };
   const values = points.map((point) => point.equity);
-  const min = Math.min(0, ...values);
-  const max = Math.max(0, ...values);
+  const { minimum: min, maximum: max } = finiteRange(values);
   const range = max - min || 1;
   const x = (index: number) => padding.left + (index / Math.max(points.length - 1, 1)) * (width - padding.left - padding.right);
   const y = (value: number) => padding.top + ((max - value) / range) * (height - padding.top - padding.bottom);
@@ -216,23 +245,35 @@ function HistoricalChart({
   const height = 430;
   const padding = { top: 25, right: 62, bottom: 40, left: 18 };
   const sortedCandles = useMemo(() => [...candles].sort((a, b) => new Date(a.openTime).getTime() - new Date(b.openTime).getTime()), [candles]);
+  const displayCandles = useMemo(() => evenlySample(sortedCandles, 1600), [sortedCandles]);
+  const displayTrades = useMemo(() => {
+    const visible = trades.slice(0, 500);
+    if (selectedTrade && !visible.some(trade => trade.id === selectedTrade.id)) visible.push(selectedTrade);
+    return visible;
+  }, [selectedTrade, trades]);
   const range = useMemo(() => {
-    const prices = [
-      ...sortedCandles.flatMap((candle) => [candle.low, candle.high]),
-      ...trades.flatMap((trade) => [trade.entryPrice, trade.exitPrice, trade.stopLoss, trade.takeProfit].filter((price): price is number => price !== null)),
-    ];
-    const minimum = Math.min(...prices);
-    const maximum = Math.max(...prices);
-    return { minimum: Number.isFinite(minimum) ? minimum : 0, maximum: Number.isFinite(maximum) ? maximum : 1 };
+    function* prices() {
+      for (const candle of sortedCandles) {
+        yield candle.low;
+        yield candle.high;
+      }
+      for (const trade of trades) {
+        yield trade.entryPrice;
+        yield trade.exitPrice;
+        if (trade.stopLoss !== null) yield trade.stopLoss;
+        if (trade.takeProfit !== null) yield trade.takeProfit;
+      }
+    }
+    return finiteRange(prices());
   }, [sortedCandles, trades]);
   const priceRange = range.maximum - range.minimum || 1;
-  const x = (index: number) => padding.left + (index / Math.max(sortedCandles.length - 1, 1)) * (width - padding.left - padding.right);
+  const x = (index: number) => padding.left + (index / Math.max(displayCandles.length - 1, 1)) * (width - padding.left - padding.right);
   const y = (price: number) => padding.top + ((range.maximum - price) / priceRange) * (height - padding.top - padding.bottom);
-  const timeStart = sortedCandles.length ? new Date(sortedCandles[0].openTime).getTime() : 0;
-  const timeEnd = sortedCandles.length ? new Date(sortedCandles[sortedCandles.length - 1].openTime).getTime() : 1;
+  const timeStart = displayCandles.length ? new Date(displayCandles[0].openTime).getTime() : 0;
+  const timeEnd = displayCandles.length ? new Date(displayCandles[displayCandles.length - 1].openTime).getTime() : 1;
   const timeSpan = timeEnd - timeStart || 1;
   const tradeX = (time: string) => padding.left + ((new Date(time).getTime() - timeStart) / timeSpan) * (width - padding.left - padding.right);
-  const bodyWidth = Math.max(2, Math.min(11, (width - padding.left - padding.right) / Math.max(sortedCandles.length, 1) * 0.62));
+  const bodyWidth = Math.max(2, Math.min(11, (width - padding.left - padding.right) / Math.max(displayCandles.length, 1) * 0.62));
   const guides = [0, 0.25, 0.5, 0.75, 1].map((fraction) => range.minimum + priceRange * fraction);
 
   return (
@@ -246,7 +287,7 @@ function HistoricalChart({
           <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-primary/50" /> TP</span>
         </div>
       </div>
-      {sortedCandles.length ? (
+      {displayCandles.length ? (
         <div className="overflow-x-auto">
           <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[700px] h-[330px]" role="img" aria-label="Historical OHLC chart with trade entries exits stop losses and take profits">
             {guides.map((guide) => (
@@ -255,7 +296,7 @@ function HistoricalChart({
                 <text x={width - padding.right + 10} y={y(guide) + 4} fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="var(--app-font-mono)">{number(guide)}</text>
               </g>
             ))}
-            {sortedCandles.map((candle, index) => {
+            {displayCandles.map((candle, index) => {
               const up = candle.close >= candle.open;
               const candleX = x(index);
               const bodyTop = y(Math.max(candle.open, candle.close));
@@ -268,7 +309,7 @@ function HistoricalChart({
                 </g>
               );
             })}
-            {trades.map((trade) => {
+            {displayTrades.map((trade) => {
               const isSelected = selectedTrade?.id === trade.id;
               const entry = tradeX(trade.entryTime);
               const exit = tradeX(trade.exitTime);
@@ -284,8 +325,8 @@ function HistoricalChart({
                 </g>
               );
             })}
-            <text x={padding.left} y={height - 12} fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="var(--app-font-mono)">{shortDate(sortedCandles[0].openTime)}</text>
-            <text x={width - padding.right} y={height - 12} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="var(--app-font-mono)">{shortDate(sortedCandles[sortedCandles.length - 1].openTime)}</text>
+            <text x={padding.left} y={height - 12} fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="var(--app-font-mono)">{shortDate(displayCandles[0].openTime)}</text>
+            <text x={width - padding.right} y={height - 12} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="10" fontFamily="var(--app-font-mono)">{shortDate(displayCandles[displayCandles.length - 1].openTime)}</text>
           </svg>
         </div>
       ) : (
@@ -305,13 +346,14 @@ function TradeTable({
   onSelect: (trade: BacktestTrade) => void;
 }) {
   const { formatMoney } = useCurrency();
+  const visibleTrades = trades.slice(0, 500);
   return (
     <div className="panel table-wrap" data-testid="table-backtest-trades">
       <div className="min-w-[760px]">
         <div className="grid grid-cols-[34px_70px_1.1fr_1.1fr_1fr_100px_80px] gap-3 px-4 py-3 border-b border-border">
           {["#", "Side", "Entry", "Exit", "P/L", "Result", "Time"].map((heading) => <div className="eyebrow" key={heading}>{heading}</div>)}
         </div>
-        {trades.map((trade) => {
+        {visibleTrades.map((trade) => {
           const selected = trade.id === selectedTradeId;
           return (
             <button
@@ -333,6 +375,11 @@ function TradeTable({
           );
         })}
       </div>
+      {trades.length > visibleTrades.length && (
+        <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+          Showing the first {visibleTrades.length.toLocaleString()} of {trades.length.toLocaleString()} trades to keep this review responsive.
+        </div>
+      )}
     </div>
   );
 }

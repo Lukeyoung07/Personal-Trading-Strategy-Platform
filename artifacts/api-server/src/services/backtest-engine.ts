@@ -579,7 +579,7 @@ function relationshipMaxBars(relationship: UniversalRuleRelationship) {
 }
 
 function executableRelationship(relationship: UniversalRuleRelationship) {
-  return relationship.supported && (relationship.type === "and" || relationship.type === "followed_by");
+  return relationship.supported && (relationship.type === "and" || relationship.type === "followed_by" || relationship.type === "direction_from");
 }
 
 function evaluateConditionAtIndex(
@@ -626,6 +626,33 @@ function followedBySatisfied(
     if (barsBetween > 0 && barsBetween <= maxBars) return true;
   }
   return false;
+}
+
+function directionFromSatisfied(
+  target: BacktestCondition,
+  source: BacktestCondition | undefined,
+  targetSide: BacktestSide,
+  targetSeries: HistoricalCandle[],
+  targetIndex: number,
+  context?: MultiTimeframeEvaluationContext,
+) {
+  const relationship = conditionRelationship(target);
+  if (
+    relationship?.type !== "direction_from"
+    || !relationship.supported
+    || relationship.targetRuleIndex == null
+    || !source
+  ) return false;
+  const targetTime = new Date(candleCompletionTime(targetSeries[targetIndex]));
+  const sourceSeries = context?.seriesByTimeframe.get(timeframeKey(source.timeframe || context.executionTimeframe)) || targetSeries;
+  const sourceIndex = context
+    ? latestCompletedIndex(sourceSeries, targetTime)
+    : Math.min(targetIndex, sourceSeries.length - 1);
+  if (sourceIndex < 0) return false;
+  const bullish = evaluateConditionAtIndex(source, "long", sourceSeries, sourceIndex);
+  const bearish = evaluateConditionAtIndex(source, "short", sourceSeries, sourceIndex);
+  if (bullish === bearish) return false;
+  return (bullish && targetSide === "long") || (bearish && targetSide === "short");
 }
 
 export function evaluateExecutableConditionAtLatest(
@@ -678,6 +705,12 @@ export function validateHistoricalBacktestStrategy(strategy: BacktestStrategy) {
         }
         if (relationshipMaxBars(relationship) < 1) {
           errors.push(`${condition.name}: followed_by must have a positive max-bars window.`);
+          continue;
+        }
+      }
+      if (relationship?.type === "direction_from") {
+        if (relationship.targetRuleIndex == null || relationship.targetRuleIndex >= evaluatedConditions.length || relationship.targetRuleIndex >= conditionIndex) {
+          errors.push(`${condition.name}: direction_from must reference an earlier condition.`);
           continue;
         }
       }
@@ -786,7 +819,7 @@ function evaluateConditions(
   const relationshipSourceConditions = new Set(
     selected.flatMap(condition => {
       const relationship = conditionRelationship(condition);
-      if (relationship?.type !== "followed_by" || relationship.targetRuleIndex == null) return [];
+      if (!relationship || !["followed_by", "direction_from"].includes(relationship.type) || relationship.targetRuleIndex == null) return [];
       const source = conditions[relationship.targetRuleIndex];
       return source ? [source] : [];
     }),
@@ -796,6 +829,15 @@ function evaluateConditions(
     if (relationship && !executableRelationship(relationship)) return false;
     if (!context) {
       const matched = evaluateConditionAtIndex(condition, side, candles, index);
+    if (relationship?.type === "direction_from") {
+      return matched && directionFromSatisfied(
+        condition,
+        relationship.targetRuleIndex == null ? undefined : conditions[relationship.targetRuleIndex],
+        side,
+        candles,
+        index,
+      );
+    }
       if (relationship?.type === "followed_by") {
         return matched && followedBySatisfied(
           condition,
@@ -817,6 +859,16 @@ function evaluateConditions(
     if (!conditionPrevious && /\bprevious[_ ](open|high|low|close)\b/i.test(rule)) return false;
     const matched = evaluateExecutableCondition(condition, side, series, conditionIndex)
       ?? evaluateRule(rule, conditionCandle, conditionPrevious);
+    if (relationship?.type === "direction_from") {
+      return matched && directionFromSatisfied(
+        condition,
+        relationship.targetRuleIndex == null ? undefined : conditions[relationship.targetRuleIndex],
+        side,
+        series,
+        conditionIndex,
+        context,
+      );
+    }
     if (relationship?.type === "followed_by") {
       return matched && followedBySatisfied(
         condition,

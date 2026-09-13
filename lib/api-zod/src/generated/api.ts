@@ -84,7 +84,7 @@ export const ChatAssistantResponse = zod.object({
   "warnings": zod.array(zod.string()).optional()
 }).optional(),
   "relationship": zod.object({
-  "type": zod.enum(['after', 'followed_by', 'while', 'and', 'or']),
+  "type": zod.enum(['after', 'followed_by', 'while', 'and', 'or', 'direction_from']),
   "targetRuleIndex": zod.number().int().nullable(),
   "maxBarsBetween": zod.number().int().min(1).optional(),
   "maxBarsBetweenDefaulted": zod.boolean().optional(),
@@ -437,7 +437,7 @@ export const CreateStrategyBody = zod.object({
   "parameters": zod.record(zod.string(), zod.unknown()).nullish(),
   "canonicalState": zod.record(zod.string(), zod.unknown()).nullish(),
   "relationship": zod.object({
-  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after', 'direction_from']).optional(),
   "targetRuleIndex": zod.number().int().min(createStrategyBodyConditionsItemRelationshipTargetRuleIndexMin).nullish(),
   "maxBarsBetween": zod.number().int().min(1).optional(),
   "maxBarsBetweenDefaulted": zod.boolean().optional(),
@@ -856,7 +856,7 @@ export const ListStrategyVersionConditionsResponseItem = zod.object({
   "triggerRules": zod.string().nullable(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "relationship": zod.object({
-  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after', 'direction_from']).optional(),
   "targetRuleIndex": zod.number().int().min(listStrategyVersionConditionsResponseRelationshipTargetRuleIndexMin).nullish(),
   "maxBarsBetween": zod.number().int().min(1).optional(),
   "maxBarsBetweenDefaulted": zod.boolean().optional(),
@@ -997,7 +997,7 @@ export const ListStrategyConditionsResponseItem = zod.object({
   "triggerRules": zod.string().nullable(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "relationship": zod.object({
-  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after', 'direction_from']).optional(),
   "targetRuleIndex": zod.number().int().min(listStrategyConditionsResponseRelationshipTargetRuleIndexMin).nullish(),
   "maxBarsBetween": zod.number().int().min(1).optional(),
   "maxBarsBetweenDefaulted": zod.boolean().optional(),
@@ -1044,7 +1044,7 @@ export const CreateStrategyConditionBody = zod.object({
   "parameters": zod.record(zod.string(), zod.unknown()).nullish(),
   "canonicalState": zod.record(zod.string(), zod.unknown()).nullish(),
   "relationship": zod.object({
-  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after', 'direction_from']).optional(),
   "targetRuleIndex": zod.number().int().min(createStrategyConditionBodyRelationshipTargetRuleIndexMin).nullish(),
   "maxBarsBetween": zod.number().int().min(1).optional(),
   "maxBarsBetweenDefaulted": zod.boolean().optional(),
@@ -1082,7 +1082,7 @@ export const CreateStrategyConditionResponse = zod.object({
   "triggerRules": zod.string().nullable(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "relationship": zod.object({
-  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after', 'direction_from']).optional(),
   "targetRuleIndex": zod.number().int().min(createStrategyConditionResponseRelationshipTargetRuleIndexMin).nullish(),
   "maxBarsBetween": zod.number().int().min(1).optional(),
   "maxBarsBetweenDefaulted": zod.boolean().optional(),
@@ -1140,7 +1140,7 @@ export const ReorderStrategyConditionsResponseItem = zod.object({
   "triggerRules": zod.string().nullable(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "relationship": zod.object({
-  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after', 'direction_from']).optional(),
   "targetRuleIndex": zod.number().int().min(reorderStrategyConditionsResponseRelationshipTargetRuleIndexMin).nullish(),
   "maxBarsBetween": zod.number().int().min(1).optional(),
   "maxBarsBetweenDefaulted": zod.boolean().optional(),
@@ -1187,7 +1187,7 @@ export const UpdateStrategyConditionBody = zod.object({
   "parameters": zod.record(zod.string(), zod.unknown()).nullish(),
   "canonicalState": zod.record(zod.string(), zod.unknown()).nullish(),
   "relationship": zod.object({
-  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after', 'direction_from']).optional(),
   "targetRuleIndex": zod.number().int().min(updateStrategyConditionBodyRelationshipTargetRuleIndexMin).nullish(),
   "maxBarsBetween": zod.number().int().min(1).optional(),
   "maxBarsBetweenDefaulted": zod.boolean().optional(),
@@ -1225,7 +1225,7 @@ export const UpdateStrategyConditionResponse = zod.object({
   "triggerRules": zod.string().nullable(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
   "relationship": zod.object({
-  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after', 'direction_from']).optional(),
   "targetRuleIndex": zod.number().int().min(updateStrategyConditionResponseRelationshipTargetRuleIndexMin).nullish(),
   "maxBarsBetween": zod.number().int().min(1).optional(),
   "maxBarsBetweenDefaulted": zod.boolean().optional(),

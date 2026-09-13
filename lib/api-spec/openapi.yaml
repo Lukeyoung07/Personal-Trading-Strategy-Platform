@@ -1869,7 +1869,7 @@ components:
           type: ["object", "null"]
           additionalProperties: false
           properties:
-            type: { type: string, enum: [and, or, followed_by, before, after] }
+            type: { type: string, enum: [and, or, followed_by, before, after, direction_from] }
             targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
             maxBarsBetween: { type: integer, minimum: 1 }
             maxBarsBetweenDefaulted: { type: boolean }
@@ -1912,7 +1912,7 @@ components:
           type: ["object", "null"]
           additionalProperties: false
           properties:
-            type: { type: string, enum: [and, or, followed_by, before, after] }
+            type: { type: string, enum: [and, or, followed_by, before, after, direction_from] }
             targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
             maxBarsBetween: { type: integer, minimum: 1 }
             maxBarsBetweenDefaulted: { type: boolean }
@@ -1948,7 +1948,7 @@ components:
           type: ["object", "null"]
           additionalProperties: false
           properties:
-            type: { type: string, enum: [and, or, followed_by, before, after] }
+            type: { type: string, enum: [and, or, followed_by, before, after, direction_from] }
             targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
             maxBarsBetween: { type: integer, minimum: 1 }
             maxBarsBetweenDefaulted: { type: boolean }
@@ -1979,7 +1979,7 @@ components:
           type: ["object", "null"]
           additionalProperties: false
           properties:
-            type: { type: string, enum: [and, or, followed_by, before, after] }
+            type: { type: string, enum: [and, or, followed_by, before, after, direction_from] }
             targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
             maxBarsBetween: { type: integer, minimum: 1 }
             maxBarsBetweenDefaulted: { type: boolean }
@@ -2928,7 +2928,7 @@ components:
       properties:
         type:
           type: string
-          enum: [after, followed_by, while, and, or]
+          enum: [after, followed_by, while, and, or, direction_from]
         targetRuleIndex: { type: ["integer", "null"] }
         maxBarsBetween: { type: integer, minimum: 1 }
         maxBarsBetweenDefaulted: { type: boolean }

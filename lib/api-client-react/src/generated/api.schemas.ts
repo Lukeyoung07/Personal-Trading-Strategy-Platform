@@ -487,6 +487,7 @@ export const StrategyConditionInputRelationshipType = {
   followed_by: 'followed_by',
   before: 'before',
   after: 'after',
+  direction_from: 'direction_from',
 } as const;
 
 /**
@@ -758,6 +759,7 @@ export const StrategyVersionConditionRelationshipType = {
   followed_by: 'followed_by',
   before: 'before',
   after: 'after',
+  direction_from: 'direction_from',
 } as const;
 
 /**
@@ -875,6 +877,7 @@ export const StrategyConditionRelationshipType = {
   followed_by: 'followed_by',
   before: 'before',
   after: 'after',
+  direction_from: 'direction_from',
 } as const;
 
 /**
@@ -982,6 +985,7 @@ export const StrategyConditionUpdateRelationshipType = {
   followed_by: 'followed_by',
   before: 'before',
   after: 'after',
+  direction_from: 'direction_from',
 } as const;
 
 /**
@@ -2554,6 +2558,7 @@ export const AssistantRuleRelationshipType = {
   while: 'while',
   and: 'and',
   or: 'or',
+  direction_from: 'direction_from',
 } as const;
 
 export interface AssistantRuleRelationship {

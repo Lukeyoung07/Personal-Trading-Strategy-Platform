@@ -26,7 +26,8 @@ export type UniversalRuleRelationshipType =
   | "confirmation_of"
   | "invalidates"
   | "requires"
-  | "while";
+  | "while"
+  | "direction_from";
 
 export type UniversalRuleProvenance = {
   source: UniversalRuleSource;

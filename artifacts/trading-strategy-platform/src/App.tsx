@@ -748,12 +748,14 @@ function BacktestResultsRoute() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const backtestId = Number(params.id);
-  return <div className="page-wrap"><BacktestResultsPanel
-    backtestId={backtestId}
-    onBack={() => setLocation("/backtesting")}
-    onViewStrategy={(strategyId, strategyVersionId) => setLocation(`/strategy-builder?strategyId=${strategyId}&versionId=${strategyVersionId}`)}
-    onRunAgain={backtest => setLocation(`/backtesting?strategyId=${backtest.strategyId}&strategyVersionId=${backtest.strategyVersionId}&instrumentId=${backtest.instrumentId}&timeframeId=${backtest.timeframeId}&startDate=${formatDateInput(new Date(backtest.startDate))}&endDate=${formatDateInput(new Date(backtest.endDate))}`)}
-  /></div>;
+  return <div className="page-wrap"><ErrorBoundary>
+    <BacktestResultsPanel
+      backtestId={backtestId}
+      onBack={() => setLocation("/backtesting")}
+      onViewStrategy={(strategyId, strategyVersionId) => setLocation(`/strategy-builder?strategyId=${strategyId}&versionId=${strategyVersionId}`)}
+      onRunAgain={backtest => setLocation(`/backtesting?strategyId=${backtest.strategyId}&strategyVersionId=${backtest.strategyVersionId}&instrumentId=${backtest.instrumentId}&timeframeId=${backtest.timeframeId}&startDate=${formatDateInput(new Date(backtest.startDate))}&endDate=${formatDateInput(new Date(backtest.endDate))}`)}
+    />
+  </ErrorBoundary></div>;
 }
 function Router() { return <ErrorBoundary><Shell><Switch><Route path="/" component={Dashboard}/><Route path="/strategy-builder" component={StrategyBuilderRoute}/><Route path="/strategy-library" component={StrategyLibrary}/><Route path="/market-monitor" component={MarketMonitor}/><Route path="/trade-journal" component={Journal}/><Route path="/performance" component={Performance}/><Route path="/strategy-monitoring" component={StrategyMonitoringPage}/><Route path="/alerts" component={Alerts}/><Route path="/news" component={EconomicCalendar}/><Route path="/settings" component={SettingsPage}/><Route path="/backtesting/:id" component={BacktestResultsRoute}/><Route path="/backtesting" component={Backtesting}/><Route component={NotFound}/></Switch></Shell></ErrorBoundary>; }
 export default function App() { return <QueryClientProvider client={queryClient}><CurrencyProvider><TooltipProvider><Router/><Toaster/></TooltipProvider></CurrencyProvider></QueryClientProvider>; }
