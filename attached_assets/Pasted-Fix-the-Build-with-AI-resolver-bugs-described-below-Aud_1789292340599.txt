@@ -1,0 +1,48 @@
+Fix the Build with AI resolver bugs described below. Audit the root cause first — do not patch each symptom individually with isolated regex/string fixes. This codebase's own project history explicitly warns against that pattern, and several of these defects likely share a common root cause.
+
+REPRODUCTION
+
+Input prompt sent to Build with AI:
+
+"Build a continuation strategy for XAUUSD, both directions.
+
+Trend filter: Break of Structure on the 1-hour timeframe establishes the trend direction.
+
+Entry, 5-minute timeframe, all of the following in sequence:
+1. Liquidity Sweep of the pullback's recent high or low, against the 1-hour trend direction.
+2. Displacement immediately after the sweep, in the direction of the 1-hour trend.
+3. Fair Value Gap formed by that displacement. Enter on formation.
+4. Break of Structure on the 5-minute timeframe, confirming the pullback has ended and price is resuming the 1-hour trend.
+
+Session: New York session only.
+
+Risk management:
+- Stop loss beyond the liquidity sweep's extreme, structural, not a fixed percentage.
+- Take profit at the next external liquidity level in the trend direction (previous day high or low, or equal highs/lows).
+- Only take the trade if the take-profit distance is at least 1.5 times the stop-loss distance.
+
+Do not use EMA, RSI, MACD, or any indicator-based confirmation.
+Do not use Order Blocks or Breaker Blocks."
+
+Resulting draft: 8 Entry conditions, 0 Confirmation conditions, 0 Exit conditions, Risk = "Not set", 7 of 8 conditions marked review_required.
+
+DEFECTS TO FIX
+
+1. direction_from over-applied. Every condition except the first (Break of Structure trend filter) got tagged with a "direction from → rule 1" relationship and stuck in review_required — including Liquidity Sweep, Displacement, Fair Value Gap, New York Session, Previous Day High, and Equal Highs, all of which have direction independently resolvable to "both" and don't need to inherit direction from another condition. A session filter or a liquidity level has no directional ambiguity at all and should never carry this relationship. Find where direction_from gets attached and fix it so it only applies where the prompt actually implies a dependency, not as a blanket default whenever any trend/bias condition exists in the draft.
+
+2. "Pullback" wrongly extracted as a standalone concept. The prompt used "pullback" as descriptive text — "Liquidity Sweep of the pullback's recent high or low" — identifying which high/low gets swept, not requesting a standalone concept. It was extracted as its own unsupported condition, and on the wrong timeframe (1h instead of 5m) despite being in a sentence scoped to the 5-minute entry sequence. Fix the span/role classifier so nested qualifying language attached to an adjacent concept doesn't become its own condition, and fix timeframe inheritance so conditions inherit the timeframe scope of their containing instruction block rather than defaulting elsewhere.
+
+3. Risk rules and exit conditions dropped entirely. The prompt explicitly specified: stop loss beyond the liquidity sweep's extreme, take profit at the next external liquidity level in the trend direction, and a minimum 1.5:1 reward-to-risk requirement. None of it appears anywhere in the draft — not as risk rules, not as review_required, not as anything. Trace what happens to text following "Risk management:" and fix so this parses into risk_rule entries (executable where possible, review_required where the stop/target references a structural level rather than a fixed percentage) instead of being silently discarded.
+
+4. Confirmation stage empty; everything landed in Entry. A previous fix was supposed to categorize Displacement and Break of Structure / HTF bias conditions as "Confirmation" rather than "Entry." Check whether the AI-draft generation pathway actually calls the same stage-categorization logic as whatever was fixed previously — if that fix only touched manual Builder editing and not AI-generated drafts, that's the regression.
+
+5. Wrong timeframe on session/liquidity-level conditions. New York Session, Previous Day High, and Equal Highs were all assigned 1h despite being part of the 5-minute entry/exit sequence in the prompt. Likely the same root cause as defect 2's timeframe issue — fix once, verify both.
+
+REQUIREMENTS
+
+- Write a failing test for each of the 5 defects above, using this exact prompt as input, before changing any code. Confirm each test fails against current behavior first.
+- Identify and fix the shared root cause(s) — I expect defects 1, 2, and 5 are connected through the same context-propagation/span-classification logic, but confirm rather than assume.
+- Do not touch unrelated parts of the resolver, registry, evaluators, or Builder UI.
+- Do not delete or reset any existing strategies, versions, trades, or backtest records.
+- After fixing, rerun the exact same prompt through Build with AI and confirm the new draft: has entry conditions only for the true entry sequence, has Displacement and both BOS conditions correctly staged, has risk rules populated with the stop/target/RR from the prompt, has no phantom "Pullback" condition, and has correct timeframes throughout.
+- Report back per defect, not just an aggregate pass count: defect number, root cause found, what was changed, test name added, pass/fail after fix. Also include full test suite results, typecheck, and build status.
