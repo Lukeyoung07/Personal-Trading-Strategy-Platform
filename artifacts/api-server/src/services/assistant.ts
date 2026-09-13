@@ -412,6 +412,67 @@ function isNegatedConceptMention(message: string, index: number) {
     || /\bnot\s+(?:add|use|infer|include|invent|want|request)\b[\s\S]{0,160}$/i.test(prefix);
 }
 
+function escapeConceptPattern(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+}
+
+function canonicalConceptMentions(value: string) {
+  return TRADING_CONCEPT_REGISTRY
+    .flatMap(definition => [definition.name, ...definition.aliases].map(label => ({ definition, label })))
+    .sort((left, right) => right.label.length - left.label.length)
+    .flatMap(({ definition, label }) => {
+      const pattern = new RegExp(`\\b${escapeConceptPattern(label)}\\b`, "gi");
+      return [...value.matchAll(pattern)].map(match => ({
+        definition,
+        index: match.index ?? 0,
+        length: match[0].length,
+      }));
+    })
+    .sort((left, right) => left.index - right.index || right.length - left.length)
+    .filter((mention, index, mentions) => !mentions.some((other, otherIndex) =>
+      otherIndex < index
+      && other.index <= mention.index
+      && other.index + other.length >= mention.index + mention.length,
+    ));
+}
+
+function isNestedConceptMention(message: string, index: number, conceptName: string) {
+  if (index < 0) return false;
+  const currentDefinition = resolveTradingConcept(conceptName);
+  if (currentDefinition && currentDefinition.status !== "executable" && conceptName !== "ATR") return false;
+  const sentenceStart = Math.max(
+    message.lastIndexOf(".", index - 1),
+    message.lastIndexOf("!", index - 1),
+    message.lastIndexOf("?", index - 1),
+    message.lastIndexOf(";", index - 1),
+  ) + 1;
+  const before = message.slice(sentenceStart, index);
+  const connectorMatch = [...before.matchAll(/(?:\busing\b|\bwith\b|\baround\b|\bnear\b|\bfrom\b|\boff\b|\bbased\s+on\b|\bdefined\s+by\b|\bbelonging\s+to\b|\bparameters?\s+for\b|\bwhere\b|\bthat\s+(?:sweeps?|closes?|forms?|uses?))\b/gi)].at(-1);
+  if (!connectorMatch) return false;
+  const connectorEnd = (connectorMatch.index ?? 0) + connectorMatch[0].length;
+  const nestedText = before.slice(connectorEnd);
+  if (/\b\d+(?:\.\d+)?[\s-]*(?:m|min|minute|h|hr|hour|d|day|w|week)s?\b/i.test(nestedText)) return false;
+  if (/\b(?:followed\s+by|after|then)\b/i.test(nestedText)) return false;
+  const parentMentions = canonicalConceptMentions(before.slice(0, connectorMatch.index ?? 0));
+  if (!parentMentions.length) return false;
+  const previousMention = canonicalConceptMentions(before).at(-1);
+  if (/\b(?:and|then|followed\s+by|plus)\s*$/i.test(before) && currentDefinition && previousMention) {
+    if (previousMention.definition.category === currentDefinition.category) return true;
+    const levelContextCategories = new Set(["SUPPORT & RESISTANCE", "LIQUIDITY"]);
+    return levelContextCategories.has(previousMention.definition.category)
+      && levelContextCategories.has(currentDefinition.category);
+  }
+  return true;
+}
+
+function isExecutionInstructionPhrase(value: string) {
+  const normalized = value.trim();
+  return /\bclosed\s+(?:\d+\s*(?:m|min|minute|h|hr|hour)s?\s+)?(?:candles?|bars?)\b/i.test(normalized)
+    || /\b(?:historical\s+backtesting?|backtesting?|backtest|monitoring|builder|build\s+with\s+ai|trading\s+concept\s+library)\b/i.test(normalized)
+    || /\b(?:atr|average\s+true\s+range)\b[^.!?]{0,40}\b(?:parameters?|periods?|multiples?|thresholds?)\b/i.test(normalized)
+    || /^(?:timeframe|market|direction|entry|confirmation|invalidation|exit|risk management|stop[- ]loss|take[- ]profit|percentage risk|position sizing)\b/i.test(normalized);
+}
+
 function conceptsRequestedInMessage(message: string) {
   const requested: Array<{ name: string; supported: boolean; explanation: string; matchedText: string }> = [];
   const seen = new Set<string>();
@@ -420,6 +481,7 @@ function conceptsRequestedInMessage(message: string) {
     const match = message.match(concept.pattern);
     if (!match || seen.has(concept.name)) continue;
     if (isNegatedConceptMention(message, match.index ?? -1)) continue;
+    if (isNestedConceptMention(message, match.index ?? -1, concept.name)) continue;
     const resolvedConcept = resolveTradingConcept(concept.name);
     if (resolvedConcept?.status === "executable") {
       requested.push({
@@ -474,6 +536,7 @@ function requestedExecutableConceptMatches(message: string) {
     .flatMap(({ alias, definition }) => {
       const match = message.match(new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")}\\b`, "i"));
       if (!match || isNegatedConceptMention(message, match.index ?? -1)) return [];
+      if (isNestedConceptMention(message, match.index ?? -1, definition.name)) return [];
       return [{ name: definition.name, matchedText: match[0], canonicalId: definition.canonicalId }];
     })
     .filter((match, index, matches) => matches.findIndex(candidate => candidate.canonicalId === match.canonicalId) === index)
@@ -549,6 +612,8 @@ function explicitConceptPhraseMatches(message: string) {
     if (/(?:stop[- ]loss|take[- ]profit|risk[\/ -]?reward|r\s*:\s*r|target\s+\d+(?:\.\d+)?\s*R|\d+(?:\.\d+)?\s*R\s*(?:target|take[- ]profit|tp)|percentage\s+risk|risk\s+per\s+trade)/i.test(cleaned)) return;
     if (/^(?:strategy|setup|system|rules?|risk management|long|short|both|directions?|bullish|bearish|bias|main setup|explicit|required|optional|entry|exit|confirmation|invalidation|condition)(?:\s+(?:strategy|setup|system|rules?|directions?|entry|exit|confirmation|invalidation|condition))?$/i.test(cleaned)) return;
     if (isMetaInstructionPhrase(cleaned)) return;
+    if (isExecutionInstructionPhrase(cleaned)) return;
+    if (canonicalConceptMentions(cleaned).some(mention => mention.definition.status === "executable") && !resolveTradingConcept(cleaned)) return;
     if (!matches.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) matches.push(cleaned);
   };
   for (const match of message.matchAll(/\b(?:concept|condition)\s*:\s*([^\n;]+)/gi)) {
@@ -621,6 +686,7 @@ function canonicalExecutableName(value: string) {
 function requestedConceptAuthorizations(message: string): RequestedConceptAuthorization[] {
   const byCanonical = new Map<string, RequestedConceptAuthorization>();
   const add = (requestedConcept: string, matchedText: string, supported: boolean, explanation: string) => {
+    if (isExecutionInstructionPhrase(requestedConcept) && !resolveTradingConcept(requestedConcept)) return;
     let canonicalConcept = canonicalConceptName(requestedConcept);
     if (/^(?:bullish|bearish)\s+structure$/i.test(canonicalConcept)) canonicalConcept = "Market Structure Shift";
     const hasFvgInteraction = /\b(?:fvg|fair\s+value\s+gap)\b[^.!?]{0,60}\b(?:retests?|fills?)\b/i.test(message);
@@ -691,7 +757,6 @@ function requestedConceptAuthorizations(message: string): RequestedConceptAuthor
     .filter(key => key.startsWith(`${catalogKey("Breakout")}:`));
   if (directionalBreakoutKeys.length) byCanonical.delete(catalogKey("Breakout"));
   return [...byCanonical.values()]
-    .filter(authorization => !indicatorCross || authorization.canonicalConcept !== (indicatorCross[1] || indicatorCross[2]).toUpperCase())
     .sort((left, right) => {
     const leftIndex = message.toLowerCase().indexOf(left.matchedText.toLowerCase());
     const rightIndex = message.toLowerCase().indexOf(right.matchedText.toLowerCase());
@@ -893,7 +958,6 @@ function universalRuleMetadata(
   const reasons: string[] = [];
   if (!supported) reasons.push("The requested wording does not have a deterministic canonical evaluator.");
   const relationship = relationshipForRequest(requestMessage, conditionIndex);
-  if (relationship && !relationship.supported) reasons.push(relationship.reason);
   const timeframe = normalizeStrategyTimeframe(condition?.timeframe);
   if (condition?.timeframe && condition.timeframe !== "Not specified" && !timeframe) {
     reasons.push(`Timeframe “${String(condition.timeframe)}” could not be normalized without guessing.`);
@@ -1037,6 +1101,11 @@ function reconcileRequestedConditions(draft: any, message: string) {
     );
     if (existingBaseConditions.length > 1) {
       requested = requested.filter(candidate => candidate.name !== requestedIndicatorCross.name);
+    } else if (
+      existingBaseConditions.length === 0
+      && originalConditions.some((condition: any) => canonicalConceptName(String(condition?.conceptName || "")) === requestedIndicatorCross.name)
+    ) {
+      requested = requested.filter(candidate => candidate.name !== baseIndicator);
     }
   }
   if (!requested.length) return [];

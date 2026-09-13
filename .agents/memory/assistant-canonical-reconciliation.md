@@ -8,3 +8,9 @@ The assistant must resolve user-requested concept aliases through the canonical 
 **Why:** Model drafts can contain broader, polluted, or synonym labels, and the same request can mention both a family concept and a specific interaction. Letting model order or fuzzy matches control execution creates duplicate conditions, loses requested concepts, or silently changes review status.
 
 **How to apply:** Keep alias resolution, authorization filtering, condition matching, and synthetic-condition expansion in one reconciliation path. When adding a canonical alias, add a regression case for both the direct alias and a polluted model draft. For overlapping session aliases, prefer the specific named session (for example New York) before the generic kill-zone fallback.
+
+Nested vocabulary inside an executable concept must be classified from the canonical registry context, not authorized as sibling conditions. Execution/data phrases such as closed candles and ATR parameters remain request metadata, while direct Support, Resistance, and liquidity-level requests remain independently authorizable.
+
+**Why:** Natural-language definitions commonly mention other trading terms as level, side, or data parameters. Treating every registry alias occurrence as a separate requested concept polluted drafts and could downgrade valid executable conditions.
+
+**How to apply:** Detect parent concept plus parameter connectors and preserve only the authorized parent condition; retain explicit relationship metadata and risk rules separately. Add paired nested-versus-standalone regression cases whenever a registry concept can also appear as a parameter.

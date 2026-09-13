@@ -1764,4 +1764,125 @@ Risk/Reward: 2:1`,
     expect(response.strategyDraft?.compatibility.unsupportedConditions).toContain("Judas Swing");
     expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).not.toContain("Market Structure Shift");
   });
+
+  it("keeps nested sweep vocabulary as parameters while preserving the requested executable relationship", async () => {
+    mockStrategyDraft({
+      name: "Nested liquidity vocabulary",
+      description: "A polluted model draft for a liquidity sweep followed by displacement.",
+      direction: "long",
+      marketSymbol: "XAUUSD",
+      timeframes: ["5m"],
+      conditions: [
+        {
+          name: "Liquidity Sweep",
+          stage: "entry",
+          requirement: "required",
+          conceptName: "Liquidity Sweep",
+          timeframe: "5m",
+          direction: "long",
+          parameters: { kind: "liquidity_sweep", sweepSide: "sell_side", level: "lookback_extreme", lookback: 5 },
+          triggerRules: "model sweep",
+        },
+        ...["Support", "Resistance", "Buy-Side Liquidity", "Sell-Side Liquidity", "Closed Candles"].map(conceptName => ({
+          name: conceptName,
+          stage: "confirmation",
+          requirement: "required",
+          conceptName,
+          timeframe: "5m",
+          direction: "long",
+          triggerRules: "nested model vocabulary",
+        })),
+        {
+          name: "Displacement",
+          stage: "confirmation",
+          requirement: "required",
+          conceptName: "Displacement",
+          timeframe: "5m",
+          direction: "long",
+          parameters: { kind: "displacement", polarity: "bullish", atrPeriod: 14, minimumBodyAtr: 1.5, minimumCloseLocation: 0.7 },
+          triggerRules: "model displacement",
+        },
+        {
+          name: "ATR",
+          stage: "confirmation",
+          requirement: "required",
+          conceptName: "ATR",
+          timeframe: "5m",
+          direction: "long",
+          triggerRules: "nested parameter vocabulary",
+        },
+      ],
+      conceptsUsed: [
+        { name: "Liquidity Sweep", supported: true },
+        { name: "Support", supported: true },
+        { name: "Resistance", supported: true },
+        { name: "Buy-Side Liquidity", supported: true },
+        { name: "Sell-Side Liquidity", supported: true },
+        { name: "Closed Candles", supported: true },
+        { name: "Displacement", supported: true },
+        { name: "ATR", supported: true },
+      ],
+      riskManagementRules: "1% stop loss and 2% take profit",
+    });
+
+    const response = await answerAssistant({
+      message: "Build a 5m XAUUSD strategy using a Liquidity Sweep using support/resistance and buy-side/sell-side liquidity on closed 5-minute candles, followed by Displacement with ATR parameters. Use a 1% stop loss and 2% take profit.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual([
+      "Liquidity Sweep",
+      "Displacement",
+    ]);
+    expect(response.strategyDraft?.conditions[0]).toMatchObject({
+      executionStatus: "executable",
+      parameters: { kind: "liquidity_sweep", sweepSide: "sell_side" },
+    });
+    expect(response.strategyDraft?.conditions[1]).toMatchObject({
+      executionStatus: "executable",
+      parameters: { kind: "displacement", atrPeriod: 14, minimumBodyAtr: 1.5 },
+      relationship: { type: "followed_by", targetRuleIndex: 0 },
+    });
+    expect(response.strategyDraft?.riskRules).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "stop_loss_percentage", value: 1 }),
+      expect.objectContaining({ type: "take_profit_percentage", value: 2 }),
+    ]));
+    expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
+  });
+
+  it.each(["Support", "Resistance", "Buy-Side Liquidity", "Sell-Side Liquidity"])(
+    "keeps standalone %s as an explicitly requested concept",
+    async conceptName => {
+      mockStrategyDraft({
+        name: `${conceptName} strategy`,
+        description: "",
+        direction: "long",
+        marketSymbol: "XAUUSD",
+        timeframes: ["5m"],
+        conditions: [{
+          name: conceptName,
+          stage: "entry",
+          requirement: "required",
+          conceptName,
+          timeframe: "5m",
+          direction: "long",
+          triggerRules: "model rule",
+        }],
+        riskManagementRules: null,
+      });
+
+      const response = await answerAssistant({
+        message: `Build a 5m XAUUSD strategy using ${conceptName}.`,
+        messages: [],
+        context: { page: "/strategy-builder" },
+      });
+
+      expect(response.strategyDraft?.conditions.map(condition => condition.conceptName)).toEqual([conceptName]);
+      expect(response.strategyDraft?.conditions[0].authorization).toMatchObject({
+        status: "explicit",
+        canonicalConcept: conceptName,
+      });
+    },
+  );
 });
