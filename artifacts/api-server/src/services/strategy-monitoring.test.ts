@@ -89,6 +89,25 @@ describe("strategy monitoring transition contracts", () => {
     });
   });
 
+  it("honors the immutable saved status instead of re-reading current registry status", () => {
+    expect(createBuiltInStrategyMonitoringDetector({
+      id: 80,
+      name: "Wick Rejection",
+      canonicalId: "concept.wick-rejection",
+      registryVersion: "2026-09-12",
+      canonicalStatus: "review_required",
+      executorKind: null,
+    })).toBeNull();
+    expect(createBuiltInStrategyMonitoringDetector({
+      id: 81,
+      name: "Judas Swing",
+      canonicalId: "concept.judas-swing",
+      registryVersion: "2026-09-12",
+      canonicalStatus: "executable",
+      executorKind: "price_action",
+    })).not.toBeNull();
+  });
+
   it("uses the shared Failed Breakout and session evaluators for monitoring", async () => {
     const makeCandle = (index: number, values: { high: number; low: number; close: number; openTime?: string }) => ({
       id: index,

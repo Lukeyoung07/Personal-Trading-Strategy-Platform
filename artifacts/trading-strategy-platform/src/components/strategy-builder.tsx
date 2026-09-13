@@ -9,6 +9,7 @@ import {
   getListMarketsQueryKey,
   getListStrategiesQueryKey,
   getListStrategyConditionsQueryKey,
+  useCreateStrategyVersion,
   useCreateStrategy,
   useCreateStrategyCondition,
   useDeleteStrategyCondition,
@@ -315,8 +316,9 @@ function SearchableConcept({ concepts, value, onChange }: { concepts: TradingCon
   </div>;
 }
 
-function StrategyForm({ strategy, markets, concepts, timeframes, onClose, onSaved, initialDraft }: { strategy: Strategy | null; markets: Market[]; concepts: TradingConcept[]; timeframes: Timeframe[]; onClose?: () => void; onSaved: (strategy: Strategy) => void; initialDraft?: AssistantStrategyDraft | null }) {
+function StrategyForm({ strategy, markets, concepts, timeframes, onClose, onSaved, initialDraft, saveAsVersion = false }: { strategy: Strategy | null; markets: Market[]; concepts: TradingConcept[]; timeframes: Timeframe[]; onClose?: () => void; onSaved: (strategy: Strategy) => void; initialDraft?: AssistantStrategyDraft | null; saveAsVersion?: boolean }) {
   const create = useCreateStrategy();
+  const createVersion = useCreateStrategyVersion();
   const update = useUpdateStrategy();
   const queryClient = useQueryClient();
   const [error, setError] = useState("");
@@ -411,17 +413,34 @@ function StrategyForm({ strategy, markets, concepts, timeframes, onClose, onSave
        })
        : undefined;
     setError("");
-    const done = (saved: Strategy) => {
+     const done = (saved: Strategy) => {
       queryClient.invalidateQueries({ queryKey: getListStrategiesQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
       onSaved(saved);
       onClose?.();
     };
     const onError = (failure: unknown) => setError(friendlyMutationError(failure, "Could not save this strategy. Please check the details and try again."));
-     if (strategy) update.mutate({ strategyId: strategy.id, data: baseData }, { onSuccess: done, onError });
-     else create.mutate({ data: { ...baseData, conditions: initialConditions } }, { onSuccess: done, onError });
+      const afterCreate = (saved: Strategy) => {
+        if (!saveAsVersion) {
+          done(saved);
+          return;
+        }
+        createVersion.mutate({
+          strategyId: saved.id,
+          data: {
+            label: "AI draft",
+            thesis: initialDraft?.description || null,
+            riskSnapshot: baseData.riskSnapshot,
+          },
+        }, {
+          onSuccess: () => done(saved),
+          onError: failure => setError(friendlyMutationError(failure, "The strategy was created, but its AI draft version could not be saved. You can retry from Version History.")),
+        });
+      };
+      if (strategy) update.mutate({ strategyId: strategy.id, data: baseData }, { onSuccess: done, onError });
+      else create.mutate({ data: { ...baseData, conditions: initialConditions } }, { onSuccess: afterCreate, onError });
   };
-  const busy = create.isPending || update.isPending;
+   const busy = create.isPending || update.isPending || createVersion.isPending;
   return <form onSubmit={save} className="space-y-6" key={strategy?.id ?? initialDraft?.name ?? "new-strategy"}>
     {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive" role="alert" data-testid="status-builder-strategy-error">{error}</div>}
       <Field label="Strategy name"><input className="input" name="name" required defaultValue={strategy?.name || initialDraft?.name || ""} placeholder="Name your hypothesis" data-testid="input-builder-strategy-name" /></Field>
@@ -1240,7 +1259,7 @@ export function StrategyBuilder() {
        <Panel title="Create the strategy foundation" eyebrow="Start without assumptions">
          {assistantDraft && <AssistantDraftReview draft={assistantDraft} action={assistantDraftAction} />}
         <p className="text-sm text-muted-foreground mt-3 max-w-2xl leading-relaxed">Give your strategy a name and describe the market context in your own words. Everything else can stay open until you are ready to define it.</p>
-           <div className="mt-6"><StrategyForm markets={markets.data || []} concepts={concepts.data || []} timeframes={timeframes.data || []} strategy={null} initialDraft={assistantDraft} onSaved={savedStrategy} /></div>
+           <div className="mt-6"><StrategyForm markets={markets.data || []} concepts={concepts.data || []} timeframes={timeframes.data || []} strategy={null} initialDraft={assistantDraft} saveAsVersion={assistantDraftAction === "save-version"} onSaved={savedStrategy} /></div>
       </Panel>
       <ConceptsCard concepts={concepts.data || []} />
       </div> : <div className="space-y-5">

@@ -439,7 +439,8 @@ function canonicalConceptMentions(value: string) {
 function isNestedConceptMention(message: string, index: number, conceptName: string) {
   if (index < 0) return false;
   const currentDefinition = resolveTradingConcept(conceptName);
-  if (currentDefinition && currentDefinition.status !== "executable" && conceptName !== "ATR") return false;
+  if (!currentDefinition) return false;
+  if (currentDefinition.kind !== "concept") return true;
   const sentenceStart = Math.max(
     message.lastIndexOf(".", index - 1),
     message.lastIndexOf("!", index - 1),
@@ -455,14 +456,11 @@ function isNestedConceptMention(message: string, index: number, conceptName: str
   if (/\b(?:followed\s+by|after|then)\b/i.test(nestedText)) return false;
   const parentMentions = canonicalConceptMentions(before.slice(0, connectorMatch.index ?? 0));
   if (!parentMentions.length) return false;
-  const previousMention = canonicalConceptMentions(before).at(-1);
-  if (/\b(?:and|then|followed\s+by|plus)\s*$/i.test(before) && currentDefinition && previousMention) {
-    if (previousMention.definition.category === currentDefinition.category) return true;
-    const levelContextCategories = new Set(["SUPPORT & RESISTANCE", "LIQUIDITY"]);
-    return levelContextCategories.has(previousMention.definition.category)
-      && levelContextCategories.has(currentDefinition.category);
-  }
-  return true;
+  const parent = parentMentions.at(-1)?.definition;
+  if (!parent) return false;
+  return currentDefinition.validAsParameterOf.some(nesting =>
+    nesting.parentCanonicalId === parent.canonicalId,
+  ) || Boolean(parent);
 }
 
 function isExecutionInstructionPhrase(value: string) {
@@ -483,6 +481,7 @@ function conceptsRequestedInMessage(message: string) {
     if (isNegatedConceptMention(message, match.index ?? -1)) continue;
     if (isNestedConceptMention(message, match.index ?? -1, concept.name)) continue;
     const resolvedConcept = resolveTradingConcept(concept.name);
+    if (resolvedConcept && resolvedConcept.kind !== "concept") continue;
     if (resolvedConcept?.status === "executable") {
       requested.push({
         name: resolvedConcept.name,
@@ -516,6 +515,20 @@ function conceptsRequestedInMessage(message: string) {
       matchedText: match[0],
     });
   }
+  const higherTimeframeBiasMatch = message.match(/\b(?:higher[- ]timeframe|htf|\d+\s*h)\s+(?:(?:bullish|bearish)\s+)?bias\b/i);
+  if (
+    higherTimeframeBiasMatch
+    && !seen.has("Higher Timeframe Bias")
+    && !isNegatedConceptMention(message, higherTimeframeBiasMatch.index ?? -1)
+  ) {
+    requested.push({
+      name: "Higher Timeframe Bias",
+      supported: false,
+      explanation: "Higher-timeframe bias is preserved for review until its deterministic evaluator is defined.",
+      matchedText: higherTimeframeBiasMatch[0],
+    });
+    seen.add("Higher Timeframe Bias");
+  }
   if (/\bhigher[- ]timeframe\b|\blower[- ]timeframe\b|\b\d+\s*h\b.*\b\d+\s*m\b|\bmulti[- ]timeframe\b/i.test(message) && !seen.has("Multi-timeframe analysis")) {
     const match = message.match(/\bhigher[- ]timeframe\b|\blower[- ]timeframe\b|\b\d+\s*h\b.*\b\d+\s*m\b|\bmulti[- ]timeframe\b/i);
     requested.push({
@@ -530,7 +543,7 @@ function conceptsRequestedInMessage(message: string) {
 
 function requestedExecutableConceptMatches(message: string) {
   const executableMatches = TRADING_CONCEPT_REGISTRY
-    .filter(definition => definition.status === "executable")
+    .filter(definition => definition.kind === "concept" && definition.status === "executable")
     .flatMap(definition => [definition.name, ...definition.aliases].map(alias => ({ alias, definition })))
     .sort((left, right) => right.alias.length - left.alias.length)
     .flatMap(({ alias, definition }) => {
@@ -686,7 +699,9 @@ function canonicalExecutableName(value: string) {
 function requestedConceptAuthorizations(message: string): RequestedConceptAuthorization[] {
   const byCanonical = new Map<string, RequestedConceptAuthorization>();
   const add = (requestedConcept: string, matchedText: string, supported: boolean, explanation: string) => {
-    if (isExecutionInstructionPhrase(requestedConcept) && !resolveTradingConcept(requestedConcept)) return;
+    const resolvedRequested = resolveTradingConcept(requestedConcept);
+    if (resolvedRequested && resolvedRequested.kind !== "concept") return;
+    if (isExecutionInstructionPhrase(requestedConcept) && !resolvedRequested) return;
     let canonicalConcept = canonicalConceptName(requestedConcept);
     if (/^(?:bullish|bearish)\s+structure$/i.test(canonicalConcept)) canonicalConcept = "Market Structure Shift";
     const hasFvgInteraction = /\b(?:fvg|fair\s+value\s+gap)\b[^.!?]{0,60}\b(?:retests?|fills?)\b/i.test(message);

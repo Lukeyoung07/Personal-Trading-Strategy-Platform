@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   concepts: [{ id: 1, name: "Momentum", category: "PRICE", isBuiltIn: true }] as any[],
   markets: [] as any[],
   createStrategy: vi.fn(),
+  createVersion: vi.fn(),
   createCondition: vi.fn(),
   updateStrategy: vi.fn(),
   chat: {
@@ -54,6 +55,7 @@ vi.mock("@workspace/api-client-react", () => ({
   getListStrategiesQueryKey: () => ["strategies"],
   getListStrategyConditionsQueryKey: (id: number) => ["strategy-conditions", id],
   useCreateStrategy: () => ({ mutate: state.createStrategy, isPending: false }),
+  useCreateStrategyVersion: () => ({ mutate: state.createVersion, isPending: false }),
   useCreateStrategyCondition: () => ({ mutate: state.createCondition, isPending: false }),
   useDeleteStrategyCondition: () => ({ mutate: vi.fn(), isPending: false }),
   useListConcepts: () => ({ data: state.concepts, isLoading: false, isError: false }),
@@ -119,6 +121,7 @@ afterEach(() => {
   state.conditions = [];
   state.markets = [];
   state.createStrategy.mockReset();
+  state.createVersion.mockReset();
   state.createCondition.mockReset();
   state.updateStrategy.mockReset();
   state.chat.mutate.mockReset();
@@ -305,6 +308,39 @@ describe("StrategyBuilder", () => {
       resetBehavior: null,
     }]);
     expect(state.createCondition).not.toHaveBeenCalled();
+  });
+
+  it("saves the reviewed AI draft as an immutable version after creating the strategy", () => {
+    const draft = authorizedDraft({
+      name: "AI version handoff",
+      description: "A reviewed AI hypothesis.",
+      direction: "long",
+      marketSymbol: null,
+      timeframes: ["1H"],
+      conditions: [],
+      riskManagementRules: "stop-loss: 1%",
+      compatibility: { compatible: true, unsupportedConditions: [] },
+    });
+    state.createStrategy.mockImplementation((_request: unknown, options: { onSuccess?: (value: unknown) => void }) => {
+      options.onSuccess?.({ ...strategy, id: 19, name: "AI version handoff" });
+    });
+    state.createVersion.mockImplementation((_request: unknown, options: { onSuccess?: (value: unknown) => void }) => {
+      options.onSuccess?.({});
+    });
+    window.history.pushState({}, "", "/strategy-builder?assistantDraft=1&assistantAction=save-version");
+    sessionStorage.setItem("assistant-strategy-draft", JSON.stringify(draft));
+
+    render(<StrategyBuilder />);
+    fireEvent.click(screen.getByTestId("button-save-builder-strategy"));
+
+    expect(state.createVersion).toHaveBeenCalledWith({
+      strategyId: 19,
+      data: {
+        label: "AI draft",
+        thesis: "A reviewed AI hypothesis.",
+        riskSnapshot: null,
+      },
+    }, expect.any(Object));
   });
 
   it("renders paired HTF structure and FVG retest conditions with their review metadata", () => {

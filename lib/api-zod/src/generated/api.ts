@@ -407,6 +407,9 @@ export const createStrategyBodyDirectionDefault = `both`;
 
 export const createStrategyBodyConditionsItemDirectionDefault = `both`;
 export const createStrategyBodyConditionsItemRequirementDefault = `required`;
+export const createStrategyBodyConditionsItemRelationshipTargetRuleIndexMin = 0;
+
+
 
 export const CreateStrategyBody = zod.object({
   "name": zod.string().min(1),
@@ -427,6 +430,12 @@ export const CreateStrategyBody = zod.object({
   "triggerRules": zod.string().nullish(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullish(),
   "canonicalState": zod.record(zod.string(), zod.unknown()).nullish(),
+  "relationship": zod.object({
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "targetRuleIndex": zod.number().int().min(createStrategyBodyConditionsItemRelationshipTargetRuleIndexMin).nullish(),
+  "supported": zod.boolean().optional(),
+  "reason": zod.string().nullish()
+}).nullish(),
   "invalidationRules": zod.string().nullish(),
   "resetBehavior": zod.string().nullish()
 })).optional(),
@@ -809,6 +818,10 @@ export const ListStrategyVersionConditionsParams = zod.object({
   "versionId": zod.coerce.number().int().min(1)
 })
 
+export const listStrategyVersionConditionsResponseRelationshipTargetRuleIndexMin = 0;
+
+
+
 export const ListStrategyVersionConditionsResponseItem = zod.object({
   "id": zod.number().int(),
   "strategyVersionId": zod.number().int(),
@@ -833,6 +846,12 @@ export const ListStrategyVersionConditionsResponseItem = zod.object({
   "order": zod.number().int(),
   "triggerRules": zod.string().nullable(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
+  "relationship": zod.object({
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "targetRuleIndex": zod.number().int().min(listStrategyVersionConditionsResponseRelationshipTargetRuleIndexMin).nullish(),
+  "supported": zod.boolean().optional(),
+  "reason": zod.string().nullish()
+}).nullish(),
   "invalidationRules": zod.string().nullable(),
   "resetBehavior": zod.string().nullable(),
   "createdAt": zod.coerce.date()
@@ -940,6 +959,10 @@ export const ListStrategyConditionsParams = zod.object({
   "strategyId": zod.coerce.number().int().min(1)
 })
 
+export const listStrategyConditionsResponseRelationshipTargetRuleIndexMin = 0;
+
+
+
 export const ListStrategyConditionsResponseItem = zod.object({
   "id": zod.number().int(),
   "strategyId": zod.number().int(),
@@ -961,6 +984,12 @@ export const ListStrategyConditionsResponseItem = zod.object({
   "order": zod.number().int(),
   "triggerRules": zod.string().nullable(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
+  "relationship": zod.object({
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "targetRuleIndex": zod.number().int().min(listStrategyConditionsResponseRelationshipTargetRuleIndexMin).nullish(),
+  "supported": zod.boolean().optional(),
+  "reason": zod.string().nullish()
+}).nullish(),
   "invalidationRules": zod.string().nullable(),
   "resetBehavior": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
@@ -984,6 +1013,9 @@ export const CreateStrategyConditionParams = zod.object({
 
 export const createStrategyConditionBodyDirectionDefault = `both`;
 export const createStrategyConditionBodyRequirementDefault = `required`;
+export const createStrategyConditionBodyRelationshipTargetRuleIndexMin = 0;
+
+
 
 export const CreateStrategyConditionBody = zod.object({
   "conceptId": zod.number().int().min(1),
@@ -996,9 +1028,19 @@ export const CreateStrategyConditionBody = zod.object({
   "triggerRules": zod.string().nullish(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullish(),
   "canonicalState": zod.record(zod.string(), zod.unknown()).nullish(),
+  "relationship": zod.object({
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "targetRuleIndex": zod.number().int().min(createStrategyConditionBodyRelationshipTargetRuleIndexMin).nullish(),
+  "supported": zod.boolean().optional(),
+  "reason": zod.string().nullish()
+}).nullish(),
   "invalidationRules": zod.string().nullish(),
   "resetBehavior": zod.string().nullish()
 })
+
+export const createStrategyConditionResponseRelationshipTargetRuleIndexMin = 0;
+
+
 
 export const CreateStrategyConditionResponse = zod.object({
   "id": zod.number().int(),
@@ -1021,6 +1063,12 @@ export const CreateStrategyConditionResponse = zod.object({
   "order": zod.number().int(),
   "triggerRules": zod.string().nullable(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
+  "relationship": zod.object({
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "targetRuleIndex": zod.number().int().min(createStrategyConditionResponseRelationshipTargetRuleIndexMin).nullish(),
+  "supported": zod.boolean().optional(),
+  "reason": zod.string().nullish()
+}).nullish(),
   "invalidationRules": zod.string().nullable(),
   "resetBehavior": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
@@ -1045,6 +1093,10 @@ export const ReorderStrategyConditionsBody = zod.object({
   "conditionIds": zod.array(zod.number().int().min(1))
 })
 
+export const reorderStrategyConditionsResponseRelationshipTargetRuleIndexMin = 0;
+
+
+
 export const ReorderStrategyConditionsResponseItem = zod.object({
   "id": zod.number().int(),
   "strategyId": zod.number().int(),
@@ -1066,6 +1118,12 @@ export const ReorderStrategyConditionsResponseItem = zod.object({
   "order": zod.number().int(),
   "triggerRules": zod.string().nullable(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
+  "relationship": zod.object({
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "targetRuleIndex": zod.number().int().min(reorderStrategyConditionsResponseRelationshipTargetRuleIndexMin).nullish(),
+  "supported": zod.boolean().optional(),
+  "reason": zod.string().nullish()
+}).nullish(),
   "invalidationRules": zod.string().nullable(),
   "resetBehavior": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
@@ -1089,6 +1147,8 @@ export const UpdateStrategyConditionParams = zod.object({
 
 
 
+export const updateStrategyConditionBodyRelationshipTargetRuleIndexMin = 0;
+
 
 
 export const UpdateStrategyConditionBody = zod.object({
@@ -1102,9 +1162,19 @@ export const UpdateStrategyConditionBody = zod.object({
   "triggerRules": zod.string().nullish(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullish(),
   "canonicalState": zod.record(zod.string(), zod.unknown()).nullish(),
+  "relationship": zod.object({
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "targetRuleIndex": zod.number().int().min(updateStrategyConditionBodyRelationshipTargetRuleIndexMin).nullish(),
+  "supported": zod.boolean().optional(),
+  "reason": zod.string().nullish()
+}).nullish(),
   "invalidationRules": zod.string().nullish(),
   "resetBehavior": zod.string().nullish()
 })
+
+export const updateStrategyConditionResponseRelationshipTargetRuleIndexMin = 0;
+
+
 
 export const UpdateStrategyConditionResponse = zod.object({
   "id": zod.number().int(),
@@ -1127,6 +1197,12 @@ export const UpdateStrategyConditionResponse = zod.object({
   "order": zod.number().int(),
   "triggerRules": zod.string().nullable(),
   "parameters": zod.record(zod.string(), zod.unknown()).nullable(),
+  "relationship": zod.object({
+  "type": zod.enum(['and', 'or', 'followed_by', 'before', 'after']).optional(),
+  "targetRuleIndex": zod.number().int().min(updateStrategyConditionResponseRelationshipTargetRuleIndexMin).nullish(),
+  "supported": zod.boolean().optional(),
+  "reason": zod.string().nullish()
+}).nullish(),
   "invalidationRules": zod.string().nullable(),
   "resetBehavior": zod.string().nullable(),
   "createdAt": zod.coerce.date(),

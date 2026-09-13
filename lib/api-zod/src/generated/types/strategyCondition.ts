@@ -9,6 +9,7 @@ import type { StrategyConditionCanonicalDefinition } from './strategyConditionCa
 import type { StrategyConditionCanonicalState } from './strategyConditionCanonicalState';
 import type { StrategyConditionDirection } from './strategyConditionDirection';
 import type { StrategyConditionParameters } from './strategyConditionParameters';
+import type { StrategyConditionRelationship } from './strategyConditionRelationship';
 import type { StrategyConditionRequirement } from './strategyConditionRequirement';
 import type { StrategyConditionStage } from './strategyConditionStage';
 
@@ -43,6 +44,8 @@ export interface StrategyCondition {
   triggerRules: string | null;
   /** @nullable */
   parameters: StrategyConditionParameters;
+  /** @nullable */
+  relationship?: StrategyConditionRelationship;
   /** @nullable */
   invalidationRules: string | null;
   /** @nullable */

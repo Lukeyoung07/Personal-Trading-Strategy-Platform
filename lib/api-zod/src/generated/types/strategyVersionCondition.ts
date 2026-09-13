@@ -9,6 +9,7 @@ import type { StrategyVersionConditionCanonicalDefinition } from './strategyVers
 import type { StrategyVersionConditionCanonicalState } from './strategyVersionConditionCanonicalState';
 import type { StrategyVersionConditionDirection } from './strategyVersionConditionDirection';
 import type { StrategyVersionConditionParameters } from './strategyVersionConditionParameters';
+import type { StrategyVersionConditionRelationship } from './strategyVersionConditionRelationship';
 import type { StrategyVersionConditionRequirement } from './strategyVersionConditionRequirement';
 import type { StrategyVersionConditionStage } from './strategyVersionConditionStage';
 
@@ -49,6 +50,8 @@ export interface StrategyVersionCondition {
   triggerRules: string | null;
   /** @nullable */
   parameters: StrategyVersionConditionParameters;
+  /** @nullable */
+  relationship?: StrategyVersionConditionRelationship;
   /** @nullable */
   invalidationRules: string | null;
   /** @nullable */

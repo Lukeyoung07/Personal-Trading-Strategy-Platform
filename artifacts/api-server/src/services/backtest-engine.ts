@@ -31,6 +31,8 @@ export interface BacktestCondition {
   parameters?: unknown;
   invalidationRules: string | null;
   conceptDetectionRules: string | null;
+  canonicalStatus?: string | null;
+  executorKind?: string | null;
   canonicalState?: CanonicalConditionSnapshot | null;
 }
 
@@ -163,6 +165,7 @@ function executableParameters(condition: BacktestCondition): ExecutableConceptPa
     if (saved.executionStatus !== "executable" || !saved.executorKind || !saved.parameters) return null;
     return { ...saved.parameters, kind: saved.executorKind } as ExecutableConceptParameters;
   }
+  if (condition.canonicalStatus === "review_required") return null;
   const conceptName = condition.conceptName || condition.name;
   const definition = resolveTradingConcept(conceptName);
   if (definition && definition.status !== "executable") return null;
@@ -170,6 +173,7 @@ function executableParameters(condition: BacktestCondition): ExecutableConceptPa
 }
 
 function isReviewRequiredConcept(condition: BacktestCondition) {
+  if (condition.canonicalStatus === "review_required") return true;
   if (condition.canonicalState) return condition.canonicalState.executionStatus !== "executable";
   const conceptName = condition.conceptName || condition.name;
   const definition = resolveTradingConcept(conceptName);
@@ -567,6 +571,7 @@ export function evaluateExecutableConditionAtLatest(
   candles: HistoricalCandle[],
 ): boolean | null {
   if (!candles.length) return false;
+  if (!candles[candles.length - 1].isClosed) return false;
   if (isReviewRequiredConcept(condition)) return null;
   const rule = condition.triggerRules?.trim() || condition.conceptDetectionRules?.trim();
   if (!executableParameters(condition)) {

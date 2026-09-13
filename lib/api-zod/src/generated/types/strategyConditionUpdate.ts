@@ -8,6 +8,7 @@
 import type { StrategyConditionUpdateCanonicalState } from './strategyConditionUpdateCanonicalState';
 import type { StrategyConditionUpdateDirection } from './strategyConditionUpdateDirection';
 import type { StrategyConditionUpdateParameters } from './strategyConditionUpdateParameters';
+import type { StrategyConditionUpdateRelationship } from './strategyConditionUpdateRelationship';
 import type { StrategyConditionUpdateRequirement } from './strategyConditionUpdateRequirement';
 import type { StrategyConditionUpdateStage } from './strategyConditionUpdateStage';
 
@@ -29,6 +30,8 @@ export interface StrategyConditionUpdate {
   parameters?: StrategyConditionUpdateParameters;
   /** @nullable */
   canonicalState?: StrategyConditionUpdateCanonicalState;
+  /** @nullable */
+  relationship?: StrategyConditionUpdateRelationship;
   /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */

@@ -111,6 +111,13 @@ function conditionParameters(conceptName: string | null | undefined, value: unkn
   return parameters;
 }
 
+function assertBuilderConditionConcept(concept: typeof tradingConceptsTable.$inferSelect) {
+  const definition = resolveTradingConcept(concept.name);
+  if (definition && definition.kind !== "concept") {
+    throw new Error(`${concept.name} is registry metadata and cannot become a Builder condition.`);
+  }
+}
+
 function canonicalDefinitionWithState(definition: unknown, state: unknown) {
   if (!state || typeof state !== "object" || Array.isArray(state)) return definition ?? null;
   const base = definition && typeof definition === "object" && !Array.isArray(definition)
@@ -123,6 +130,21 @@ function canonicalStateFromDefinition(definition: unknown) {
   if (!definition || typeof definition !== "object" || Array.isArray(definition)) return null;
   const state = (definition as Record<string, unknown>).conditionState;
   return state && typeof state === "object" && !Array.isArray(state) ? state : null;
+}
+
+function canonicalStateWithRelationship(state: unknown, relationship: unknown) {
+  if (relationship == null) return state;
+  const base = state && typeof state === "object" && !Array.isArray(state)
+    ? state as Record<string, unknown>
+    : {};
+  return { ...base, relationship };
+}
+
+function relationshipFromDefinition(definition: unknown) {
+  const state = canonicalStateFromDefinition(definition);
+  const record = state as Record<string, unknown> | null;
+  if (!record || typeof record.relationship !== "object" || record.relationship === null || Array.isArray(record.relationship)) return null;
+  return record.relationship;
 }
 
 const DEFAULT_CONCEPTS = [
@@ -985,6 +1007,7 @@ async function buildVersionConditionSnapshots(
       conditionOrder: condition.conditionOrder,
       triggerRules: condition.triggerRules,
       parameters: conditionParameters(concept?.name, condition.parameters),
+      relationship: relationshipFromDefinition(condition.canonicalDefinition),
       invalidationRules: condition.invalidationRules,
       resetBehavior: condition.resetBehavior,
     };
@@ -1055,8 +1078,9 @@ router.post("/strategies", async (req, res): Promise<void> => {
           .from(tradingConceptsTable)
           .where(eq(tradingConceptsTable.id, inputCondition.conceptId));
         if (!concept) throw new Error("Concept not found.");
+        assertBuilderConditionConcept(concept);
         const parameters = conditionParameters(concept.name, inputCondition.parameters);
-        const { canonicalState, ...conditionInput } = inputCondition;
+        const { canonicalState, relationship, ...conditionInput } = inputCondition;
         const [condition] = await tx.insert(strategyConditionsTable).values({
           ...conditionInput,
           strategyId: strategy.id,
@@ -1066,7 +1090,10 @@ router.post("/strategies", async (req, res): Promise<void> => {
           registryVersion: concept.registryVersion,
           canonicalStatus: concept.canonicalStatus,
           executorKind: concept.executorKind,
-          canonicalDefinition: canonicalDefinitionWithState(concept.canonicalDefinition, canonicalState),
+          canonicalDefinition: canonicalDefinitionWithState(
+            concept.canonicalDefinition,
+            canonicalStateWithRelationship(canonicalState, relationship),
+          ),
         }).returning();
         persistedConditions.push(condition);
       }
@@ -1078,7 +1105,7 @@ router.post("/strategies", async (req, res): Promise<void> => {
       return strategy;
     });
   } catch (error) {
-    if (error instanceof Error && (/^Concept not found/.test(error.message) || /^Parameters for /.test(error.message))) {
+    if (error instanceof Error && (/^Concept not found/.test(error.message) || /^Parameters for /.test(error.message) || /cannot become a Builder condition/.test(error.message))) {
       res.status(400).json({ error: error.message });
       return;
     }
@@ -1509,6 +1536,7 @@ router.get("/strategies/:strategyId/versions/:versionId/conditions", async (req,
     return {
       ...condition,
       canonicalState: canonicalStateFromDefinition(condition.canonicalDefinition),
+      relationship: relationshipFromDefinition(condition.canonicalDefinition),
       order: condition.conditionOrder,
     };
   }));
@@ -1525,6 +1553,7 @@ async function strategyConditionView(condition: typeof strategyConditionsTable.$
     conceptName: concept?.name ?? "Missing concept",
     conceptCategory: concept?.category ?? null,
     canonicalState: canonicalStateFromDefinition(condition.canonicalDefinition),
+    relationship: relationshipFromDefinition(condition.canonicalDefinition),
     order: condition.conditionOrder,
   };
 }
@@ -1560,6 +1589,12 @@ router.post("/strategies/:strategyId/conditions", async (req, res): Promise<void
     res.status(400).json({ error: "Concept not found." });
     return;
   }
+  try {
+    assertBuilderConditionConcept(concept);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Registry metadata cannot become a Builder condition." });
+    return;
+  }
   let parameters: unknown;
   try {
     parameters = conditionParameters(concept.name, body.data.parameters);
@@ -1571,7 +1606,7 @@ router.post("/strategies/:strategyId/conditions", async (req, res): Promise<void
     .select({ conditionOrder: max(strategyConditionsTable.conditionOrder) })
     .from(strategyConditionsTable)
     .where(eq(strategyConditionsTable.strategyId, params.data.strategyId));
-  const { canonicalState, ...conditionInput } = body.data;
+  const { canonicalState, relationship, ...conditionInput } = body.data;
   const [created] = await db
     .insert(strategyConditionsTable)
     .values({
@@ -1583,7 +1618,10 @@ router.post("/strategies/:strategyId/conditions", async (req, res): Promise<void
       registryVersion: concept.registryVersion,
       canonicalStatus: concept.canonicalStatus,
       executorKind: concept.executorKind,
-      canonicalDefinition: canonicalDefinitionWithState(concept.canonicalDefinition, canonicalState),
+      canonicalDefinition: canonicalDefinitionWithState(
+        concept.canonicalDefinition,
+        canonicalStateWithRelationship(canonicalState, relationship),
+      ),
     })
     .returning();
   res.status(201).json(CreateStrategyConditionResponse.parse(await strategyConditionView(created)));
@@ -1636,6 +1674,12 @@ router.patch("/strategies/:strategyId/conditions/:conditionId", async (req, res)
     res.status(400).json({ error: "Concept not found." });
     return;
   }
+  try {
+    assertBuilderConditionConcept(concept);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Registry metadata cannot become a Builder condition." });
+    return;
+  }
   let parameters: unknown;
   try {
     parameters = conditionParameters(concept.name, body.data.parameters ?? existing.parameters);
@@ -1643,7 +1687,7 @@ router.patch("/strategies/:strategyId/conditions/:conditionId", async (req, res)
     res.status(400).json({ error: error instanceof Error ? error.message : "Condition parameters are invalid." });
     return;
   }
-  const { canonicalState, ...conditionInput } = body.data;
+  const { canonicalState, relationship, ...conditionInput } = body.data;
   const [updated] = await db
     .update(strategyConditionsTable)
     .set({
@@ -1656,7 +1700,10 @@ router.patch("/strategies/:strategyId/conditions/:conditionId", async (req, res)
       executorKind: concept.executorKind,
       canonicalDefinition: canonicalDefinitionWithState(
         concept.canonicalDefinition,
-        canonicalState ?? canonicalStateFromDefinition(existing.canonicalDefinition),
+        canonicalStateWithRelationship(
+          canonicalState ?? canonicalStateFromDefinition(existing.canonicalDefinition),
+          relationship,
+        ),
       ),
     })
     .where(and(eq(strategyConditionsTable.id, params.data.conditionId), eq(strategyConditionsTable.strategyId, params.data.strategyId)))

@@ -3,10 +3,23 @@ import type { ExecutableConceptParameters } from "./executable-concepts";
 export type CanonicalConceptStatus = "executable" | "review_required";
 export type CanonicalConceptDirection = "long" | "short" | "both";
 export type CanonicalExecutorKind = ExecutableConceptParameters["kind"];
+export type CanonicalRegistryKind =
+  | "concept"
+  | "parameter_value"
+  | "risk_rule"
+  | "execution_requirement"
+  | "metadata_only";
+
+export type CanonicalParameterNesting = {
+  parentCanonicalId: string;
+  parameter: string;
+  values?: string[];
+};
 
 export type CanonicalConceptDefinition = {
   canonicalId: string;
   registryVersion: string;
+  kind: CanonicalRegistryKind;
   name: string;
   category: string;
   definition: string;
@@ -16,6 +29,9 @@ export type CanonicalConceptDefinition = {
   aliases: string[];
   requiredData: string[];
   requiredTimeframes: string[];
+  supportedTimeframes: string[];
+  variants: string[];
+  validAsParameterOf: CanonicalParameterNesting[];
   closedCandlePolicy: string;
   entryBehavior: string;
   invalidationBehavior: string;
@@ -172,6 +188,17 @@ const LIBRARY_ROWS: readonly ConceptSeed[] = [
   ["RISK / TRADE MANAGEMENT", "Trailing Stop"],
 ];
 
+const AUXILIARY_ROWS: readonly ConceptSeed[] = [
+  ["PARAMETER VALUES", "ATR"],
+  ["EXECUTION / DATA", "Closed Candles"],
+  ["EXECUTION / DATA", "Timeframe"],
+  ["EXECUTION / DATA", "Historical Backtesting"],
+  ["EXECUTION / DATA", "Monitoring"],
+  ["EXECUTION / DATA", "Builder"],
+  ["EXECUTION / DATA", "Build with AI"],
+  ["METADATA", "Trading Concept Library"],
+];
+
 const EXECUTABLE_KINDS: Record<string, CanonicalExecutorKind> = {
   "Higher High": "market_structure", "Higher Low": "market_structure",
   "Lower High": "market_structure", "Lower Low": "market_structure",
@@ -229,7 +256,57 @@ const ALIASES: Record<string, string[]> = {
   "Price Below EMA": ["Price Below Exponential Moving Average"],
   "RSI Overbought": ["RSI > 70"], "RSI Oversold": ["RSI < 30"],
   "MACD Cross": ["MACD Crossover"],
+  "Closed Candles": ["Closed Candle", "Completed Candles", "Completed Candle", "Closed Bars", "Completed Bars"],
+  "Historical Backtesting": ["Historical Backtest", "Backtesting", "Backtest"],
+  "Monitoring": ["Live Monitoring", "Strategy Monitoring"],
+  "Builder": ["Strategy Builder"],
+  "Build with AI": ["Build With AI", "AI Builder"],
+  "Trading Concept Library": ["Concept Library", "Trading Concept Registry"],
 };
+
+const PARAMETER_VALUE_NAMES = new Set(["ATR"]);
+const EXECUTION_REQUIREMENT_NAMES = new Set([
+  "Closed Candles",
+  "Timeframe",
+  "Historical Backtesting",
+  "Monitoring",
+  "Builder",
+  "Build with AI",
+]);
+const METADATA_ONLY_NAMES = new Set(["Trading Concept Library"]);
+
+function registryKindFor(name: string): CanonicalRegistryKind {
+  if (PARAMETER_VALUE_NAMES.has(name)) return "parameter_value";
+  if (EXECUTION_REQUIREMENT_NAMES.has(name)) return "execution_requirement";
+  if (METADATA_ONLY_NAMES.has(name)) return "metadata_only";
+  if (name.includes("Risk") || name.includes("Stop") || name.includes("Take") || name.includes("Position") || name.includes("Break Even") || name.includes("Trailing")) {
+    return "risk_rule";
+  }
+  return "concept";
+}
+
+function validAsParameterOfFor(name: string): CanonicalParameterNesting[] {
+  if (name === "Buy-Side Liquidity") {
+    return [{ parentCanonicalId: idForConcept("Liquidity Sweep"), parameter: "sweepSide", values: ["buy_side"] }];
+  }
+  if (name === "Sell-Side Liquidity") {
+    return [{ parentCanonicalId: idForConcept("Liquidity Sweep"), parameter: "sweepSide", values: ["sell_side"] }];
+  }
+  if (name === "Support") {
+    return [{ parentCanonicalId: idForConcept("Failed Breakout"), parameter: "levelType", values: ["support"] }];
+  }
+  if (name === "Resistance") {
+    return [{ parentCanonicalId: idForConcept("Failed Breakout"), parameter: "levelType", values: ["resistance"] }];
+  }
+  if (name === "ATR") {
+    return [
+      { parentCanonicalId: idForConcept("Displacement"), parameter: "atrPeriod" },
+      { parentCanonicalId: idForConcept("EMA"), parameter: "period" },
+      { parentCanonicalId: idForConcept("SMA"), parameter: "period" },
+    ];
+  }
+  return [];
+}
 
 const EXECUTABLE_FIELDS: Record<CanonicalExecutorKind, {
   required: string[];
@@ -312,13 +389,16 @@ function aliasesFor(name: string) {
 }
 
 function definitionFor(category: string, name: string): CanonicalConceptDefinition {
-  const executorKind = EXECUTABLE_KINDS[name] ?? null;
-  const executable = executorKind !== null;
+  const kind = registryKindFor(name);
+  const executorKind = kind === "concept" ? EXECUTABLE_KINDS[name] ?? null : null;
+  const executable = kind === "concept" && executorKind !== null;
   const fields = executorKind ? EXECUTABLE_FIELDS[executorKind] : null;
   const aliases = aliasesFor(name);
+  const validAsParameterOf = validAsParameterOfFor(name);
   return {
     canonicalId: idForConcept(name),
     registryVersion: "2026-09-12",
+    kind,
     name,
     category,
     definition: executable
@@ -330,6 +410,9 @@ function definitionFor(category: string, name: string): CanonicalConceptDefiniti
     aliases,
     requiredData: executable ? [executorKind === "session" ? "timestamp" : "OHLC"] : ["OHLC and any domain-specific series required by a future evaluator"],
     requiredTimeframes: ["the condition timeframe"],
+    supportedTimeframes: executable ? ["1m", "5m", "15m", "30m", "1h", "4h", "1d"] : [],
+    variants: executable ? (executorKind === "indicator" ? ["above", "below", "cross_above", "cross_below"] : ["auto", "bullish", "bearish"]) : [],
+    validAsParameterOf,
     closedCandlePolicy: "Evaluate only completed candles; never use the still-forming candle or future bars.",
     entryBehavior: executable ? "The shared evaluator returns met only when the canonical rule is true on the decision candle." : "Keep visible as review_required and do not execute until its evaluator contract is approved.",
     invalidationBehavior: executable ? "Use the evaluator's false result on later closed candles; no implicit invalidation is invented." : "Preserve the requested concept and explain the missing invalidation/evaluator contract.",
@@ -339,7 +422,9 @@ function definitionFor(category: string, name: string): CanonicalConceptDefiniti
     exclusions: ["Do not infer this concept from a merely related phrase.", "Do not invent parameters, direction, timeframe, or risk rules."],
     relationships: name.includes("Retest") || name.includes("Break") ? ["May be requested after a preceding formation concept; relationship execution remains explicit."] : [],
     status: executable ? "executable" : "review_required",
-    statusReason: executable ? "A shared deterministic closed-candle evaluator and history requirement are registered." : reviewReason(name),
+    statusReason: kind !== "concept"
+      ? `This registry entry is ${kind.replaceAll("_", " ")} metadata and cannot become a Builder condition.`
+      : executable ? "A shared deterministic closed-candle evaluator and history requirement are registered." : reviewReason(name),
     executorKind,
     evaluatorVersion: executable ? "historical-1" : null,
     parameterSchema: fields?.schema ?? {},
@@ -350,7 +435,7 @@ function definitionFor(category: string, name: string): CanonicalConceptDefiniti
 
 export const TRADING_CONCEPT_REGISTRY: readonly CanonicalConceptDefinition[] = LIBRARY_ROWS.map(
   ([category, name]) => definitionFor(category, name),
-);
+).concat(AUXILIARY_ROWS.map(([category, name]) => definitionFor(category, name)));
 
 const NAME_LOOKUP = new Map<string, CanonicalConceptDefinition>();
 for (const definition of TRADING_CONCEPT_REGISTRY) {

@@ -478,6 +478,17 @@ export const StrategyConditionInputRequirement = {
   optional: 'optional',
 } as const;
 
+export type StrategyConditionInputRelationshipType = typeof StrategyConditionInputRelationshipType[keyof typeof StrategyConditionInputRelationshipType];
+
+
+export const StrategyConditionInputRelationshipType = {
+  and: 'and',
+  or: 'or',
+  followed_by: 'followed_by',
+  before: 'before',
+  after: 'after',
+} as const;
+
 /**
  * @nullable
  */
@@ -487,6 +498,21 @@ export type StrategyConditionInputParameters = { [key: string]: unknown } | null
  * @nullable
  */
 export type StrategyConditionInputCanonicalState = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type StrategyConditionInputRelationship = {
+  type?: StrategyConditionInputRelationshipType;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  targetRuleIndex?: number | null;
+  supported?: boolean;
+  /** @nullable */
+  reason?: string | null;
+} | null;
 
 export interface StrategyConditionInput {
   /** @minimum 1 */
@@ -506,6 +532,8 @@ export interface StrategyConditionInput {
   parameters?: StrategyConditionInputParameters;
   /** @nullable */
   canonicalState?: StrategyConditionInputCanonicalState;
+  /** @nullable */
+  relationship?: StrategyConditionInputRelationship;
   /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */
@@ -718,6 +746,32 @@ export const StrategyVersionConditionRequirement = {
  */
 export type StrategyVersionConditionParameters = { [key: string]: unknown } | null;
 
+export type StrategyVersionConditionRelationshipType = typeof StrategyVersionConditionRelationshipType[keyof typeof StrategyVersionConditionRelationshipType];
+
+
+export const StrategyVersionConditionRelationshipType = {
+  and: 'and',
+  or: 'or',
+  followed_by: 'followed_by',
+  before: 'before',
+  after: 'after',
+} as const;
+
+/**
+ * @nullable
+ */
+export type StrategyVersionConditionRelationship = {
+  type?: StrategyVersionConditionRelationshipType;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  targetRuleIndex?: number | null;
+  supported?: boolean;
+  /** @nullable */
+  reason?: string | null;
+} | null;
+
 export interface StrategyVersionCondition {
   id: number;
   strategyVersionId: number;
@@ -755,6 +809,8 @@ export interface StrategyVersionCondition {
   triggerRules: string | null;
   /** @nullable */
   parameters: StrategyVersionConditionParameters;
+  /** @nullable */
+  relationship?: StrategyVersionConditionRelationship;
   /** @nullable */
   invalidationRules: string | null;
   /** @nullable */
@@ -804,6 +860,32 @@ export const StrategyConditionRequirement = {
  */
 export type StrategyConditionParameters = { [key: string]: unknown } | null;
 
+export type StrategyConditionRelationshipType = typeof StrategyConditionRelationshipType[keyof typeof StrategyConditionRelationshipType];
+
+
+export const StrategyConditionRelationshipType = {
+  and: 'and',
+  or: 'or',
+  followed_by: 'followed_by',
+  before: 'before',
+  after: 'after',
+} as const;
+
+/**
+ * @nullable
+ */
+export type StrategyConditionRelationship = {
+  type?: StrategyConditionRelationshipType;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  targetRuleIndex?: number | null;
+  supported?: boolean;
+  /** @nullable */
+  reason?: string | null;
+} | null;
+
 export interface StrategyCondition {
   id: number;
   strategyId: number;
@@ -835,6 +917,8 @@ export interface StrategyCondition {
   triggerRules: string | null;
   /** @nullable */
   parameters: StrategyConditionParameters;
+  /** @nullable */
+  relationship?: StrategyConditionRelationship;
   /** @nullable */
   invalidationRules: string | null;
   /** @nullable */
@@ -880,6 +964,32 @@ export type StrategyConditionUpdateParameters = { [key: string]: unknown } | nul
  */
 export type StrategyConditionUpdateCanonicalState = { [key: string]: unknown } | null;
 
+export type StrategyConditionUpdateRelationshipType = typeof StrategyConditionUpdateRelationshipType[keyof typeof StrategyConditionUpdateRelationshipType];
+
+
+export const StrategyConditionUpdateRelationshipType = {
+  and: 'and',
+  or: 'or',
+  followed_by: 'followed_by',
+  before: 'before',
+  after: 'after',
+} as const;
+
+/**
+ * @nullable
+ */
+export type StrategyConditionUpdateRelationship = {
+  type?: StrategyConditionUpdateRelationshipType;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  targetRuleIndex?: number | null;
+  supported?: boolean;
+  /** @nullable */
+  reason?: string | null;
+} | null;
+
 export interface StrategyConditionUpdate {
   /** @minimum 1 */
   conceptId?: number;
@@ -898,6 +1008,8 @@ export interface StrategyConditionUpdate {
   parameters?: StrategyConditionUpdateParameters;
   /** @nullable */
   canonicalState?: StrategyConditionUpdateCanonicalState;
+  /** @nullable */
+  relationship?: StrategyConditionUpdateRelationship;
   /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */

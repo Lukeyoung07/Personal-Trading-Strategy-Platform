@@ -8,6 +8,7 @@
 import type { StrategyConditionInputCanonicalState } from './strategyConditionInputCanonicalState';
 import type { StrategyConditionInputDirection } from './strategyConditionInputDirection';
 import type { StrategyConditionInputParameters } from './strategyConditionInputParameters';
+import type { StrategyConditionInputRelationship } from './strategyConditionInputRelationship';
 import type { StrategyConditionInputRequirement } from './strategyConditionInputRequirement';
 import type { StrategyConditionInputStage } from './strategyConditionInputStage';
 
@@ -29,6 +30,8 @@ export interface StrategyConditionInput {
   parameters?: StrategyConditionInputParameters;
   /** @nullable */
   canonicalState?: StrategyConditionInputCanonicalState;
+  /** @nullable */
+  relationship?: StrategyConditionInputRelationship;
   /** @nullable */
   invalidationRules?: string | null;
   /** @nullable */

@@ -902,8 +902,23 @@ export class StrategyMonitoringEngine {
 
 export const strategyMonitoringEngine = new StrategyMonitoringEngine();
 
-export function createBuiltInStrategyMonitoringDetector(concept: { id: number; name: string }): ConditionDetector | null {
-  const definition = resolveTradingConcept(concept.name);
+export function createBuiltInStrategyMonitoringDetector(concept: {
+  id: number;
+  name: string;
+  canonicalId?: string | null;
+  registryVersion?: string | null;
+  canonicalStatus?: string | null;
+  executorKind?: string | null;
+}): ConditionDetector | null {
+  const currentDefinition = resolveTradingConcept(concept.name);
+  const definition = concept.canonicalId && concept.canonicalStatus
+    ? {
+        canonicalId: concept.canonicalId,
+        registryVersion: concept.registryVersion || "persisted",
+        status: concept.canonicalStatus,
+        executorKind: concept.executorKind,
+      }
+    : currentDefinition;
   if (!definition || definition.status !== "executable" || !definition.executorKind) return null;
   return {
     id: `canonical-${definition.canonicalId}`,
@@ -940,6 +955,10 @@ export async function registerBuiltInStrategyMonitoringDetectors() {
   const concepts = await db.select({
     id: tradingConceptsTable.id,
     name: tradingConceptsTable.name,
+    canonicalId: tradingConceptsTable.canonicalId,
+    registryVersion: tradingConceptsTable.registryVersion,
+    canonicalStatus: tradingConceptsTable.canonicalStatus,
+    executorKind: tradingConceptsTable.executorKind,
   }).from(tradingConceptsTable);
 
   for (const concept of concepts) {

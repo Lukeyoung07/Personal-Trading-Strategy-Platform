@@ -1865,6 +1865,14 @@ components:
         order: { type: integer }
         triggerRules: { type: ["string", "null"] }
         parameters: { type: ["object", "null"], additionalProperties: true }
+        relationship:
+          type: ["object", "null"]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [and, or, followed_by, before, after] }
+            targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
+            supported: { type: boolean }
+            reason: { type: ["string", "null"] }
         invalidationRules: { type: ["string", "null"] }
         resetBehavior: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
@@ -1898,6 +1906,14 @@ components:
         order: { type: integer }
         triggerRules: { type: ["string", "null"] }
         parameters: { type: ["object", "null"], additionalProperties: true }
+        relationship:
+          type: ["object", "null"]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [and, or, followed_by, before, after] }
+            targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
+            supported: { type: boolean }
+            reason: { type: ["string", "null"] }
         invalidationRules: { type: ["string", "null"] }
         resetBehavior: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
@@ -1924,6 +1940,14 @@ components:
         triggerRules: { type: ["string", "null"] }
         parameters: { type: ["object", "null"], additionalProperties: true }
         canonicalState: { type: ["object", "null"], additionalProperties: true }
+        relationship:
+          type: ["object", "null"]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [and, or, followed_by, before, after] }
+            targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
+            supported: { type: boolean }
+            reason: { type: ["string", "null"] }
         invalidationRules: { type: ["string", "null"] }
         resetBehavior: { type: ["string", "null"] }
     StrategyConditionUpdate:
@@ -1945,6 +1969,14 @@ components:
         triggerRules: { type: ["string", "null"] }
         parameters: { type: ["object", "null"], additionalProperties: true }
         canonicalState: { type: ["object", "null"], additionalProperties: true }
+        relationship:
+          type: ["object", "null"]
+          additionalProperties: false
+          properties:
+            type: { type: string, enum: [and, or, followed_by, before, after] }
+            targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
+            supported: { type: boolean }
+            reason: { type: ["string", "null"] }
         invalidationRules: { type: ["string", "null"] }
         resetBehavior: { type: ["string", "null"] }
     StrategyConditionReorderInput:

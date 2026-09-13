@@ -6,7 +6,7 @@ import {
 
 describe("canonical trading concept registry", () => {
   it("covers the complete built-in library without duplicate canonical IDs or labels", () => {
-    expect(TRADING_CONCEPT_REGISTRY).toHaveLength(134);
+    expect(TRADING_CONCEPT_REGISTRY).toHaveLength(142);
 
     const ids = TRADING_CONCEPT_REGISTRY.map(definition => definition.canonicalId);
     expect(new Set(ids).size).toBe(ids.length);
@@ -41,5 +41,26 @@ describe("canonical trading concept registry", () => {
         expect(definition.evaluatorVersion).toBe("historical-1");
       }
     }
+  });
+
+  it("classifies registry entries and nesting structurally", () => {
+    const validKinds = new Set(["concept", "parameter_value", "risk_rule", "execution_requirement", "metadata_only"]);
+    for (const definition of TRADING_CONCEPT_REGISTRY) {
+      expect(validKinds.has(definition.kind)).toBe(true);
+      if (definition.kind !== "concept") {
+        expect(definition.executorKind).toBeNull();
+      }
+    }
+    expect(resolveTradingConcept("Sell-Side Liquidity")?.validAsParameterOf).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          parentCanonicalId: resolveTradingConcept("Liquidity Sweep")?.canonicalId,
+          parameter: "sweepSide",
+          values: ["sell_side"],
+        }),
+      ]),
+    );
+    expect(resolveTradingConcept("Closed Candles")?.kind).toBe("execution_requirement");
+    expect(resolveTradingConcept("ATR")?.kind).toBe("parameter_value");
   });
 });

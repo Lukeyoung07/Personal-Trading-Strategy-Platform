@@ -64,6 +64,10 @@ describe("historical backtest engine", () => {
       candle(1, { open: 100, close: 101 }),
     ])).toBe(true);
     expect(evaluateExecutableConditionAtLatest(condition, [
+      candle(0, { open: 100, close: 99 }),
+      { ...candle(1, { open: 100, close: 101 }), isClosed: false },
+    ])).toBe(false);
+    expect(evaluateExecutableConditionAtLatest(condition, [
       candle(0, { open: 100, close: 101 }),
       candle(1, { open: 100, close: 99 }),
     ])).toBe(false);
