@@ -47,6 +47,8 @@ export type UniversalRuleRelationship = {
   targetRuleIndex: number | null;
   targetCanonicalId?: string | null;
   parameters?: Record<string, unknown> | null;
+  maxBarsBetween?: number;
+  maxBarsBetweenDefaulted?: boolean;
   supported: boolean;
   reason: string | null;
 };

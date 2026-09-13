@@ -1871,6 +1871,8 @@ components:
           properties:
             type: { type: string, enum: [and, or, followed_by, before, after] }
             targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
+            maxBarsBetween: { type: integer, minimum: 1 }
+            maxBarsBetweenDefaulted: { type: boolean }
             supported: { type: boolean }
             reason: { type: ["string", "null"] }
         invalidationRules: { type: ["string", "null"] }
@@ -1912,6 +1914,8 @@ components:
           properties:
             type: { type: string, enum: [and, or, followed_by, before, after] }
             targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
+            maxBarsBetween: { type: integer, minimum: 1 }
+            maxBarsBetweenDefaulted: { type: boolean }
             supported: { type: boolean }
             reason: { type: ["string", "null"] }
         invalidationRules: { type: ["string", "null"] }
@@ -1946,6 +1950,8 @@ components:
           properties:
             type: { type: string, enum: [and, or, followed_by, before, after] }
             targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
+            maxBarsBetween: { type: integer, minimum: 1 }
+            maxBarsBetweenDefaulted: { type: boolean }
             supported: { type: boolean }
             reason: { type: ["string", "null"] }
         invalidationRules: { type: ["string", "null"] }
@@ -1975,6 +1981,8 @@ components:
           properties:
             type: { type: string, enum: [and, or, followed_by, before, after] }
             targetRuleIndex: { type: ["integer", "null"], minimum: 0 }
+            maxBarsBetween: { type: integer, minimum: 1 }
+            maxBarsBetweenDefaulted: { type: boolean }
             supported: { type: boolean }
             reason: { type: ["string", "null"] }
         invalidationRules: { type: ["string", "null"] }
@@ -2922,6 +2930,8 @@ components:
           type: string
           enum: [after, followed_by, while, and, or]
         targetRuleIndex: { type: ["integer", "null"] }
+        maxBarsBetween: { type: integer, minimum: 1 }
+        maxBarsBetweenDefaulted: { type: boolean }
         supported: { type: boolean }
         reason: { type: ["string", "null"] }
     AssistantRiskRule:

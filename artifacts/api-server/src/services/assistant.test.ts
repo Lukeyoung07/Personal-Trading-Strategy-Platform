@@ -1842,13 +1842,49 @@ Risk/Reward: 2:1`,
     expect(response.strategyDraft?.conditions[1]).toMatchObject({
       executionStatus: "executable",
       parameters: { kind: "displacement", atrPeriod: 14, minimumBodyAtr: 1.5 },
-      relationship: { type: "followed_by", targetRuleIndex: 0 },
+      relationship: {
+        type: "followed_by",
+        targetRuleIndex: 0,
+        supported: true,
+        maxBarsBetween: 20,
+        maxBarsBetweenDefaulted: true,
+      },
     });
     expect(response.strategyDraft?.riskRules).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: "stop_loss_percentage", value: 1 }),
       expect.objectContaining({ type: "take_profit_percentage", value: 2 }),
     ]));
     expect(response.strategyDraft?.compatibility).toEqual({ compatible: true, unsupportedConditions: [] });
+  });
+
+  it("parses an explicit followed-by candle window without requiring review", async () => {
+    mockStrategyDraft({
+      name: "Windowed sequence",
+      description: "A sweep followed by displacement within a bounded window.",
+      direction: "long",
+      marketSymbol: "XAUUSD",
+      timeframes: ["5m"],
+      conditions: [
+        { name: "Liquidity Sweep", stage: "entry", requirement: "required", conceptName: "Liquidity Sweep", timeframe: "5m", direction: "long", triggerRules: "model sweep" },
+        { name: "Displacement", stage: "confirmation", requirement: "required", conceptName: "Displacement", timeframe: "5m", direction: "long", triggerRules: "model displacement" },
+      ],
+      riskManagementRules: null,
+    });
+
+    const response = await answerAssistant({
+      message: "Build XAUUSD 5m with Liquidity Sweep followed by Displacement within 10 candles.",
+      messages: [],
+      context: { page: "/strategy-builder" },
+    });
+
+    expect(response.strategyDraft?.conditions[1].relationship).toMatchObject({
+      type: "followed_by",
+      targetRuleIndex: 0,
+      supported: true,
+      maxBarsBetween: 10,
+      maxBarsBetweenDefaulted: false,
+    });
+    expect(response.strategyDraft?.conditions[1].executionStatus).toBe("executable");
   });
 
   it.each(["Support", "Resistance", "Buy-Side Liquidity", "Sell-Side Liquidity"])(

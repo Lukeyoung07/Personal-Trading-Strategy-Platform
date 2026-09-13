@@ -88,6 +88,9 @@ async function assertBacktestNotCancelled(backtestId: number) {
 }
 
 function engineCondition(condition: typeof strategyVersionConditionsTable.$inferSelect): BacktestCondition {
+  const canonicalState = condition.canonicalDefinition && typeof condition.canonicalDefinition === "object"
+    ? (condition.canonicalDefinition as Record<string, unknown>).conditionState as BacktestCondition["canonicalState"]
+    : null;
   return {
     name: condition.name,
     conceptName: condition.conceptName,
@@ -99,9 +102,8 @@ function engineCondition(condition: typeof strategyVersionConditionsTable.$infer
     parameters: condition.parameters,
     canonicalStatus: condition.canonicalStatus,
     executorKind: condition.executorKind,
-    canonicalState: condition.canonicalDefinition && typeof condition.canonicalDefinition === "object"
-      ? (condition.canonicalDefinition as Record<string, unknown>).conditionState as BacktestCondition["canonicalState"]
-      : null,
+    relationship: canonicalState?.relationship ?? null,
+    canonicalState,
     invalidationRules: condition.invalidationRules,
     conceptDetectionRules: condition.conceptDetectionRules,
   };

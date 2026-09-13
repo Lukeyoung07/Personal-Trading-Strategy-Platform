@@ -14,3 +14,9 @@ Monitoring snapshots expose a provider-neutral market-data state (`live`, `stale
 **Why:** Condition outcomes and provider health answer different questions. Conflating them made a waiting strategy look like a rule failure and hid the reason automatic multi-source evaluation could not proceed.
 
 **How to apply:** Persist the normalized state on the monitoring session, show it in the UI, and keep insufficient candles or unavailable sources in WAITING. Treat the 15-minute threshold as a generic freshness policy, not an instrument- or provider-specific rule.
+
+Followed-by relationships are executable temporal dependencies: the source trigger must precede the target and remain within the recorded bar window; monitoring retains the source trigger timestamp in typed evaluator state so the target can wait without treating the source as permanently met.
+
+**Why:** A flat AND loses event order, while a transient source status cannot represent a valid setup between source and target evaluation ticks.
+
+**How to apply:** Keep the backtest and monitoring window interpretation aligned, default newly created followed-by relationships to 20 bars when unspecified, and reject unsupported relationship types rather than evaluating them as unordered conditions.

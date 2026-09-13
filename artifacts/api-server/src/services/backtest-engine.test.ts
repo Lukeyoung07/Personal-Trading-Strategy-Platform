@@ -828,4 +828,184 @@ describe("historical backtest engine", () => {
     expect(result.trades[0].exitReason).toBe("exit_condition:Bearish exit");
     expect(result.trades[1].exitReason).toBe("end_of_period");
   });
+
+  const followedBy = (maxBarsBetween?: number, supported = true) => ({
+    type: "followed_by" as const,
+    targetRuleIndex: 0,
+    ...(maxBarsBetween == null ? {} : { maxBarsBetween }),
+    supported,
+    reason: supported ? null : "Relationship evaluator is not registered.",
+  });
+
+  const sequenceStrategy = (relationship = followedBy()) => ({
+    direction: "long" as const,
+    entryRules: null,
+    exitRules: null,
+    riskRules: null,
+    conditions: [
+      {
+        name: "Source bullish candle",
+        conceptName: null,
+        timeframe: "5m",
+        stage: "entry" as const,
+        direction: "long" as const,
+        requirement: "required" as const,
+        triggerRules: "close > open",
+        parameters: null,
+        invalidationRules: null,
+        conceptDetectionRules: null,
+      },
+      {
+        name: "Target bearish candle",
+        conceptName: null,
+        timeframe: "5m",
+        stage: "confirmation" as const,
+        direction: "long" as const,
+        requirement: "required" as const,
+        triggerRules: "close < open",
+        parameters: null,
+        relationship,
+        invalidationRules: null,
+        conceptDetectionRules: null,
+      },
+    ],
+  });
+
+  it("enforces followed_by using the default twenty-bar window", () => {
+    const result = runHistoricalBacktest(sequenceStrategy(), [
+      candle(0, { open: 100, close: 101 }),
+      candle(1, { open: 100, close: 99 }),
+      candle(2, { open: 100, close: 100 }),
+    ]);
+    expect(result.trades).toHaveLength(1);
+  });
+
+  it("generates a trade when the target follows the source within the explicit window", () => {
+    const result = runHistoricalBacktest(sequenceStrategy(followedBy(2)), [
+      candle(0, { open: 100, close: 101 }),
+      candle(1, { open: 100, close: 100 }),
+      candle(2, { open: 100, close: 99 }),
+      candle(3, { open: 100, close: 100 }),
+    ]);
+    expect(result.trades).toHaveLength(1);
+  });
+
+  it("does not match a target that occurs before or outside the followed_by window", () => {
+    const before = runHistoricalBacktest(sequenceStrategy(followedBy(20)), [
+      candle(0, { open: 100, close: 99 }),
+      candle(1, { open: 100, close: 101 }),
+      candle(2, { open: 100, close: 100 }),
+    ]);
+    const outside = runHistoricalBacktest(sequenceStrategy(followedBy(2)), [
+      candle(0, { open: 100, close: 101 }),
+      candle(1, { open: 100, close: 100 }),
+      candle(2, { open: 100, close: 100 }),
+      candle(3, { open: 100, close: 99 }),
+      candle(4, { open: 100, close: 100 }),
+    ]);
+    expect(before.trades).toEqual([]);
+    expect(outside.trades).toEqual([]);
+  });
+
+  it("does not let a target trigger when the source never occurs", () => {
+    const result = runHistoricalBacktest(sequenceStrategy(followedBy(20)), [
+      candle(0, { open: 100, close: 100 }),
+      candle(1, { open: 100, close: 99 }),
+      candle(2, { open: 100, close: 100 }),
+    ]);
+    expect(result.trades).toEqual([]);
+  });
+
+  it("keeps multiple independent followed_by sequences eligible", () => {
+    const result = runHistoricalBacktest({
+      ...sequenceStrategy(followedBy(2)),
+      riskRules: "stop-loss: 1%, take-profit: 1%",
+    }, [
+      candle(0, { open: 100, close: 101 }),
+      candle(1, { open: 100, close: 99 }),
+      candle(2, { open: 100, close: 100, high: 102 }),
+      candle(3, { open: 100, close: 101 }),
+      candle(4, { open: 100, close: 99 }),
+      candle(5, { open: 100, close: 100, high: 102 }),
+    ]);
+    expect(result.trades).toHaveLength(2);
+  });
+
+  it("runs the XAUUSD-style liquidity sweep followed by displacement sequence in both directions", () => {
+    const relationship = followedBy(20);
+    const long = runHistoricalBacktest({
+      direction: "long",
+      entryRules: null,
+      exitRules: null,
+      riskRules: "stop-loss: 1%, take-profit: 2%",
+      conditions: [
+        {
+          ...structuredCondition("Sell-side liquidity sweep", "Liquidity Sweep", "long", {
+            kind: "liquidity_sweep",
+            level: "lookback_extreme",
+            sweepSide: "sell_side",
+            lookback: 2,
+          }),
+        },
+        {
+          ...structuredCondition("Bullish displacement", "Displacement", "long", {
+            kind: "displacement",
+            polarity: "bullish",
+            atrPeriod: 2,
+            minimumBodyAtr: 1.5,
+            minimumCloseLocation: 0.7,
+          }),
+          relationship,
+        },
+      ],
+    }, [
+      candle(0, { open: 100, high: 102, low: 98, close: 100 }),
+      candle(1, { open: 100, high: 102, low: 98, close: 100 }),
+      candle(2, { open: 100, high: 100, low: 97, close: 99 }),
+      candle(3, { open: 100, high: 109, low: 99, close: 108 }),
+      candle(4, { open: 108, high: 109, low: 107, close: 108 }),
+    ]);
+    const short = runHistoricalBacktest({
+      direction: "short",
+      entryRules: null,
+      exitRules: null,
+      riskRules: "stop-loss: 1%, take-profit: 2%",
+      conditions: [
+        {
+          ...structuredCondition("Buy-side liquidity sweep", "Liquidity Sweep", "short", {
+            kind: "liquidity_sweep",
+            level: "lookback_extreme",
+            sweepSide: "buy_side",
+            lookback: 2,
+          }),
+        },
+        {
+          ...structuredCondition("Bearish displacement", "Displacement", "short", {
+            kind: "displacement",
+            polarity: "bearish",
+            atrPeriod: 2,
+            minimumBodyAtr: 1.5,
+            minimumCloseLocation: 0.7,
+          }),
+          relationship,
+        },
+      ],
+    }, [
+      candle(0, { open: 100, high: 102, low: 98, close: 100 }),
+      candle(1, { open: 100, high: 102, low: 98, close: 100 }),
+      candle(2, { open: 102, high: 103, low: 100, close: 101 }),
+      candle(3, { open: 100, high: 101, low: 91, close: 92 }),
+      candle(4, { open: 92, high: 93, low: 91, close: 92 }),
+    ]);
+
+    expect(long.trades).toHaveLength(1);
+    expect(short.trades).toHaveLength(1);
+    expect(long.trades[0].entryReason).toContain("Bullish displacement");
+    expect(short.trades[0].entryReason).toContain("Bearish displacement");
+  });
+
+  it("rejects unsupported relationships instead of falling back to unordered AND", () => {
+    const errors = validateHistoricalBacktestStrategy(sequenceStrategy(followedBy(20, false)));
+    expect(errors).toContain("Target bearish candle: relationship 'followed_by' is review required because no executable relationship evaluator is registered.");
+  });
 });

@@ -5,6 +5,7 @@ import {
   resolveTradingConcept,
   type ExecutableConceptParameters,
   type CanonicalConditionSnapshot,
+  type UniversalRuleRelationship,
 } from "@workspace/api-zod";
 
 export type BacktestSide = "long" | "short";
@@ -33,6 +34,7 @@ export interface BacktestCondition {
   conceptDetectionRules: string | null;
   canonicalStatus?: string | null;
   executorKind?: string | null;
+  relationship?: UniversalRuleRelationship | null;
   canonicalState?: CanonicalConditionSnapshot | null;
 }
 
@@ -566,6 +568,66 @@ function evaluateExecutableCondition(
   return false;
 }
 
+const DEFAULT_FOLLOWED_BY_MAX_BARS = 20;
+
+function conditionRelationship(condition: BacktestCondition) {
+  return condition.relationship ?? condition.canonicalState?.relationship ?? null;
+}
+
+function relationshipMaxBars(relationship: UniversalRuleRelationship) {
+  return relationship.maxBarsBetween ?? DEFAULT_FOLLOWED_BY_MAX_BARS;
+}
+
+function executableRelationship(relationship: UniversalRuleRelationship) {
+  return relationship.supported && (relationship.type === "and" || relationship.type === "followed_by");
+}
+
+function evaluateConditionAtIndex(
+  condition: BacktestCondition,
+  side: BacktestSide,
+  candles: HistoricalCandle[],
+  index: number,
+) {
+  const executable = evaluateExecutableCondition(condition, side, candles, index);
+  if (executable !== null) return executable;
+  const rule = ruleForCondition(condition);
+  return evaluateRule(rule, candles[index], candles[index - 1]);
+}
+
+function followedBySatisfied(
+  target: BacktestCondition,
+  source: BacktestCondition | undefined,
+  side: BacktestSide,
+  targetSeries: HistoricalCandle[],
+  targetIndex: number,
+  context?: MultiTimeframeEvaluationContext,
+) {
+  const relationship = conditionRelationship(target);
+  if (
+    relationship?.type !== "followed_by"
+    || !relationship.supported
+    || relationship.targetRuleIndex == null
+    || !source
+  ) return false;
+
+  const targetTime = new Date(candleCompletionTime(targetSeries[targetIndex]));
+  const sourceSeries = context?.seriesByTimeframe.get(timeframeKey(source.timeframe || context.executionTimeframe)) || targetSeries;
+  const sourceLimit = context
+    ? latestCompletedIndex(sourceSeries, targetTime)
+    : Math.min(targetIndex, sourceSeries.length - 1);
+  if (sourceLimit < 0) return false;
+  const maxBars = relationshipMaxBars(relationship);
+  for (let sourceIndex = sourceLimit; sourceIndex >= 0; sourceIndex -= 1) {
+    if (!evaluateConditionAtIndex(source, side, sourceSeries, sourceIndex)) continue;
+    const sourceTime = new Date(candleCompletionTime(sourceSeries[sourceIndex]));
+    if (sourceTime >= targetTime) continue;
+    const anchorIndex = latestCompletedIndex(targetSeries, sourceTime);
+    const barsBetween = targetIndex - anchorIndex;
+    if (barsBetween > 0 && barsBetween <= maxBars) return true;
+  }
+  return false;
+}
+
 export function evaluateExecutableConditionAtLatest(
   condition: BacktestCondition,
   candles: HistoricalCandle[],
@@ -601,8 +663,24 @@ export function validateHistoricalBacktestStrategy(strategy: BacktestStrategy) {
   if (!entryConditions.length && !strategy.entryRules?.trim()) {
     errors.push("This strategy version has no executable entry rule.");
   }
-  for (const condition of [...entryConditions, ...exitConditions]) {
+  const evaluatedConditions = [...entryConditions, ...exitConditions];
+  for (const [conditionIndex, condition] of evaluatedConditions.entries()) {
     try {
+      const relationship = conditionRelationship(condition);
+      if (relationship && !executableRelationship(relationship)) {
+        errors.push(`${condition.name}: relationship '${relationship.type}' is review required because no executable relationship evaluator is registered.`);
+        continue;
+      }
+      if (relationship?.type === "followed_by") {
+        if (relationship.targetRuleIndex == null || relationship.targetRuleIndex >= evaluatedConditions.length || relationship.targetRuleIndex >= conditionIndex) {
+          errors.push(`${condition.name}: followed_by must reference an earlier condition.`);
+          continue;
+        }
+        if (relationshipMaxBars(relationship) < 1) {
+          errors.push(`${condition.name}: followed_by must have a positive max-bars window.`);
+          continue;
+        }
+      }
       if (isReviewRequiredConcept(condition)) {
         errors.push(`${condition.name}: this canonical concept is review required and has no executable evaluator.`);
         continue;
@@ -705,10 +783,29 @@ function evaluateConditions(
   const required = selected.filter(condition => condition.requirement === "required");
   const optional = selected.filter(condition => condition.requirement === "optional");
   if (!required.length && !optional.length) return { matched: false, reasons: [] as string[] };
+  const relationshipSourceConditions = new Set(
+    selected.flatMap(condition => {
+      const relationship = conditionRelationship(condition);
+      if (relationship?.type !== "followed_by" || relationship.targetRuleIndex == null) return [];
+      const source = conditions[relationship.targetRuleIndex];
+      return source ? [source] : [];
+    }),
+  );
   const evaluate = (condition: BacktestCondition) => {
+    const relationship = conditionRelationship(condition);
+    if (relationship && !executableRelationship(relationship)) return false;
     if (!context) {
-      return evaluateExecutableCondition(condition, side, candles, index)
-        ?? evaluateRule(ruleForCondition(condition), candle, previous);
+      const matched = evaluateConditionAtIndex(condition, side, candles, index);
+      if (relationship?.type === "followed_by") {
+        return matched && followedBySatisfied(
+          condition,
+          relationship.targetRuleIndex == null ? undefined : conditions[relationship.targetRuleIndex],
+          side,
+          candles,
+          index,
+        );
+      }
+      return matched;
     }
     const series = context.seriesByTimeframe.get(timeframeKey(condition.timeframe || context.executionTimeframe));
     if (!series) return false;
@@ -718,10 +815,23 @@ function evaluateConditions(
     const conditionPrevious = conditionIndex > 0 ? series[conditionIndex - 1] : undefined;
     const rule = ruleForCondition(condition);
     if (!conditionPrevious && /\bprevious[_ ](open|high|low|close)\b/i.test(rule)) return false;
-    return evaluateExecutableCondition(condition, side, series, conditionIndex)
+    const matched = evaluateExecutableCondition(condition, side, series, conditionIndex)
       ?? evaluateRule(rule, conditionCandle, conditionPrevious);
+    if (relationship?.type === "followed_by") {
+      return matched && followedBySatisfied(
+        condition,
+        relationship.targetRuleIndex == null ? undefined : conditions[relationship.targetRuleIndex],
+        side,
+        series,
+        conditionIndex,
+        context,
+      );
+    }
+    return matched;
   };
-  const requiredResults = required.map(condition => ({ condition, matched: evaluate(condition) }));
+  const requiredResults = required
+    .filter(condition => !relationshipSourceConditions.has(condition))
+    .map(condition => ({ condition, matched: evaluate(condition) }));
   const optionalResults = optional.map(condition => ({ condition, matched: evaluate(condition) }));
   return {
     matched: requiredResults.every(result => result.matched),
@@ -790,6 +900,13 @@ export function runHistoricalBacktest(
     throw new BacktestEngineError("This strategy version has no executable entry rule. Add a supported OHLC rule to an entry checkpoint or entry rules.");
   }
   for (const condition of [...entryConditions, ...exitConditions]) {
+    const relationship = conditionRelationship(condition);
+    if (relationship && !executableRelationship(relationship)) {
+      throw new BacktestEngineError(`Condition '${condition.name}' uses a review-required relationship '${relationship.type}'.`);
+    }
+    if (isReviewRequiredConcept(condition)) {
+      throw new BacktestEngineError(`Condition '${condition.name}' is a review-required concept and cannot be backtested.`);
+    }
     if (!executableParameters(condition)) ruleForCondition(condition);
   }
   if (exitRule && exitConditions.length === 0) evaluateRule(exitRule, candles[0], undefined);

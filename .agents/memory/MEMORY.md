@@ -2,6 +2,7 @@
 - [Strategy version integrity](strategy-version-integrity.md) — snapshots own historical display context; version allocation and activation are serialized per strategy.
 - [Market data boundaries](market-data-boundaries.md) — provider mappings feed service-owned connection, candle, and quote normalization; clients cannot assert connection truth.
 - [Strategy monitoring semantics](strategy-monitoring-semantics.md) — exact-version monitoring uses typed evaluators, provider-neutral data states, honest waiting states, activation epochs, and durable sparse transitions.
+- [Followed-by temporal dependencies](strategy-monitoring-semantics.md) — source triggers precede targets within a recorded bar window; monitoring retains trigger timestamps and newly created unspecified windows default to 20 bars.
 - [BiQuote runtime integration](biquote-runtime-integration.md) — server-side SignalR must remain external to the API bundle and use its Node transport dependencies.
 - [BiQuote regression testing](biquote-regression-testing.md) — frontend Vitest uses a standalone jsdom/React config because the app Vite config requires runtime env variables.
 - [Market selection persistence](market-selection-persistence.md) — persisted monitor selections must be cleared when their instrument no longer exists, or stale streams reconnect against deleted records.

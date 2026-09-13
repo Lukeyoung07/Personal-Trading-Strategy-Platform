@@ -17,6 +17,9 @@ export type StrategyConditionInputRelationship = {
      * @nullable
      */
   targetRuleIndex?: number | null;
+  /** @minimum 1 */
+  maxBarsBetween?: number;
+  maxBarsBetweenDefaulted?: boolean;
   supported?: boolean;
   /** @nullable */
   reason?: string | null;

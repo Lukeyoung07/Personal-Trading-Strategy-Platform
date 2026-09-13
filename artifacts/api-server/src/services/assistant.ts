@@ -933,7 +933,36 @@ function requestedParameters(conceptName: string, message: string, condition: an
   return normalizeExecutableParameters(conceptName, input);
 }
 
-function relationshipForRequest(message: string, conditionIndex: number): any | undefined {
+const DEFAULT_FOLLOWED_BY_MAX_BARS = 20;
+
+function timeframeMinutes(value: string | null | undefined) {
+  const normalized = normalizeStrategyTimeframe(value);
+  if (!normalized) return null;
+  const match = normalized.match(/^(\d+(?:\.\d+)?)([MHDW])$/);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  const multiplier = match[2] === "M" ? 1 : match[2] === "H" ? 60 : match[2] === "D" ? 1_440 : 10_080;
+  return amount * multiplier;
+}
+
+function followedByWindow(message: string, timeframe: string | null) {
+  const bars = message.match(/\b(?:within|in|max(?:imum)?)\s+(\d+)\s+(?:closed\s+)?(?:bars?|candles?)\b/i)?.[1];
+  if (bars) return { maxBarsBetween: Number(bars), maxBarsBetweenDefaulted: false };
+  const duration = message.match(/\b(?:within|in|max(?:imum)?)\s+(\d+(?:\.\d+)?)\s*(minutes?|mins?|m|hours?|hrs?|h|days?|d)\b/i);
+  if (!duration) return { maxBarsBetween: DEFAULT_FOLLOWED_BY_MAX_BARS, maxBarsBetweenDefaulted: true };
+  const durationMinutes = Number(duration[1]) * (/^m/i.test(duration[2]) ? 1 : /^h/i.test(duration[2]) ? 60 : 1_440);
+  const requestTimeframe = message.match(/\bon\s+(\d+(?:\.\d+)?\s*(?:m|min|minute|minutes|h|hr|hour|hours|d|day|days|w|week|weeks))\b/i)?.[1];
+  const barMinutes = timeframeMinutes(requestTimeframe) ?? timeframeMinutes(timeframe);
+  if (!barMinutes || !Number.isFinite(durationMinutes)) {
+    return { maxBarsBetween: DEFAULT_FOLLOWED_BY_MAX_BARS, maxBarsBetweenDefaulted: true };
+  }
+  return {
+    maxBarsBetween: Math.max(1, Math.ceil(durationMinutes / barMinutes)),
+    maxBarsBetweenDefaulted: false,
+  };
+}
+
+function relationshipForRequest(message: string, conditionIndex: number, timeframe: string | null): any | undefined {
   if (conditionIndex < 1) return undefined;
   const relationship = /\bfollowed\s+by\b/i.test(message)
     ? "followed_by"
@@ -947,13 +976,14 @@ function relationshipForRequest(message: string, conditionIndex: number): any | 
             ? "and"
             : null;
   if (!relationship) return undefined;
-  const supported = relationship === "and"
-    || (relationship === "followed_by" && /\b(?:displacement|higher[- ]timeframe|multi[- ]timeframe|htf)\b[^.!?]{0,100}\b(?:fvg|fair\s+value\s+gap)\b/i.test(message));
+  const supported = relationship === "and" || relationship === "followed_by";
+  const window = relationship === "followed_by" ? followedByWindow(message, timeframe) : {};
   return {
     type: relationship,
     targetRuleIndex: conditionIndex - 1,
+    ...window,
     supported,
-    reason: supported ? null : "The current evaluator preserves this relationship for review but does not execute it as a temporal or disjunctive operator.",
+    reason: supported ? null : "This relationship type does not have an executable evaluator yet.",
   };
 }
 
@@ -972,8 +1002,8 @@ function universalRuleMetadata(
     : supportedRule(normalizedRule) ? "legacy_expression" : "unsupported";
   const reasons: string[] = [];
   if (!supported) reasons.push("The requested wording does not have a deterministic canonical evaluator.");
-  const relationship = relationshipForRequest(requestMessage, conditionIndex);
   const timeframe = normalizeStrategyTimeframe(condition?.timeframe);
+  const relationship = relationshipForRequest(requestMessage, conditionIndex, timeframe);
   if (condition?.timeframe && condition.timeframe !== "Not specified" && !timeframe) {
     reasons.push(`Timeframe “${String(condition.timeframe)}” could not be normalized without guessing.`);
   }

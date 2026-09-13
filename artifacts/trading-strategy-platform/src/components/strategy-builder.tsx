@@ -1181,7 +1181,14 @@ function DraftCondition({ condition }: { condition: AssistantStrategyDraft["cond
     <div className="text-xs font-semibold mt-2">{condition.name}</div>
     <div className="text-[11px] text-primary mt-1">{condition.conceptName} · {condition.direction} · {condition.canonicalRuleType || "legacy rule"} · {condition.timeframe}</div>
     {typedParameters && <div className="text-[10px] text-muted-foreground mt-2 break-all">Parameters: {typedParameters}</div>}
-    {condition.relationship && <div className="text-[10px] text-primary mt-1">Relationship: {condition.relationship.type.replaceAll("_", " ")}{condition.relationship.targetRuleIndex == null ? "" : ` → rule ${condition.relationship.targetRuleIndex + 1}`} · {condition.relationship.supported ? "executable" : "review required"}</div>}
+    {condition.relationship && <div className="text-[10px] text-primary mt-1">
+      Relationship: {condition.relationship.type.replaceAll("_", " ")}
+      {condition.relationship.targetRuleIndex == null ? "" : ` → rule ${condition.relationship.targetRuleIndex + 1}`}
+      {condition.relationship.type === "followed_by"
+        ? ` · within ${condition.relationship.maxBarsBetween ?? 20} bars${condition.relationship.maxBarsBetweenDefaulted || condition.relationship.maxBarsBetween == null ? " (default)" : ""}`
+        : ""}
+      {` · ${condition.relationship.supported ? "executable" : "review required"}`}
+    </div>}
     {condition.provenance?.detectedText && <div className="text-[10px] text-muted-foreground mt-1">Detected: “{condition.provenance.detectedText}” · source: {condition.provenance.source}</div>}
     <div className="text-[11px] text-muted-foreground mt-2 leading-relaxed">{condition.triggerRules}</div>
     {condition.validation?.reasons?.length ? <div className="text-[10px] text-amber-200 mt-2 leading-relaxed">{condition.validation.reasons.join(" ")}</div> : null}

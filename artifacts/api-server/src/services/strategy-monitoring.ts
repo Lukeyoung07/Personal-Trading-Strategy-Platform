@@ -24,6 +24,7 @@ import {
   requiredCandleCountForCondition,
   type BacktestCondition,
 } from "./backtest-engine";
+import type { UniversalRuleRelationship } from "@workspace/api-zod";
 
 export type ConditionEvaluationStatus = "not_met" | "met" | "waiting" | "invalid";
 export type MonitoringStatus = "not_started" | "waiting" | "monitoring" | "paused" | "error";
@@ -73,7 +74,10 @@ export interface ConditionDetector {
   readonly id: string;
   readonly version: string;
   readonly conceptId: number;
-  dependencies?(conditionId: number, allConditionIds: readonly number[]): number[];
+  dependencies?(
+    condition: Pick<BacktestCondition, "relationship" | "canonicalState"> & { id: number },
+    allConditions: ReadonlyArray<Pick<BacktestCondition, "relationship" | "canonicalState"> & { id: number }>,
+  ): number[];
   requiredCandleCount(condition?: BacktestCondition): number;
   evaluate(input: {
     condition: BacktestCondition & { id: number; conceptId: number; timeframe: string; order: number };
@@ -83,6 +87,61 @@ export interface ConditionDetector {
     previousState: unknown;
     evaluatedAt: Date;
   }): Promise<DetectorResult>;
+}
+
+const DEFAULT_FOLLOWED_BY_MAX_BARS = 20;
+
+function conditionRelationship(condition: Pick<BacktestCondition, "relationship" | "canonicalState">): UniversalRuleRelationship | null {
+  return condition.relationship ?? condition.canonicalState?.relationship ?? null;
+}
+
+function relationshipMaxBars(relationship: UniversalRuleRelationship) {
+  return relationship.maxBarsBetween ?? DEFAULT_FOLLOWED_BY_MAX_BARS;
+}
+
+function executableRelationship(relationship: UniversalRuleRelationship) {
+  return relationship.supported && (relationship.type === "and" || relationship.type === "followed_by");
+}
+
+function candleCompletionTime(candle: EvaluationCandle) {
+  return (candle.closeTime ?? candle.openTime).getTime();
+}
+
+function lastCompletedIndexAt(candles: readonly EvaluationCandle[], at: Date) {
+  let result = -1;
+  const target = at.getTime();
+  for (let index = 0; index < candles.length; index += 1) {
+    if (candleCompletionTime(candles[index]) <= target) result = index;
+    else break;
+  }
+  return result;
+}
+
+function lastTriggerAt(result: EvaluatedCondition | undefined) {
+  if (!result) return null;
+  const state = result.evaluatorState;
+  if (state && typeof state === "object" && "lastTriggerAt" in state && typeof state.lastTriggerAt === "string") {
+    const parsed = new Date(state.lastTriggerAt);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  if (result.status === "met" && result.evidence?.candleOpenTime) {
+    const parsed = new Date(String(result.evidence.candleOpenTime));
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return null;
+}
+
+export function followedByDependencyIsActive(
+  relationship: UniversalRuleRelationship,
+  sourceResult: EvaluatedCondition | undefined,
+  targetCandles: readonly EvaluationCandle[],
+) {
+  const triggerAt = lastTriggerAt(sourceResult);
+  if (!triggerAt || !targetCandles.length) return false;
+  const targetIndex = targetCandles.length - 1;
+  const anchorIndex = lastCompletedIndexAt(targetCandles, triggerAt);
+  const barsBetween = targetIndex - anchorIndex;
+  return barsBetween > 0 && barsBetween <= relationshipMaxBars(relationship);
 }
 
 export interface ResetPolicy {
@@ -364,9 +423,26 @@ export class StrategyMonitoringEngine {
     for (const condition of conditions) orderCounts.set(condition.conditionOrder, (orderCounts.get(condition.conditionOrder) ?? 0) + 1);
     const dependenciesByCondition = new Map<number, number[]>();
     const invalidDependencyByCondition = new Map<number, string>();
+    const dependencyConditions = conditions.map(candidate => {
+      const canonicalState = candidate.canonicalDefinition && typeof candidate.canonicalDefinition === "object"
+        ? (candidate.canonicalDefinition as Record<string, unknown>).conditionState as BacktestCondition["canonicalState"]
+        : null;
+      return { id: candidate.id, relationship: canonicalState?.relationship ?? null, canonicalState };
+    });
     for (const condition of conditions) {
       const detector = this.detectors.find(candidate => candidate.conceptId === condition.conceptId);
-      const dependencies = detector?.dependencies?.(condition.id, conditions.map(candidate => candidate.id)) ?? [];
+      const canonicalState = condition.canonicalDefinition && typeof condition.canonicalDefinition === "object"
+        ? (condition.canonicalDefinition as Record<string, unknown>).conditionState as BacktestCondition["canonicalState"]
+        : null;
+      const relationship = canonicalState?.relationship ?? null;
+      const relationshipSourceId = relationship?.type === "followed_by" && relationship.targetRuleIndex != null
+        ? conditions[relationship.targetRuleIndex]?.id
+        : undefined;
+      const dependencyCondition = { id: condition.id, relationship, canonicalState };
+      const dependencies = [...new Set([
+        ...(detector?.dependencies?.(dependencyCondition, dependencyConditions) ?? []),
+        ...(relationshipSourceId == null ? [] : [relationshipSourceId]),
+      ])];
       dependenciesByCondition.set(condition.id, dependencies);
       const unique = new Set(dependencies);
       const invalid = dependencies.find(dependencyId => {
@@ -429,12 +505,26 @@ export class StrategyMonitoringEngine {
         result = this.conditionResult(condition, timeframe?.id ?? null, "invalid", "CONDITION_STRUCTURE_INVALID", "The saved condition has invalid stage, direction, requirement, or ordering metadata.");
       } else if (!timeframe) {
         result = this.conditionResult(condition, null, "invalid", "TIMEFRAME_UNMAPPED", `No active market-data timeframe matches '${condition.timeframe}'.`);
+      } else if (
+        condition.canonicalDefinition
+        && typeof condition.canonicalDefinition === "object"
+        && ((condition.canonicalDefinition as Record<string, unknown>).conditionState as BacktestCondition["canonicalState"])?.relationship
+        && !executableRelationship(((condition.canonicalDefinition as Record<string, unknown>).conditionState as BacktestCondition["canonicalState"])!.relationship!)
+      ) {
+        result = this.conditionResult(condition, timeframe.id, "invalid", "RELATIONSHIP_UNSUPPORTED", "This saved relationship is review required because no executable relationship evaluator is registered.");
       } else if (invalidDependencyByCondition.has(condition.id)) {
         result = this.conditionResult(condition, timeframe.id, "invalid", "DEPENDENCY_INVALID", invalidDependencyByCondition.get(condition.id)!);
       } else if (!sourceId) {
         result = this.conditionResult(condition, timeframe.id, "waiting", sourceResolution.reasonCode, sourceResolution.reason);
       } else {
         const detector = this.detectors.find(candidate => candidate.conceptId === condition.conceptId);
+        const canonicalState = condition.canonicalDefinition && typeof condition.canonicalDefinition === "object"
+          ? (condition.canonicalDefinition as Record<string, unknown>).conditionState as BacktestCondition["canonicalState"]
+          : null;
+        const relationship = canonicalState?.relationship ?? null;
+        const relationshipSourceId = relationship?.type === "followed_by" && relationship.targetRuleIndex != null
+          ? conditions[relationship.targetRuleIndex]?.id
+          : undefined;
         const detectorCondition = {
           id: condition.id,
           conceptId: condition.conceptId,
@@ -447,13 +537,13 @@ export class StrategyMonitoringEngine {
           stage: condition.stage as "entry" | "confirmation" | "invalidation" | "exit",
           triggerRules: condition.triggerRules,
           parameters: condition.parameters,
-          canonicalState: condition.canonicalDefinition && typeof condition.canonicalDefinition === "object"
-            ? (condition.canonicalDefinition as Record<string, unknown>).conditionState as BacktestCondition["canonicalState"]
-            : null,
+          relationship,
+          canonicalState,
           invalidationRules: condition.invalidationRules,
           conceptDetectionRules: condition.conceptDetectionRules,
         } satisfies BacktestCondition & { id: number; conceptId: number; timeframe: string; order: number };
-        const requiredCount = Math.max(1, detector?.requiredCandleCount(detectorCondition) ?? 1);
+        const relationshipLookback = relationship?.type === "followed_by" ? relationshipMaxBars(relationship) + 1 : 0;
+        const requiredCount = Math.max(1, (detector?.requiredCandleCount(detectorCondition) ?? 1) + relationshipLookback);
         let candles: readonly EvaluationCandle[];
         try {
           candles = await loadCandles(condition.timeframe, requiredCount);
@@ -473,9 +563,28 @@ export class StrategyMonitoringEngine {
           result = this.conditionResult(condition, timeframe.id, "waiting", "EVALUATOR_UNAVAILABLE", "The saved concept and rules are descriptive; no executable detector is registered.", null, lastMarketDataAt, null, null, null, lastCandleOpenTime);
         } else {
           const dependencies = dependenciesByCondition.get(condition.id) ?? [];
-          const waitingDependency = dependencies.find(id => dependencyStates.get(id) !== "met");
+          const sourceResult = relationshipSourceId == null
+            ? undefined
+            : results.find(candidate => candidate.condition.id === relationshipSourceId);
+          const relationshipActive = relationship?.type === "followed_by"
+            ? followedByDependencyIsActive(relationship, sourceResult, candles)
+            : false;
+          const waitingDependency = dependencies.find(id => {
+            if (id === relationshipSourceId && relationship?.type === "followed_by") return !relationshipActive;
+            return dependencyStates.get(id) !== "met";
+          });
           if (waitingDependency) {
-            result = this.conditionResult(condition, timeframe.id, "waiting", "DEPENDENCY_WAITING", `Waiting for condition ${waitingDependency} to be met first.`, null, lastMarketDataAt);
+            result = this.conditionResult(
+              condition,
+              timeframe.id,
+              "waiting",
+              relationshipSourceId === waitingDependency ? "FOLLOWED_BY_WAITING" : "DEPENDENCY_WAITING",
+              relationshipSourceId === waitingDependency
+                ? `Waiting for the source condition to trigger within the last ${relationshipMaxBars(relationship!)} bars before evaluating ${condition.name}.`
+                : `Waiting for condition ${waitingDependency} to be met first.`,
+              null,
+              lastMarketDataAt,
+            );
           } else {
             const previous = previousByCondition.get(condition.id);
             try {
@@ -487,12 +596,19 @@ export class StrategyMonitoringEngine {
                 previousState: this.parseState(previous?.evaluatorState),
                 evaluatedAt,
               });
+              const status = relationship?.type === "followed_by" && detectorResult.status !== "met"
+                ? "waiting"
+                : transitionConditionStatus((previous?.status as ConditionEvaluationStatus | undefined) ?? null, detectorResult.status);
               result = this.conditionResult(
                 condition,
                 timeframe.id,
-                transitionConditionStatus((previous?.status as ConditionEvaluationStatus | undefined) ?? null, detectorResult.status),
-                detectorResult.reasonCode,
-                detectorResult.reason,
+                status,
+                relationship?.type === "followed_by" && detectorResult.status !== "met"
+                  ? "FOLLOWED_BY_TARGET_WAITING"
+                  : detectorResult.reasonCode,
+                relationship?.type === "followed_by" && detectorResult.status !== "met"
+                  ? `The source condition is active; waiting for ${condition.name} to trigger within the relationship window.`
+                  : detectorResult.reason,
                 detectorResult.evidence ?? null,
                 lastMarketDataAt,
                 detector.id,
@@ -924,8 +1040,14 @@ export function createBuiltInStrategyMonitoringDetector(concept: {
     id: `canonical-${definition.canonicalId}`,
     version: definition.registryVersion,
     conceptId: concept.id,
+    dependencies(condition, allConditions) {
+      const relationship = conditionRelationship(condition);
+      if (relationship?.type !== "followed_by" || relationship.targetRuleIndex == null) return [];
+      const source = allConditions[relationship.targetRuleIndex];
+      return source ? [source.id] : [];
+    },
     requiredCandleCount: condition => condition ? requiredCandleCountForCondition(condition) : 1,
-    async evaluate({ condition, candles }) {
+    async evaluate({ condition, candles, previousState }) {
       const matched = evaluateExecutableConditionAtLatest(condition, Array.from(candles));
       if (matched == null) {
         return {
@@ -934,18 +1056,28 @@ export function createBuiltInStrategyMonitoringDetector(concept: {
           reason: "The saved concept does not have a supported executable monitoring evaluator.",
         };
       }
+      const previousTriggerAt = previousState && typeof previousState === "object"
+        && "lastTriggerAt" in previousState && typeof previousState.lastTriggerAt === "string"
+        ? previousState.lastTriggerAt
+        : null;
+      const latestCandle = candles[candles.length - 1];
+      const triggerAt = matched && latestCandle
+        ? (latestCandle.closeTime ?? latestCandle.openTime).toISOString()
+        : previousTriggerAt;
       return matched
         ? {
             status: "met",
             reasonCode: "EXECUTABLE_CONDITION_MET",
             reason: `The closed ${condition.timeframe} candle satisfies ${condition.name}.`,
             evidence: { evaluator: `historical-${concept.name}`, candleOpenTime: candles[candles.length - 1]?.openTime ?? null },
+            state: triggerAt ? { lastTriggerAt: triggerAt } : null,
           }
         : {
             status: "not_met",
             reasonCode: "EXECUTABLE_CONDITION_NOT_MET",
             reason: `The latest closed ${condition.timeframe} candle does not satisfy ${condition.name}.`,
             evidence: { evaluator: `historical-${concept.name}`, candleOpenTime: candles[candles.length - 1]?.openTime ?? null },
+            state: triggerAt ? { lastTriggerAt: triggerAt } : null,
           };
     },
   };

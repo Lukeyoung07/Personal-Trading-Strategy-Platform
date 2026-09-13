@@ -509,6 +509,9 @@ export type StrategyConditionInputRelationship = {
      * @nullable
      */
   targetRuleIndex?: number | null;
+  /** @minimum 1 */
+  maxBarsBetween?: number;
+  maxBarsBetweenDefaulted?: boolean;
   supported?: boolean;
   /** @nullable */
   reason?: string | null;
@@ -767,6 +770,9 @@ export type StrategyVersionConditionRelationship = {
      * @nullable
      */
   targetRuleIndex?: number | null;
+  /** @minimum 1 */
+  maxBarsBetween?: number;
+  maxBarsBetweenDefaulted?: boolean;
   supported?: boolean;
   /** @nullable */
   reason?: string | null;
@@ -881,6 +887,9 @@ export type StrategyConditionRelationship = {
      * @nullable
      */
   targetRuleIndex?: number | null;
+  /** @minimum 1 */
+  maxBarsBetween?: number;
+  maxBarsBetweenDefaulted?: boolean;
   supported?: boolean;
   /** @nullable */
   reason?: string | null;
@@ -985,6 +994,9 @@ export type StrategyConditionUpdateRelationship = {
      * @nullable
      */
   targetRuleIndex?: number | null;
+  /** @minimum 1 */
+  maxBarsBetween?: number;
+  maxBarsBetweenDefaulted?: boolean;
   supported?: boolean;
   /** @nullable */
   reason?: string | null;
@@ -2548,6 +2560,9 @@ export interface AssistantRuleRelationship {
   type: AssistantRuleRelationshipType;
   /** @nullable */
   targetRuleIndex: number | null;
+  /** @minimum 1 */
+  maxBarsBetween?: number;
+  maxBarsBetweenDefaulted?: boolean;
   supported: boolean;
   /** @nullable */
   reason?: string | null;

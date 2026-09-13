@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyMarketDataState,
   createBuiltInStrategyMonitoringDetector,
+  followedByDependencyIsActive,
   shouldCreateMonitoringAlert,
   transitionConditionStatus,
   type ConditionEvaluationStatus,
@@ -175,6 +176,36 @@ describe("strategy monitoring transition contracts", () => {
       previousState: null,
       evaluatedAt: new Date("2026-09-12T00:00:00.000Z"),
     })).resolves.toMatchObject({ status: "met", reasonCode: "EXECUTABLE_CONDITION_MET" });
+  });
+
+  it("keeps a followed_by dependency active only inside its bar window", () => {
+    const candles = (count: number) => Array.from({ length: count }, (_, index) => ({
+      id: index,
+      openTime: new Date(Date.UTC(2026, 0, 1, index)),
+      closeTime: new Date(Date.UTC(2026, 0, 1, index, 59)),
+      open: 100,
+      high: 101,
+      low: 99,
+      close: 100,
+      volume: null,
+      isClosed: true,
+      receivedAt: new Date("2026-09-12T00:00:00.000Z"),
+    }));
+    const sourceResult = {
+      status: "not_met",
+      evaluatorState: { lastTriggerAt: "2026-01-01T00:59:00.000Z" },
+      evidence: null,
+    } as any;
+    const relationship = {
+      type: "followed_by",
+      targetRuleIndex: 0,
+      maxBarsBetween: 2,
+      supported: true,
+      reason: null,
+    } as const;
+
+    expect(followedByDependencyIsActive(relationship, sourceResult, candles(2))).toBe(true);
+    expect(followedByDependencyIsActive(relationship, sourceResult, candles(4))).toBe(false);
   });
 
   it.each([
